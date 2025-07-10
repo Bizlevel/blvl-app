@@ -15,3 +15,7 @@
 ## Задача 1.4
 - Task 1.4 completed: Applied `initial_schema` migration to Supabase (tables, indexes, RLS policies) using mcp_supabase_apply_migration.
 - Migration executed successfully on project acevqbdpzgbtqznbpgzr.
+
+## Задача 1.5
+- Task 1.5 completed: added `test/infrastructure_test.dart` verifying Supabase initialization, levels query and RLS; configured shared_preferences mock; removed obsolete widget_test to avoid carousel dependency.
+- All tests pass.
