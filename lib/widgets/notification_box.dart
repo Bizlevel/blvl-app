@@ -1,4 +1,4 @@
-import 'package:badges/badges.dart';
+import 'package:badges/badges.dart' as badges;
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:online_course/theme/color.dart';
@@ -34,13 +34,12 @@ class NotificationBox extends StatelessWidget {
   }
 
   Widget _buildIconNotified() {
-    return Badge(
-      badgeColor: AppColor.actionColor,
-      padding: EdgeInsets.all(3),
-      position: BadgePosition.topEnd(top: -7, end: 0),
-      badgeContent: Text(
-        '',
-        style: TextStyle(color: Colors.white),
+    return badges.Badge(
+      position: badges.BadgePosition.topEnd(top: -7, end: 0),
+      badgeContent: const SizedBox.shrink(),
+      badgeStyle: badges.BadgeStyle(
+        badgeColor: AppColor.actionColor,
+        padding: EdgeInsets.all(3),
       ),
       child: _buildIcon(),
     );
