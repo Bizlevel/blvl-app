@@ -89,3 +89,8 @@
 
 ## Задача 4.5
 - Task 4.5 completed: added `LessonWidget` (Chewie + offline caching + watched callback) and `QuizWidget` (single-question radio quiz); converted `LevelDetailScreen` to `ConsumerStatefulWidget`, integrated sequential progression (видео → тест → следующий урок). Видео кэшируется через `flutter_cache_manager`; квиз блокирует переход до правильного ответа. No blocking issues.
+
+## Задача 5.1
+- Task 5.1 completed: added Supabase Edge Function `leo-chat` integrating OpenAI with user context, token counting, and CORS handling.
+- Deployed function to project acevqbdpzgbtqznbpgzr via MCP; test request returns successful response.
+- No blocking issues found.
