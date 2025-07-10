@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 
+import 'providers/auth_provider.dart';
+import 'screens/auth/login_screen.dart';
 import 'screens/root_app.dart';
 import 'services/supabase_service.dart';
 import 'theme/color.dart';
@@ -19,16 +21,30 @@ Future<void> main() async {
   );
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends ConsumerWidget {
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final authAsync = ref.watch(authStateProvider);
+
+    Widget home = authAsync.when(
+      data: (authState) {
+        final session = authState.session;
+        final isLoggedIn = session != null && session.user != null;
+        return isLoggedIn ? const RootApp() : const LoginScreen();
+      },
+      loading: () => const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      ),
+      error: (error, _) => const LoginScreen(),
+    );
+
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Online Course App',
+      title: 'BizLevel',
       theme: ThemeData(
         primaryColor: AppColor.primary,
       ),
-      home: const RootApp(),
+      home: home,
     );
   }
 }

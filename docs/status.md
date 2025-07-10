@@ -39,3 +39,10 @@
 ## Задача 2.5
 - Task 2.5 completed: added `test/infrastructure_integration_test.dart` covering model serialization, AuthService error path, and Riverpod providers.
 - Supabase initialized in tests via SupabaseService.initialize().
+
+## Задача 3.1
+- Task 3.1 completed: implemented `LoginScreen` using `CustomTextBox` and `CustomImage`.
+- Updated `main.dart` with auth gate (Riverpod) to route between `LoginScreen` and `RootApp`.
+- Added stub `RegisterScreen` and navigation from login screen.
+- Error handling via `AuthFailure` with SnackBar feedback.
+- No blocking issues found.
