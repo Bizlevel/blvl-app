@@ -31,3 +31,7 @@
 ## Задача 2.3
 - Task 2.3 completed: implemented AuthService with signIn, signUp, signOut, getCurrentUser and error handling.
 - Added AuthFailure for consistent error messages.
+
+## Задача 2.4
+- Task 2.4 completed: added authStateProvider (StreamProvider<AuthState>) and currentUserProvider (FutureProvider<UserModel?>).
+- Providers use Supabase streams and users table; null-safe handling implemented.
