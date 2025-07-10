@@ -23,3 +23,7 @@
 ## Задача 2.1
 - Task 2.1 completed: integrated Riverpod in main.dart, added ProviderScope wrapper and flutter_riverpod import, preserved existing initialization logic.
 - No blocking issues found.
+
+## Задача 2.2
+- Task 2.2 completed: added UserModel, LevelModel, LessonModel with Freezed & JSON serialization under lib/models/.
+- Build_runner generation pending; will run after cleaning obsolete carousel_slider usage.
