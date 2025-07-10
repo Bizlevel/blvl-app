@@ -51,6 +51,32 @@ class AuthService {
 
   /// Returns the currently authenticated [User] or `null` if not signed in.
   static User? getCurrentUser() => _client.auth.currentUser;
+
+  /// Updates profile fields in `users` table for the current user.
+  static Future<void> updateProfile({
+    required String name,
+    required String about,
+    required String goal,
+  }) async {
+    final user = _client.auth.currentUser;
+    if (user == null) {
+      throw AuthFailure('Пользователь не авторизован');
+    }
+
+    try {
+      await _client.from('users').upsert({
+        'id': user.id,
+        'name': name,
+        'about': about,
+        'goal': goal,
+        'updated_at': DateTime.now().toIso8601String(),
+      });
+    } on PostgrestException catch (e) {
+      throw AuthFailure(e.message);
+    } catch (e) {
+      throw AuthFailure('Не удалось сохранить профиль');
+    }
+  }
 }
 
 /// A typed failure returned by [AuthService] methods.
