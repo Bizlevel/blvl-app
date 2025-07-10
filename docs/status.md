@@ -46,3 +46,10 @@
 - Added stub `RegisterScreen` and navigation from login screen.
 - Error handling via `AuthFailure` with SnackBar feedback.
 - No blocking issues found.
+
+## Задача 3.2
+- Task 3.2 completed: implemented `RegisterScreen` with email, password, подтверждение пароля, валидация и вызовом `AuthService.signUp`.
+- Добавлен переход на `OnboardingProfileScreen` (заглушка) после успешной регистрации.
+- Создан `onboarding_screens.dart` с заглушкой для экрана профиля (будет доработан в 3.3).
+- Error handling через `AuthFailure` и SnackBar.
+- Нет блокирующих ошибок.
