@@ -86,3 +86,6 @@
 
 ## Задача 4.4
 - Task 4.4 completed: implemented `LevelDetailScreen` with lessons list and "Завершить уровень" button; created `lessons_provider.dart` and `SupabaseService.fetchLessonsRaw`; added navigation from `LevelCard` to detail screen; updated `levels_provider` to include level id. Placeholder styling—widgets LessonWidget/QuizWidget будут подключены на этапе 4.5. No blocking issues.
+
+## Задача 4.5
+- Task 4.5 completed: added `LessonWidget` (Chewie + offline caching + watched callback) and `QuizWidget` (single-question radio quiz); converted `LevelDetailScreen` to `ConsumerStatefulWidget`, integrated sequential progression (видео → тест → следующий урок). Видео кэшируется через `flutter_cache_manager`; квиз блокирует переход до правильного ответа. No blocking issues.
