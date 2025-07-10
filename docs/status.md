@@ -35,3 +35,7 @@
 ## Задача 2.4
 - Task 2.4 completed: added authStateProvider (StreamProvider<AuthState>) and currentUserProvider (FutureProvider<UserModel?>).
 - Providers use Supabase streams and users table; null-safe handling implemented.
+
+## Задача 2.5
+- Task 2.5 completed: added `test/infrastructure_integration_test.dart` covering model serialization, AuthService error path, and Riverpod providers.
+- Supabase initialized in tests via SupabaseService.initialize().
