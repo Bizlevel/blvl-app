@@ -11,3 +11,7 @@
 ## Задача 1.3
 - Task 1.3 completed: added SupabaseService singleton with initialize() method using compile-time env vars; updated main.dart to call initialization before Sentry.
 - .env keys set as defaults for compile-time env variables.
+
+## Задача 1.4
+- Task 1.4 completed: Applied `initial_schema` migration to Supabase (tables, indexes, RLS policies) using mcp_supabase_apply_migration.
+- Migration executed successfully on project acevqbdpzgbtqznbpgzr.
