@@ -36,4 +36,17 @@ class SupabaseService {
         .map((e) => Map<String, dynamic>.from(e as Map))
         .toList();
   }
+
+  /// Fetches lessons for a given level ID ordered by order field.
+  static Future<List<Map<String, dynamic>>> fetchLessonsRaw(int levelId) async {
+    final response = await client
+        .from('lessons')
+        .select()
+        .eq('level_id', levelId)
+        .order('order', ascending: true);
+
+    return (response as List<dynamic>)
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList();
+  }
 }

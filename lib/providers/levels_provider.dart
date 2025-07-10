@@ -14,6 +14,7 @@ final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
     final bool isLocked = !level.isFree && level.number > 3;
 
     return {
+      'id': level.id,
       'image': level.imageUrl,
       'level': level.number,
       'name': level.title,

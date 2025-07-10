@@ -5,6 +5,7 @@ import 'package:online_course/utils/data.dart';
 import 'package:online_course/providers/levels_provider.dart';
 import 'package:online_course/widgets/level_card.dart';
 import 'package:online_course/widgets/notification_box.dart';
+import 'package:online_course/screens/level_detail_screen.dart';
 
 class LevelsMapScreen extends ConsumerWidget {
   const LevelsMapScreen({Key? key}) : super(key: key);
@@ -74,7 +75,17 @@ class LevelsMapScreen extends ConsumerWidget {
                 final levelData = levels[index];
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 15),
-                  child: LevelCard(data: levelData),
+                  child: LevelCard(
+                    data: levelData,
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => LevelDetailScreen(
+                              levelId: levelData['id'] as int),
+                        ),
+                      );
+                    },
+                  ),
                 );
               },
               childCount: levels.length,

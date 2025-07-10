@@ -83,3 +83,6 @@
 
 ## Задача 4.3
 - Task 4.3 completed: added `levels_provider.dart` (FutureProvider with Supabase fetch), extended `SupabaseService` with `fetchLevelsRaw()`, updated `LevelsMapScreen` to display levels list via `LevelCard` with loading/error states. Simple lock logic implemented (бесплатные первые 3). No blocking issues.
+
+## Задача 4.4
+- Task 4.4 completed: implemented `LevelDetailScreen` with lessons list and "Завершить уровень" button; created `lessons_provider.dart` and `SupabaseService.fetchLessonsRaw`; added navigation from `LevelCard` to detail screen; updated `levels_provider` to include level id. Placeholder styling—widgets LessonWidget/QuizWidget будут подключены на этапе 4.5. No blocking issues.
