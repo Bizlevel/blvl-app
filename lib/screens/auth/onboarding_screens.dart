@@ -5,6 +5,7 @@ import '../../services/auth_service.dart';
 import '../../theme/color.dart';
 import '../../widgets/custom_textfield.dart';
 import '../../widgets/custom_image.dart';
+import 'onboarding_video_screen.dart';
 
 class OnboardingProfileScreen extends ConsumerStatefulWidget {
   const OnboardingProfileScreen({Key? key}) : super(key: key);
@@ -118,21 +119,6 @@ class _OnboardingProfileScreenState
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-// Placeholder for next step, to be implemented in Task 3.4
-class OnboardingVideoScreen extends StatelessWidget {
-  const OnboardingVideoScreen({Key? key}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Онбординг: Видео')),
-      body: const Center(
-        child: Text('Экран видео будет реализован в Задаче 3.4'),
       ),
     );
   }

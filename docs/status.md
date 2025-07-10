@@ -60,3 +60,10 @@
 - Создан переход на `OnboardingVideoScreen` (заглушка) – реализуется в 3.4.
 - UI использует `CustomTextBox`, `CustomImage`, кнопка «Далее» активируется после успешного сохранения.
 - Нет блокирующих ошибок.
+
+## Задача 3.4
+- Task 3.4 completed: создан `OnboardingVideoScreen` (video_player + chewie, кэширование через DefaultCacheManager).
+- Автовоспроизведение, кнопка «Начать», кнопка «Пропустить» активируется спустя 5 сек или переход произойдет после окончания видео.
+- Экран возвращает пользователя на `RootApp`.
+- Импорт `OnboardingVideoScreen` подключён в `OnboardingProfileScreen`, удалён временный placeholder.
+- Нет блокирующих ошибок.
