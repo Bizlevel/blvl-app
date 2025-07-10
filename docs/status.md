@@ -27,3 +27,7 @@
 ## Задача 2.2
 - Task 2.2 completed: added UserModel, LevelModel, LessonModel with Freezed & JSON serialization under lib/models/.
 - Build_runner generation pending; will run after cleaning obsolete carousel_slider usage.
+
+## Задача 2.3
+- Task 2.3 completed: implemented AuthService with signIn, signUp, signOut, getCurrentUser and error handling.
+- Added AuthFailure for consistent error messages.
