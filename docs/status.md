@@ -80,3 +80,6 @@
 
 ## Задача 4.2
 - Task 4.2 completed: created `LevelCard` widget in `lib/widgets/level_card.dart` adapted from `feature_item.dart`; shows level number badge, lessons count, lock overlay for paid levels, compatible with existing design. No breaking changes introduced.
+
+## Задача 4.3
+- Task 4.3 completed: added `levels_provider.dart` (FutureProvider with Supabase fetch), extended `SupabaseService` with `fetchLevelsRaw()`, updated `LevelsMapScreen` to display levels list via `LevelCard` with loading/error states. Simple lock logic implemented (бесплатные первые 3). No blocking issues.

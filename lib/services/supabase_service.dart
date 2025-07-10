@@ -26,4 +26,14 @@ class SupabaseService {
 
   /// Convenient accessor to the Supabase client.
   static SupabaseClient get client => Supabase.instance.client;
+
+  /// Fetches all levels ordered by number.
+  static Future<List<Map<String, dynamic>>> fetchLevelsRaw() async {
+    final response =
+        await client.from('levels').select().order('number', ascending: true);
+    // Supabase returns dynamic; ensure casting to List<Map<String, dynamic>>
+    return (response as List<dynamic>)
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList();
+  }
 }
