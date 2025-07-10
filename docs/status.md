@@ -77,3 +77,6 @@
 
 ## Задача 4.1
 - Task 4.1 completed: transformed home.dart into levels_map_screen.dart, removed categories, featured CarouselSlider, recommended sections; converted to ConsumerWidget and updated RootApp to use new screen. Deleted obsolete home.dart. No blocking issues found.
+
+## Задача 4.2
+- Task 4.2 completed: created `LevelCard` widget in `lib/widgets/level_card.dart` adapted from `feature_item.dart`; shows level number badge, lessons count, lock overlay for paid levels, compatible with existing design. No breaking changes introduced.
