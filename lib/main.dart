@@ -1,9 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 import 'screens/root_app.dart';
 import 'theme/color.dart';
 
-void main() {
-  runApp(MyApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await SentryFlutter.init(
+    (options) {
+      // TODO: Replace with your DSN via --dart-define=SENTRY_DSN=YOUR_DSN
+      options.dsn =
+          const String.fromEnvironment('SENTRY_DSN', defaultValue: '');
+    },
+    appRunner: () => runApp(MyApp()),
+  );
 }
 
 class MyApp extends StatelessWidget {
