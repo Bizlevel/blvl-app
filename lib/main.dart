@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 
 import 'screens/root_app.dart';
@@ -14,7 +15,7 @@ Future<void> main() async {
       options.dsn =
           const String.fromEnvironment('SENTRY_DSN', defaultValue: '');
     },
-    appRunner: () => runApp(MyApp()),
+    appRunner: () => runApp(ProviderScope(child: MyApp())),
   );
 }
 

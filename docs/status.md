@@ -19,3 +19,7 @@
 ## Задача 1.5
 - Task 1.5 completed: added `test/infrastructure_test.dart` verifying Supabase initialization, levels query and RLS; configured shared_preferences mock; removed obsolete widget_test to avoid carousel dependency.
 - All tests pass.
+
+## Задача 2.1
+- Task 2.1 completed: integrated Riverpod in main.dart, added ProviderScope wrapper and flutter_riverpod import, preserved existing initialization logic.
+- No blocking issues found.
