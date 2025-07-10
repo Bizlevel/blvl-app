@@ -74,3 +74,6 @@
 - Генерируется уникальный email чтобы избегать дубликатов.
 - Все тесты локально проходят (flutter test).
 - Нет блокирующих ошибок.
+
+## Задача 4.1
+- Task 4.1 completed: transformed home.dart into levels_map_screen.dart, removed categories, featured CarouselSlider, recommended sections; converted to ConsumerWidget and updated RootApp to use new screen. Deleted obsolete home.dart. No blocking issues found.
