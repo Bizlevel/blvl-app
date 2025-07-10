@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
+
 import 'screens/root_app.dart';
+import 'services/supabase_service.dart';
 import 'theme/color.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await SupabaseService.initialize();
   await SentryFlutter.init(
     (options) {
       // TODO: Replace with your DSN via --dart-define=SENTRY_DSN=YOUR_DSN
