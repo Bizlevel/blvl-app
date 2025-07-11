@@ -19,8 +19,19 @@ pluginManagement {
     }
 }
 
-plugins {
-    id "dev.flutter.flutter-plugin-loader" version "1.0.0"
+def localPropertiesFile = new File(rootDir, "local.properties")
+def flutterSdkPath
+
+if (localPropertiesFile.exists()) {
+    Properties localProperties = new Properties()
+    localPropertiesFile.withReader { reader -> localProperties.load(reader) }
+    flutterSdkPath = localProperties.getProperty("flutter.sdk")
 }
+
+if (flutterSdkPath == null) {
+    throw new GradleException("flutter.sdk not set in local.properties")
+}
+
+apply from: "$flutterSdkPath/packages/flutter_tools/gradle/app_plugin_loader.gradle"
 
 include ':app'
