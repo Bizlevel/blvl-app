@@ -138,3 +138,10 @@
 - Added user-friendly error messages like "Нет соединения с интернетом".
 - Graceful sign-out on JWT expiry; UI now receives typed failures for SnackBars.
 - Компиляция успешна, все тесты проходят.
+
+## Задача 7.4
+- Task 7.4 completed: bumped version to 1.0.0+2 in `pubspec.yaml`, removed legacy `carousel_slider` dependency.
+- Enabled `minifyEnabled` & `shrinkResources` with ProGuard config in `android/app/build.gradle`; added basic `proguard-rules.pro`.
+- Release build still uses debug keystore; placeholder comment added for CI keystore replacement.
+- Permissions unchanged (none superfluous). App builds with `flutter build apk --release` locally.
+- Готово к публикации.
