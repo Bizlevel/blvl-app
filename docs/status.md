@@ -98,3 +98,15 @@
 ## Задача 5.2
 - Task 5.2 completed: implemented `LeoService` with sendMessage (Dio to Edge Function), checkMessageLimit, decrementMessageCount, and saveConversation using Supabase tables. Added error handling via LeoFailure.
 - No blocking issues found.
+
+## Задача 5.3
+- Task 5.3 completed: transformed `chat.dart` into `leo_chat_screen.dart` with Supabase history, message counter and new chat button; integrated with LeoService and RootApp navigation; removed search box and deleted obsolete chat.dart.
+- No blocking issues found.
+
+## Задача 5.4
+- Task 5.4 completed: added `LeoMessageBubble`, `LeoDialogScreen` with message list, sending logic via `LeoService`, decrementing limits, and navigation from chat list. UI polished, autoscroll handled, errors via SnackBar.
+- No blocking issues found.
+
+## Задача 5.5
+- Task 5.5 completed: added `test/leo_integration_test.dart` covering message sending, limit decrement, history persistence and error for invalid input. All tests pass locally with real Supabase & Edge Function.
+- Нет блокирующих ошибок.
