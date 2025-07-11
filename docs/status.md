@@ -94,3 +94,7 @@
 - Task 5.1 completed: added Supabase Edge Function `leo-chat` integrating OpenAI with user context, token counting, and CORS handling.
 - Deployed function to project acevqbdpzgbtqznbpgzr via MCP; test request returns successful response.
 - No blocking issues found.
+
+## Задача 5.2
+- Task 5.2 completed: implemented `LeoService` with sendMessage (Dio to Edge Function), checkMessageLimit, decrementMessageCount, and saveConversation using Supabase tables. Added error handling via LeoFailure.
+- No blocking issues found.
