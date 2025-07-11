@@ -126,3 +126,8 @@
 - Lessons generated with placeholder descriptions, Vimeo links, and stub quizzes.
 - Verified record counts in Supabase; RLS select policies work for authenticated users.
 - No blocking issues found.
+
+## Задача 7.2
+- Task 7.2 completed: added const constructors to `CustomImage`, converted `BlankImageWidget` to `StatelessWidget`, added const `Card` to reduce rebuilds; ensured `CachedNetworkImage` continues using cache.
+- Verified compile; no functional changes.
+- Performance: reduced widget rebuild cost and unnecessary state.

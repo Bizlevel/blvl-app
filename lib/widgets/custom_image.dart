@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:online_course/theme/color.dart';
 
 class CustomImage extends StatelessWidget {
-  CustomImage(
+  const CustomImage(
     this.image, {
     this.width = 100,
     this.height = 100,
@@ -73,17 +73,12 @@ class CustomImage extends StatelessWidget {
   }
 }
 
-class BlankImageWidget extends StatefulWidget {
+class BlankImageWidget extends StatelessWidget {
   const BlankImageWidget({Key? key}) : super(key: key);
 
   @override
-  _BlankImageWidgetState createState() => _BlankImageWidgetState();
-}
-
-class _BlankImageWidgetState extends State<BlankImageWidget> {
-  @override
   Widget build(BuildContext context) {
-    return Card(
+    return const Card(
       margin: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
       elevation: 0.0,
