@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'supabase_service.dart';
@@ -17,9 +20,13 @@ class AuthService {
       final response = await _client.auth
           .signInWithPassword(email: email, password: password);
       return response;
-    } on AuthException catch (e) {
+    } on AuthException catch (e, st) {
+      await Sentry.captureException(e, stackTrace: st);
       throw AuthFailure(e.message ?? 'Не удалось войти.');
-    } catch (e) {
+    } on SocketException {
+      throw AuthFailure('Нет соединения с интернетом');
+    } catch (e, st) {
+      await Sentry.captureException(e, stackTrace: st);
       throw AuthFailure('Неизвестная ошибка входа');
     }
   }
@@ -31,9 +38,13 @@ class AuthService {
       final response =
           await _client.auth.signUp(email: email, password: password);
       return response;
-    } on AuthException catch (e) {
+    } on AuthException catch (e, st) {
+      await Sentry.captureException(e, stackTrace: st);
       throw AuthFailure(e.message ?? 'Не удалось зарегистрироваться.');
-    } catch (e) {
+    } on SocketException {
+      throw AuthFailure('Нет соединения с интернетом');
+    } catch (e, st) {
+      await Sentry.captureException(e, stackTrace: st);
       throw AuthFailure('Неизвестная ошибка регистрации');
     }
   }
@@ -42,9 +53,13 @@ class AuthService {
   static Future<void> signOut() async {
     try {
       await _client.auth.signOut();
-    } on AuthException catch (e) {
+    } on AuthException catch (e, st) {
+      await Sentry.captureException(e, stackTrace: st);
       throw AuthFailure(e.message ?? 'Не удалось выйти из аккаунта.');
-    } catch (e) {
+    } on SocketException {
+      throw AuthFailure('Нет соединения с интернетом');
+    } catch (e, st) {
+      await Sentry.captureException(e, stackTrace: st);
       throw AuthFailure('Неизвестная ошибка выхода');
     }
   }
@@ -71,9 +86,13 @@ class AuthService {
         'goal': goal,
         'updated_at': DateTime.now().toIso8601String(),
       });
-    } on PostgrestException catch (e) {
+    } on PostgrestException catch (e, st) {
+      await Sentry.captureException(e, stackTrace: st);
       throw AuthFailure(e.message);
-    } catch (e) {
+    } on SocketException {
+      throw AuthFailure('Нет соединения с интернетом');
+    } catch (e, st) {
+      await Sentry.captureException(e, stackTrace: st);
       throw AuthFailure('Не удалось сохранить профиль');
     }
   }

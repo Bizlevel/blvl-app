@@ -1,6 +1,8 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'supabase_service.dart';
@@ -43,28 +45,52 @@ class LeoService {
       throw LeoFailure('Пользователь не авторизован');
     }
 
-    try {
-      final response = await _dio.post(
-        '/leo-chat',
-        data: jsonEncode({'messages': messages}),
-        options: Options(headers: {
-          'Authorization': 'Bearer ${session.accessToken}',
-          'Content-Type': 'application/json',
-        }),
-      );
+    return _withRetry(() async {
+      try {
+        final response = await _dio.post(
+          '/leo-chat',
+          data: jsonEncode({'messages': messages}),
+          options: Options(headers: {
+            'Authorization': 'Bearer ${session.accessToken}',
+            'Content-Type': 'application/json',
+          }),
+        );
 
-      if (response.statusCode == 200 && response.data is Map<String, dynamic>) {
-        return Map<String, dynamic>.from(response.data);
-      } else {
-        final message = (response.data is Map && response.data['error'] != null)
-            ? response.data['error'] as String
-            : 'Неизвестная ошибка Leo';
-        throw LeoFailure(message);
+        if (response.statusCode == 200 &&
+            response.data is Map<String, dynamic>) {
+          return Map<String, dynamic>.from(response.data);
+        } else {
+          final message =
+              (response.data is Map && response.data['error'] != null)
+                  ? response.data['error'] as String
+                  : 'Неизвестная ошибка Leo';
+          throw LeoFailure(message);
+        }
+      } on DioException catch (e, st) {
+        await Sentry.captureException(e, stackTrace: st);
+        if (e.error is SocketException) {
+          throw LeoFailure('Нет соединения с интернетом');
+        }
+        throw LeoFailure(e.message ?? 'Сетевая ошибка при обращении к Leo');
+      } catch (e, st) {
+        await Sentry.captureException(e, stackTrace: st);
+        throw LeoFailure('Не удалось получить ответ Leo');
       }
-    } on DioException catch (e) {
-      throw LeoFailure(e.message ?? 'Сетевая ошибка при обращении к Leo');
-    } catch (e) {
-      throw LeoFailure('Не удалось получить ответ Leo');
+    });
+  }
+
+  /// Generic retry with exponential backoff (300ms, 600ms)
+  static Future<T> _withRetry<T>(Future<T> Function() action,
+      {int retries = 2}) async {
+    int attempt = 0;
+    while (true) {
+      try {
+        return await action();
+      } catch (e) {
+        if (attempt >= retries) rethrow;
+        await Future.delayed(Duration(milliseconds: 300 * (1 << attempt)));
+        attempt++;
+      }
     }
   }
 

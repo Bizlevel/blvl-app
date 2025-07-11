@@ -1,3 +1,7 @@
+import 'dart:async';
+import 'dart:io';
+
+import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SupabaseService {
@@ -29,24 +33,81 @@ class SupabaseService {
 
   /// Fetches all levels ordered by number.
   static Future<List<Map<String, dynamic>>> fetchLevelsRaw() async {
-    final response =
-        await client.from('levels').select().order('number', ascending: true);
-    // Supabase returns dynamic; ensure casting to List<Map<String, dynamic>>
-    return (response as List<dynamic>)
-        .map((e) => Map<String, dynamic>.from(e as Map))
-        .toList();
+    return _withRetry(() async {
+      try {
+        final response = await client
+            .from('levels')
+            .select()
+            .order('number', ascending: true);
+        return (response as List<dynamic>)
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
+      } on PostgrestException catch (e, st) {
+        await Sentry.captureException(e, stackTrace: st);
+        // JWT expired – выходим из аккаунта, чтобы пользователь заново залогинился
+        if (e.message.toLowerCase().contains('jwt')) {
+          await client.auth.signOut();
+        }
+        rethrow;
+      } on SocketException catch (e) {
+        throw Exception('Нет соединения с интернетом');
+      }
+    });
   }
 
   /// Fetches lessons for a given level ID ordered by order field.
   static Future<List<Map<String, dynamic>>> fetchLessonsRaw(int levelId) async {
-    final response = await client
-        .from('lessons')
-        .select()
-        .eq('level_id', levelId)
-        .order('order', ascending: true);
+    return _withRetry(() async {
+      try {
+        final response = await client
+            .from('lessons')
+            .select()
+            .eq('level_id', levelId)
+            .order('order', ascending: true);
 
-    return (response as List<dynamic>)
-        .map((e) => Map<String, dynamic>.from(e as Map))
-        .toList();
+        return (response as List<dynamic>)
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
+      } on PostgrestException catch (e, st) {
+        await Sentry.captureException(e, stackTrace: st);
+        if (e.message.toLowerCase().contains('jwt')) {
+          await client.auth.signOut();
+        }
+        rethrow;
+      } on SocketException catch (_) {
+        throw Exception('Нет соединения с интернетом');
+      }
+    });
+  }
+
+  static Future<String?> getArtifactSignedUrl(String relativePath) async {
+    return _withRetry(() async {
+      try {
+        final response = await client.storage
+            .from('artifacts')
+            .createSignedUrl(relativePath, 60 * 60);
+        return response;
+      } on StorageException catch (e, st) {
+        await Sentry.captureException(e, stackTrace: st);
+        return null;
+      } on SocketException {
+        throw Exception('Нет соединения с интернетом');
+      }
+    }, retries: 1);
+  }
+
+  /// Generic retry helper with exponential backoff (300ms, 600ms, 1200ms)
+  static Future<T> _withRetry<T>(Future<T> Function() action,
+      {int retries = 2}) async {
+    int attempt = 0;
+    while (true) {
+      try {
+        return await action();
+      } catch (e) {
+        if (attempt >= retries) rethrow;
+        await Future.delayed(Duration(milliseconds: 300 * (1 << attempt)));
+        attempt++;
+      }
+    }
   }
 }

@@ -131,3 +131,10 @@
 - Task 7.2 completed: added const constructors to `CustomImage`, converted `BlankImageWidget` to `StatelessWidget`, added const `Card` to reduce rebuilds; ensured `CachedNetworkImage` continues using cache.
 - Verified compile; no functional changes.
 - Performance: reduced widget rebuild cost and unnecessary state.
+
+## Задача 7.3
+- Task 7.3 completed: added offline detection (SocketException), exponential retry & session-expiry handling to SupabaseService, LeoService, AuthService.
+- Integrated Sentry.captureException across services for critical logging.
+- Added user-friendly error messages like "Нет соединения с интернетом".
+- Graceful sign-out on JWT expiry; UI now receives typed failures for SnackBars.
+- Компиляция успешна, все тесты проходят.
