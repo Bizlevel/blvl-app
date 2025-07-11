@@ -110,3 +110,19 @@
 ## Задача 5.5
 - Task 5.5 completed: added `test/leo_integration_test.dart` covering message sending, limit decrement, history persistence and error for invalid input. All tests pass locally with real Supabase & Edge Function.
 - Нет блокирующих ошибок.
+
+## Задача 6.1
+- Task 6.1 completed: transformed account.dart into profile_screen.dart, updated statistics to level/messages/artifacts, added artifacts section and Premium button, updated RootApp import, removed obsolete file. No blocking issues.
+
+## Задача 6.2
+- Task 6.2 completed: added ArtifactCard widget with download via url_launcher and Supabase signed URLs; integrated artifacts list in ProfileScreen using levelsProvider, updated SupabaseService with getArtifactSignedUrl(); artifacts shown only for доступные уровни, placeholder if none. No blocking issues.
+
+## Задача 6.4
+- Task 6.4 completed: refactored RootApp to ConsumerWidget with Riverpod StateProvider for tab index; reduced to 3 tabs (Уровни, Leo, Профиль); icons/pages updated, fade animation kept via AnimatedSwitcher; removed old AnimationController code. No blocking issues.
+
+## Задача 7.1
+- Task 7.1 completed: inserted 10 levels and 40 lessons via migrations `initial_data_levels_*`.
+- Levels upserted with correct metadata and free/premium flags; artifacts URLs set.
+- Lessons generated with placeholder descriptions, Vimeo links, and stub quizzes.
+- Verified record counts in Supabase; RLS select policies work for authenticated users.
+- No blocking issues found.
