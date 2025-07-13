@@ -8,6 +8,7 @@ import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
 import '../root_app.dart';
 import '../../theme/color.dart';
+import '../../services/supabase_service.dart';
 
 class OnboardingVideoScreen extends StatefulWidget {
   const OnboardingVideoScreen({Key? key}) : super(key: key);
@@ -74,7 +75,17 @@ class _OnboardingVideoScreenState extends State<OnboardingVideoScreen> {
     });
   }
 
-  void _goToApp() {
+  void _goToApp() async {
+    // Помечаем, что онбординг пройден
+    final user = SupabaseService.client.auth.currentUser;
+    if (user != null) {
+      try {
+        await SupabaseService.client
+            .from('users')
+            .update({'onboarding_completed': true}).eq('id', user.id);
+      } catch (_) {}
+    }
+
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const RootApp()),
       (_) => false,

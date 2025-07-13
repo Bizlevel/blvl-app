@@ -155,6 +155,12 @@ class _LeoChatScreenState extends State<LeoChatScreen> {
         ),
       );
       await _loadData();
-    } catch (_) {}
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Не удалось создать диалог')),
+        );
+      }
+    }
   }
 }

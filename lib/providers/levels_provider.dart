@@ -4,8 +4,12 @@ import 'package:online_course/services/supabase_service.dart';
 
 /// Provides список уровней в формате, удобном для LevelCard.
 final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
-  // Получаем "сырые" записи из таблицы levels
-  final rows = await SupabaseService.fetchLevelsRaw();
+  // Запрашиваем количество уроков агрегатом lessons(count)
+  final rows = await SupabaseService.client
+      .from('levels')
+      .select(
+          'id, number, title, description, image_url, is_free, lessons(count)')
+      .order('number', ascending: true);
 
   return rows.map((json) {
     final level = LevelModel.fromJson(json);
@@ -18,8 +22,13 @@ final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
       'image': level.imageUrl,
       'level': level.number,
       'name': level.title,
-      'lessons':
-          json['lessons_count'] ?? 0, // TODO: заменить реальным количеством
+      'lessons': () {
+        final lessonsAgg = json['lessons'];
+        if (lessonsAgg is List && lessonsAgg.isNotEmpty) {
+          return (lessonsAgg.first['count'] as int? ?? 0);
+        }
+        return 0;
+      }(),
       'isLocked': isLocked,
     };
   }).toList();

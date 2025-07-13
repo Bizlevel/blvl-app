@@ -81,10 +81,12 @@ class AuthService {
     try {
       await _client.from('users').upsert({
         'id': user.id,
+        'email': user.email,
         'name': name,
         'about': about,
         'goal': goal,
         'updated_at': DateTime.now().toIso8601String(),
+        'onboarding_completed': false,
       });
     } on PostgrestException catch (e, st) {
       await Sentry.captureException(e, stackTrace: st);

@@ -16,12 +16,17 @@ final currentUserProvider = FutureProvider<UserModel?>((ref) async {
   final user = auth.session?.user;
   if (user == null) return null;
 
-  final response = await SupabaseService.client
-      .from('users')
-      .select()
-      .eq('id', user.id)
-      .single();
+  try {
+    final response = await SupabaseService.client
+        .from('users')
+        .select()
+        .eq('id', user.id)
+        .maybeSingle();
 
-  if (response == null) return null;
-  return UserModel.fromJson(response as Map<String, dynamic>);
+    if (response == null) return null; // профиль ещё не заполнен
+    return UserModel.fromJson(response as Map<String, dynamic>);
+  } on PostgrestException {
+    // table exists but запись отсутствует – вернём null
+    return null;
+  }
 });

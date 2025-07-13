@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:online_course/theme/color.dart';
-import 'package:online_course/utils/data.dart';
+import 'package:online_course/providers/auth_provider.dart';
 import 'package:online_course/providers/levels_provider.dart';
 import 'package:online_course/widgets/level_card.dart';
 import 'package:online_course/widgets/notification_box.dart';
@@ -21,7 +21,7 @@ class LevelsMapScreen extends ConsumerWidget {
             pinned: true,
             snap: true,
             floating: true,
-            title: _buildAppBar(),
+            title: _buildAppBar(ref),
           ),
           _buildLevels(ref),
         ],
@@ -29,7 +29,16 @@ class LevelsMapScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildAppBar() {
+  Widget _buildAppBar(WidgetRef ref) {
+    final userAsync = ref.watch(currentUserProvider);
+
+    String userName = 'Добро пожаловать';
+    userAsync.whenData((user) {
+      if (user != null && user.name.isNotEmpty) {
+        userName = user.name;
+      }
+    });
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -39,7 +48,7 @@ class LevelsMapScreen extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                profile["name"]!,
+                userName,
                 style: TextStyle(
                   color: AppColor.labelColor,
                   fontSize: 14,

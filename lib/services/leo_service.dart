@@ -189,10 +189,20 @@ class LeoService {
         'content': content,
       });
 
-      // increment message_count
-      await _client.rpc('increment_chat_messages', params: {
-        'p_chat_id': effectiveChatId,
-      });
+      // increment message_count (+1)
+      // получаем текущее значение message_count
+      final chatRow = await _client
+          .from('leo_chats')
+          .select('message_count')
+          .eq('id', effectiveChatId)
+          .single();
+
+      final currentCount = chatRow['message_count'] as int? ?? 0;
+
+      await _client.from('leo_chats').update({
+        'message_count': currentCount + 1,
+        'updated_at': DateTime.now().toIso8601String(),
+      }).eq('id', effectiveChatId);
 
       return effectiveChatId;
     } on PostgrestException catch (e) {

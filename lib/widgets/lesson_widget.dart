@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'dart:convert';
+import 'package:dio/dio.dart';
 
 import 'package:chewie/chewie.dart';
 import 'package:flutter/material.dart';
@@ -30,10 +32,18 @@ class _LessonWidgetState extends State<LessonWidget> {
 
   Future<void> _initPlayer() async {
     try {
-      // Кэшируем видео локально
-      final file =
-          await DefaultCacheManager().getSingleFile(widget.lesson.videoUrl);
-      _videoController = VideoPlayerController.file(File(file.path));
+      // Получаем прямой URL (для Vimeo преобразуем)
+      final directUrl = await _resolvePlayableUrl(widget.lesson.videoUrl);
+
+      // Кэшируем файл локально, если это mp4
+      Uri uri = Uri.parse(directUrl);
+      if (uri.path.endsWith('.mp4')) {
+        final file = await DefaultCacheManager().getSingleFile(directUrl);
+        _videoController = VideoPlayerController.file(File(file.path));
+      } else {
+        // потоковое воспроизведение (HLS / DASH)
+        _videoController = VideoPlayerController.network(directUrl);
+      }
       await _videoController!.initialize();
       _chewieController = ChewieController(
         videoPlayerController: _videoController!,
@@ -49,9 +59,47 @@ class _LessonWidgetState extends State<LessonWidget> {
       setState(() {
         _initialized = true;
       });
-    } catch (_) {
-      // ignore errors for now – UI покажет fallback
+    } catch (e) {
+      debugPrint('Video init error: $e');
+      // Показываем заглушку вместо бесконечного индикатора
+      setState(() {
+        _initialized = true;
+        _videoController = null;
+        _chewieController = null;
+      });
     }
+  }
+
+  /// If URL is a plain Vimeo page, fetches player config and returns direct mp4/HLS url.
+  Future<String> _resolvePlayableUrl(String url) async {
+    if (url.contains('vimeo.com') && !url.contains('player.vimeo.com')) {
+      final idMatch = RegExp(r'vimeo\.com\/(\d+)').firstMatch(url);
+      if (idMatch != null) {
+        final id = idMatch.group(1);
+        final configUrl = 'https://player.vimeo.com/video/$id/config';
+        try {
+          final response = await Dio().get(configUrl);
+          final data = response.data is String
+              ? jsonDecode(response.data as String)
+              : response.data;
+
+          // предпочитаем mp4 progressive
+          final progressive =
+              (data['request']['files']['progressive'] as List?) ?? [];
+          if (progressive.isNotEmpty) {
+            return progressive.first['url'] as String;
+          }
+          // fallback to hls
+          final hls = data['request']['files']['hls']?['cdns'] as Map?;
+          if (hls != null && hls.isNotEmpty) {
+            return (hls.values.first as Map)['url'] as String;
+          }
+        } catch (e) {
+          debugPrint('Failed to resolve Vimeo url: $e');
+        }
+      }
+    }
+    return url;
   }
 
   void _listener() {
@@ -74,6 +122,10 @@ class _LessonWidgetState extends State<LessonWidget> {
   Widget build(BuildContext context) {
     if (!_initialized) {
       return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_videoController == null || _chewieController == null) {
+      return const Text('Видео недоступно');
     }
 
     return Column(

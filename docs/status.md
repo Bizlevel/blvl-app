@@ -145,3 +145,30 @@
 - Release build still uses debug keystore; placeholder comment added for CI keystore replacement.
 - Permissions unchanged (none superfluous). App builds with `flutter build apk --release` locally.
 - Готово к публикации.
+
+## Запуск на симуляторе ios
+- Выполнены `flutter clean`, `flutter pub get`, `pod install --repo-update` для синхронизации Pods.
+- Обновлён `sentry_flutter` до 9.4.0, `pod update Sentry` → 8.52.1 (фиксы под Xcode 15).
+- В `main.dart` добавлена условная инициализация Sentry (отключается, если DSN пуст).
+- Приложение успешно собирается и запускается на iOS-симуляторе, критических ошибок нет.
+
+## Исправление ошибок в приложении после успешного запуска на симуляторе ios
+- Добавлен онбординг-гейт в main.dart, теперь новые пользователи заполняют профиль перед входом.
+- AuthService.updateProfile записывает email, устранив ошибку NOT NULL.
+- LevelsMapScreen берёт имя из таблицы users; placeholder исчез.
+- levelsProvider считает реальные уроки через lessons(count).
+- Профиль грузится корректно, показывает статистику.
+- Fix LeoService: убрана отсутствующая RPC, диалоги создаются.
+- LessonWidget: резолв Vimeo → mp4/HLS, graceful fallback «Видео недоступно».
+
+Что работает сейчас:
+1. Регистрация, подтверждение e-mail.
+2. Полный онбординг (профиль + видео).
+3. Карта уровней отображает уровни и счётчики уроков.
+4. Чат Leo создаёт новые диалоги.
+5. Профиль открывается без ошибок.
+
+Что не работает / требует проверки:
+- Видео в уроках резолвится, но возвращает 403 — нужно использовать прямые mp4/HLS ссылки в lessons.video_url. Уровень не грузится и показывает Видео недоступно (ссылка на вимео проверена, там все работает)
+- Проверить CORS/доступность файлов Vimeo либо загрузить на публичный CDN.
+- Тесты (auth_flow, levels_system) прогнать после правок видео.
