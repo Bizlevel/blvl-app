@@ -96,6 +96,22 @@ class SupabaseService {
     }, retries: 1);
   }
 
+  static Future<String?> getVideoSignedUrl(String relativePath) async {
+    return _withRetry(() async {
+      try {
+        final response = await client.storage
+            .from('video')
+            .createSignedUrl(relativePath, 60 * 60);
+        return response;
+      } on StorageException catch (e, st) {
+        await Sentry.captureException(e, stackTrace: st);
+        return null;
+      } on SocketException {
+        throw Exception('Нет соединения с интернетом');
+      }
+    }, retries: 1);
+  }
+
   /// Generic retry helper with exponential backoff (300ms, 600ms, 1200ms)
   static Future<T> _withRetry<T>(Future<T> Function() action,
       {int retries = 2}) async {
