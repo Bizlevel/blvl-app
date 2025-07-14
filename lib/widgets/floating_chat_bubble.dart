@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:online_course/screens/leo_dialog_screen.dart';
-import 'package:online_course/theme/color.dart';
+import 'package:online_course/providers/leo_unread_provider.dart';
 import 'package:online_course/services/leo_service.dart';
+import 'package:online_course/theme/color.dart';
 
 /// Floating chat bubble that opens the LeoDialogScreen.
 /// Place this widget inside a [Stack] so that it can be positioned
@@ -14,7 +16,7 @@ import 'package:online_course/services/leo_service.dart';
 ///   ],
 /// );
 /// ```
-class FloatingChatBubble extends StatefulWidget {
+class FloatingChatBubble extends ConsumerStatefulWidget {
   /// Supabase chat identifier. Must be non-empty.
   final String chatId;
   final String systemPrompt;
@@ -25,10 +27,10 @@ class FloatingChatBubble extends StatefulWidget {
   const FloatingChatBubble({Key? key, required this.chatId, required this.systemPrompt, this.unreadCount = 0}) : super(key: key);
 
   @override
-  State<FloatingChatBubble> createState() => _FloatingChatBubbleState();
+  ConsumerState<FloatingChatBubble> createState() => _FloatingChatBubbleState();
 }
 
-class _FloatingChatBubbleState extends State<FloatingChatBubble> with SingleTickerProviderStateMixin {
+class _FloatingChatBubbleState extends ConsumerState<FloatingChatBubble> with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final Animation<double> _pulse;
 
@@ -47,6 +49,9 @@ class _FloatingChatBubbleState extends State<FloatingChatBubble> with SingleTick
   }
 
   Future<void> _openDialog() async {
+    // reset unread before opening dialog
+    await LeoService.resetUnread(widget.chatId);
+
     if (!mounted) return;
 
     // Save context prompt before opening
@@ -66,7 +71,10 @@ class _FloatingChatBubbleState extends State<FloatingChatBubble> with SingleTick
   }
 
   @override
+  @override
   Widget build(BuildContext context) {
+    final unreadAsync = ref.watch(leoUnreadProvider(widget.chatId));
+    final unread = unreadAsync.when(data: (v)=>v, loading: ()=>widget.unreadCount, error: (_,__)=>widget.unreadCount);
     return ScaleTransition(
       scale: _pulse,
       child: Stack(
@@ -77,7 +85,7 @@ class _FloatingChatBubbleState extends State<FloatingChatBubble> with SingleTick
             onPressed: _openDialog,
             child: const Icon(Icons.chat_bubble_outline),
           ),
-          if (widget.unreadCount > 0)
+          if (unread > 0)
             Positioned(
               right: -4,
               top: -4,
@@ -85,7 +93,7 @@ class _FloatingChatBubbleState extends State<FloatingChatBubble> with SingleTick
                 padding: const EdgeInsets.all(4),
                 decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
                 child: Text(
-                  '${widget.unreadCount}',
+                  '${unread}',
                   style: const TextStyle(fontSize: 10, color: Colors.white),
                 ),
               ),

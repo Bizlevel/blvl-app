@@ -39,6 +39,37 @@ class LeoService {
   /// Отправляет список сообщений в Edge Function `leo-chat` и возвращает
   /// ответ ассистента + статистику токенов.
   /// Expects [messages] in chat completion API format.
+    /// Проверка контента через OpenAI Moderation API. Бросает [LeoFailure] если flagged.
+  static Future<void> _moderationCheck(String content) async {
+    final openaiKey = dotenv.env['OPENAI_API_KEY'] ?? '';
+    if (openaiKey.isEmpty) return; // moderation доступна только при прямом OpenAI ключе
+
+    try {
+      final response = await Dio().post(
+        'https://api.openai.com/v1/moderations',
+        options: Options(headers: {
+          'Authorization': 'Bearer $openaiKey',
+          'Content-Type': 'application/json',
+        }),
+        data: {
+          'input': content,
+        },
+      );
+      if (response.statusCode == 200 && response.data is Map<String, dynamic>) {
+        final results = response.data['results'] as List?;
+        if (results != null && results.isNotEmpty) {
+          final flagged = results.first['flagged'] as bool? ?? false;
+          if (flagged) {
+            throw LeoFailure('Сообщение содержит запрещённый контент');
+          }
+        }
+      }
+    } catch (e) {
+      // если moderation не доступен – не блокировать, но залогировать
+      await Sentry.captureException(e);
+    }
+  }
+
   static Future<Map<String, dynamic>> sendMessage(
       {required List<Map<String, dynamic>> messages}) async {
     final session = _client.auth.currentSession;
@@ -48,6 +79,11 @@ class LeoService {
 
     final openaiKey = dotenv.env['OPENAI_API_KEY'] ?? '';
     if (openaiKey.isNotEmpty) {
+    // Run moderation on the latest user message (last in list)
+    final last = messages.isNotEmpty ? messages.last : null;
+    if (last != null && last['role'] == 'user') {
+      await _moderationCheck(last['content'] as String? ?? '');
+    }
       // Call OpenAI API directly
       return _withRetry(() async {
         try {
@@ -133,6 +169,12 @@ class LeoService {
 
   /// Проверяет, сколько сообщений осталось у пользователя.
   /// Возвращает число оставшихся сообщений.
+  static Future<void> resetUnread(String chatId) async {
+    try {
+      await _client.rpc('reset_leo_unread', params: {'p_chat_id': chatId});
+    } catch (_) {}
+  }
+
   static Future<int> checkMessageLimit() async {
     final user = _client.auth.currentUser;
     if (user == null) throw LeoFailure('Не авторизован');
@@ -161,28 +203,15 @@ class LeoService {
 
   /// Декрементирует счётчик сообщений пользователя. Для Premium – суточный,
   /// для Free – общий.
-  static Future<void> decrementMessageCount() async {
+  static Future<int> decrementMessageCount() async {
     final user = _client.auth.currentUser;
     if (user == null) throw LeoFailure('Не авторизован');
 
     try {
-      final profile = await _client
-          .from('users')
-          .select('is_premium, leo_messages_total, leo_messages_today')
-          .eq('id', user.id)
-          .single();
-
-      final isPremium = profile['is_premium'] as bool? ?? false;
-
-      if (isPremium) {
-        final today = (profile['leo_messages_today'] as int? ?? 0) - 1;
-        await _client.from('users').update(
-            {'leo_messages_today': today.clamp(0, 999)}).eq('id', user.id);
-      } else {
-        final total = (profile['leo_messages_total'] as int? ?? 0) - 1;
-        await _client.from('users').update(
-            {'leo_messages_total': total.clamp(0, 999)}).eq('id', user.id);
-      }
+      // Call atomic RPC which returns remaining messages
+      final response = await _client.rpc('decrement_leo_message');
+      final remaining = response as int? ?? 0;
+      return remaining;
     } on PostgrestException catch (e) {
       throw LeoFailure(e.message);
     } catch (e) {

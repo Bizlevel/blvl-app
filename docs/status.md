@@ -263,3 +263,10 @@ The next steps are to finish the LevelCard UI update, add the fetchLevelsRaw hel
 3. Zone mismatch ошибок больше не воспроизводится.
 Все изменения добавлены и готовы к проверке.
 
+## Leo AI assistant improvements (14.07)
+- Edge Function `leo_context` генерирует персональный system prompt на основе прогресса.
+- RPC `decrement_leo_message` + UI блокируют превышение дневного лимита.
+- OpenAI Moderation API фильтрует пользовательский ввод перед отправкой.
+- `LeoDialogScreen` переписан: постраничная загрузка чата, кнопка «Загрузить ещё», плавный автоскролл.
+- Бейдж непрочитанных сообщений и обнуление счётчика работают стабильно.
+
