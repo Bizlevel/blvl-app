@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:online_course/theme/color.dart';
+import 'package:flutter/services.dart';
 
 import 'custom_image.dart';
 
@@ -22,7 +23,14 @@ class LevelCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: _isLocked ? null : onTap,
+      onTap: _isLocked
+          ? null
+          : () {
+              HapticFeedback.lightImpact();
+              if (onTap != null) {
+                onTap!();
+              }
+            },
       child: Container(
         width: width,
         height: height,

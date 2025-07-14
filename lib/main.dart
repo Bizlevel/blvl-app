@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
+import 'package:responsive_framework/responsive_framework.dart';
 
 import 'providers/auth_provider.dart';
 import 'screens/auth/login_screen.dart';
@@ -10,30 +11,29 @@ import 'services/supabase_service.dart';
 import 'theme/color.dart';
 import 'screens/auth/onboarding_screens.dart';
 
-Future<void> main() async {
+Future<void> _bootstrap() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Пытаемся загрузить переменные из .env; в release-сборке файл обычно
-  // отсутствует, поэтому проглатываем FileNotFoundError.
+  await SupabaseService.initialize();
+  runApp(ProviderScope(child: MyApp()));
+}
+  
+
+
+Future<void> main() async {
+  // Загружаем переменные окружения (если файл есть)
   try {
     await dotenv.load(fileName: '.env');
-  } catch (_) {
-    // ignore – fallback to --dart-define / const String.fromEnvironment
-  }
-  await SupabaseService.initialize();
+  } catch (_) {}
 
-  // Приоритет: .env → --dart-define
   final dsn = dotenv.env['sentry_dsn'] ??
       const String.fromEnvironment('SENTRY_DSN', defaultValue: '');
 
-  // Если DSN не указан – не инициализируем Sentry, чтобы избежать ошибок в консоли
   if (dsn.isEmpty) {
-    runApp(ProviderScope(child: MyApp()));
+    await _bootstrap();
   } else {
     await SentryFlutter.init(
-      (options) {
-        options.dsn = dsn;
-      },
-      appRunner: () => runApp(ProviderScope(child: MyApp())),
+      (options) => options..dsn = dsn,
+      appRunner: _bootstrap,
     );
   }
 }
@@ -74,6 +74,17 @@ class MyApp extends ConsumerWidget {
     );
 
     return MaterialApp(
+      builder: (context, child) => ResponsiveWrapper.builder(
+        BouncingScrollWrapper.builder(context, child!),
+        maxWidth: 600,
+        minWidth: 320,
+        defaultScale: true,
+        breakpoints: const [
+          ResponsiveBreakpoint.resize(320, name: MOBILE),
+          ResponsiveBreakpoint.autoScale(600, name: TABLET),
+          ResponsiveBreakpoint.autoScale(800, name: DESKTOP),
+        ],
+      ),
       debugShowCheckedModeBanner: false,
       title: 'BizLevel',
       theme: ThemeData(

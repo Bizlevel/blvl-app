@@ -5,6 +5,7 @@ import 'package:online_course/providers/auth_provider.dart';
 import 'package:online_course/providers/levels_provider.dart';
 import 'package:online_course/widgets/level_card.dart';
 import 'package:online_course/widgets/notification_box.dart';
+import 'package:shimmer/shimmer.dart';
 import 'package:online_course/screens/level_detail_screen.dart';
 
 class LevelsMapScreen extends ConsumerWidget {
@@ -102,9 +103,28 @@ class LevelsMapScreen extends ConsumerWidget {
           ),
         );
       },
-      loading: () => const SliverFillRemaining(
-        hasScrollBody: false,
-        child: Center(child: CircularProgressIndicator()),
+      loading: () => SliverPadding(
+        padding: const EdgeInsets.fromLTRB(15, 10, 15, 20),
+        sliver: SliverList(
+          delegate: SliverChildBuilderDelegate(
+            (context, index) => Padding(
+              padding: const EdgeInsets.only(bottom: 15),
+              child: Shimmer.fromColors(
+                baseColor: Colors.grey.shade300,
+                highlightColor: Colors.grey.shade100,
+                child: Container(
+                  width: double.infinity,
+                  height: 290,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                ),
+              ),
+            ),
+            childCount: 4,
+          ),
+        ),
       ),
       error: (error, _) => SliverFillRemaining(
         hasScrollBody: false,

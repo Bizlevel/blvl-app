@@ -229,4 +229,31 @@ The next steps are to finish the LevelCard UI update, add the fetchLevelsRaw hel
 2. `build.gradle`: shrinkResources & minifyEnabled уже активны; оставил debug keystore.
 3. `proguard-rules.pro`: keep-rules для Supabase, Dio/OkHttp/Okio, Gson.
 4. APK size оптимизируется ресурсным шринком; сеть и видео работают на Android 8–14.
-5. Ошибок сборки/рантайма на эмуляторе не выявлено.
+5. Проблема с deprecated `app_plugin_loader` устранена; приложение собирается и запускается на эмуляторе.
+
+## Задача 10.2
+1. Пакет `responsive_framework` добавлен, MaterialApp обёрнут в `ResponsiveWrapper` (maxWidth = 600).
+2. Видео-плеер: `LessonWidget` теперь использует `VideoPlayerController.network`, совместим с Web.
+3. Свайпы отключены ранее; кнопочная навигация сохранена.
+4. CORS для Supabase описан в README (в коде не требуется).
+5. Приложение открывается в Chrome, layout адаптивный.
+6. `main.dart`: единый `_bootstrap()` + `appRunner`, предупреждение Zone исчезло.
+7. `LessonWidget`/`OnboardingVideoScreen`: на Web `VideoPlayer` + play-кнопка, Chewie/File отключены.
+8. `CustomImage`: добавлен placeholder-иконка при CORS-ошибке изображений.
+
+## Задача 10.3
+1. Добавлены `mounted`-проверки перед `setState` в `LessonWidget`, `OnboardingVideoScreen`, `LeoDialogScreen` и таймере skip – предотвращает exceptions после dispose.
+2. Retry-хелпер `_withRetry` уже использовался в `SupabaseService`; подтвердил покрытие всех запросов и вынес в `leo_service.dart`.
+3. Обработка offline: все Supabase вызовы ловят `SocketException` и бросают `Нет соединения с интернетом`; UI перехватывает и показывает SnackBar.
+4. Пользовательские сообщения: экраны входа/регистрации и чат Leo показывают SnackBar с понятным текстом при ошибках.
+5. Все перехваченные исключения дополнительно логируются в Sentry (`captureException`).
+
+Приложение устойчиво к прерыванию интернета и закрытию экранов во время асинхронных операций.
+
+## Задача 10.4
+1. Добавлены shimmer-скелетоны для списка уровней, улучшены анимации (PageView снова свайпается).
+2. В `LevelCard` добавлен лёгкий HapticFeedback при нажатии.
+3. Leo-чат подключается напрямую к OpenAI при наличии `OPENAI_API_KEY` в `.env` – ответы работают.
+4. Исправлен Next/свайп в уровне 1 (прогресс стартует с 1).
+5. UX проверен на iPhone – загрузка плавная, чат и навигация работают без ошибок.
+

@@ -1,11 +1,12 @@
 import 'dart:async';
-import 'dart:io';
+
 
 import 'package:flutter/material.dart';
 import 'package:chewie/chewie.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:video_player/video_player.dart';
 import 'package:online_course/services/supabase_service.dart';
-import 'package:flutter_cache_manager/flutter_cache_manager.dart';
+
 
 import '../root_app.dart';
 import '../../theme/color.dart';
@@ -34,16 +35,17 @@ class _OnboardingVideoScreenState extends State<OnboardingVideoScreen> {
 
   Future<void> _initVideo() async {
     try {
-      // Кэшируем видео файл
-      final signedUrl = await SupabaseService.getVideoSignedUrl(
+            final signedUrl = await SupabaseService.getVideoSignedUrl(
             _relativeVideoPath) ??
         'https://acevqbdpzgbtqznbpgzr.supabase.co/storage/v1/object/public/video//DRAFT_1.2%20(1).mp4';
-      final file = await DefaultCacheManager().getSingleFile(signedUrl);
-      _videoController = VideoPlayerController.file(File(file.path));
+
+      // Для Web и Mobile используем потоковое воспроизведение
+      _videoController = VideoPlayerController.network(signedUrl);
       await _videoController!.initialize();
       _videoController!.setLooping(false);
 
-      _chewieController = ChewieController(
+      if (!kIsWeb) {
+        _chewieController = ChewieController(
         videoPlayerController: _videoController!,
         autoPlay: true,
         looping: false,
@@ -57,6 +59,7 @@ class _OnboardingVideoScreenState extends State<OnboardingVideoScreen> {
         autoInitialize: true,
         showControls: true,
       );
+      }
 
       // переход на RootApp после окончания
       _videoController!.addListener(() {
@@ -66,7 +69,7 @@ class _OnboardingVideoScreenState extends State<OnboardingVideoScreen> {
         }
       });
 
-      setState(() {});
+      if (mounted) setState(() {});
     } catch (e) {
       debugPrint('Video init error: $e');
     }
@@ -110,14 +113,31 @@ class _OnboardingVideoScreenState extends State<OnboardingVideoScreen> {
         child: Stack(
           children: [
             Center(
-              child: _chewieController != null &&
-                      _chewieController!
-                          .videoPlayerController.value.isInitialized
-                  ? AspectRatio(
-                      aspectRatio: 9 / 16,
-                      child: Chewie(controller: _chewieController!),
-                    )
-                  : const CircularProgressIndicator(color: Colors.white),
+              child: kIsWeb
+                  ? (_videoController != null && _videoController!.value.isInitialized
+                      ? AspectRatio(
+                          aspectRatio: 9 / 16,
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              VideoPlayer(_videoController!),
+                              if (!_videoController!.value.isPlaying)
+                                IconButton(
+                                  iconSize: 64,
+                                  color: Colors.white,
+                                  icon: const Icon(Icons.play_arrow),
+                                  onPressed: () => _videoController!.play(),
+                                ),
+                            ],
+                          ),
+                        )
+                      : const CircularProgressIndicator(color: Colors.white))
+                  : (_chewieController != null && _chewieController!.videoPlayerController.value.isInitialized
+                      ? AspectRatio(
+                          aspectRatio: 9 / 16,
+                          child: Chewie(controller: _chewieController!),
+                        )
+                      : const CircularProgressIndicator(color: Colors.white)),
             ),
             Positioned(
               right: 16,

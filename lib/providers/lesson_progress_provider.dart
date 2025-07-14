@@ -40,7 +40,7 @@ class LessonProgressState {
     );
   }
 
-  static const empty = LessonProgressState(unlockedPage: 0, watchedVideos: {}, passedQuizzes: {});
+  static const empty = LessonProgressState(unlockedPage: 1, watchedVideos: {}, passedQuizzes: {});
 }
 
 class LessonProgressNotifier extends StateNotifier<LessonProgressState> {
@@ -56,6 +56,10 @@ class LessonProgressNotifier extends StateNotifier<LessonProgressState> {
     final raw = prefs.getString(_prefsKey);
     if (raw != null) {
       state = LessonProgressState.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+    if (state.unlockedPage < 1) {
+      state = state.copyWith(unlockedPage: 1);
+      _save();
+    }
     }
   }
 

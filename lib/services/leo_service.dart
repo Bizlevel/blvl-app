@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'supabase_service.dart';
@@ -25,7 +26,7 @@ class LeoService {
 
   // We use Dio because Edge Functions требуют произвольные HTTP-заголовки
   // и проще настраивать таймауты/перехватчики.
-  static final Dio _dio = Dio(BaseOptions(
+  static final Dio _edgeDio = Dio(BaseOptions(
     baseUrl: const String.fromEnvironment('SUPABASE_URL',
             defaultValue: 'https://acevqbdpzgbtqznbpgzr.supabase.co') +
         '/functions/v1',
@@ -45,9 +46,45 @@ class LeoService {
       throw LeoFailure('Пользователь не авторизован');
     }
 
+    final openaiKey = dotenv.env['OPENAI_API_KEY'] ?? '';
+    if (openaiKey.isNotEmpty) {
+      // Call OpenAI API directly
+      return _withRetry(() async {
+        try {
+          final response = await Dio().post(
+            'https://api.openai.com/v1/chat/completions',
+            options: Options(headers: {
+              'Authorization': 'Bearer $openaiKey',
+              'Content-Type': 'application/json',
+            }),
+            data: {
+              'model': 'gpt-3.5-turbo',
+              'messages': messages,
+              'temperature': 0.7,
+            },
+          );
+          if (response.statusCode == 200 && response.data is Map<String, dynamic>) {
+            final choices = response.data['choices'] as List?;
+            final first = choices != null && choices.isNotEmpty ? choices.first : null;
+            final content = first?['message']?['content'] ?? '';
+            return {
+              'message': {'content': content},
+              'tokens': response.data['usage'] ?? {},
+            };
+          } else {
+            throw LeoFailure('OpenAI error: ${response.statusMessage}');
+          }
+        } on DioException catch (e, st) {
+          await Sentry.captureException(e, stackTrace: st);
+          throw LeoFailure(e.message ?? 'Ошибка сети при обращении к OpenAI');
+        }
+      });
+    }
+
+    // Fallback to Supabase Edge Function
     return _withRetry(() async {
       try {
-        final response = await _dio.post(
+        final response = await _edgeDio.post(
           '/leo-chat',
           data: jsonEncode({'messages': messages}),
           options: Options(headers: {

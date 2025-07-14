@@ -1,10 +1,10 @@
-import 'dart:io';
+
 // Vimeo support removed, using Supabase Storage signed URLs
 import 'package:online_course/services/supabase_service.dart';
 
 import 'package:chewie/chewie.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:online_course/models/lesson_model.dart';
 import 'package:video_player/video_player.dart';
 
@@ -37,17 +37,11 @@ class _LessonWidgetState extends State<LessonWidget> {
             widget.lesson.videoUrl) ??
           'https://acevqbdpzgbtqznbpgzr.supabase.co/storage/v1/object/public/video//DRAFT_1.2%20(1).mp4';
 
-      // Кэшируем файл локально, если это mp4
-      Uri uri = Uri.parse(directUrl);
-      if (uri.path.endsWith('.mp4')) {
-        final file = await DefaultCacheManager().getSingleFile(directUrl);
-        _videoController = VideoPlayerController.file(File(file.path));
-      } else {
-        // потоковое воспроизведение (HLS / DASH)
-        _videoController = VideoPlayerController.network(directUrl);
-      }
+      // Для Web и Mobile используем потоковое воспроизведение
+      _videoController = VideoPlayerController.network(directUrl);
       await _videoController!.initialize();
-      _chewieController = ChewieController(
+      if (!kIsWeb) {
+        _chewieController = ChewieController(
         videoPlayerController: _videoController!,
         autoPlay: false,
         looping: false,
@@ -57,13 +51,16 @@ class _LessonWidgetState extends State<LessonWidget> {
             ? 9 / 16
             : _videoController!.value.aspectRatio,
       );
+      }
       _videoController!.addListener(_listener);
+      if (!mounted) return;
       setState(() {
         _initialized = true;
       });
     } catch (e) {
       debugPrint('Video init error: $e');
       // Показываем заглушку вместо бесконечного индикатора
+      if (!mounted) return;
       setState(() {
         _initialized = true;
         _videoController = null;
@@ -94,6 +91,32 @@ class _LessonWidgetState extends State<LessonWidget> {
   Widget build(BuildContext context) {
     if (!_initialized) {
       return const Center(child: CircularProgressIndicator());
+    }
+
+    if (kIsWeb) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AspectRatio(
+            aspectRatio: _videoController!.value.aspectRatio == 0 ? 9 / 16 : _videoController!.value.aspectRatio,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                VideoPlayer(_videoController!),
+                if (!_videoController!.value.isPlaying)
+                  IconButton(
+                    iconSize: 64,
+                    color: Colors.white,
+                    icon: const Icon(Icons.play_arrow),
+                    onPressed: () => _videoController!.play(),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(widget.lesson.description, style: const TextStyle(fontSize: 14)),
+        ],
+      );
     }
 
     if (_videoController == null || _chewieController == null) {

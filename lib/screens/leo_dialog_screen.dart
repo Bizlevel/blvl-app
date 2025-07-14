@@ -83,6 +83,7 @@ class _LeoDialogScreenState extends State<LeoDialogScreen> {
         content: assistantMsg,
       );
 
+      if (!mounted) return;
       setState(() {
         _messages.add({'role': 'assistant', 'content': assistantMsg});
       });
@@ -91,7 +92,7 @@ class _LeoDialogScreenState extends State<LeoDialogScreen> {
         SnackBar(content: Text(e.toString())),
       );
     } finally {
-      setState(() => _isSending = false);
+      if (mounted) setState(() => _isSending = false);
       _scrollToBottom();
     }
   }

@@ -188,7 +188,7 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
   Widget _buildPageView() {
     return PageView.builder(
       controller: _pageController,
-      physics: const NeverScrollableScrollPhysics(),
+      physics: const PageScrollPhysics(),
       itemCount: _blocks.length,
       itemBuilder: (context, index) {
         final locked = index > _progress.unlockedPage;
