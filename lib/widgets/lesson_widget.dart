@@ -94,9 +94,10 @@ class _LessonWidgetState extends State<LessonWidget> {
     }
 
     if (kIsWeb) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+      return SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
           AspectRatio(
             aspectRatio: _videoController!.value.aspectRatio == 0 ? 9 / 16 : _videoController!.value.aspectRatio,
             child: Stack(
@@ -116,16 +117,18 @@ class _LessonWidgetState extends State<LessonWidget> {
           const SizedBox(height: 10),
           Text(widget.lesson.description, style: const TextStyle(fontSize: 14)),
         ],
-      );
+      ),
+    );
     }
 
     if (_videoController == null || _chewieController == null) {
       return const Text('Видео недоступно');
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
         AspectRatio(
           aspectRatio: _videoController!.value.aspectRatio == 0
               ? 9 / 16
@@ -138,6 +141,7 @@ class _LessonWidgetState extends State<LessonWidget> {
           style: const TextStyle(fontSize: 14),
         ),
       ],
-    );
+    ),
+  );
   }
 }

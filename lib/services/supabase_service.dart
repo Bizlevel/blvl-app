@@ -88,7 +88,9 @@ class SupabaseService {
             .createSignedUrl(relativePath, 60 * 60);
         return response;
       } on StorageException catch (e, st) {
-        await Sentry.captureException(e, stackTrace: st);
+        if (e.statusCode != 404) {
+          await Sentry.captureException(e, stackTrace: st);
+        }
         return null;
       } on SocketException {
         throw Exception('Нет соединения с интернетом');
@@ -146,7 +148,9 @@ class SupabaseService {
             .createSignedUrl(relativePath, 60 * 60);
         return response;
       } on StorageException catch (e, st) {
-        await Sentry.captureException(e, stackTrace: st);
+        if (e.statusCode != 404) {
+          await Sentry.captureException(e, stackTrace: st);
+        }
         return null;
       } on SocketException {
         throw Exception('Нет соединения с интернетом');

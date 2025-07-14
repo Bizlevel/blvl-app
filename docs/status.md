@@ -257,3 +257,9 @@ The next steps are to finish the LevelCard UI update, add the fetchLevelsRaw hel
 4. Исправлен Next/свайп в уровне 1 (прогресс стартует с 1).
 5. UX проверен на iPhone – загрузка плавная, чат и навигация работают без ошибок.
 
+## Ошибки Sentry (14.07)
+1. RenderFlex overflow (BIZLEVEL-FLUTTER-5/6) – исправлено: LessonWidget обёрнут в SingleChildScrollView.
+2. StorageException 404 (BIZLEVEL-FLUTTER-4/2) – обработка 404 без throw, логирование в Sentry подавлено.
+3. Zone mismatch ошибок больше не воспроизводится.
+Все изменения добавлены и готовы к проверке.
+
