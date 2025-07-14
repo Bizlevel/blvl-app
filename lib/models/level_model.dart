@@ -14,6 +14,7 @@ class LevelModel with _$LevelModel {
     @JsonKey(name: 'is_free') @Default(false) bool isFree,
     @JsonKey(name: 'artifact_title') String? artifactTitle,
     @JsonKey(name: 'artifact_description') String? artifactDescription,
+    
     @JsonKey(name: 'artifact_url') String? artifactUrl,
     @JsonKey(name: 'created_at') DateTime? createdAt,
   }) = _LevelModel;

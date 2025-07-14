@@ -52,6 +52,11 @@ final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
         return 0;
       }(),
       'isLocked': isLocked,
+      'lockReason': isLocked
+          ? (level.number > 3 && !level.isFree
+              ? 'Только для премиум'
+              : 'Завершите предыдущий уровень')
+          : null,
     };
   }).toList();
 });

@@ -116,6 +116,28 @@ class SupabaseService {
     });
   }
 
+  /// Marks level as completed for current user and bumps current_level if needed.
+  static Future<void> completeLevel(int levelId) async {
+    final user = client.auth.currentUser;
+    if (user == null) throw Exception('Пользователь не авторизован');
+    await _withRetry(() async {
+      try {
+        // Upsert into user_progress
+        await client.from('user_progress').upsert({
+          'user_id': user.id,
+          'level_id': levelId,
+          'is_completed': true,
+          'updated_at': DateTime.now().toIso8601String(),
+        });
+        // Update users.current_level if we just completed it
+        await client.rpc('update_current_level', params: {'p_level_id': levelId});
+      } on PostgrestException catch (e, st) {
+        await Sentry.captureException(e, stackTrace: st);
+        rethrow;
+      }
+    });
+  }
+
   static Future<String?> getVideoSignedUrl(String relativePath) async {
     return _withRetry(() async {
       try {

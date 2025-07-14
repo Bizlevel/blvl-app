@@ -22,7 +22,7 @@ class _LessonWidgetState extends State<LessonWidget> {
   VideoPlayerController? _videoController;
   ChewieController? _chewieController;
   bool _initialized = false;
-  bool _isEnded = false;
+  bool _progressSent = false;
 
   @override
   void initState() {
@@ -75,9 +75,9 @@ class _LessonWidgetState extends State<LessonWidget> {
 
 
   void _listener() {
-    if (!_isEnded &&
-        _videoController!.value.position >= _videoController!.value.duration) {
-      _isEnded = true;
+    final position = _videoController!.value.position;
+    if (!_progressSent && position >= const Duration(seconds: 10)) {
+      _progressSent = true;
       widget.onWatched();
     }
   }
