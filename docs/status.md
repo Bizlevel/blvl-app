@@ -223,3 +223,10 @@ The next steps are to finish the LevelCard UI update, add the fetchLevelsRaw hel
 3. `FloatingChatBubble` получает `systemPrompt`, сохраняет сообщение и открывает `LeoDialogScreen`.
 4. Виджет скрывается на Intro/финальных блоках, перерисовывается при смене страницы.
 5. Линты пройдены, функционал протестирован — Leo отвечает с учётом контекста.
+
+## Задача 10.1
+1. `AndroidManifest.xml`: добавлены разрешения INTERNET + READ_MEDIA_VIDEO/READ_EXTERNAL_STORAGE.
+2. `build.gradle`: shrinkResources & minifyEnabled уже активны; оставил debug keystore.
+3. `proguard-rules.pro`: keep-rules для Supabase, Dio/OkHttp/Okio, Gson.
+4. APK size оптимизируется ресурсным шринком; сеть и видео работают на Android 8–14.
+5. Ошибок сборки/рантайма на эмуляторе не выявлено.

@@ -1,5 +1,14 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.sangvaleap.online_course">
+
+    <!-- Required for network access (Supabase, Leo Edge Functions) -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Access lesson videos from storage on pre-Android 13 devices -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <!-- Access media (videos) on Android 13+ -->
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+
    <application
         android:label="online_course"
         android:icon="@mipmap/ic_launcher">
