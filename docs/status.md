@@ -181,4 +181,45 @@
 - Обновили таблицу `lessons`: поле `video_url` теперь хранит относительный путь `lesson_<id>.mp4`.
 - Добавлен метод `getVideoSignedUrl()` в `SupabaseService` (создаёт подписанный URL на 1 час через bucket `video`).
 - Проверено: запрос к `getVideoSignedUrl('lesson_6.mp4')` возвращает рабочую ссылку HTTP 200.
-- Подготовлено основание для задачи 8.2 (обновление плеера на Supabase URLs). 
+- Подготовлено основание для задачи 8.2 (обновление плеера на Supabase URLs).
+
+## Задача 8.2
+- Task 8.2 completed: removed Vimeo logic from LessonWidget; now uses SupabaseService.getVideoSignedUrl with 9:16 AspectRatio.
+- Updated OnboardingVideoScreen to fetch signed URL and wrap player in AspectRatio.
+- Added fallback test video file from Supabase bucket for all videos.
+- Verified video playback in lessons and onboarding; watched callback remains functional. 
+
+## Задача 8.3
+The sequential access logic is now implemented in both the provider and backend service.
+The LevelCard UI logic is being updated to show lock reasons.
+The next steps are to finish the LevelCard UI update, add the fetchLevelsRaw helper, and run code-gen/lint fixes.
+
+## Задача 8.4
+Выполнена. Блочная структура работает: Intro → видео → тест, «Далее» разблокируется после просмотра/верного ответа, «Назад» возвращает на предыдущий блок, прогресс-точки отражают позицию.
+• ArtifactBlock оставлен заглушкой – появится, если модель урока получит поля artifact*.
+
+## Задача 9.1
+1. Добавил lesson_progress_provider.dart (Riverpod + SharedPreferences) — хранит unlockedPage, просмотренные видео, пройденные тесты, автосохраняет/восстанавливает JSON по ключу level_progress_<levelId>. pubspec.yaml
+2. подключил shared_preferences.
+3. LevelDetailScreen: • вместо локального _unlockedPage использует состояние провайдера; • блоки LessonBlock/QuizBlock вызывают _videoWatched/_quizPassed, которые отмечают прогресс и разблокируют следующий экран; • при открытии уровня восстанавливается последняя страница (jumpToPage).
+4. LessonWidget — шлёт onWatched после 10 сек. воспроизведения (теперь учитывается частичный просмотр).
+
+## Задача 9.2
+1. SupabaseService: • добавлен completeLevel(levelId) — upsert в user_progress + RPC update_current_level.
+2. LevelDetailScreen: • импорт SupabaseService. • метод _isLevelCompleted проверяет, что кол-во просмотренных видео и пройденных тестов равно числу уроков. • добавлена кнопка «Завершить уровень» (отключена, пока условия не выполнены). При нажатии вызывает completeLevel, показывает SnackBar и возвращает на карту уровней.
+3. LessonProgressProvider и LessonWidget не изменялись — данные уже приходят из провайдера.
+4. pubspec.yaml не трогали (зависимости OK).
+
+## Задача 9.3
+1. Создан виджет `FloatingChatBubble` (Stateful) с пульсацией и бейджем непрочитанных сообщений.
+2. При нажатии открывает `LeoDialogScreen` через `showModalBottomSheet` (90% высоты).
+3. Виджет размещается через `Positioned(bottom:20,right:20)` поверх контента.
+4. Добавлена анимация масштабирования (Tween 1→1.1) для привлечения внимания.
+5. Изменения не затронули существующие файлы; интеграция на экраны будет в задаче 9.4.
+
+## Задача 9.4
+1. `LevelDetailScreen`: обёрнут в `Stack`, добавлен `FloatingChatBubble`, показывается только на Lesson/Quiz блоках.
+2. Формируется `systemPrompt` по текущему блоку; перед открытием чата сохраняется в `leo_messages`.
+3. `FloatingChatBubble` получает `systemPrompt`, сохраняет сообщение и открывает `LeoDialogScreen`.
+4. Виджет скрывается на Intro/финальных блоках, перерисовывается при смене страницы.
+5. Линты пройдены, функционал протестирован — Leo отвечает с учётом контекста.

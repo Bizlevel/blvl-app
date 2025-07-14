@@ -96,6 +96,26 @@ class SupabaseService {
     }, retries: 1);
   }
 
+  static Future<List<Map<String, dynamic>>> fetchLevelsWithProgress(String userId) async {
+    return _withRetry(() async {
+      try {
+        final response = await client
+            .from('levels')
+            .select(
+                'id, number, title, description, image_url, is_free, lessons(count), user_progress(is_completed)')
+            .order('number', ascending: true);
+        return (response as List<dynamic>)
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
+      } on PostgrestException catch (e, st) {
+        await Sentry.captureException(e, stackTrace: st);
+        rethrow;
+      } on SocketException {
+        throw Exception('Нет соединения с интернетом');
+      }
+    });
+  }
+
   static Future<String?> getVideoSignedUrl(String relativePath) async {
     return _withRetry(() async {
       try {

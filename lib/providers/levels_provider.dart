@@ -2,20 +2,42 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:online_course/models/level_model.dart';
 import 'package:online_course/services/supabase_service.dart';
 
-/// Provides список уровней в формате, удобном для LevelCard.
+/// Provides список уровней с учётом прогресса пользователя.
 final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
-  // Запрашиваем количество уроков агрегатом lessons(count)
-  final rows = await SupabaseService.client
-      .from('levels')
-      .select(
-          'id, number, title, description, image_url, is_free, lessons(count)')
-      .order('number', ascending: true);
+    final userId = SupabaseService.client.auth.currentUser?.id;
+  final rows = userId == null
+      ? await SupabaseService.fetchLevelsRaw()
+      : await SupabaseService.fetchLevelsWithProgress(userId);
+
+  // Сначала сортируем по номеру на случай, если order потерян
+  rows.sort((a, b) => (a['number'] as int).compareTo(b['number'] as int));
+
+  bool previousCompleted = false;
 
   return rows.map((json) {
     final level = LevelModel.fromJson(json);
 
-    // Простая логика блокировки: первые 3 уровни бесплатны.
-    final bool isLocked = !level.isFree && level.number > 3;
+    // Определяем, завершён ли текущий уровень пользователем
+    final progressArr = json['user_progress'] as List?;
+    final bool isCompleted = progressArr != null && progressArr.isNotEmpty
+        ? (progressArr.first['is_completed'] as bool? ?? false)
+        : false;
+
+    // Логика доступности
+    bool isAccessible;
+    if (level.number == 1) {
+      isAccessible = true;
+    } else if (!level.isFree && level.number > 3) {
+      // Премиум лимит
+      isAccessible = false;
+    } else {
+      isAccessible = previousCompleted;
+    }
+
+    // Обновляем previousCompleted для следующего уровня
+    previousCompleted = isCompleted;
+
+    final bool isLocked = !isAccessible;
 
     return {
       'id': level.id,

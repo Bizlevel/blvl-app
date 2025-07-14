@@ -1,6 +1,6 @@
 import 'dart:io';
-import 'dart:convert';
-import 'package:dio/dio.dart';
+// Vimeo support removed, using Supabase Storage signed URLs
+import 'package:online_course/services/supabase_service.dart';
 
 import 'package:chewie/chewie.dart';
 import 'package:flutter/material.dart';
@@ -32,8 +32,10 @@ class _LessonWidgetState extends State<LessonWidget> {
 
   Future<void> _initPlayer() async {
     try {
-      // Получаем прямой URL (для Vimeo преобразуем)
-      final directUrl = await _resolvePlayableUrl(widget.lesson.videoUrl);
+      // Получаем подписанный URL из Supabase Storage
+      final directUrl = await SupabaseService.getVideoSignedUrl(
+            widget.lesson.videoUrl) ??
+          'https://acevqbdpzgbtqznbpgzr.supabase.co/storage/v1/object/public/video//DRAFT_1.2%20(1).mp4';
 
       // Кэшируем файл локально, если это mp4
       Uri uri = Uri.parse(directUrl);
@@ -70,37 +72,7 @@ class _LessonWidgetState extends State<LessonWidget> {
     }
   }
 
-  /// If URL is a plain Vimeo page, fetches player config and returns direct mp4/HLS url.
-  Future<String> _resolvePlayableUrl(String url) async {
-    if (url.contains('vimeo.com') && !url.contains('player.vimeo.com')) {
-      final idMatch = RegExp(r'vimeo\.com\/(\d+)').firstMatch(url);
-      if (idMatch != null) {
-        final id = idMatch.group(1);
-        final configUrl = 'https://player.vimeo.com/video/$id/config';
-        try {
-          final response = await Dio().get(configUrl);
-          final data = response.data is String
-              ? jsonDecode(response.data as String)
-              : response.data;
 
-          // предпочитаем mp4 progressive
-          final progressive =
-              (data['request']['files']['progressive'] as List?) ?? [];
-          if (progressive.isNotEmpty) {
-            return progressive.first['url'] as String;
-          }
-          // fallback to hls
-          final hls = data['request']['files']['hls']?['cdns'] as Map?;
-          if (hls != null && hls.isNotEmpty) {
-            return (hls.values.first as Map)['url'] as String;
-          }
-        } catch (e) {
-          debugPrint('Failed to resolve Vimeo url: $e');
-        }
-      }
-    }
-    return url;
-  }
 
   void _listener() {
     if (!_isEnded &&

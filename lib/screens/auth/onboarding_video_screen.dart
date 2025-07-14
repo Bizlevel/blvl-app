@@ -4,11 +4,12 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:chewie/chewie.dart';
 import 'package:video_player/video_player.dart';
+import 'package:online_course/services/supabase_service.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
 import '../root_app.dart';
 import '../../theme/color.dart';
-import '../../services/supabase_service.dart';
+
 
 class OnboardingVideoScreen extends StatefulWidget {
   const OnboardingVideoScreen({Key? key}) : super(key: key);
@@ -18,8 +19,7 @@ class OnboardingVideoScreen extends StatefulWidget {
 }
 
 class _OnboardingVideoScreenState extends State<OnboardingVideoScreen> {
-  static const _videoUrl =
-      'https://flutter.github.io/assets-for-api-docs/assets/videos/bee.mp4'; // TODO: replace with Vimeo URL
+  static const _relativeVideoPath = 'onboarding.mp4';
 
   ChewieController? _chewieController;
   VideoPlayerController? _videoController;
@@ -35,7 +35,10 @@ class _OnboardingVideoScreenState extends State<OnboardingVideoScreen> {
   Future<void> _initVideo() async {
     try {
       // Кэшируем видео файл
-      final file = await DefaultCacheManager().getSingleFile(_videoUrl);
+      final signedUrl = await SupabaseService.getVideoSignedUrl(
+            _relativeVideoPath) ??
+        'https://acevqbdpzgbtqznbpgzr.supabase.co/storage/v1/object/public/video//DRAFT_1.2%20(1).mp4';
+      final file = await DefaultCacheManager().getSingleFile(signedUrl);
       _videoController = VideoPlayerController.file(File(file.path));
       await _videoController!.initialize();
       _videoController!.setLooping(false);
@@ -110,7 +113,10 @@ class _OnboardingVideoScreenState extends State<OnboardingVideoScreen> {
               child: _chewieController != null &&
                       _chewieController!
                           .videoPlayerController.value.isInitialized
-                  ? Chewie(controller: _chewieController!)
+                  ? AspectRatio(
+                      aspectRatio: 9 / 16,
+                      child: Chewie(controller: _chewieController!),
+                    )
                   : const CircularProgressIndicator(color: Colors.white),
             ),
             Positioned(
