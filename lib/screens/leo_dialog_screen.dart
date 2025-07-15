@@ -10,8 +10,8 @@ import 'package:online_course/widgets/leo_message_bubble.dart';
 /// Supports pagination (30 messages per page), unread counter reset,
 /// message limit enforcement and auto-scroll to bottom.
 class LeoDialogScreen extends StatefulWidget {
-  final String chatId;
-  const LeoDialogScreen({Key? key, required this.chatId}) : super(key: key);
+  final String? chatId;
+  const LeoDialogScreen({Key? key, this.chatId}) : super(key: key);
 
   @override
   State<LeoDialogScreen> createState() => _LeoDialogScreenState();
@@ -19,6 +19,8 @@ class LeoDialogScreen extends StatefulWidget {
 
 class _LeoDialogScreenState extends State<LeoDialogScreen> {
   static const _pageSize = 30;
+
+  String? _chatId;
 
   final _scrollController = ScrollController();
   final _inputController = TextEditingController();
@@ -33,8 +35,11 @@ class _LeoDialogScreenState extends State<LeoDialogScreen> {
   @override
   void initState() {
     super.initState();
+    _chatId = widget.chatId;
     _fetchRemaining();
-    _loadMessages();
+    if (_chatId != null) {
+      _loadMessages();
+    }
   }
 
   Future<void> _fetchRemaining() async {
@@ -48,13 +53,14 @@ class _LeoDialogScreenState extends State<LeoDialogScreen> {
   }
 
   Future<void> _loadMessages() async {
+    if (_chatId == null) return;
     final rangeStart = _page * _pageSize;
     final rangeEnd = rangeStart + _pageSize - 1;
 
     final data = await SupabaseService.client
         .from('leo_messages')
         .select('role, content, created_at')
-        .eq('chat_id', widget.chatId)
+        .eq('chat_id', _chatId!)
         .order('created_at', ascending: false)
         .range(rangeStart, rangeEnd);
 
@@ -110,8 +116,14 @@ class _LeoDialogScreenState extends State<LeoDialogScreen> {
 
     try {
       // Save user message & decrement limit atomically
-      await LeoService.saveConversation(
-          chatId: widget.chatId, role: 'user', content: text);
+      if (_chatId == null) {
+        // создаём диалог при первом сообщении
+        _chatId = await LeoService.saveConversation(role: 'user', content: text);
+        // сразу загрузим (чтобы появился счётчик и т.д.)
+      } else {
+        await LeoService.saveConversation(
+            chatId: _chatId, role: 'user', content: text);
+      }
       final rem = await LeoService.decrementMessageCount();
       if (mounted) setState(() => _remaining = rem);
 
@@ -121,7 +133,7 @@ class _LeoDialogScreenState extends State<LeoDialogScreen> {
       final assistantMsg = response['message']['content'] as String? ?? '';
 
       await LeoService.saveConversation(
-          chatId: widget.chatId, role: 'assistant', content: assistantMsg);
+          chatId: _chatId, role: 'assistant', content: assistantMsg);
 
       if (!mounted) return;
       setState(() {

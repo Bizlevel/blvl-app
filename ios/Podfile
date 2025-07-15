@@ -33,6 +33,9 @@ target 'Runner' do
   use_modular_headers!
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+
+  # Ensure HybridPublic headers are available for Flutter integration
+  pod 'Sentry', '8.52.1', :subspecs => ['HybridSDK']
 end
 
 post_install do |installer|

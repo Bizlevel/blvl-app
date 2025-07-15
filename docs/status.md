@@ -298,3 +298,10 @@ The next steps are to finish the LevelCard UI update, add the fetchLevelsRaw hel
 - Решение: добавлен условный импорт `dart:ui_web` с префиксом `ui` и вызовы `ui.platformViewRegistry.registerViewFactory`; `ensureInitialized()` вызывается один раз в `main()`.
 - Приложение успешно собирается и работает в браузере.
 
+## Задача 11.3
+- Leo чат: диалог сохраняется только после первого сообщения пользователя, пустые чаты более не создаются.
+- Списки диалогов (`LeoChatScreen`, `FloatingChatBubble`) фильтруют чаты с `message_count > 0`.
+- Обновлены `LeoDialogScreen` и `LeoChatScreen` для поддержки нового поведения, добавлено локальное поле `_chatId`.
+- Успешно протестировано на iOS и Web, ошибок не выявлено.
+- Код закоммичен, лимиты и счётчики сообщений работают корректно.
+

@@ -31,6 +31,7 @@ class _LeoChatScreenState extends State<LeoChatScreen> {
       final rawChats = await SupabaseService.client
           .from('leo_chats')
           .select('id, title, updated_at, message_count')
+          .gt('message_count', 0)
           .order('updated_at', ascending: false);
       _chats =
           rawChats.map((e) => Map<String, dynamic>.from(e as Map)).toList();
@@ -135,32 +136,10 @@ class _LeoChatScreenState extends State<LeoChatScreen> {
   }
 
   void _onNewChat() {
-    // Просто обновляем экран — LeoDialogScreen будет создавать чат.
-    setState(() {
-      _loadFuture = _createNewChat();
-    });
-  }
-
-  Future<void> _createNewChat() async {
-    try {
-      // создали системное пустое сообщение чтобы получить chatId
-      final newId = await LeoService.saveConversation(
-        role: 'user',
-        content: '...',
-      );
-      if (!mounted) return;
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => LeoDialogScreen(chatId: newId),
-        ),
-      );
-      await _loadData();
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Не удалось создать диалог')),
-        );
-      }
-    }
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const LeoDialogScreen(),
+      ),
+    );
   }
 }

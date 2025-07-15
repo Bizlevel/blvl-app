@@ -19,6 +19,13 @@ class AuthService {
     try {
       final response = await _client.auth
           .signInWithPassword(email: email, password: password);
+      // Set Sentry user context
+      final user = response.user;
+      if (user != null) {
+        Sentry.configureScope((scope) {
+          scope.setUser(SentryUser(id: user.id, email: user.email));
+        });
+      }
       return response;
     } on AuthException catch (e, st) {
       await Sentry.captureException(e, stackTrace: st);
@@ -53,6 +60,8 @@ class AuthService {
   static Future<void> signOut() async {
     try {
       await _client.auth.signOut();
+      // Clear Sentry user context
+      Sentry.configureScope((scope) => scope.setUser(null));
     } on AuthException catch (e, st) {
       await Sentry.captureException(e, stackTrace: st);
       throw AuthFailure(e.message ?? 'Не удалось выйти из аккаунта.');

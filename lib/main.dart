@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:flutter/foundation.dart';
 import 'package:responsive_framework/responsive_framework.dart';
 
 import 'providers/auth_provider.dart';
@@ -34,8 +36,22 @@ Future<void> main() async {
   if (dsn.isEmpty) {
     _runApp();
   } else {
+    final packageInfo = await PackageInfo.fromPlatform();
     await SentryFlutter.init(
-      (options) => options..dsn = dsn,
+      (options) {
+        options
+          ..dsn = dsn
+          ..tracesSampleRate = 1.0
+          ..environment = kReleaseMode ? 'prod' : 'dev'
+          ..release = 'bizlevel@${packageInfo.version}+${packageInfo.buildNumber}'
+          ..enableAutoSessionTracking = true
+          ..attachScreenshot = true
+          ..attachViewHierarchy = true
+          ..beforeSend = (SentryEvent event, Hint hint) {
+            event.request?.headers?.removeWhere((k, _) => k.toLowerCase() == 'authorization');
+            return event;
+          };
+      },
       appRunner: _runApp,
     );
   }
@@ -94,6 +110,7 @@ class MyApp extends ConsumerWidget {
         primaryColor: AppColor.primary,
       ),
       home: home,
+      navigatorObservers: [SentryNavigatorObserver()],
     );
   }
 }
