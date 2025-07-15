@@ -3,7 +3,7 @@
 import 'package:online_course/services/supabase_service.dart';
 
 import 'package:chewie/chewie.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:online_course/models/lesson_model.dart';
 import 'package:video_player/video_player.dart';
@@ -55,7 +55,7 @@ class _LessonWidgetState extends State<LessonWidget> {
           setState(() {});
           return;
         }
-        if (Theme.of(context).platform == TargetPlatform.iOS) {
+        if (defaultTargetPlatform == TargetPlatform.iOS) {
           _embedUrl = embed;
           _useWebView = true;
           _initialized = true;
