@@ -1,5 +1,5 @@
 
-// Vimeo support removed, using Supabase Storage signed URLs
+// Vimeo/WebView support
 import 'package:online_course/services/supabase_service.dart';
 
 import 'package:chewie/chewie.dart';
@@ -7,6 +7,14 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:online_course/models/lesson_model.dart';
 import 'package:video_player/video_player.dart';
+import 'package:online_course/compat/webview_stub.dart'
+    if (dart.library.io) 'package:webview_flutter/webview_flutter.dart';
+import 'package:online_course/compat/ui_stub.dart' if (dart.library.html) 'dart:ui_web' as ui;
+// ignore: avoid_web_libraries_in_flutter
+import 'package:online_course/compat/html_stub.dart'
+    if (dart.library.html) 'dart:html'
+    as html;
+
 
 class LessonWidget extends StatefulWidget {
   final LessonModel lesson;
@@ -24,6 +32,10 @@ class _LessonWidgetState extends State<LessonWidget> {
   bool _initialized = false;
   bool _progressSent = false;
 
+  // For iframe/WebView playback
+  String? _embedUrl;
+  bool _useWebView = false;
+
   @override
   void initState() {
     super.initState();
@@ -35,9 +47,23 @@ class _LessonWidgetState extends State<LessonWidget> {
       // Choose video source: Vimeo > Supabase Storage
       String directUrl;
       if (widget.lesson.vimeoId != null && widget.lesson.vimeoId!.isNotEmpty) {
-        // Vimeo embed URL (plays HLS/MP4 directly in video_player)
-        directUrl =
-            'https://player.vimeo.com/video/${widget.lesson.vimeoId}?byline=0&portrait=0';
+        final embed = 'https://player.vimeo.com/video/${widget.lesson.vimeoId}?byline=0&portrait=0&playsinline=1';
+        // For Web – use iframe; for iOS – use WebView; otherwise fallback to direct player
+        if (kIsWeb) {
+          _embedUrl = embed;
+          _initialized = true;
+          setState(() {});
+          return;
+        }
+        if (Theme.of(context).platform == TargetPlatform.iOS) {
+          _embedUrl = embed;
+          _useWebView = true;
+          _initialized = true;
+          setState(() {});
+          return;
+        }
+        // Android/Desktop fallback: try to use video_player (may fail if Vimeo forbids)
+        directUrl = embed;
       } else {
         // Fallback to Supabase Storage signed URL
         if (widget.lesson.videoUrl != null && widget.lesson.videoUrl!.isNotEmpty) {
@@ -48,7 +74,7 @@ class _LessonWidgetState extends State<LessonWidget> {
         }
       }
 
-      // Для Web и Mobile используем потоковое воспроизведение
+      // Use video_player for remaining cases
       _videoController = VideoPlayerController.network(directUrl);
       await _videoController!.initialize();
       if (!kIsWeb) {
@@ -104,32 +130,55 @@ class _LessonWidgetState extends State<LessonWidget> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (kIsWeb) {
-      return SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-          AspectRatio(
-            aspectRatio: _videoController!.value.aspectRatio == 0 ? 9 / 16 : _videoController!.value.aspectRatio,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                VideoPlayer(_videoController!),
-                if (!_videoController!.value.isPlaying)
-                  IconButton(
-                    iconSize: 64,
-                    color: Colors.white,
-                    icon: const Icon(Icons.play_arrow),
-                    onPressed: () => _videoController!.play(),
-                  ),
-              ],
+    // Web iframe playback
+    if (kIsWeb && _embedUrl != null) {
+      final viewId = 'vimeo-${widget.lesson.vimeoId}';
+      // ignore: undefined_prefixed_name
+      ui.platformViewRegistry.registerViewFactory(viewId, (int id) {
+        final iframe = html.IFrameElement()
+          ..src = _embedUrl!
+          ..style.border = 'none'
+          ..allowFullscreen = true;
+        return iframe;
+      });
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            height: 400,
+            child: HtmlElementView(viewType: viewId),
+          ),
+          const SizedBox(height: 10),
+          Text(widget.lesson.description, style: const TextStyle(fontSize: 14)),
+        ],
+      );
+    }
+
+    // iOS WebView playback
+    if (_useWebView && _embedUrl != null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            height: 400,
+            child: WebView(
+              initialUrl: _embedUrl,
+              javascriptMode: JavascriptMode.unrestricted,
             ),
           ),
           const SizedBox(height: 10),
           Text(widget.lesson.description, style: const TextStyle(fontSize: 14)),
         ],
-      ),
-    );
+      );
+    }
+
+    if (kIsWeb) {
+      // Fallback: video_player widget (should rarely reach here)
+      return AspectRatio(
+        aspectRatio: _videoController!.value.aspectRatio == 0 ? 9 / 16 : _videoController!.value.aspectRatio,
+        child: VideoPlayer(_videoController!),
+      );
     }
 
     if (_videoController == null || _chewieController == null) {

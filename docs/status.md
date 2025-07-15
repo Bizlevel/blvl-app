@@ -277,3 +277,24 @@ The next steps are to finish the LevelCard UI update, add the fetchLevelsRaw hel
 - если vimeoId заполнен → воспроизводим https://player.vimeo.com/video/<id>;
 - иначе получаем подписанный URL из Supabase Storage (старый сценарий).
 • Улучшён резервный путь при отсутствии videoUrl.
+
+## Задача 11.1
+- Исправлен `Zone mismatch`: инициализация Flutter/Supabase/Sentry объединена в одной зоне (`main.dart`), добавлен `debugZoneErrorsAreFatal`.
+- Удалён const в `ProviderScope`, добавлен import `foundation`.
+- Обновлён `SupabaseService.initialize` (вызывается в той же зоне).
+
+## Задача 11.2
+- Поддержка воспроизведения уроков Vimeo на Web и iOS:
+  - Web: встраиваемый iframe через `HtmlElementView`.
+  - iOS: `webview_flutter` (conditional import) с unrestricted JS.
+  - Android/десктоп: fallback на `video_player`.
+- Добавлены stubs `compat/webview_stub.dart`, `compat/html_stub.dart` для кроссплатформенной сборки.
+- `lesson_widget.dart` переработан: условный выбор источника, обработка прогресса, graceful fallback.
+- В `pubspec.yaml` добавлена зависимость `webview_flutter`.
+
+## Исправление сборки Web (15.07)
+- Ошибки: `platformViewRegistry` undefined и `Zone mismatch` приводили к падению приложения на Chrome.
+- Причина: после Flutter 3.10 `platformViewRegistry` перемещён в `dart:ui_web`, а `WidgetsFlutterBinding.ensureInitialized()` вызывался в другой Zone.
+- Решение: добавлен условный импорт `dart:ui_web` с префиксом `ui` и вызовы `ui.platformViewRegistry.registerViewFactory`; `ensureInitialized()` вызывается один раз в `main()`.
+- Приложение успешно собирается и работает в браузере.
+

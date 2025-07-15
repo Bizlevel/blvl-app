@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
@@ -11,9 +12,8 @@ import 'services/supabase_service.dart';
 import 'theme/color.dart';
 import 'screens/auth/onboarding_screens.dart';
 
-Future<void> _bootstrap() async {
+void _runApp() {
   WidgetsFlutterBinding.ensureInitialized();
-  await SupabaseService.initialize();
   runApp(ProviderScope(child: MyApp()));
 }
   
@@ -25,15 +25,18 @@ Future<void> main() async {
     await dotenv.load(fileName: '.env');
   } catch (_) {}
 
+  // Инициализируем Supabase
+  await SupabaseService.initialize();
+
   final dsn = dotenv.env['sentry_dsn'] ??
       const String.fromEnvironment('SENTRY_DSN', defaultValue: '');
 
   if (dsn.isEmpty) {
-    await _bootstrap();
+    _runApp();
   } else {
     await SentryFlutter.init(
       (options) => options..dsn = dsn,
-      appRunner: _bootstrap,
+      appRunner: _runApp,
     );
   }
 }
