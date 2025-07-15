@@ -270,3 +270,10 @@ The next steps are to finish the LevelCard UI update, add the fetchLevelsRaw hel
 - `LeoDialogScreen` переписан: постраничная загрузка чата, кнопка «Загрузить ещё», плавный автоскролл.
 - Бейдж непрочитанных сообщений и обнуление счётчика работают стабильно.
 
+## Правки для настроек видео на Vimeo
+- 
+1. lesson_model.dart: • videoUrl → nullable. • Добавлено новое поле vimeoId.
+2. lesson_widget.dart: • В _initPlayer() теперь выбирается источник:
+- если vimeoId заполнен → воспроизводим https://player.vimeo.com/video/<id>;
+- иначе получаем подписанный URL из Supabase Storage (старый сценарий).
+• Улучшён резервный путь при отсутствии videoUrl.

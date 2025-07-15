@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class SupabaseService {
   SupabaseService._();
@@ -14,15 +15,10 @@ class SupabaseService {
     if (_initialized) return;
 
     await Supabase.initialize(
-      url: const String.fromEnvironment(
-        'SUPABASE_URL',
-        defaultValue: 'https://acevqbdpzgbtqznbpgzr.supabase.co',
-      ),
-      anonKey: const String.fromEnvironment(
-        'SUPABASE_ANON_KEY',
-        defaultValue:
-            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFjZXZxYmRwemdidHF6bmJwZ3pyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5NzcwOTcsImV4cCI6MjA2NzU1MzA5N30.0CUdl2VhvaBfKLLhMnU1yH2mL9cI01DtX6Hrtq48dyw',
-      ),
+      url: dotenv.env['SUPABASE_URL'] ??
+          const String.fromEnvironment('SUPABASE_URL', defaultValue: ''),
+      anonKey: dotenv.env['SUPABASE_ANON_KEY'] ??
+          const String.fromEnvironment('SUPABASE_ANON_KEY', defaultValue: ''),
     );
 
     _initialized = true;

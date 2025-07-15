@@ -13,7 +13,8 @@ _$LessonModelImpl _$$LessonModelImplFromJson(Map<String, dynamic> json) =>
       order: (json['order'] as num).toInt(),
       title: json['title'] as String,
       description: json['description'] as String,
-      videoUrl: json['video_url'] as String,
+      videoUrl: json['video_url'] as String?,
+      vimeoId: json['vimeo_id'] as String?,
       durationMinutes: (json['duration_minutes'] as num).toInt(),
       quizQuestions: json['quiz_questions'] as List<dynamic>,
       correctAnswers: (json['correct_answers'] as List<dynamic>)
@@ -32,6 +33,7 @@ Map<String, dynamic> _$$LessonModelImplToJson(_$LessonModelImpl instance) =>
       'title': instance.title,
       'description': instance.description,
       'video_url': instance.videoUrl,
+      'vimeo_id': instance.vimeoId,
       'duration_minutes': instance.durationMinutes,
       'quiz_questions': instance.quizQuestions,
       'correct_answers': instance.correctAnswers,

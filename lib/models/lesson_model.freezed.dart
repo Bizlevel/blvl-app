@@ -28,7 +28,9 @@ mixin _$LessonModel {
   String get title => throw _privateConstructorUsedError;
   String get description => throw _privateConstructorUsedError;
   @JsonKey(name: 'video_url')
-  String get videoUrl => throw _privateConstructorUsedError;
+  String? get videoUrl => throw _privateConstructorUsedError;
+  @JsonKey(name: 'vimeo_id')
+  String? get vimeoId => throw _privateConstructorUsedError;
   @JsonKey(name: 'duration_minutes')
   int get durationMinutes => throw _privateConstructorUsedError;
   @JsonKey(name: 'quiz_questions')
@@ -60,7 +62,8 @@ abstract class $LessonModelCopyWith<$Res> {
       @JsonKey(name: 'order') int order,
       String title,
       String description,
-      @JsonKey(name: 'video_url') String videoUrl,
+      @JsonKey(name: 'video_url') String? videoUrl,
+      @JsonKey(name: 'vimeo_id') String? vimeoId,
       @JsonKey(name: 'duration_minutes') int durationMinutes,
       @JsonKey(name: 'quiz_questions') List<dynamic> quizQuestions,
       @JsonKey(name: 'correct_answers') List<int> correctAnswers,
@@ -87,7 +90,8 @@ class _$LessonModelCopyWithImpl<$Res, $Val extends LessonModel>
     Object? order = null,
     Object? title = null,
     Object? description = null,
-    Object? videoUrl = null,
+    Object? videoUrl = freezed,
+    Object? vimeoId = freezed,
     Object? durationMinutes = null,
     Object? quizQuestions = null,
     Object? correctAnswers = null,
@@ -114,10 +118,14 @@ class _$LessonModelCopyWithImpl<$Res, $Val extends LessonModel>
           ? _value.description
           : description // ignore: cast_nullable_to_non_nullable
               as String,
-      videoUrl: null == videoUrl
+      videoUrl: freezed == videoUrl
           ? _value.videoUrl
           : videoUrl // ignore: cast_nullable_to_non_nullable
-              as String,
+              as String?,
+      vimeoId: freezed == vimeoId
+          ? _value.vimeoId
+          : vimeoId // ignore: cast_nullable_to_non_nullable
+              as String?,
       durationMinutes: null == durationMinutes
           ? _value.durationMinutes
           : durationMinutes // ignore: cast_nullable_to_non_nullable
@@ -152,7 +160,8 @@ abstract class _$$LessonModelImplCopyWith<$Res>
       @JsonKey(name: 'order') int order,
       String title,
       String description,
-      @JsonKey(name: 'video_url') String videoUrl,
+      @JsonKey(name: 'video_url') String? videoUrl,
+      @JsonKey(name: 'vimeo_id') String? vimeoId,
       @JsonKey(name: 'duration_minutes') int durationMinutes,
       @JsonKey(name: 'quiz_questions') List<dynamic> quizQuestions,
       @JsonKey(name: 'correct_answers') List<int> correctAnswers,
@@ -177,7 +186,8 @@ class __$$LessonModelImplCopyWithImpl<$Res>
     Object? order = null,
     Object? title = null,
     Object? description = null,
-    Object? videoUrl = null,
+    Object? videoUrl = freezed,
+    Object? vimeoId = freezed,
     Object? durationMinutes = null,
     Object? quizQuestions = null,
     Object? correctAnswers = null,
@@ -204,10 +214,14 @@ class __$$LessonModelImplCopyWithImpl<$Res>
           ? _value.description
           : description // ignore: cast_nullable_to_non_nullable
               as String,
-      videoUrl: null == videoUrl
+      videoUrl: freezed == videoUrl
           ? _value.videoUrl
           : videoUrl // ignore: cast_nullable_to_non_nullable
-              as String,
+              as String?,
+      vimeoId: freezed == vimeoId
+          ? _value.vimeoId
+          : vimeoId // ignore: cast_nullable_to_non_nullable
+              as String?,
       durationMinutes: null == durationMinutes
           ? _value.durationMinutes
           : durationMinutes // ignore: cast_nullable_to_non_nullable
@@ -237,7 +251,8 @@ class _$LessonModelImpl implements _LessonModel {
       @JsonKey(name: 'order') required this.order,
       required this.title,
       required this.description,
-      @JsonKey(name: 'video_url') required this.videoUrl,
+      @JsonKey(name: 'video_url') this.videoUrl,
+      @JsonKey(name: 'vimeo_id') this.vimeoId,
       @JsonKey(name: 'duration_minutes') required this.durationMinutes,
       @JsonKey(name: 'quiz_questions')
       required final List<dynamic> quizQuestions,
@@ -263,7 +278,10 @@ class _$LessonModelImpl implements _LessonModel {
   final String description;
   @override
   @JsonKey(name: 'video_url')
-  final String videoUrl;
+  final String? videoUrl;
+  @override
+  @JsonKey(name: 'vimeo_id')
+  final String? vimeoId;
   @override
   @JsonKey(name: 'duration_minutes')
   final int durationMinutes;
@@ -291,7 +309,7 @@ class _$LessonModelImpl implements _LessonModel {
 
   @override
   String toString() {
-    return 'LessonModel(id: $id, levelId: $levelId, order: $order, title: $title, description: $description, videoUrl: $videoUrl, durationMinutes: $durationMinutes, quizQuestions: $quizQuestions, correctAnswers: $correctAnswers, createdAt: $createdAt)';
+    return 'LessonModel(id: $id, levelId: $levelId, order: $order, title: $title, description: $description, videoUrl: $videoUrl, vimeoId: $vimeoId, durationMinutes: $durationMinutes, quizQuestions: $quizQuestions, correctAnswers: $correctAnswers, createdAt: $createdAt)';
   }
 
   @override
@@ -307,6 +325,7 @@ class _$LessonModelImpl implements _LessonModel {
                 other.description == description) &&
             (identical(other.videoUrl, videoUrl) ||
                 other.videoUrl == videoUrl) &&
+            (identical(other.vimeoId, vimeoId) || other.vimeoId == vimeoId) &&
             (identical(other.durationMinutes, durationMinutes) ||
                 other.durationMinutes == durationMinutes) &&
             const DeepCollectionEquality()
@@ -327,6 +346,7 @@ class _$LessonModelImpl implements _LessonModel {
       title,
       description,
       videoUrl,
+      vimeoId,
       durationMinutes,
       const DeepCollectionEquality().hash(_quizQuestions),
       const DeepCollectionEquality().hash(_correctAnswers),
@@ -355,7 +375,8 @@ abstract class _LessonModel implements LessonModel {
       @JsonKey(name: 'order') required final int order,
       required final String title,
       required final String description,
-      @JsonKey(name: 'video_url') required final String videoUrl,
+      @JsonKey(name: 'video_url') final String? videoUrl,
+      @JsonKey(name: 'vimeo_id') final String? vimeoId,
       @JsonKey(name: 'duration_minutes') required final int durationMinutes,
       @JsonKey(name: 'quiz_questions')
       required final List<dynamic> quizQuestions,
@@ -380,7 +401,10 @@ abstract class _LessonModel implements LessonModel {
   String get description;
   @override
   @JsonKey(name: 'video_url')
-  String get videoUrl;
+  String? get videoUrl;
+  @override
+  @JsonKey(name: 'vimeo_id')
+  String? get vimeoId;
   @override
   @JsonKey(name: 'duration_minutes')
   int get durationMinutes;

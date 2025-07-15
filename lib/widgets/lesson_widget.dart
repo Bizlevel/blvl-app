@@ -32,10 +32,21 @@ class _LessonWidgetState extends State<LessonWidget> {
 
   Future<void> _initPlayer() async {
     try {
-      // Получаем подписанный URL из Supabase Storage
-      final directUrl = await SupabaseService.getVideoSignedUrl(
-            widget.lesson.videoUrl) ??
-          'https://acevqbdpzgbtqznbpgzr.supabase.co/storage/v1/object/public/video//DRAFT_1.2%20(1).mp4';
+      // Choose video source: Vimeo > Supabase Storage
+      String directUrl;
+      if (widget.lesson.vimeoId != null && widget.lesson.vimeoId!.isNotEmpty) {
+        // Vimeo embed URL (plays HLS/MP4 directly in video_player)
+        directUrl =
+            'https://player.vimeo.com/video/${widget.lesson.vimeoId}?byline=0&portrait=0';
+      } else {
+        // Fallback to Supabase Storage signed URL
+        if (widget.lesson.videoUrl != null && widget.lesson.videoUrl!.isNotEmpty) {
+          directUrl = await SupabaseService.getVideoSignedUrl(widget.lesson.videoUrl!) ??
+              'https://acevqbdpzgbtqznbpgzr.supabase.co/storage/v1/object/public/video//DRAFT_1.2%20(1).mp4';
+        } else {
+          directUrl = 'https://acevqbdpzgbtqznbpgzr.supabase.co/storage/v1/object/public/video//DRAFT_1.2%20(1).mp4';
+        }
+      }
 
       // Для Web и Mobile используем потоковое воспроизведение
       _videoController = VideoPlayerController.network(directUrl);
