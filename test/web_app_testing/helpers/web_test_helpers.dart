@@ -5,6 +5,7 @@ import 'package:online_course/main.dart';
 import 'package:online_course/services/supabase_service.dart';
 import 'mock_data.dart';
 import 'test_reporter.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 /// Browser types for cross-browser testing
 enum BrowserType { chrome, firefox, safari }
@@ -28,10 +29,14 @@ class WebTestHelper {
   /// Initialize test environment with proper setup
   static Future<void> initializeTestEnvironment() async {
     TestWidgetsFlutterBinding.ensureInitialized();
-    
+    // Load empty environment to satisfy dotenv access
+    if (!dotenv.isInitialized) {
+      dotenv.testLoad(fileInput: '');
+    }
+
     // Initialize Supabase for testing
     await SupabaseService.initialize();
-    
+
     // Clear any existing test data
     await MockDataProvider.clearTestData();
   }
@@ -45,7 +50,7 @@ class WebTestHelper {
       overrides: overrides,
       child: MaterialApp(
         title: 'BizLevel Test',
-        home: home ?? const MyApp(),
+        home: home ?? MyApp(),
         debugShowCheckedModeBanner: false,
       ),
     );
@@ -59,7 +64,7 @@ class WebTestHelper {
   }) async {
     // Set screen size
     await tester.binding.setSurfaceSize(screenSize.size);
-    
+
     // Add browser-specific behavior simulation
     switch (browser) {
       case BrowserType.chrome:
@@ -81,15 +86,15 @@ class WebTestHelper {
     Duration timeout = defaultTimeout,
   }) async {
     final endTime = DateTime.now().add(timeout);
-    
+
     while (DateTime.now().isBefore(endTime)) {
       await tester.pump(const Duration(milliseconds: 100));
-      
+
       if (finder.evaluate().isNotEmpty) {
         return;
       }
     }
-    
+
     throw TimeoutException(
       'Widget not found within timeout: ${finder.description}',
       timeout,
@@ -136,10 +141,10 @@ class WebTestHelper {
   /// Verify element is visible on screen
   static void verifyElementVisible(Finder finder) {
     expect(finder, findsOneWidget);
-    
+
     final element = finder.evaluate().first;
     final renderObject = element.renderObject;
-    
+
     if (renderObject != null) {
       expect(renderObject.paintBounds.isEmpty, false,
           reason: 'Element should be visible on screen');
@@ -152,7 +157,7 @@ class WebTestHelper {
     Finder finder,
   ) async {
     verifyElementVisible(finder);
-    
+
     // Attempt to tap the element
     await tester.tap(finder);
     await tester.pump();
@@ -167,7 +172,7 @@ class WebTestHelper {
   }) async {
     await tester.tap(finder);
     await tester.pump();
-    
+
     for (int i = 0; i < text.length; i++) {
       await tester.enterText(finder, text.substring(0, i + 1));
       await tester.pump();
@@ -209,7 +214,7 @@ class WebTestHelper {
       await setBrowserEnvironment(tester, screenSize: screenSize);
       await tester.pumpWidget(app);
       await tester.pumpAndSettle();
-      
+
       // Verify layout adapts to screen size
       // This can be customized based on specific responsive requirements
     }
@@ -220,9 +225,9 @@ class WebTestHelper {
 class TimeoutException implements Exception {
   final String message;
   final Duration timeout;
-  
+
   const TimeoutException(this.message, this.timeout);
-  
+
   @override
   String toString() => 'TimeoutException: $message (timeout: $timeout)';
 }
