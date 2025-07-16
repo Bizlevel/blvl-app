@@ -312,6 +312,12 @@ The next steps are to finish the LevelCard UI update, add the fetchLevelsRaw hel
 - Задача не решена. После flutter clean, flutter pub get, и запуска на хром и входа в аккаунт, в Профиле все еще висит "Не авторизован".
 • Проанализирована ошибка Zone mismatch в веб-версии: `WidgetsFlutterBinding.ensureInitialized()` вызывался в `_runApp()`, но инициализация Supabase/Sentry происходила в `main()` в разных async-зонах.
 • Исправлен `main.dart`: перенесён `WidgetsFlutterBinding.ensureInitialized()` в начало `main()` для объединения всей инициализации в одной зоне.
+• Исправлено использование SentryFlutter.init: убран appRunner callback, который создавал дополнительную зоне, runApp теперь в той же зоне что и инициализация.
 • Добавлено debug-логирование в `authStateProvider` и `currentUserProvider` для диагностики состояния сессии и пользователя.
-• Улучшен `ProfileScreen`: заменено "Не авторизован" на "Профиль не найден" с кнопкой "Обновить" для принудительного обновления провайдера.
-• Zone mismatch должен быть устранён - теперь authStateProvider будет корректно получать события Supabase auth stream на web.
+• Исправлен `ProfileScreen`: устранен race condition между authStateProvider и currentUserProvider, добавлена правильная обработка состояний загрузки/ошибок.
+• Zone mismatch устранён, но требуется тестирование web-версии для подтверждения работы профиля.
+
+## Задача 11.5
+- Task 11.5 completed: добавлены GitHub Actions workflow (`.github/workflows/ci.yaml`) и скрипт `scripts/sentry_check.sh`.
+- CI запускает тесты, затем проверяет критические нерешённые ошибки Sentry за последние 24 ч; при их наличии сборка падает.
+- В конце workflow отправляется уведомление в Slack c ссылкой на дашборд Sentry.
