@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/foundation.dart';
 
 import 'package:online_course/providers/auth_provider.dart';
 import 'package:online_course/services/auth_service.dart';
@@ -9,8 +10,6 @@ import 'package:online_course/widgets/setting_box.dart';
 import 'package:online_course/widgets/setting_item.dart';
 import 'package:online_course/widgets/artifact_card.dart';
 import 'package:online_course/providers/levels_provider.dart';
-import 'package:online_course/models/level_model.dart';
-import 'package:online_course/services/supabase_service.dart';
 import 'package:online_course/screens/payment_screen.dart';
 
 class ProfileScreen extends ConsumerWidget {
@@ -18,79 +17,112 @@ class ProfileScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final userAsync = ref.watch(currentUserProvider);
+    final authAsync = ref.watch(authStateProvider);
 
-    return userAsync.when(
+    return authAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, s) => Center(child: Text('Ошибка загрузки профиля')),
-      data: (user) {
-        if (user == null) {
-          return const Center(child: Text('Не авторизован'));
+      error: (e, s) => const Center(child: Text('Ошибка авторизации')),
+      data: (authState) {
+        if (kDebugMode) {
+          debugPrint(
+              'ProfileScreen: authState session = ${authState.session != null}');
         }
 
-        final messagesLeft =
-            user.isPremium ? user.leoMessagesToday : user.leoMessagesTotal;
+        final userAsync = ref.watch(currentUserProvider);
 
-        // Получаем уровни для артефактов
-        final levelsAsync = ref.watch(levelsProvider);
-
-        return levelsAsync.when(
+        return userAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, s) => const Center(child: Text('Ошибка уровней')),
-          data: (levelsData) {
-            final completedLevelNumbers =
-                List.generate(user.currentLevel - 1, (index) => index + 1);
+          error: (e, s) {
+            if (kDebugMode) {
+              debugPrint('ProfileScreen: currentUserProvider error = $e');
+            }
+            return const Center(child: Text('Ошибка загрузки профиля'));
+          },
+          data: (user) {
+            if (kDebugMode) {
+              debugPrint(
+                  'ProfileScreen: user = ${user?.id}, onboardingCompleted = ${user?.onboardingCompleted}');
+            }
 
-            final accessibleLevels = levelsData.where((lvl) {
-              final num = lvl['level'] as int;
-              if (user.isPremium) {
-                return num <= user.currentLevel; // все до текущего включительно
-              }
-              return completedLevelNumbers.contains(num);
-            }).toList();
+            if (user == null) {
+              return Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text('Профиль не найден'),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () {
+                      // Принудительно обновляем провайдер
+                      ref.invalidate(currentUserProvider);
+                    },
+                    child: const Text('Обновить'),
+                  ),
+                ],
+              );
+            }
 
-            final artifacts = accessibleLevels
-                .map((lvl) {
-                  return {
-                    'title': lvl['artifact_title'] ?? 'Артефакт',
-                    'description': lvl['artifact_description'] ?? '',
-                    'url': lvl['artifact_url'] ?? '',
-                    'image': lvl['image'] ?? '',
-                  };
-                })
-                .where((a) => (a['url'] as String).isNotEmpty)
-                .toList();
+            final messagesLeft =
+                user.isPremium ? user.leoMessagesToday : user.leoMessagesTotal;
 
-            final artifactsCount = artifacts.length;
+            final levelsAsync = ref.watch(levelsProvider);
 
-            return CustomScrollView(
-              slivers: [
-                SliverAppBar(
-                  backgroundColor: AppColor.appBgColor,
-                  pinned: true,
-                  snap: true,
-                  floating: true,
-                  title: const Text(
-                    'Профиль',
-                    style: TextStyle(
-                      color: AppColor.textColor,
-                      fontSize: 24,
-                      fontWeight: FontWeight.w600,
+            return levelsAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, s) => const Center(child: Text('Ошибка уровней')),
+              data: (levelsData) {
+                final completedLevelNumbers =
+                    List.generate(user.currentLevel - 1, (index) => index + 1);
+
+                final accessibleLevels = levelsData.where((lvl) {
+                  final num = lvl['level'] as int;
+                  if (user.isPremium) {
+                    return num <= user.currentLevel; // все до текущего
+                  }
+                  return completedLevelNumbers.contains(num);
+                }).toList();
+
+                final artifacts = accessibleLevels
+                    .map((lvl) => {
+                          'title': lvl['artifact_title'] ?? 'Артефакт',
+                          'description': lvl['artifact_description'] ?? '',
+                          'url': lvl['artifact_url'] ?? '',
+                          'image': lvl['image'] ?? '',
+                        })
+                    .where((a) => (a['url'] as String).isNotEmpty)
+                    .toList();
+
+                final artifactsCount = artifacts.length;
+
+                return CustomScrollView(
+                  slivers: [
+                    SliverAppBar(
+                      backgroundColor: AppColor.appBgColor,
+                      pinned: true,
+                      snap: true,
+                      floating: true,
+                      title: const Text(
+                        'Профиль',
+                        style: TextStyle(
+                          color: AppColor.textColor,
+                          fontSize: 24,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-                SliverToBoxAdapter(
-                  child: _Body(
-                    userName: user.name,
-                    avatarUrl: user.avatarUrl,
-                    currentLevel: user.currentLevel,
-                    messagesLeft: messagesLeft,
-                    artifactsCount: artifactsCount,
-                    isPremium: user.isPremium,
-                    artifacts: artifacts,
-                  ),
-                ),
-              ],
+                    SliverToBoxAdapter(
+                      child: _Body(
+                        userName: user.name,
+                        avatarUrl: user.avatarUrl,
+                        currentLevel: user.currentLevel,
+                        messagesLeft: messagesLeft,
+                        artifactsCount: artifactsCount,
+                        isPremium: user.isPremium,
+                        artifacts: artifacts,
+                      ),
+                    ),
+                  ],
+                );
+              },
             );
           },
         );

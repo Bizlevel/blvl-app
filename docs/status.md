@@ -305,3 +305,13 @@ The next steps are to finish the LevelCard UI update, add the fetchLevelsRaw hel
 - Успешно протестировано на iOS и Web, ошибок не выявлено.
 - Код закоммичен, лимиты и счётчики сообщений работают корректно.
 
+## Задача 11.4
+• ProfileScreen.build полностью переработан:
+– При authAsync.loading и currentUserProvider.loading отображается CircularProgressIndicator.
+– Удалён дублирующий build и лишние скобки, из-за которых показывалось сообщение «Не авторизован».
+- Задача не решена. После flutter clean, flutter pub get, и запуска на хром и входа в аккаунт, в Профиле все еще висит "Не авторизован".
+• Проанализирована ошибка Zone mismatch в веб-версии: `WidgetsFlutterBinding.ensureInitialized()` вызывался в `_runApp()`, но инициализация Supabase/Sentry происходила в `main()` в разных async-зонах.
+• Исправлен `main.dart`: перенесён `WidgetsFlutterBinding.ensureInitialized()` в начало `main()` для объединения всей инициализации в одной зоне.
+• Добавлено debug-логирование в `authStateProvider` и `currentUserProvider` для диагностики состояния сессии и пользователя.
+• Улучшен `ProfileScreen`: заменено "Не авторизован" на "Профиль не найден" с кнопкой "Обновить" для принудительного обновления провайдера.
+• Zone mismatch должен быть устранён - теперь authStateProvider будет корректно получать события Supabase auth stream на web.

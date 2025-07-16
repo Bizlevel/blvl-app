@@ -45,7 +45,7 @@ class SupabaseService {
           await client.auth.signOut();
         }
         rethrow;
-      } on SocketException catch (e) {
+      } on SocketException {
         throw Exception('Нет соединения с интернетом');
       }
     });

@@ -15,13 +15,13 @@ import 'theme/color.dart';
 import 'screens/auth/onboarding_screens.dart';
 
 void _runApp() {
-  WidgetsFlutterBinding.ensureInitialized();
   runApp(ProviderScope(child: MyApp()));
 }
-  
-
 
 Future<void> main() async {
+  // КРИТИЧНО: Все инициализации должны быть в одной зоне для web
+  WidgetsFlutterBinding.ensureInitialized();
+
   // Загружаем переменные окружения (если файл есть)
   try {
     await dotenv.load(fileName: '.env');
@@ -43,12 +43,14 @@ Future<void> main() async {
           ..dsn = dsn
           ..tracesSampleRate = 1.0
           ..environment = kReleaseMode ? 'prod' : 'dev'
-          ..release = 'bizlevel@${packageInfo.version}+${packageInfo.buildNumber}'
+          ..release =
+              'bizlevel@${packageInfo.version}+${packageInfo.buildNumber}'
           ..enableAutoSessionTracking = true
           ..attachScreenshot = true
           ..attachViewHierarchy = true
           ..beforeSend = (SentryEvent event, Hint hint) {
-            event.request?.headers?.removeWhere((k, _) => k.toLowerCase() == 'authorization');
+            event.request?.headers
+                .removeWhere((k, _) => k.toLowerCase() == 'authorization');
             return event;
           };
       },
@@ -67,7 +69,7 @@ class MyApp extends ConsumerWidget {
       data: (authState) {
         // Проверяем наличие сессии
         final session = authState.session;
-        final isLoggedIn = session != null && session.user != null;
+        final isLoggedIn = session != null;
         if (!isLoggedIn) {
           return const LoginScreen();
         }

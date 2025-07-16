@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:online_course/services/leo_service.dart';
 import 'package:online_course/services/supabase_service.dart';
-import 'package:online_course/theme/color.dart';
 import 'package:online_course/widgets/chat_item.dart';
 import 'package:online_course/screens/leo_dialog_screen.dart';
 
