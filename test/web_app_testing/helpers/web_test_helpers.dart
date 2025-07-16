@@ -34,8 +34,8 @@ class WebTestHelper {
       dotenv.testLoad(fileInput: '');
     }
 
-    // Initialize Supabase for testing
-    await SupabaseService.initialize();
+    // Skip real Supabase initialization in web tests to avoid network calls.
+    // The app code that relies on Supabase is mocked via provider overrides.
 
     // Clear any existing test data
     await MockDataProvider.clearTestData();
