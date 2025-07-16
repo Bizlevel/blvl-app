@@ -14,12 +14,8 @@ import 'services/supabase_service.dart';
 import 'theme/color.dart';
 import 'screens/auth/onboarding_screens.dart';
 
-void _runApp() {
-  runApp(ProviderScope(child: MyApp()));
-}
-
 Future<void> main() async {
-  // КРИТИЧНО: Все инициализации должны быть в одной зоне для web
+  // КРИТИЧНО для web: Все инициализации должны быть в одной зоне
   WidgetsFlutterBinding.ensureInitialized();
 
   // Загружаем переменные окружения (если файл есть)
@@ -34,8 +30,10 @@ Future<void> main() async {
       const String.fromEnvironment('SENTRY_DSN', defaultValue: '');
 
   if (dsn.isEmpty) {
-    _runApp();
+    // Без Sentry
+    runApp(ProviderScope(child: MyApp()));
   } else {
+    // С Sentry, но в той же зоне
     final packageInfo = await PackageInfo.fromPlatform();
     await SentryFlutter.init(
       (options) {
@@ -54,8 +52,11 @@ Future<void> main() async {
             return event;
           };
       },
-      appRunner: _runApp,
+      // НЕ используем appRunner - это создает разные зоны
     );
+
+    // Запускаем приложение в той же зоне
+    runApp(ProviderScope(child: MyApp()));
   }
 }
 

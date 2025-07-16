@@ -29,7 +29,7 @@ class AuthService {
       return response;
     } on AuthException catch (e, st) {
       await Sentry.captureException(e, stackTrace: st);
-      throw AuthFailure(e.message ?? 'Не удалось войти.');
+      throw AuthFailure(e.message);
     } on SocketException {
       throw AuthFailure('Нет соединения с интернетом');
     } catch (e, st) {
@@ -47,7 +47,7 @@ class AuthService {
       return response;
     } on AuthException catch (e, st) {
       await Sentry.captureException(e, stackTrace: st);
-      throw AuthFailure(e.message ?? 'Не удалось зарегистрироваться.');
+      throw AuthFailure(e.message);
     } on SocketException {
       throw AuthFailure('Нет соединения с интернетом');
     } catch (e, st) {
@@ -64,7 +64,7 @@ class AuthService {
       Sentry.configureScope((scope) => scope.setUser(null));
     } on AuthException catch (e, st) {
       await Sentry.captureException(e, stackTrace: st);
-      throw AuthFailure(e.message ?? 'Не удалось выйти из аккаунта.');
+      throw AuthFailure(e.message);
     } on SocketException {
       throw AuthFailure('Нет соединения с интернетом');
     } catch (e, st) {

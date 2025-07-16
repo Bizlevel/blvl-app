@@ -24,8 +24,6 @@ void main() {
       createdAt: null,
     );
 
-    bool watched = false;
-
     await tester.pumpWidget(
       MaterialApp(
         home: LessonWidget(

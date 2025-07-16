@@ -24,6 +24,11 @@ final currentUserProvider = FutureProvider<UserModel?>((ref) async {
   if (user == null) return null;
 
   try {
+    if (kDebugMode) {
+      debugPrint(
+          'currentUserProvider: querying users table for user ${user.id}');
+    }
+
     final response = await SupabaseService.client
         .from('users')
         .select()
@@ -32,15 +37,36 @@ final currentUserProvider = FutureProvider<UserModel?>((ref) async {
 
     if (kDebugMode) {
       debugPrint('currentUserProvider: users query response = $response');
+      debugPrint(
+          'currentUserProvider: response type = ${response.runtimeType}');
     }
 
-    if (response == null) return null; // профиль ещё не заполнен
-    return UserModel.fromJson(response);
+    if (response == null) {
+      if (kDebugMode) {
+        debugPrint(
+            'currentUserProvider: no user found in users table for ${user.id}');
+      }
+      return null; // профиль ещё не заполнен
+    }
+
+    final userModel = UserModel.fromJson(response);
+    if (kDebugMode) {
+      debugPrint(
+          'currentUserProvider: successfully loaded user ${userModel.id}, onboardingCompleted = ${userModel.onboardingCompleted}');
+    }
+
+    return userModel;
   } on PostgrestException catch (e) {
     if (kDebugMode) {
-      debugPrint('currentUserProvider: PostgrestException = ${e.message}');
+      debugPrint(
+          'currentUserProvider: PostgrestException = ${e.message}, code = ${e.code}');
     }
     // table exists but запись отсутствует – вернём null
+    return null;
+  } catch (e) {
+    if (kDebugMode) {
+      debugPrint('currentUserProvider: unexpected error = $e');
+    }
     return null;
   }
 });

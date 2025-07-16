@@ -1,8 +1,0 @@
-{
-  "mcpServers": { 
-    "supabase":{"command":"npx","args":["-y","@supabase/mcp-server-supabase@latest","--access-token","sbp_a57f75166cd0ae97cd1a314ae546a7babae5cdbe"]},
-    "Sentry": {
-      "url": "https://mcp.sentry.dev/mcp"
-    }
-  }
-}
