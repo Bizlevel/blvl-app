@@ -6,6 +6,7 @@ import 'package:online_course/screens/auth/login_screen.dart';
 import 'package:online_course/screens/auth/onboarding_screens.dart';
 import 'package:online_course/providers/auth_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:online_course/models/user_model.dart';
 
 import 'helpers/web_test_helpers.dart';
 
@@ -58,7 +59,15 @@ void main() {
         }),
         // currentUserProvider override: user completed onboarding
         currentUserProvider.overrideWith((ref) async {
-          return null; // treat as onboarding completed for test simplicity
+          return UserModel(
+            id: 'uid',
+            email: 'user@biz.kz',
+            name: 'User',
+            onboardingCompleted: true,
+            currentLevel: 1,
+            createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
+          );
         })
       ];
 
