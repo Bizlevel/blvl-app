@@ -321,3 +321,7 @@ The next steps are to finish the LevelCard UI update, add the fetchLevelsRaw hel
 - Task 11.5 completed: добавлены GitHub Actions workflow (`.github/workflows/ci.yaml`) и скрипт `scripts/sentry_check.sh`.
 - CI запускает тесты, затем проверяет критические нерешённые ошибки Sentry за последние 24 ч; при их наличии сборка падает.
 - В конце workflow отправляется уведомление в Slack c ссылкой на дашборд Sentry.
+
+## Задача 11.6
+- Task 11.6 completed: добавлен smoke-тест `integration_test/web_smoke_test.dart` (запуск LessonWidget в Chrome) и dev-dependency `integration_test`.
+- Workflow CI уже запускает `flutter test --platform chrome`, теперь включает интеграционный web-тест и гарантирует, что приложение рендерит урок с видео без ошибок.
