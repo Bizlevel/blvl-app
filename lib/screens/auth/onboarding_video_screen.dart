@@ -93,6 +93,8 @@ class _OnboardingVideoScreenState extends State<OnboardingVideoScreen> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('onboarding_done', true);
 
+    if (!mounted) return;
+
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const RootApp()),
       (_) => false,

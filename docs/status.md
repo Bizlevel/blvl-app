@@ -83,54 +83,16 @@
 Задача 9.3: Создан виджет `FloatingChatBubble` (Stateful) с пульсацией и бейджем непрочитанных сообщений. При нажатии открывает `LeoDialogScreen` через `showModalBottomSheet` (90% высоты). Виджет размещается через `Positioned(bottom:20,right:20)` поверх контента. Добавлена анимация масштабирования (Tween 1→1.1) для привлечения внимания. Изменения не затронули существующие файлы; интеграция на экраны будет в задаче 9.4.
 Задача 9.4: `LevelDetailScreen`: обёрнут в `Stack`, добавлен `FloatingChatBubble`, показывается только на Lesson/Quiz блоках. Формируется `systemPrompt` по текущему блоку; перед открытием чата сохраняется в `leo_messages`. `FloatingChatBubble` получает `systemPrompt`, сохраняет сообщение и открывает `LeoDialogScreen`. Виджет скрывается на Intro/финальных блоках, перерисовывается при смене страницы. Линты пройдены, функционал протестирован — Leo отвечает с учётом контекста.
 
-## Задача 10.1
-1. `AndroidManifest.xml`: добавлены разрешения INTERNET + READ_MEDIA_VIDEO/READ_EXTERNAL_STORAGE.
-2. `build.gradle`: shrinkResources & minifyEnabled уже активны; оставил debug keystore.
-3. `proguard-rules.pro`: keep-rules для Supabase, Dio/OkHttp/Okio, Gson.
-4. APK size оптимизируется ресурсным шринком; сеть и видео работают на Android 8–14.
-5. Проблема с deprecated `app_plugin_loader` устранена; приложение собирается и запускается на эмуляторе.
+# Этап 10:
+Задача 10.1: `AndroidManifest.xml`: добавлены разрешения INTERNET + READ_MEDIA_VIDEO/READ_EXTERNAL_STORAGE. `build.gradle`: shrinkResources & minifyEnabled уже активны; оставил debug keystore. `proguard-rules.pro`: keep-rules для Supabase, Dio/OkHttp/Okio, Gson. APK size оптимизируется ресурсным шринком; сеть и видео работают на Android 8–14. Проблема с deprecated `app_plugin_loader` устранена; приложение собирается и запускается на эмуляторе.
+Задача 10.2: Пакет `responsive_framework` добавлен, MaterialApp обёрнут в `ResponsiveWrapper` (maxWidth = 600). Видео-плеер: `LessonWidget` теперь использует `VideoPlayerController.network`, совместим с Web. Свайпы отключены ранее; кнопочная навигация сохранена. CORS для Supabase описан в README (в коде не требуется). Приложение открывается в Chrome, layout адаптивный. `main.dart`: единый `_bootstrap()` + `appRunner`, предупреждение Zone исчезло. `LessonWidget`/`OnboardingVideoScreen`: на Web `VideoPlayer` + play-кнопка, Chewie/File отключены. `CustomImage`: добавлен placeholder-иконка при CORS-ошибке изображений.
+Задача 10.3: Добавлены `mounted`-проверки перед `setState` в `LessonWidget`, `OnboardingVideoScreen`, `LeoDialogScreen` и таймере skip – предотвращает exceptions после dispose. Retry-хелпер `_withRetry` уже использовался в `SupabaseService`; подтвердил покрытие всех запросов и вынес в `leo_service.dart`. Обработка offline: все Supabase вызовы ловят `SocketException` и бросают `Нет соединения с интернетом`; UI перехватывает и показывает SnackBar. Пользовательские сообщения: экраны входа/регистрации и чат Leo показывают SnackBar с понятным текстом при ошибках. Все перехваченные исключения дополнительно логируются в Sentry (`captureException`). Приложение устойчиво к прерыванию интернета и закрытию экранов во время асинхронных операций.
+Задача 10.4: Добавлены shimmer-скелетоны для списка уровней, улучшены анимации (PageView снова свайпается). В `LevelCard` добавлен лёгкий HapticFeedback при нажатии. Leo-чат подключается напрямую к OpenAI при наличии `OPENAI_API_KEY` в `.env` – ответы работают. Исправлен Next/свайп в уровне 1 (прогресс стартует с 1). UX проверен на iPhone – загрузка плавная, чат и навигация работают без ошибок.
+# Fixing issues
+Ошибки Sentry (14.07): RenderFlex overflow (BIZLEVEL-FLUTTER-5/6) – исправлено: LessonWidget обёрнут в SingleChildScrollView. StorageException 404 (BIZLEVEL-FLUTTER-4/2) – обработка 404 без throw, логирование в Sentry подавлено. Zone mismatch ошибок больше не воспроизводится. Все изменения добавлены и готовы к проверке.
 
-## Задача 10.2
-1. Пакет `responsive_framework` добавлен, MaterialApp обёрнут в `ResponsiveWrapper` (maxWidth = 600).
-2. Видео-плеер: `LessonWidget` теперь использует `VideoPlayerController.network`, совместим с Web.
-3. Свайпы отключены ранее; кнопочная навигация сохранена.
-4. CORS для Supabase описан в README (в коде не требуется).
-5. Приложение открывается в Chrome, layout адаптивный.
-6. `main.dart`: единый `_bootstrap()` + `appRunner`, предупреждение Zone исчезло.
-7. `LessonWidget`/`OnboardingVideoScreen`: на Web `VideoPlayer` + play-кнопка, Chewie/File отключены.
-8. `CustomImage`: добавлен placeholder-иконка при CORS-ошибке изображений.
-
-## Задача 10.3
-1. Добавлены `mounted`-проверки перед `setState` в `LessonWidget`, `OnboardingVideoScreen`, `LeoDialogScreen` и таймере skip – предотвращает exceptions после dispose.
-2. Retry-хелпер `_withRetry` уже использовался в `SupabaseService`; подтвердил покрытие всех запросов и вынес в `leo_service.dart`.
-3. Обработка offline: все Supabase вызовы ловят `SocketException` и бросают `Нет соединения с интернетом`; UI перехватывает и показывает SnackBar.
-4. Пользовательские сообщения: экраны входа/регистрации и чат Leo показывают SnackBar с понятным текстом при ошибках.
-5. Все перехваченные исключения дополнительно логируются в Sentry (`captureException`).
-
-Приложение устойчиво к прерыванию интернета и закрытию экранов во время асинхронных операций.
-
-## Задача 10.4
-1. Добавлены shimmer-скелетоны для списка уровней, улучшены анимации (PageView снова свайпается).
-2. В `LevelCard` добавлен лёгкий HapticFeedback при нажатии.
-3. Leo-чат подключается напрямую к OpenAI при наличии `OPENAI_API_KEY` в `.env` – ответы работают.
-4. Исправлен Next/свайп в уровне 1 (прогресс стартует с 1).
-5. UX проверен на iPhone – загрузка плавная, чат и навигация работают без ошибок.
-
-## Ошибки Sentry (14.07)
-1. RenderFlex overflow (BIZLEVEL-FLUTTER-5/6) – исправлено: LessonWidget обёрнут в SingleChildScrollView.
-2. StorageException 404 (BIZLEVEL-FLUTTER-4/2) – обработка 404 без throw, логирование в Sentry подавлено.
-3. Zone mismatch ошибок больше не воспроизводится.
-Все изменения добавлены и готовы к проверке.
-
-## Leo AI assistant improvements (14.07)
-- Edge Function `leo_context` генерирует персональный system prompt на основе прогресса.
-- RPC `decrement_leo_message` + UI блокируют превышение дневного лимита.
-- OpenAI Moderation API фильтрует пользовательский ввод перед отправкой.
-- `LeoDialogScreen` переписан: постраничная загрузка чата, кнопка «Загрузить ещё», плавный автоскролл.
-- Бейдж непрочитанных сообщений и обнуление счётчика работают стабильно.
-
-## Правки для настроек видео на Vimeo
-- 
+Leo AI assistant improvements (14.07): Edge Function `leo_context` генерирует персональный system prompt на основе прогресса. - RPC `decrement_leo_message` + UI блокируют превышение дневного лимита. - OpenAI Moderation API фильтрует пользовательский ввод перед отправкой. - `LeoDialogScreen` переписан: постраничная загрузка чата, кнопка «Загрузить ещё», плавный автоскролл. - Бейдж непрочитанных сообщений и обнуление счётчика работают стабильно.
+Правки для настроек видео на Vimeo
 1. lesson_model.dart: • videoUrl → nullable. • Добавлено новое поле vimeoId.
 2. lesson_widget.dart: • В _initPlayer() теперь выбирается источник:
 - если vimeoId заполнен → воспроизводим https://player.vimeo.com/video/<id>;

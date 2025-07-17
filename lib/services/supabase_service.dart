@@ -84,7 +84,7 @@ class SupabaseService {
             .createSignedUrl(relativePath, 60 * 60);
         return response;
       } on StorageException catch (e, st) {
-        if (e.statusCode != 404) {
+        if ((e.statusCode ?? 0) != 404) {
           await Sentry.captureException(e, stackTrace: st);
         }
         return null;
@@ -146,7 +146,7 @@ class SupabaseService {
             .createSignedUrl(relativePath, 60 * 60);
         return response;
       } on StorageException catch (e, st) {
-        if (e.statusCode != 404) {
+        if ((e.statusCode ?? 0) != 404) {
           await Sentry.captureException(e, stackTrace: st);
         }
         return null;
