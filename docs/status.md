@@ -326,9 +326,17 @@ The next steps are to finish the LevelCard UI update, add the fetchLevelsRaw hel
 - Task 11.6 completed: добавлен smoke-тест `integration_test/web_smoke_test.dart` (запуск LessonWidget в Chrome) и dev-dependency `integration_test`.
 - Workflow CI уже запускает `flutter test --platform chrome`, теперь включает интеграционный web-тест и гарантирует, что приложение рендерит урок с видео без ошибок.
 
-## Задача 12.1
-- Task 12.1 completed: добавлен dev_dependency `flutter_lints`, запущен `flutter pub get`.
+## Задача Fix warnings
+- Добавлен dev_dependency `flutter_lints`, запущен `flutter pub get`.
 - Подавлены предупреждения `invalid_annotation_target` в моделях через `// ignore_for_file`.
 - Исправлены `dead_null_aware_expression` в `AuthService` и удалена неисп. переменная в `web_smoke_test`.
 - `flutter analyze` теперь выдаёт только info-уровень замечания, критических warnings нет.
 - Проблем не обнаружено.
+
+## Задача 12.1
+- Исправлен вертикальный маршрут: PageView обёрнут в `SizedBox.expand`, что гарантирует корректные constraints и исключает горизонтальный свайп на iOS.
+- Файл изменён: `lib/screens/level_detail_screen.dart`.
+
+## Задача 12.2
+- Убран автоматический `jumpToPage()` в `build`; `PageController` теперь создаётся с `initialPage`, что устраняет произвольные "прыжки" между блоками.
+- Изменён файл `lib/screens/level_detail_screen.dart`.

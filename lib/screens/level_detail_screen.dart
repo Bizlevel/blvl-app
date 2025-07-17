@@ -23,15 +23,19 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
   late final PageController _pageController;
 
   late List<_PageBlock> _blocks;
-  LessonProgressState get _progress => ref.watch(lessonProgressProvider(widget.levelId));
+  LessonProgressState get _progress =>
+      ref.watch(lessonProgressProvider(widget.levelId));
 
-  // Leo chat
+  // Leo chat (создаётся при первом сообщении пользователя)
   String? _chatId;
 
   @override
   void initState() {
     super.initState();
-    _pageController = PageController();
+    // Берём последнюю разблокированную страницу, чтобы открывать уровень там, где пользователь остановился.
+    final initialUnlockedPage =
+        ref.read(lessonProgressProvider(widget.levelId)).unlockedPage;
+    _pageController = PageController(initialPage: initialUnlockedPage);
     // Listen for page changes to rebuild so that chat bubble visibility updates
     _pageController.addListener(() {
       if (mounted) setState(() {});
@@ -53,13 +57,18 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
   }
 
   void _videoWatched(int page) {
-    _progressNotifier.markVideoWatched(page);
-    _unlockNext(page);
+    // Отложим обновление, чтобы избежать модификации провайдера во время билда
+    Future(() {
+      _progressNotifier.markVideoWatched(page);
+      _unlockNext(page);
+    });
   }
 
   void _quizPassed(int page) {
-    _progressNotifier.markQuizPassed(page);
-    _unlockNext(page);
+    Future(() {
+      _progressNotifier.markQuizPassed(page);
+      _unlockNext(page);
+    });
   }
 
   @override
@@ -71,66 +80,60 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
       body: lessonsAsync.when(
         data: (lessons) {
           _buildBlocks(lessons);
-          // Restore saved position
-          if (_pageController.hasClients && _currentIndex != _progress.unlockedPage) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              _pageController.jumpToPage(_progress.unlockedPage);
-            });
-          }
-          // Ensure chat is created once lessons are available
-          if (_chatId == null) {
-            final prompt = _buildSystemPrompt();
-            _ensureChatCreated(prompt);
-          }
 
-          final mainContent = Column(
-            children: [
-              Expanded(child: _buildPageView()),
-              _ProgressDots(current: _currentIndex, total: _blocks.length),
-              _NavBar(
-                canBack: _currentIndex > 0,
-                canNext: _currentIndex + 1 <= _progress.unlockedPage,
-                onBack: _goBack,
-                onNext: _goNext,
-              ),
-              const SizedBox(height: 10),
-              ElevatedButton.icon(
-                onPressed: _isLevelCompleted(lessons)
-                    ? () async {
-                        try {
-                          await SupabaseService.completeLevel(widget.levelId);
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Уровень завершён!')),
-                            );
-                            Navigator.of(context).pop();
-                          }
-                        } catch (e) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Ошибка: $e')),
-                            );
+          final mainContent = SafeArea(
+            child: Column(
+              children: [
+                Expanded(child: _buildPageView()),
+                _ProgressDots(current: _currentIndex, total: _blocks.length),
+                _NavBar(
+                  canBack: _currentIndex > 0,
+                  canNext: _currentIndex < _progress.unlockedPage,
+                  onBack: _goBack,
+                  onNext: _goNext,
+                ),
+                const SizedBox(height: 10),
+                ElevatedButton.icon(
+                  onPressed: _isLevelCompleted(lessons)
+                      ? () async {
+                          try {
+                            await SupabaseService.completeLevel(widget.levelId);
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                    content: Text('Уровень завершён!')),
+                              );
+                              Navigator.of(context).pop();
+                            }
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Ошибка: $e')),
+                              );
+                            }
                           }
                         }
-                      }
-                    : null,
-                icon: const Icon(Icons.check),
-                label: const Text('Завершить уровень'),
-                style: ElevatedButton.styleFrom(backgroundColor: AppColor.primary),
-              ),
-            ],
+                      : null,
+                  icon: const Icon(Icons.check),
+                  label: const Text('Завершить уровень'),
+                  style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColor.primary),
+                ),
+              ],
+            ),
           );
 
           // Wrap with Stack to overlay chat bubble
           final stack = Stack(
             children: [
               mainContent,
-              if (_chatId != null && (_blocks[_currentIndex] is _LessonBlock || _blocks[_currentIndex] is _QuizBlock))
+              if (_blocks[_currentIndex] is _LessonBlock ||
+                  _blocks[_currentIndex] is _QuizBlock)
                 Positioned(
                   bottom: 20,
                   right: 20,
                   child: FloatingChatBubble(
-                    chatId: _chatId!,
+                    chatId: _chatId,
                     systemPrompt: _buildSystemPrompt(),
                     unreadCount: 0,
                   ),
@@ -147,12 +150,14 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
 
   // Helpers ---------------------------------------------------------
 
-  int get _currentIndex => _pageController.hasClients ? _pageController.page?.round() ?? 0 : 0;
+  int get _currentIndex =>
+      _pageController.hasClients ? _pageController.page?.round() ?? 0 : 0;
 
   // --- Leo chat helpers --------------------------------------------
   void _ensureChatCreated(String prompt) async {
     try {
-      final id = await LeoService.saveConversation(role: 'system', content: prompt);
+      final id =
+          await LeoService.saveConversation(role: 'system', content: prompt);
       if (mounted) setState(() => _chatId = id);
     } catch (_) {
       // Silently ignore chat creation errors – chat bubble will not show
@@ -175,31 +180,40 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
 
   void _goBack() {
     if (_currentIndex > 0) {
-      _pageController.previousPage(duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
+      _pageController.previousPage(
+          duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
     }
   }
 
   void _goNext() {
-    if (_currentIndex + 1 < _blocks.length && _currentIndex + 1 <= _progress.unlockedPage) {
-      _pageController.nextPage(duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
+    if (_currentIndex + 1 < _blocks.length &&
+        _currentIndex < _progress.unlockedPage) {
+      _pageController.nextPage(
+          duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
     }
   }
 
   Widget _buildPageView() {
-    return PageView.builder(
-      controller: _pageController,
-      physics: const PageScrollPhysics(),
-      itemCount: _blocks.length,
-      itemBuilder: (context, index) {
-        final locked = index > _progress.unlockedPage;
-        return AbsorbPointer(
-          absorbing: locked,
-          child: Opacity(
-            opacity: locked ? 0.3 : 1,
-            child: _blocks[index].build(context, index),
-          ),
-        );
-      },
+    // SizedBox.expand гарантирует, что PageView получает валидные вертикальные constraints
+    // даже на раннем этапе компоновки (особенно в iOS debug-сборке), исключая создание
+    // горизонтального Viewport и неправильную ориентацию свайпа.
+    return SizedBox.expand(
+      child: PageView.builder(
+        scrollDirection: Axis.vertical,
+        controller: _pageController,
+        physics: const PageScrollPhysics(),
+        itemCount: _blocks.length,
+        itemBuilder: (context, index) {
+          final locked = index > _progress.unlockedPage;
+          return AbsorbPointer(
+            absorbing: locked,
+            child: Opacity(
+              opacity: locked ? 0.3 : 1,
+              child: _blocks[index].build(context, index),
+            ),
+          );
+        },
+      ),
     );
   }
 
@@ -237,9 +251,13 @@ class _IntroBlock extends _PageBlock {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text('Уровень $levelId', style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
+            Text('Уровень $levelId',
+                style:
+                    const TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
-            const Text('Проходите уроки по порядку и выполняйте тесты, чтобы продвигаться дальше.', textAlign: TextAlign.center),
+            const Text(
+                'Проходите уроки по порядку и выполняйте тесты, чтобы продвигаться дальше.',
+                textAlign: TextAlign.center),
           ],
         ),
       ),
@@ -288,7 +306,8 @@ class _QuizBlock extends _PageBlock {
 class _ProgressDots extends StatelessWidget {
   final int current;
   final int total;
-  const _ProgressDots({Key? key, required this.current, required this.total}) : super(key: key);
+  const _ProgressDots({Key? key, required this.current, required this.total})
+      : super(key: key);
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -318,7 +337,13 @@ class _NavBar extends StatelessWidget {
   final bool canNext;
   final VoidCallback onBack;
   final VoidCallback onNext;
-  const _NavBar({Key? key, required this.canBack, required this.canNext, required this.onBack, required this.onNext}) : super(key: key);
+  const _NavBar(
+      {Key? key,
+      required this.canBack,
+      required this.canNext,
+      required this.onBack,
+      required this.onNext})
+      : super(key: key);
   @override
   Widget build(BuildContext context) {
     return Padding(
