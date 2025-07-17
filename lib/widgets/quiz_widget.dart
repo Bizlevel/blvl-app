@@ -51,16 +51,28 @@ class _QuizWidgetState extends State<QuizWidget> {
                   },
             child: const Text('Проверить'),
           )
-        else
-          Text(
-            _isCorrect
-                ? 'Верно! 👍'
-                : 'Неправильный ответ. Попробуйте ещё раз.',
-            style: TextStyle(
-              color: _isCorrect ? Colors.green : Colors.red,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
+        else ...{
+          if (_isCorrect)
+            Text('Верно! 👍',
+                style: const TextStyle(
+                    color: Colors.green, fontWeight: FontWeight.w600))
+          else
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('Неправильный ответ. Попробуйте ещё раз.',
+                  style: TextStyle(
+                      color: Colors.red, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              ElevatedButton(
+                onPressed: () {
+                  setState(() {
+                    _checked = false;
+                    _selected = null;
+                  });
+                },
+                child: const Text('Попробовать снова'),
+              ),
+            ]),
+        },
       ],
     );
   }

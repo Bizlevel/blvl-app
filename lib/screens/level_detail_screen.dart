@@ -89,7 +89,6 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
             child: Column(
               children: [
                 Expanded(child: _buildPageView()),
-                _ProgressDots(current: _currentIndex, total: _blocks.length),
                 _NavBar(
                   canBack: (_pageController.hasClients
                       ? (_pageController.page ??
@@ -138,6 +137,16 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
           final stack = Stack(
             children: [
               mainContent,
+              // Vertical progress dots on right side center
+              Positioned(
+                top: MediaQuery.of(context).size.height * 0.3,
+                right: 8,
+                child: _ProgressDots(
+                  current: _currentIndex,
+                  total: _blocks.length,
+                  vertical: true,
+                ),
+              ),
               if (_blocks[_currentIndex] is _LessonBlock ||
                   _blocks[_currentIndex] is _QuizBlock)
                 Positioned(
@@ -409,28 +418,37 @@ class _QuizBlock extends _PageBlock {
 class _ProgressDots extends StatelessWidget {
   final int current;
   final int total;
-  const _ProgressDots({Key? key, required this.current, required this.total})
+  final bool vertical;
+  const _ProgressDots(
+      {Key? key,
+      required this.current,
+      required this.total,
+      this.vertical = false})
       : super(key: key);
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: List.generate(
-          total,
-          (i) => Container(
-            margin: const EdgeInsets.symmetric(horizontal: 4),
-            width: 10,
-            height: 10,
-            decoration: BoxDecoration(
-              color: i <= current ? AppColor.primary : Colors.grey.shade300,
-              shape: BoxShape.circle,
-            ),
-          ),
+    final dots = List.generate(
+      total,
+      (i) => Container(
+        margin: const EdgeInsets.all(4),
+        width: 10,
+        height: 10,
+        decoration: BoxDecoration(
+          color: i <= current ? AppColor.primary : Colors.grey.shade300,
+          shape: BoxShape.circle,
         ),
       ),
     );
+
+    return vertical
+        ? Column(mainAxisSize: MainAxisSize.min, children: dots)
+        : Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: dots,
+            ),
+          );
   }
 }
 

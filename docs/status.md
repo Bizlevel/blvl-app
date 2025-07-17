@@ -336,22 +336,17 @@ The next steps are to finish the LevelCard UI update, add the fetchLevelsRaw hel
 ## Задача 12.1
 - Исправлен вертикальный маршрут: PageView обёрнут в `SizedBox.expand`, что гарантирует корректные constraints и исключает горизонтальный свайп на iOS.
 - Файл изменён: `lib/screens/level_detail_screen.dart`.
-
 ## Задача 12.2
 - Убран автоматический `jumpToPage()` в `build`; `PageController` теперь создаётся с `initialPage`, что устраняет произвольные "прыжки" между блоками.
 - Изменён файл `lib/screens/level_detail_screen.dart`.
-
 ## Задача 12.3
 - Пересчитан `_currentIndex` на основе фактической позиции `page`, кнопка «Назад» активна во время анимации; условная блокировка удалена.
 - Обновлены методы `_goBack` и блок `_NavBar` в `lib/screens/level_detail_screen.dart`.
-
 ## Задача 12.4
 - Добавлен `_ArtifactBlock` и включён в маршрут (`_buildBlocks`). Блок показывает описание и кнопку скачивания артефакта через подписанный URL.
 - Импортирован `url_launcher`. Изменён файл `lib/screens/level_detail_screen.dart`.
-
 ## Задача 12.5
 - В базу добавлен столбец `updated_at` в `user_progress` (migration `add_updated_at_to_user_progress`). Ошибка PGRST204 больше не возникает.
-
 ## Задачи 12.6–12.9
 - 12.6: `canNext` учитывает текущую и следующую страницу; `unlockNext` предотвращает выход за пределы списка блоков.
 - 12.7: `LessonWidget` показывает fallback с кнопкой «Пропустить», убран хардкод video URL.
@@ -360,3 +355,11 @@ The next steps are to finish the LevelCard UI update, add the fetchLevelsRaw hel
 
 ## Задача 12.10
 - Добавлен интеграционный тест `test/level_flow_test.dart`, покрывающий прохождение уроков, квиза и кнопку завершения уровня с мок-провайдерами.
+
+## Fix build iOS Sentry headers
+- Удалена сабспека `HybridSDK` в `ios/Podfile`; выполнен `pod install --repo-update`, Sentry собирается без ошибок header copy.
+
+## Bugfixes 18.07
+- QuizWidget: добавлена кнопка «Попробовать снова» после неверного ответа.
+- Supabase: создан RPC `update_current_level` (migration) – ошибка PGRST202 устранена.
+- ProgressDots: отрисовываются вертикально справа, не перекрывают контент.
