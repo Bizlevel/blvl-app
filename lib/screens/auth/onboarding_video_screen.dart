@@ -38,7 +38,7 @@ class _OnboardingVideoScreenState extends State<OnboardingVideoScreen> {
           'https://acevqbdpzgbtqznbpgzr.supabase.co/storage/v1/object/public/video//DRAFT_1.2%20(1).mp4';
 
       // Для Web и Mobile используем потоковое воспроизведение
-      _videoController = VideoPlayerController.network(signedUrl);
+      _videoController = VideoPlayerController.networkUrl(Uri.parse(signedUrl));
       await _videoController!.initialize();
       _videoController!.setLooping(false);
 

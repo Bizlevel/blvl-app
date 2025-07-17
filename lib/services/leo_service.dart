@@ -41,8 +41,9 @@ class LeoService {
   /// Проверка контента через OpenAI Moderation API. Бросает [LeoFailure] если flagged.
   static Future<void> _moderationCheck(String content) async {
     final openaiKey = dotenv.env['OPENAI_API_KEY'] ?? '';
-    if (openaiKey.isEmpty)
+    if (openaiKey.isEmpty) {
       return; // moderation доступна только при прямом OpenAI ключе
+    }
 
     try {
       final response = await Dio().post(

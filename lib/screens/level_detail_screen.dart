@@ -7,7 +7,6 @@ import 'package:online_course/services/supabase_service.dart';
 import 'package:online_course/providers/lesson_progress_provider.dart';
 import 'package:online_course/widgets/lesson_widget.dart';
 import 'package:online_course/widgets/floating_chat_bubble.dart';
-import 'package:online_course/services/leo_service.dart';
 import 'package:online_course/widgets/quiz_widget.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:online_course/providers/levels_provider.dart';
@@ -183,16 +182,6 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
   }
 
   // --- Leo chat helpers --------------------------------------------
-  void _ensureChatCreated(String prompt) async {
-    try {
-      final id =
-          await LeoService.saveConversation(role: 'system', content: prompt);
-      if (mounted) setState(() => _chatId = id);
-    } catch (_) {
-      // Silently ignore chat creation errors – chat bubble will not show
-    }
-  }
-
   String _buildSystemPrompt() {
     if (_currentIndex == 0) {
       return 'Пользователь читает вводный блок уровня ${widget.levelId}. Помогите разобраться со структурой уровня.';

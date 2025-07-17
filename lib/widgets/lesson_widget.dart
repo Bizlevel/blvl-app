@@ -101,7 +101,7 @@ class _LessonWidgetState extends State<LessonWidget> {
       }
 
       // Use video_player for remaining cases
-      _videoController = VideoPlayerController.network(directUrl);
+      _videoController = VideoPlayerController.networkUrl(Uri.parse(directUrl));
       await _videoController!.initialize();
       if (!kIsWeb) {
         _chewieController = ChewieController(

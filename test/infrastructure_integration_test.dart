@@ -87,7 +87,7 @@ void main() {
       final container = ProviderContainer();
       addTearDown(container.dispose);
 
-      final first = await container.read(authStateProvider.stream).first;
+      final first = await container.read(authStateProvider.future);
       expect(first, isA<AuthState>());
     });
 

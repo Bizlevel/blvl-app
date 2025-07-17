@@ -13,7 +13,7 @@ final authStateProvider = StreamProvider<AuthState>((ref) {
 /// Loads current user profile from `users` table or returns null if not signed in.
 final currentUserProvider = FutureProvider<UserModel?>((ref) async {
   // Ensure we have a session.
-  final auth = await ref.watch(authStateProvider.stream).first;
+  final auth = await ref.watch(authStateProvider.future);
   final user = auth.session?.user;
 
   if (kDebugMode) {

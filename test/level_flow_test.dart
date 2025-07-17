@@ -58,13 +58,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          lessonsProvider(99).overrideWithProvider(
-            FutureProvider<List<LessonModel>>((_) async => lessons),
-          ),
-          lessonProgressProvider(99).overrideWithProvider(
-            StateNotifierProvider<LessonProgressNotifier, LessonProgressState>(
-                (ref) => testProgressNotifier),
-          ),
+          lessonsProvider(99).overrideWith((ref) async => lessons),
+          lessonProgressProvider(99)
+              .overrideWith((ref) => testProgressNotifier),
         ],
         child: const MaterialApp(
           home: LevelDetailScreen(levelId: 99),
