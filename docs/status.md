@@ -344,3 +344,7 @@ The next steps are to finish the LevelCard UI update, add the fetchLevelsRaw hel
 ## Задача 12.3
 - Пересчитан `_currentIndex` на основе фактической позиции `page`, кнопка «Назад» активна во время анимации; условная блокировка удалена.
 - Обновлены методы `_goBack` и блок `_NavBar` в `lib/screens/level_detail_screen.dart`.
+
+## Задача 12.4
+- Добавлен `_ArtifactBlock` и включён в маршрут (`_buildBlocks`). Блок показывает описание и кнопку скачивания артефакта через подписанный URL.
+- Импортирован `url_launcher`. Изменён файл `lib/screens/level_detail_screen.dart`.

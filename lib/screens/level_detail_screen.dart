@@ -9,6 +9,7 @@ import 'package:online_course/widgets/lesson_widget.dart';
 import 'package:online_course/widgets/floating_chat_bubble.dart';
 import 'package:online_course/services/leo_service.dart';
 import 'package:online_course/widgets/quiz_widget.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 /// Shows a level as full-screen blocks (Intro → Lesson → Quiz → …).
 class LevelDetailScreen extends ConsumerStatefulWidget {
@@ -241,7 +242,78 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
         _LessonBlock(lesson: lesson, onWatched: _videoWatched),
         _QuizBlock(lesson: lesson, onCorrect: _quizPassed),
       ],
+      _ArtifactBlock(levelId: widget.levelId),
     ];
+  }
+}
+
+// Artifact ----------------------------------------------------------
+class _ArtifactBlock extends _PageBlock {
+  final int levelId;
+  _ArtifactBlock({required this.levelId});
+
+  Future<Map<String, dynamic>?> _fetchArtifact() async {
+    final rows = await SupabaseService.client
+        .from('levels')
+        .select('artifact_title, artifact_description, artifact_url')
+        .eq('id', levelId)
+        .maybeSingle();
+    if (rows == null) return null;
+    return Map<String, dynamic>.from(rows as Map);
+  }
+
+  @override
+  Widget build(BuildContext context, int index) {
+    return FutureBuilder<Map<String, dynamic>?>(
+      future: _fetchArtifact(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (!snapshot.hasData || snapshot.data?['artifact_url'] == null) {
+          return const Center(child: Text('Артефакт отсутствует'));
+        }
+
+        final data = snapshot.data!;
+        final title = (data['artifact_title'] as String?) ?? 'Артефакт';
+        final description = (data['artifact_description'] as String?) ?? '';
+        final relativePath = data['artifact_url'] as String;
+
+        return Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Text(title,
+                  style: const TextStyle(
+                      fontSize: 20, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 12),
+              if (description.isNotEmpty)
+                Text(description, textAlign: TextAlign.center),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: () async {
+                  final url =
+                      await SupabaseService.getArtifactSignedUrl(relativePath);
+                  if (url != null && await canLaunchUrl(Uri.parse(url))) {
+                    await launchUrl(Uri.parse(url),
+                        mode: LaunchMode.externalApplication);
+                  } else {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                          content: Text('Не удалось открыть артефакт')));
+                    }
+                  }
+                },
+                icon: const Icon(Icons.download),
+                label: const Text('Скачать'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 }
 
