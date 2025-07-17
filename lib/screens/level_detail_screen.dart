@@ -54,7 +54,10 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
       ref.read(lessonProgressProvider(widget.levelId).notifier);
 
   void _unlockNext(int current) {
-    _progressNotifier.unlockPage(current + 1);
+    // Не выходим за пределы списка блоков
+    if (current + 1 < _blocks.length) {
+      _progressNotifier.unlockPage(current + 1);
+    }
   }
 
   void _videoWatched(int page) {
@@ -93,7 +96,10 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
                               _pageController.initialPage.toDouble()) >
                           0
                       : false),
-                  canNext: _currentIndex < _progress.unlockedPage,
+                  // Кнопка «Далее» активна, если текущая страница разблокирована
+                  // или следующая страница уже открыта.
+                  canNext: _currentIndex < _progress.unlockedPage ||
+                      _currentIndex + 1 == _progress.unlockedPage,
                   onBack: _goBack,
                   onNext: _goNext,
                 ),
@@ -230,9 +236,23 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
   }
 
   bool _isLevelCompleted(List<LessonModel> lessons) {
-    final lessonCount = lessons.length;
-    return _progress.watchedVideos.length >= lessonCount &&
-        _progress.passedQuizzes.length >= lessonCount;
+    // Intro = 0, далее пары Video/Quiz, затем (опционально) Artifact.
+    for (var i = 0; i < lessons.length; i++) {
+      final videoPage = 1 + i * 2; // первый блок каждого урока
+      final quizPage = videoPage + 1;
+
+      // Видео обязательно должно быть просмотрено
+      if (!_progress.watchedVideos.contains(videoPage)) {
+        return false;
+      }
+
+      // Если урок содержит хотя бы один правильный ответ, считаем, что есть квиз
+      final hasQuiz = lessons[i].quizQuestions.isNotEmpty;
+      if (hasQuiz && !_progress.passedQuizzes.contains(quizPage)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   void _buildBlocks(List<LessonModel> lessons) {

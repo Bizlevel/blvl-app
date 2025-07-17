@@ -348,3 +348,12 @@ The next steps are to finish the LevelCard UI update, add the fetchLevelsRaw hel
 ## Задача 12.4
 - Добавлен `_ArtifactBlock` и включён в маршрут (`_buildBlocks`). Блок показывает описание и кнопку скачивания артефакта через подписанный URL.
 - Импортирован `url_launcher`. Изменён файл `lib/screens/level_detail_screen.dart`.
+
+## Задача 12.5
+- В базу добавлен столбец `updated_at` в `user_progress` (migration `add_updated_at_to_user_progress`). Ошибка PGRST204 больше не возникает.
+
+## Задачи 12.6–12.9
+- 12.6: `canNext` учитывает текущую и следующую страницу; `unlockNext` предотвращает выход за пределы списка блоков.
+- 12.7: `LessonWidget` показывает fallback с кнопкой «Пропустить», убран хардкод video URL.
+- 12.8: LessonProgressNotifier сохраняет состояние с дебаунсом 200 мс, снижая I/O.
+- 12.9: `_isLevelCompleted` проверяет просмотр каждого видео и квиз только для уроков, где он есть.

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -35,12 +36,15 @@ class LessonProgressState {
   factory LessonProgressState.fromJson(Map<String, dynamic> json) {
     return LessonProgressState(
       unlockedPage: json['unlockedPage'] as int? ?? 0,
-      watchedVideos: (json['watched'] as List<dynamic>? ?? []).cast<int>().toSet(),
-      passedQuizzes: (json['quizzes'] as List<dynamic>? ?? []).cast<int>().toSet(),
+      watchedVideos:
+          (json['watched'] as List<dynamic>? ?? []).cast<int>().toSet(),
+      passedQuizzes:
+          (json['quizzes'] as List<dynamic>? ?? []).cast<int>().toSet(),
     );
   }
 
-  static const empty = LessonProgressState(unlockedPage: 1, watchedVideos: {}, passedQuizzes: {});
+  static const empty = LessonProgressState(
+      unlockedPage: 1, watchedVideos: {}, passedQuizzes: {});
 }
 
 class LessonProgressNotifier extends StateNotifier<LessonProgressState> {
@@ -49,17 +53,20 @@ class LessonProgressNotifier extends StateNotifier<LessonProgressState> {
     _load();
   }
 
+  Timer? _debounce;
+
   String get _prefsKey => 'level_progress_$levelId';
 
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_prefsKey);
     if (raw != null) {
-      state = LessonProgressState.fromJson(jsonDecode(raw) as Map<String, dynamic>);
-    if (state.unlockedPage < 1) {
-      state = state.copyWith(unlockedPage: 1);
-      _save();
-    }
+      state =
+          LessonProgressState.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+      if (state.unlockedPage < 1) {
+        state = state.copyWith(unlockedPage: 1);
+        _scheduleSave();
+      }
     }
   }
 
@@ -68,10 +75,15 @@ class LessonProgressNotifier extends StateNotifier<LessonProgressState> {
     await prefs.setString(_prefsKey, jsonEncode(state.toJson()));
   }
 
+  void _scheduleSave() {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 200), _save);
+  }
+
   void unlockPage(int page) {
     if (page > state.unlockedPage) {
       state = state.copyWith(unlockedPage: page);
-      _save();
+      _scheduleSave();
     }
   }
 
@@ -79,7 +91,7 @@ class LessonProgressNotifier extends StateNotifier<LessonProgressState> {
     if (!state.watchedVideos.contains(page)) {
       final updated = Set<int>.from(state.watchedVideos)..add(page);
       state = state.copyWith(watchedVideos: updated);
-      _save();
+      _scheduleSave();
     }
   }
 
@@ -87,11 +99,12 @@ class LessonProgressNotifier extends StateNotifier<LessonProgressState> {
     if (!state.passedQuizzes.contains(page)) {
       final updated = Set<int>.from(state.passedQuizzes)..add(page);
       state = state.copyWith(passedQuizzes: updated);
-      _save();
+      _scheduleSave();
     }
   }
 }
 
-final lessonProgressProvider = StateNotifierProvider.family<LessonProgressNotifier, LessonProgressState, int>(
+final lessonProgressProvider = StateNotifierProvider.family<
+    LessonProgressNotifier, LessonProgressState, int>(
   (ref, levelId) => LessonProgressNotifier(levelId),
 );
