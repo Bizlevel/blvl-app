@@ -4,13 +4,13 @@ import 'package:online_course/theme/color.dart';
 import 'custom_image.dart';
 
 class FeatureItem extends StatelessWidget {
-  FeatureItem({
-    Key? key,
+  const FeatureItem({
+    super.key,
     required this.data,
     this.width = 280,
     this.height = 290,
     this.onTap,
-  }) : super(key: key);
+  });
 
   final data;
   final double width;
@@ -24,8 +24,8 @@ class FeatureItem extends StatelessWidget {
       child: Container(
         width: width,
         height: height,
-        padding: EdgeInsets.all(10),
-        margin: EdgeInsets.symmetric(vertical: 5),
+        padding: const EdgeInsets.all(10),
+        margin: const EdgeInsets.symmetric(vertical: 5),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
@@ -34,7 +34,7 @@ class FeatureItem extends StatelessWidget {
               color: AppColor.shadowColor.withOpacity(0.1),
               spreadRadius: 1,
               blurRadius: 1,
-              offset: Offset(1, 1), // changes position of shadow
+              offset: const Offset(1, 1), // changes position of shadow
             ),
           ],
         ),
@@ -64,7 +64,7 @@ class FeatureItem extends StatelessWidget {
   Widget _buildInfo() {
     return Container(
       width: width - 20,
-      padding: EdgeInsets.fromLTRB(5, 0, 5, 0),
+      padding: const EdgeInsets.fromLTRB(5, 0, 5, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -72,7 +72,7 @@ class FeatureItem extends StatelessWidget {
             data["name"],
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 17,
               color: AppColor.textColor,
               fontWeight: FontWeight.w600,
@@ -89,7 +89,7 @@ class FeatureItem extends StatelessWidget {
 
   Widget _buildPrice() {
     return Container(
-      padding: EdgeInsets.all(10),
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: AppColor.primary,
         borderRadius: BorderRadius.circular(20),
@@ -98,13 +98,13 @@ class FeatureItem extends StatelessWidget {
             color: AppColor.shadowColor.withOpacity(0.05),
             spreadRadius: 1,
             blurRadius: 1,
-            offset: Offset(0, 0),
+            offset: const Offset(0, 0),
           ),
         ],
       ),
       child: Text(
         data["price"],
-        style: TextStyle(
+        style: const TextStyle(
           color: Colors.white,
           fontWeight: FontWeight.w500,
         ),
@@ -156,7 +156,7 @@ class FeatureItem extends StatelessWidget {
           info,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: TextStyle(color: AppColor.labelColor, fontSize: 13),
+          style: const TextStyle(color: AppColor.labelColor, fontSize: 13),
         ),
       ],
     );

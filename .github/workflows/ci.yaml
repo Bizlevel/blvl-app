@@ -5,45 +5,151 @@ on:
     branches: ["main"]
   pull_request:
 
+env:
+  FLUTTER_VERSION: "3.22.0"
+  JAVA_VERSION: "17"
+  SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+  SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+  SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+  SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
 jobs:
-  build-test:
+  unit:
+    name: "Unit tests"
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@v2
         with:
-          flutter-version: "3.22.0"
+          flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
+          cache: true
 
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Run tests (Chrome)
-        run: flutter test --platform chrome
+      - name: Run unit tests
+        run: flutter test --coverage
 
-      - name: Install jq (needed for sentry_check.sh)
+  integration_web:
+    name: "Integration tests (Web)"
+    runs-on: ubuntu-latest
+    needs: unit
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Set up xvfb for headless Chrome
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb
+          Xvfb :99 &
+          export DISPLAY=:99
+
+      - name: Run integration tests (Chrome)
+        run: flutter test integration_test -d chrome
+
+  integration_android:
+    name: "Integration tests (Android)"
+    runs-on: ubuntu-latest
+    needs: unit
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Run integration tests on Android emulator
+        uses: ReactiveCircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          profile: pixel_6
+          script: flutter test integration_test -d emulator
+
+  integration_ios:
+    name: "Integration tests (iOS)"
+    runs-on: macos-14
+    needs: unit
+    env:
+      CI: "true"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Boot iOS simulator and run tests
+        run: |
+          xcrun simctl boot "iPhone 15" || true
+          sleep 20
+          flutter test integration_test -d "iPhone 15"
+
+  sentry_check:
+    name: "Sentry unresolved check"
+    runs-on: ubuntu-latest
+    needs: [integration_web, integration_android, integration_ios]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install jq (for JSON processing)
         run: sudo apt-get update && sudo apt-get install -y jq
 
       - name: Install sentry-cli
         run: curl -sL https://sentry.io/get-cli/ | bash
 
-      - name: Check Sentry unresolved critical issues (last 24h)
+      - name: Run Sentry unresolved issues check
         env:
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
-          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+          SENTRY_AUTH_TOKEN: ${{ env.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ env.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ env.SENTRY_PROJECT }}
         run: bash scripts/sentry_check.sh
 
-      - name: Notify Slack
-        if: always()
-        uses: slackapi/slack-github-action@v1.26.0
+  email_notify:
+    name: "Email notification"
+    runs-on: ubuntu-latest
+    needs: [unit, integration_web, integration_android, integration_ios, sentry_check]
+    if: always()
+    steps:
+      - name: Send email
+        uses: dawidd6/action-send-mail@v3
         with:
-          payload: |
-            {
-              "text": "*BizLevel CI* – workflow *${{ github.workflow }}* finished with status *${{ job.status }}* for commit <${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|${{ github.sha }}>\n<https://sentry.io/organizations/${{ secrets.SENTRY_ORG }}/projects/${{ secrets.SENTRY_PROJECT }}/?statsPeriod=24h|Open Sentry dashboard>"
-            }
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }} 
+          server_address: ${{ secrets.SMTP_SERVER }}
+          server_port: ${{ secrets.SMTP_PORT }}
+          username: ${{ secrets.SMTP_USERNAME }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+          subject: "BizLevel CI - Run #${{ github.run_number }} (Sentry: ${{ needs.sentry_check.result }})"
+          to: "deus2111@gmail.com"
+          from: "BizLevel CI <${{ secrets.SMTP_USERNAME }}>"
+          content_type: text/html
+          body: |
+            <h3>BizLevel CI – workflow run #${{ github.run_number }}</h3>
+            <ul>
+              <li>Unit: ${{ needs.unit.result }}</li>
+              <li>Web: ${{ needs.integration_web.result }}</li>
+              <li>Android: ${{ needs.integration_android.result }}</li>
+              <li>iOS: ${{ needs.integration_ios.result }}</li>
+              <li>Sentry: ${{ needs.sentry_check.result }}</li>
+            </ul>
+            <p>Details: <a href="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}">see workflow</a></p> 

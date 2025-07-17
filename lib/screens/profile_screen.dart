@@ -15,7 +15,7 @@ import 'package:online_course/models/user_model.dart';
 import 'package:online_course/screens/auth/login_screen.dart';
 
 class ProfileScreen extends ConsumerWidget {
-  const ProfileScreen({Key? key}) : super(key: key);
+  const ProfileScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -36,16 +36,17 @@ class ProfileScreen extends ConsumerWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text('Не авторизован'),
+                  const Text('Не авторизован'),
                   ElevatedButton(
                     onPressed: () {
                       // Переход на LoginScreen
                       Navigator.pushReplacement(
                         context,
-                        MaterialPageRoute(builder: (context) => LoginScreen()),
+                        MaterialPageRoute(
+                            builder: (context) => const LoginScreen()),
                       );
                     },
-                    child: Text('Войти'),
+                    child: const Text('Войти'),
                   ),
                 ],
               ),
@@ -69,12 +70,12 @@ class ProfileScreen extends ConsumerWidget {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text('Профиль не найден'),
+                      const Text('Профиль не найден'),
                       ElevatedButton(
                         onPressed: () {
                           ref.invalidate(currentUserProvider);
                         },
-                        child: Text('Обновить'),
+                        child: const Text('Обновить'),
                       ),
                     ],
                   ),
@@ -85,7 +86,7 @@ class ProfileScreen extends ConsumerWidget {
             // Пользователь загружен - показываем профиль
             return _buildProfileContent(context, ref, user);
           },
-          loading: () => Scaffold(
+          loading: () => const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           ),
           error: (error, stackTrace) {
@@ -97,12 +98,12 @@ class ProfileScreen extends ConsumerWidget {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text('Ошибка загрузки профиля'),
+                    const Text('Ошибка загрузки профиля'),
                     ElevatedButton(
                       onPressed: () {
                         ref.invalidate(currentUserProvider);
                       },
-                      child: Text('Повторить'),
+                      child: const Text('Повторить'),
                     ),
                   ],
                 ),
@@ -111,7 +112,7 @@ class ProfileScreen extends ConsumerWidget {
           },
         );
       },
-      loading: () => Scaffold(
+      loading: () => const Scaffold(
         body: Center(child: CircularProgressIndicator()),
       ),
       error: (error, stackTrace) {
@@ -123,12 +124,12 @@ class ProfileScreen extends ConsumerWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text('Ошибка авторизации'),
+                const Text('Ошибка авторизации'),
                 ElevatedButton(
                   onPressed: () {
                     ref.invalidate(authStateProvider);
                   },
-                  child: Text('Повторить'),
+                  child: const Text('Повторить'),
                 ),
               ],
             ),
@@ -174,12 +175,12 @@ class ProfileScreen extends ConsumerWidget {
 
         return CustomScrollView(
           slivers: [
-            SliverAppBar(
+            const SliverAppBar(
               backgroundColor: AppColor.appBgColor,
               pinned: true,
               snap: true,
               floating: true,
-              title: const Text(
+              title: Text(
                 'Профиль',
                 style: TextStyle(
                   color: AppColor.textColor,
@@ -208,7 +209,6 @@ class ProfileScreen extends ConsumerWidget {
 
 class _Body extends StatelessWidget {
   const _Body({
-    Key? key,
     required this.userName,
     required this.avatarUrl,
     required this.currentLevel,
@@ -216,7 +216,7 @@ class _Body extends StatelessWidget {
     required this.artifactsCount,
     required this.isPremium,
     required this.artifacts,
-  }) : super(key: key);
+  });
 
   final String userName;
   final String? avatarUrl;
@@ -334,12 +334,12 @@ class _Body extends StatelessWidget {
       ),
       child: Column(
         children: [
-          SettingItem(
+          const SettingItem(
             title: 'Настройки',
             leadingIcon: 'assets/icons/setting.svg',
             bgIconColor: AppColor.blue,
           ),
-          DividerWrapper(),
+          const DividerWrapper(),
           SettingItem(
             title: 'Оплата',
             leadingIcon: 'assets/icons/wallet.svg',
@@ -350,8 +350,8 @@ class _Body extends StatelessWidget {
               );
             },
           ),
-          DividerWrapper(),
-          SettingItem(
+          const DividerWrapper(),
+          const SettingItem(
             title: 'Закладки',
             leadingIcon: 'assets/icons/bookmark.svg',
             bgIconColor: AppColor.primary,
@@ -460,7 +460,7 @@ class _Body extends StatelessWidget {
 }
 
 class DividerWrapper extends StatelessWidget {
-  const DividerWrapper({Key? key}) : super(key: key);
+  const DividerWrapper({super.key});
 
   @override
   Widget build(BuildContext context) {

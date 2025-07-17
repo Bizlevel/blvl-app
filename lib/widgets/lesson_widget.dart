@@ -18,8 +18,8 @@ import 'package:online_course/compat/html_stub.dart'
 class LessonWidget extends StatefulWidget {
   final LessonModel lesson;
   final VoidCallback onWatched;
-  const LessonWidget({Key? key, required this.lesson, required this.onWatched})
-      : super(key: key);
+  const LessonWidget(
+      {super.key, required this.lesson, required this.onWatched});
 
   @override
   State<LessonWidget> createState() => _LessonWidgetState();

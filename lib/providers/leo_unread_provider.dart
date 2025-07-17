@@ -8,9 +8,9 @@ final leoUnreadProvider = StreamProvider.family<int, String>((ref, chatId) {
       .stream(primaryKey: ['id'])
       .eq('id', chatId)
       .map((rows) {
-    if (rows.isEmpty) return 0;
-    final unread = rows.first['unread_count'] as int? ?? 0;
-    return unread;
-  });
+        if (rows.isEmpty) return 0;
+        final unread = rows.first['unread_count'] as int? ?? 0;
+        return unread;
+      });
   return stream;
 });

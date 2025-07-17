@@ -4,13 +4,13 @@ import 'package:online_course/theme/color.dart';
 
 class SettingItem extends StatelessWidget {
   const SettingItem({
-    Key? key,
+    super.key,
     required this.title,
     this.onTap,
     this.leadingIcon,
     this.leadingIconColor = Colors.white,
     this.bgIconColor = AppColor.primary,
-  }) : super(key: key);
+  });
 
   final String? leadingIcon;
   final Color leadingIconColor;
@@ -31,7 +31,7 @@ class SettingItem extends StatelessWidget {
 
   Widget _buildPrefixIcon() {
     return Container(
-      padding: EdgeInsets.all(6),
+      padding: const EdgeInsets.all(6),
       decoration: BoxDecoration(color: bgIconColor, shape: BoxShape.circle),
       child: SvgPicture.asset(
         leadingIcon!,
@@ -53,10 +53,10 @@ class SettingItem extends StatelessWidget {
         Expanded(
           child: Text(
             title,
-            style: TextStyle(fontSize: 16),
+            style: const TextStyle(fontSize: 16),
           ),
         ),
-        Icon(
+        const Icon(
           Icons.arrow_forward_ios,
           color: Colors.grey,
           size: 17,
@@ -72,10 +72,10 @@ class SettingItem extends StatelessWidget {
         Expanded(
           child: Text(
             title,
-            style: TextStyle(fontSize: 16),
+            style: const TextStyle(fontSize: 16),
           ),
         ),
-        Icon(
+        const Icon(
           Icons.arrow_forward_ios,
           color: AppColor.darker,
           size: 17,

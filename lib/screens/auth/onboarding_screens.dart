@@ -8,7 +8,7 @@ import '../../widgets/custom_image.dart';
 import 'onboarding_video_screen.dart';
 
 class OnboardingProfileScreen extends ConsumerStatefulWidget {
-  const OnboardingProfileScreen({Key? key}) : super(key: key);
+  const OnboardingProfileScreen({super.key});
 
   @override
   ConsumerState<OnboardingProfileScreen> createState() =>
@@ -71,7 +71,7 @@ class _OnboardingProfileScreenState
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Center(
+            const Center(
               child: CustomImage(
                 'https://placehold.co/90x90',
                 width: 90,

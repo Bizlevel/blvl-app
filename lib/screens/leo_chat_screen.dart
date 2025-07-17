@@ -5,7 +5,7 @@ import 'package:online_course/widgets/chat_item.dart';
 import 'package:online_course/screens/leo_dialog_screen.dart';
 
 class LeoChatScreen extends StatefulWidget {
-  const LeoChatScreen({Key? key}) : super(key: key);
+  const LeoChatScreen({super.key});
 
   @override
   State<LeoChatScreen> createState() => _LeoChatScreenState();

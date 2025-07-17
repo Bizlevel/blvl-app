@@ -4,10 +4,10 @@ import 'package:online_course/widgets/custom_image.dart';
 
 class RecommendItem extends StatelessWidget {
   const RecommendItem({
-    Key? key,
+    super.key,
     required this.data,
     this.onTap,
-  }) : super(key: key);
+  });
 
   final data;
   final GestureTapCallback? onTap;
@@ -17,8 +17,8 @@ class RecommendItem extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        margin: EdgeInsets.only(right: 10),
-        padding: EdgeInsets.all(10),
+        margin: const EdgeInsets.only(right: 10),
+        padding: const EdgeInsets.all(10),
         width: 300,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
@@ -28,7 +28,7 @@ class RecommendItem extends StatelessWidget {
               color: Colors.grey.withOpacity(0.1),
               spreadRadius: 1,
               blurRadius: 1,
-              offset: Offset(1, 1), // changes position of shadow
+              offset: const Offset(1, 1), // changes position of shadow
             ),
           ],
         ),
@@ -57,7 +57,7 @@ class RecommendItem extends StatelessWidget {
           data["name"],
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: TextStyle(
+          style: const TextStyle(
             color: AppColor.textColor,
             fontSize: 16,
             fontWeight: FontWeight.w600,
@@ -68,7 +68,7 @@ class RecommendItem extends StatelessWidget {
         ),
         Text(
           data["price"],
-          style: TextStyle(fontSize: 14, color: AppColor.textColor),
+          style: const TextStyle(fontSize: 14, color: AppColor.textColor),
         ),
         const SizedBox(
           height: 15,
@@ -81,7 +81,7 @@ class RecommendItem extends StatelessWidget {
   Widget _buildDurationAndRate() {
     return Row(
       children: [
-        Icon(
+        const Icon(
           Icons.schedule_rounded,
           color: AppColor.labelColor,
           size: 14,
@@ -91,7 +91,7 @@ class RecommendItem extends StatelessWidget {
         ),
         Text(
           data["duration"],
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 12,
             color: AppColor.labelColor,
           ),
@@ -99,7 +99,7 @@ class RecommendItem extends StatelessWidget {
         const SizedBox(
           width: 20,
         ),
-        Icon(
+        const Icon(
           Icons.star,
           color: AppColor.orange,
           size: 14,
@@ -109,7 +109,7 @@ class RecommendItem extends StatelessWidget {
         ),
         Text(
           data["review"],
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 12,
             color: AppColor.labelColor,
           ),

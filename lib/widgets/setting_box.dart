@@ -4,11 +4,11 @@ import 'package:online_course/theme/color.dart';
 
 class SettingBox extends StatelessWidget {
   const SettingBox({
-    Key? key,
+    super.key,
     required this.title,
     required this.icon,
     this.color = AppColor.darker,
-  }) : super(key: key);
+  });
 
   final title;
   final String icon;
@@ -26,7 +26,7 @@ class SettingBox extends StatelessWidget {
             color: AppColor.shadowColor.withOpacity(0.1),
             spreadRadius: 1,
             blurRadius: 1,
-            offset: Offset(0, 1), // changes position of shadow
+            offset: const Offset(0, 1), // changes position of shadow
           ),
         ],
       ),

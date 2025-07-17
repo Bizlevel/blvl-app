@@ -6,11 +6,10 @@ class QuizWidget extends StatefulWidget {
   final VoidCallback onCorrect;
   final bool initiallyPassed;
   const QuizWidget(
-      {Key? key,
+      {super.key,
       required this.questionData,
       required this.onCorrect,
-      this.initiallyPassed = false})
-      : super(key: key);
+      this.initiallyPassed = false});
 
   @override
   State<QuizWidget> createState() => _QuizWidgetState();
@@ -64,9 +63,9 @@ class _QuizWidgetState extends State<QuizWidget> {
           )
         else ...{
           if (_isCorrect)
-            Text('Верно! 👍',
-                style: const TextStyle(
-                    color: Colors.green, fontWeight: FontWeight.w600))
+            const Text('Верно! 👍',
+                style:
+                    TextStyle(color: Colors.green, fontWeight: FontWeight.w600))
           else
             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               const Text('Неправильный ответ. Попробуйте ещё раз.',

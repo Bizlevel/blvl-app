@@ -1,22 +1,9 @@
-## Задача 1.1
-- Task 1.1 completed: updated dependencies and dev_dependencies in pubspec.yaml, removed carousel_slider.
-- Added Sentry initialization in lib/main.dart with placeholder DSN via environment variable.
-- Ran `flutter pub get` and code generation, no conflicts.
-- No blocking issues found.
-
-## Задача 1.2
-- Task 1.2 completed: created directories lib/models, lib/services, lib/providers, lib/screens/auth, assets/images/onboarding. Updated pubspec.yaml to include images asset path.
-- No issues; ready for next steps.
-
-## Задача 1.3
-- Task 1.3 completed: added SupabaseService singleton with initialize() method using compile-time env vars; updated main.dart to call initialization before Sentry.
-- .env keys set as defaults for compile-time env variables.
-
-## Задача 1.4
-- Task 1.4 completed: Applied `initial_schema` migration to Supabase (tables, indexes, RLS policies) using mcp_supabase_apply_migration.
-- Migration executed successfully on project acevqbdpzgbtqznbpgzr.
-
-## Задача 1.5
+# Этап 1: Инфраструктура
+Задача 1.1: updated dependencies and dev_dependencies in pubspec.yaml, removed carousel_slider. Added Sentry initialization in lib/main.dart with placeholder DSN via environment variable. Ran `flutter pub get` and code generation, no conflicts. No blocking issues found.
+Задача 1.2: created directories lib/models, lib/services, lib/providers, lib/screens/auth, assets/images/onboarding. Updated pubspec.yaml to include images asset path. No issues; ready for next steps.
+Задача 1.3: added SupabaseService singleton with initialize() method using compile-time env vars; updated main.dart to call initialization before Sentry. .env keys set as defaults for compile-time env variables.
+Задача 1.4: Applied `initial_schema` migration to Supabase (tables, indexes, RLS policies) using mcp_supabase_apply_migration. Migration executed successfully on project acevqbdpzgbtqznbpgzr.
+Задача 1.5: added `test/infrastructure_test.dart` verifying Supabase initialization, levels query and RLS; configured shared_preferences mock; removed obsolete widget_test to avoid carousel dependency. All tests pass.
 - Task 1.5 completed: added `test/infrastructure_test.dart` verifying Supabase initialization, levels query and RLS; configured shared_preferences mock; removed obsolete widget_test to avoid carousel dependency.
 - All tests pass.
 
@@ -333,39 +320,27 @@ The next steps are to finish the LevelCard UI update, add the fetchLevelsRaw hel
 - `flutter analyze` теперь выдаёт только info-уровень замечания, критических warnings нет.
 - Проблем не обнаружено.
 
-## Задача 12.1
-- Исправлен вертикальный маршрут: PageView обёрнут в `SizedBox.expand`, что гарантирует корректные constraints и исключает горизонтальный свайп на iOS.
-- Файл изменён: `lib/screens/level_detail_screen.dart`.
-## Задача 12.2
-- Убран автоматический `jumpToPage()` в `build`; `PageController` теперь создаётся с `initialPage`, что устраняет произвольные "прыжки" между блоками.
-- Изменён файл `lib/screens/level_detail_screen.dart`.
-## Задача 12.3
-- Пересчитан `_currentIndex` на основе фактической позиции `page`, кнопка «Назад» активна во время анимации; условная блокировка удалена.
-- Обновлены методы `_goBack` и блок `_NavBar` в `lib/screens/level_detail_screen.dart`.
-## Задача 12.4
-- Добавлен `_ArtifactBlock` и включён в маршрут (`_buildBlocks`). Блок показывает описание и кнопку скачивания артефакта через подписанный URL.
-- Импортирован `url_launcher`. Изменён файл `lib/screens/level_detail_screen.dart`.
-## Задача 12.5
-- В базу добавлен столбец `updated_at` в `user_progress` (migration `add_updated_at_to_user_progress`). Ошибка PGRST204 больше не возникает.
-## Задачи 12.6–12.9
-- 12.6: `canNext` учитывает текущую и следующую страницу; `unlockNext` предотвращает выход за пределы списка блоков.
-- 12.7: `LessonWidget` показывает fallback с кнопкой «Пропустить», убран хардкод video URL.
-- 12.8: LessonProgressNotifier сохраняет состояние с дебаунсом 200 мс, снижая I/O.
-- 12.9: `_isLevelCompleted` проверяет просмотр каждого видео и квиз только для уроков, где он есть.
+# Этап 12: Улучшения UX
+Задача 12.1: Исправлен вертикальный маршрут: PageView обёрнут в `SizedBox.expand`, что гарантирует корректные constraints и исключает горизонтальный свайп на iOS. Файл изменён: `lib/screens/level_detail_screen.dart`.
+Задача 12.2: Убран автоматический `jumpToPage()` в `build`; `PageController` теперь создаётся с `initialPage`, что устраняет произвольные "прыжки" между блоками. Изменён файл `lib/screens/level_detail_screen.dart`.
+Задача 12.3: Пересчитан `_currentIndex` на основе фактической позиции `page`, кнопка «Назад» активна во время анимации; условная блокировка удалена. Обновлены методы `_goBack` и блок `_NavBar` в `lib/screens/level_detail_screen.dart`.
+Задача 12.4: Добавлен `_ArtifactBlock` и включён в маршрут (`_buildBlocks`). Блок показывает описание и кнопку скачивания артефакта через подписанный URL. Импортирован `url_launcher`. Изменён файл `lib/screens/level_detail_screen.dart`.Добавлен `_ArtifactBlock` и включён в маршрут (`_buildBlocks`). Блок показывает описание и кнопку скачивания артефакта через подписанный URL. Импортирован `url_launcher`. Изменён файл `lib/screens/level_detail_screen.dart`.
+Задача 12.5: В базу добавлен столбец `updated_at` в `user_progress` (migration `add_updated_at_to_user_progress`). Ошибка PGRST204 больше не возникает.
+Задача 12.6: `canNext` учитывает текущую и следующую страницу; `unlockNext` предотвращает выход за пределы списка блоков.
+Задача 12.7: `LessonWidget` показывает fallback с кнопкой «Пропустить», убран хардкод video URL.
+Задача 12.8: LessonProgressNotifier сохраняет состояние с дебаунсом 200 мс, снижая I/O.
+Задача 12.9: `_isLevelCompleted` проверяет просмотр каждого видео и квиз только для уроков, где он есть.
+Задача 12.10: Добавлен интеграционный тест `test/level_flow_test.dart`, покрывающий прохождение уроков, квиза и кнопку завершения уровня с мок-провайдерами.
 
-## Задача 12.10
-- Добавлен интеграционный тест `test/level_flow_test.dart`, покрывающий прохождение уроков, квиза и кнопку завершения уровня с мок-провайдерами.
+Fix build iOS Sentry headers: Удалена сабспека `HybridSDK` в `ios/Podfile`; выполнен `pod install --repo-update`, Sentry собирается без ошибок header copy.
+Bugfixes 17.07: QuizWidget: добавлена кнопка «Попробовать снова» после неверного ответа. Supabase: создан RPC `update_current_level` (migration) – ошибка PGRST202 устранена. ProgressDots: отрисовываются вертикально справа, не перекрывают контент.
 
-## Fix build iOS Sentry headers
-- Удалена сабспека `HybridSDK` в `ios/Podfile`; выполнен `pod install --repo-update`, Sentry собирается без ошибок header copy.
-
-## Bugfixes 18.07
-- QuizWidget: добавлена кнопка «Попробовать снова» после неверного ответа.
-- Supabase: создан RPC `update_current_level` (migration) – ошибка PGRST202 устранена.
-- ProgressDots: отрисовываются вертикально справа, не перекрывают контент.
-
-## Задача 13.1
-- После выполнения completeLevel провайдер levelsProvider инвалидацируется; пользователь возвращается на карту с обновлёнными уровнями. Файлы: level_detail_screen.dart.
-
-## Задача 13.6
-- Провайдеры теперь изменяются только в `addPostFrameCallback`, устраняя ошибку Sentry «modify provider while building».
+# Этап 13: Стабильность
+Задача 13.1: После выполнения completeLevel провайдер levelsProvider инвалидацируется; пользователь возвращается на карту с обновлёнными уровнями. Файлы: level_detail_screen.dart.
+Задача 13.2: QuizWidget сохраняет и восстанавливает пройденные ответы.
+Задача 13.3: PageView больше не скроллится жестом — доступ вперед только через «Далее».
+Задача 13.4:Онбординг показывается лишь при первом входе (SharedPreferences + remote флаг).
+Задача 13.5: Web-layout ограничен maxWidth 480, что устраняет RenderFlex overflow; вертикальные точки обёрнуты в SafeArea.
+Задача 13.6: Провайдеры теперь изменяются только в `addPostFrameCallback`, устраняя ошибку Sentry «modify provider while building».
+Задача 13.7: уже покрывает возврат null без throw для Storage-404 – новые ошибки не создаются.
+Задача 13.8: CI запускает тесты, затем проверяет критические нерешённые ошибки Sentry за последние 24 ч; при их наличии сборка падает. TODO: добавить secrets в github actions и настроить workflow.

@@ -27,9 +27,8 @@ class LeoService {
   // We use Dio because Edge Functions требуют произвольные HTTP-заголовки
   // и проще настраивать таймауты/перехватчики.
   static final Dio _edgeDio = Dio(BaseOptions(
-    baseUrl: const String.fromEnvironment('SUPABASE_URL',
-            defaultValue: 'https://acevqbdpzgbtqznbpgzr.supabase.co') +
-        '/functions/v1',
+    baseUrl:
+        '${const String.fromEnvironment('SUPABASE_URL', defaultValue: 'https://acevqbdpzgbtqznbpgzr.supabase.co')}/functions/v1',
     connectTimeout: const Duration(seconds: 10),
     sendTimeout: const Duration(seconds: 20),
     receiveTimeout: const Duration(seconds: 20),
@@ -39,10 +38,11 @@ class LeoService {
   /// Отправляет список сообщений в Edge Function `leo-chat` и возвращает
   /// ответ ассистента + статистику токенов.
   /// Expects [messages] in chat completion API format.
-    /// Проверка контента через OpenAI Moderation API. Бросает [LeoFailure] если flagged.
+  /// Проверка контента через OpenAI Moderation API. Бросает [LeoFailure] если flagged.
   static Future<void> _moderationCheck(String content) async {
     final openaiKey = dotenv.env['OPENAI_API_KEY'] ?? '';
-    if (openaiKey.isEmpty) return; // moderation доступна только при прямом OpenAI ключе
+    if (openaiKey.isEmpty)
+      return; // moderation доступна только при прямом OpenAI ключе
 
     try {
       final response = await Dio().post(
@@ -79,11 +79,11 @@ class LeoService {
 
     final openaiKey = dotenv.env['OPENAI_API_KEY'] ?? '';
     if (openaiKey.isNotEmpty) {
-    // Run moderation on the latest user message (last in list)
-    final last = messages.isNotEmpty ? messages.last : null;
-    if (last != null && last['role'] == 'user') {
-      await _moderationCheck(last['content'] as String? ?? '');
-    }
+      // Run moderation on the latest user message (last in list)
+      final last = messages.isNotEmpty ? messages.last : null;
+      if (last != null && last['role'] == 'user') {
+        await _moderationCheck(last['content'] as String? ?? '');
+      }
       // Call OpenAI API directly
       return _withRetry(() async {
         try {
@@ -99,9 +99,11 @@ class LeoService {
               'temperature': 0.7,
             },
           );
-          if (response.statusCode == 200 && response.data is Map<String, dynamic>) {
+          if (response.statusCode == 200 &&
+              response.data is Map<String, dynamic>) {
             final choices = response.data['choices'] as List?;
-            final first = choices != null && choices.isNotEmpty ? choices.first : null;
+            final first =
+                choices != null && choices.isNotEmpty ? choices.first : null;
             final content = first?['message']?['content'] ?? '';
             return {
               'message': {'content': content},

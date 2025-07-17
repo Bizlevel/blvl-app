@@ -32,7 +32,7 @@ Future<void> main() async {
 
   if (dsn.isEmpty) {
     // Без Sentry
-    runApp(ProviderScope(child: MyApp()));
+    runApp(const ProviderScope(child: MyApp()));
   } else {
     // С Sentry, но в той же зоне
     final packageInfo = await PackageInfo.fromPlatform();
@@ -57,11 +57,13 @@ Future<void> main() async {
     );
 
     // Запускаем приложение в той же зоне
-    runApp(ProviderScope(child: MyApp()));
+    runApp(const ProviderScope(child: MyApp()));
   }
 }
 
 class MyApp extends ConsumerWidget {
+  const MyApp({super.key});
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final authAsync = ref.watch(authStateProvider);

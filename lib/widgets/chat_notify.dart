@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 
 class ChatNotify extends StatelessWidget {
-  ChatNotify({
-    Key? key,
+  const ChatNotify({
+    super.key,
     required this.number,
     this.boxSize = 30,
     this.color = Colors.red,
-  }) : super(key: key);
+  });
 
   final int number;
   final double boxSize;
@@ -25,7 +25,7 @@ class ChatNotify extends StatelessWidget {
         ),
         child: Text(
           "$number",
-          style: TextStyle(color: Colors.white),
+          style: const TextStyle(color: Colors.white),
         ),
       ),
     );

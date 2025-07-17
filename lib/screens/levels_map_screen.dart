@@ -9,7 +9,7 @@ import 'package:shimmer/shimmer.dart';
 import 'package:online_course/screens/level_detail_screen.dart';
 
 class LevelsMapScreen extends ConsumerWidget {
-  const LevelsMapScreen({Key? key}) : super(key: key);
+  const LevelsMapScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -50,13 +50,13 @@ class LevelsMapScreen extends ConsumerWidget {
             children: [
               Text(
                 userName,
-                style: TextStyle(
+                style: const TextStyle(
                   color: AppColor.labelColor,
                   fontSize: 14,
                 ),
               ),
               const SizedBox(height: 5),
-              Text(
+              const Text(
                 "Good Morning!",
                 style: TextStyle(
                   color: AppColor.textColor,
@@ -67,7 +67,7 @@ class LevelsMapScreen extends ConsumerWidget {
             ],
           ),
         ),
-        NotificationBox(notifiedNumber: 1),
+        const NotificationBox(notifiedNumber: 1),
       ],
     );
   }

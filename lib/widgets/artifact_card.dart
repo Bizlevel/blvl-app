@@ -5,12 +5,12 @@ import 'package:online_course/widgets/custom_image.dart';
 
 class ArtifactCard extends StatelessWidget {
   const ArtifactCard({
-    Key? key,
+    super.key,
     required this.title,
     required this.description,
     required this.image,
     required this.url,
-  }) : super(key: key);
+  });
 
   final String title;
   final String description;

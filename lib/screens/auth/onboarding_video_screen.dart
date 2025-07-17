@@ -11,7 +11,7 @@ import '../root_app.dart';
 import '../../theme/color.dart';
 
 class OnboardingVideoScreen extends StatefulWidget {
-  const OnboardingVideoScreen({Key? key}) : super(key: key);
+  const OnboardingVideoScreen({super.key});
 
   @override
   State<OnboardingVideoScreen> createState() => _OnboardingVideoScreenState();

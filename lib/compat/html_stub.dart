@@ -1,6 +1,7 @@
 /// Stub implementation for non-web platforms so that conditional import
 /// for `dart:html` compiles on mobile / desktop.
 /// This file is only included when `dart.library.html` is NOT available.
+library;
 
 class IFrameElement {
   String? src;

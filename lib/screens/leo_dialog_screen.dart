@@ -11,7 +11,7 @@ import 'package:online_course/widgets/leo_message_bubble.dart';
 /// message limit enforcement and auto-scroll to bottom.
 class LeoDialogScreen extends StatefulWidget {
   final String? chatId;
-  const LeoDialogScreen({Key? key, this.chatId}) : super(key: key);
+  const LeoDialogScreen({super.key, this.chatId});
 
   @override
   State<LeoDialogScreen> createState() => _LeoDialogScreenState();
@@ -118,7 +118,8 @@ class _LeoDialogScreenState extends State<LeoDialogScreen> {
       // Save user message & decrement limit atomically
       if (_chatId == null) {
         // создаём диалог при первом сообщении
-        _chatId = await LeoService.saveConversation(role: 'user', content: text);
+        _chatId =
+            await LeoService.saveConversation(role: 'user', content: text);
         // сразу загрузим (чтобы появился счётчик и т.д.)
       } else {
         await LeoService.saveConversation(
@@ -191,8 +192,7 @@ class _LeoDialogScreenState extends State<LeoDialogScreen> {
                       padding: EdgeInsets.all(8.0),
                       child: CircularProgressIndicator())
                   : TextButton(
-                      onPressed: _loadMore,
-                      child: const Text('Загрузить ещё')),
+                      onPressed: _loadMore, child: const Text('Загрузить ещё')),
             );
           }
           final msgIndex = _hasMore ? index - 1 : index;

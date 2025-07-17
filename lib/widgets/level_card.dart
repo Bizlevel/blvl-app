@@ -5,13 +5,13 @@ import 'package:flutter/services.dart';
 import 'custom_image.dart';
 
 class LevelCard extends StatelessWidget {
-  LevelCard({
-    Key? key,
+  const LevelCard({
+    super.key,
     required this.data,
     this.width = 280,
     this.height = 290,
     this.onTap,
-  }) : super(key: key);
+  });
 
   final Map<String, dynamic> data;
   final double width;
@@ -107,7 +107,7 @@ class LevelCard extends StatelessWidget {
             data["name"],
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 17,
               color: AppColor.textColor,
               fontWeight: FontWeight.w600,

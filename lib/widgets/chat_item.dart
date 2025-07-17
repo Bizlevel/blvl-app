@@ -6,11 +6,11 @@ import 'custom_image.dart';
 class ChatItem extends StatelessWidget {
   const ChatItem(
     this.chatData, {
-    Key? key,
+    super.key,
     this.onTap,
     this.isNotified = true,
     this.profileSize = 50,
-  }) : super(key: key);
+  });
 
   final chatData;
   final bool isNotified;
@@ -22,7 +22,7 @@ class ChatItem extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        margin: EdgeInsets.only(bottom: 8),
+        margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.fromLTRB(10, 12, 10, 10),
         decoration: BoxDecoration(
           color: Colors.white,
@@ -32,7 +32,7 @@ class ChatItem extends StatelessWidget {
               color: Colors.grey.withOpacity(0.1),
               spreadRadius: 1,
               blurRadius: 1,
-              offset: Offset(1, 1),
+              offset: const Offset(1, 1),
             ),
           ],
         ),
@@ -66,7 +66,7 @@ class ChatItem extends StatelessWidget {
             chatData['last_text'],
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontSize: 13),
+            style: const TextStyle(fontSize: 13),
           ),
         ),
         if (isNotified)
@@ -99,7 +99,7 @@ class ChatItem extends StatelessWidget {
             chatData['name'],
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
           ),
         ),
         const SizedBox(width: 5),
@@ -107,7 +107,7 @@ class ChatItem extends StatelessWidget {
           chatData['date'],
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 11,
             color: Colors.grey,
           ),

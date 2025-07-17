@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:online_course/theme/color.dart';
 
 class PaymentScreen extends StatelessWidget {
-  const PaymentScreen({Key? key}) : super(key: key);
+  const PaymentScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -12,11 +12,11 @@ class PaymentScreen extends StatelessWidget {
         backgroundColor: AppColor.appBgColor,
         elevation: 0,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
+      body: const Padding(
+        padding: EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: const [
+          children: [
             Text(
               'Инструкция по оплате',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),

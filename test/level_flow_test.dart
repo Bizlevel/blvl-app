@@ -7,8 +7,6 @@ import 'package:online_course/models/lesson_model.dart';
 import 'package:online_course/screens/level_detail_screen.dart';
 import 'package:online_course/providers/lessons_provider.dart';
 import 'package:online_course/providers/lesson_progress_provider.dart';
-import 'package:online_course/providers/lesson_progress_provider.dart'
-    show LessonProgressState, LessonProgressNotifier;
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();

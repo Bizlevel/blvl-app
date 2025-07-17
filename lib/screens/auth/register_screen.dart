@@ -8,7 +8,7 @@ import '../../widgets/custom_image.dart';
 import 'onboarding_screens.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
-  const RegisterScreen({Key? key}) : super(key: key);
+  const RegisterScreen({super.key});
 
   @override
   ConsumerState<RegisterScreen> createState() => _RegisterScreenState();
@@ -79,7 +79,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         child: Column(
           children: [
             SizedBox(height: size.height * 0.05),
-            CustomImage(
+            const CustomImage(
               'https://placehold.co/100x100',
               width: 100,
               height: 100,

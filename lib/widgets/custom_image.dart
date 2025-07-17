@@ -5,6 +5,7 @@ import 'package:online_course/theme/color.dart';
 class CustomImage extends StatelessWidget {
   const CustomImage(
     this.image, {
+    super.key,
     this.width = 100,
     this.height = 100,
     this.bgColor,
@@ -45,7 +46,7 @@ class CustomImage extends StatelessWidget {
               color: AppColor.shadowColor.withOpacity(0.1),
               spreadRadius: 1,
               blurRadius: 1,
-              offset: Offset(0, 1), // changes position of shadow
+              offset: const Offset(0, 1), // changes position of shadow
             ),
         ],
       ),
@@ -61,8 +62,8 @@ class CustomImage extends StatelessWidget {
   Widget _buildNetworkImage() {
     return CachedNetworkImage(
       imageUrl: image,
-      placeholder: (context, url) => BlankImageWidget(),
-      errorWidget: (context, url, error) => BlankImageWidget(),
+      placeholder: (context, url) => const BlankImageWidget(),
+      errorWidget: (context, url, error) => const BlankImageWidget(),
       imageBuilder: (context, imageProvider) => Container(
         decoration: BoxDecoration(
           borderRadius: borderRadius ?? BorderRadius.circular(radius),
@@ -74,7 +75,7 @@ class CustomImage extends StatelessWidget {
 }
 
 class BlankImageWidget extends StatelessWidget {
-  const BlankImageWidget({Key? key}) : super(key: key);
+  const BlankImageWidget({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -84,7 +85,8 @@ class BlankImageWidget extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
       ),
       alignment: Alignment.center,
-      child: const Icon(Icons.image_not_supported, color: Colors.grey, size: 40),
+      child:
+          const Icon(Icons.image_not_supported, color: Colors.grey, size: 40),
     );
   }
 }

@@ -4,10 +4,10 @@ import 'package:online_course/theme/color.dart';
 /// Бабл сообщения в диалоге с Leo
 class LeoMessageBubble extends StatelessWidget {
   const LeoMessageBubble({
-    Key? key,
+    super.key,
     required this.text,
     required this.isUser,
-  }) : super(key: key);
+  });
 
   final String text;
   final bool isUser;

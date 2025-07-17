@@ -15,7 +15,7 @@ import 'package:online_course/providers/levels_provider.dart';
 /// Shows a level as full-screen blocks (Intro → Lesson → Quiz → …).
 class LevelDetailScreen extends ConsumerStatefulWidget {
   final int levelId;
-  const LevelDetailScreen({Key? key, required this.levelId}) : super(key: key);
+  const LevelDetailScreen({super.key, required this.levelId});
 
   @override
   ConsumerState<LevelDetailScreen> createState() => _LevelDetailScreenState();
@@ -429,11 +429,7 @@ class _ProgressDots extends StatelessWidget {
   final int total;
   final bool vertical;
   const _ProgressDots(
-      {Key? key,
-      required this.current,
-      required this.total,
-      this.vertical = false})
-      : super(key: key);
+      {required this.current, required this.total, this.vertical = false});
   @override
   Widget build(BuildContext context) {
     final dots = List.generate(
@@ -468,12 +464,10 @@ class _NavBar extends StatelessWidget {
   final VoidCallback onBack;
   final VoidCallback onNext;
   const _NavBar(
-      {Key? key,
-      required this.canBack,
+      {required this.canBack,
       required this.canNext,
       required this.onBack,
-      required this.onNext})
-      : super(key: key);
+      required this.onNext});
   @override
   Widget build(BuildContext context) {
     return Padding(

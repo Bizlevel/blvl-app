@@ -3,13 +3,13 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:online_course/theme/color.dart';
 
 class CategoryBox extends StatelessWidget {
-  CategoryBox({
-    Key? key,
+  const CategoryBox({
+    super.key,
     required this.data,
     this.isSelected = false,
     this.onTap,
     this.selectedColor = AppColor.actionColor,
-  }) : super(key: key);
+  });
 
   final data;
   final Color selectedColor;
@@ -25,7 +25,7 @@ class CategoryBox extends StatelessWidget {
           AnimatedContainer(
             duration: const Duration(milliseconds: 500),
             curve: Curves.fastOutSlowIn,
-            padding: EdgeInsets.all(15),
+            padding: const EdgeInsets.all(15),
             decoration: BoxDecoration(
               color: isSelected ? AppColor.red : Colors.white,
               boxShadow: [
@@ -33,7 +33,7 @@ class CategoryBox extends StatelessWidget {
                   color: AppColor.shadowColor.withOpacity(0.1),
                   spreadRadius: 1,
                   blurRadius: 1,
-                  offset: Offset(1, 1), // changes position of shadow
+                  offset: const Offset(1, 1), // changes position of shadow
                 ),
               ],
               shape: BoxShape.circle,
@@ -52,7 +52,7 @@ class CategoryBox extends StatelessWidget {
             data["name"],
             maxLines: 1,
             overflow: TextOverflow.fade,
-            style: TextStyle(
+            style: const TextStyle(
               color: AppColor.textColor,
               fontWeight: FontWeight.w500,
             ),

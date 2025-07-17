@@ -8,7 +8,7 @@ import '../../widgets/custom_textfield.dart';
 import 'register_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
-  const LoginScreen({Key? key}) : super(key: key);
+  const LoginScreen({super.key});
 
   @override
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
@@ -63,7 +63,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           children: [
             SizedBox(height: size.height * 0.1),
             // Логотип – временный placeholder
-            CustomImage(
+            const CustomImage(
               'https://placehold.co/120x120',
               width: 120,
               height: 120,

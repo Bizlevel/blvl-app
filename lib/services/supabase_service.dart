@@ -94,7 +94,8 @@ class SupabaseService {
     }, retries: 1);
   }
 
-  static Future<List<Map<String, dynamic>>> fetchLevelsWithProgress(String userId) async {
+  static Future<List<Map<String, dynamic>>> fetchLevelsWithProgress(
+      String userId) async {
     return _withRetry(() async {
       try {
         final response = await client
@@ -128,7 +129,8 @@ class SupabaseService {
           'updated_at': DateTime.now().toIso8601String(),
         });
         // Update users.current_level if we just completed it
-        await client.rpc('update_current_level', params: {'p_level_id': levelId});
+        await client
+            .rpc('update_current_level', params: {'p_level_id': levelId});
       } on PostgrestException catch (e, st) {
         await Sentry.captureException(e, stackTrace: st);
         rethrow;

@@ -11,7 +11,7 @@ import 'package:online_course/screens/levels_map_screen.dart';
 final _rootTabProvider = StateProvider<int>((ref) => 0);
 
 class RootApp extends ConsumerWidget {
-  const RootApp({Key? key}) : super(key: key);
+  const RootApp({super.key});
 
   static final _tabs = [
     {

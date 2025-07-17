@@ -5,6 +5,7 @@ import 'package:online_course/theme/color.dart';
 class BottomBarItem extends StatelessWidget {
   const BottomBarItem(
     this.icon, {
+    super.key,
     this.onTap,
     this.color = Colors.grey,
     this.activeColor = AppColor.primary,
@@ -26,7 +27,7 @@ class BottomBarItem extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
         curve: Curves.fastOutSlowIn,
-        padding: EdgeInsets.all(7),
+        padding: const EdgeInsets.all(7),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(50),
           color: AppColor.bottomBarColor,
@@ -36,7 +37,7 @@ class BottomBarItem extends StatelessWidget {
                 color: AppColor.shadowColor.withOpacity(0.1),
                 spreadRadius: 2,
                 blurRadius: 2,
-                offset: Offset(0, 0), // changes position of shadow
+                offset: const Offset(0, 0), // changes position of shadow
               ),
           ],
         ),

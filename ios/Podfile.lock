@@ -2,11 +2,16 @@ PODS:
   - app_links (0.0.2):
     - Flutter
   - Flutter (1.0.0)
+  - integration_test (0.0.1):
+    - Flutter
   - package_info_plus (0.4.5):
     - Flutter
   - path_provider_foundation (0.0.1):
     - Flutter
     - FlutterMacOS
+  - Sentry (8.52.1):
+    - Sentry/Core (= 8.52.1)
+  - Sentry/Core (8.52.1)
   - Sentry/HybridSDK (8.52.1)
   - sentry_flutter (9.4.1):
     - Flutter
@@ -31,9 +36,10 @@ PODS:
 DEPENDENCIES:
   - app_links (from `.symlinks/plugins/app_links/ios`)
   - Flutter (from `Flutter`)
+  - integration_test (from `.symlinks/plugins/integration_test/ios`)
   - package_info_plus (from `.symlinks/plugins/package_info_plus/ios`)
   - path_provider_foundation (from `.symlinks/plugins/path_provider_foundation/darwin`)
-  - Sentry/HybridSDK (= 8.52.1)
+  - Sentry (= 8.52.1)
   - sentry_flutter (from `.symlinks/plugins/sentry_flutter/ios`)
   - shared_preferences_foundation (from `.symlinks/plugins/shared_preferences_foundation/darwin`)
   - sqflite_darwin (from `.symlinks/plugins/sqflite_darwin/darwin`)
@@ -51,6 +57,8 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/app_links/ios"
   Flutter:
     :path: Flutter
+  integration_test:
+    :path: ".symlinks/plugins/integration_test/ios"
   package_info_plus:
     :path: ".symlinks/plugins/package_info_plus/ios"
   path_provider_foundation:
@@ -73,6 +81,7 @@ EXTERNAL SOURCES:
 SPEC CHECKSUMS:
   app_links: 76b66b60cc809390ca1ad69bfd66b998d2387ac7
   Flutter: e0871f40cf51350855a761d2e70bf5af5b9b5de7
+  integration_test: 4a889634ef21a45d28d50d622cf412dc6d9f586e
   package_info_plus: 566e1b7a2f3900e4b0020914ad3fc051dcc95596
   path_provider_foundation: 080d55be775b7414fd5a5ef3ac137b97b097e564
   Sentry: 2cbbe3592f30050c60e916c63c7f5a2fa584005e
@@ -84,6 +93,6 @@ SPEC CHECKSUMS:
   wakelock_plus: fd58c82b1388f4afe3fe8aa2c856503a262a5b03
   webview_flutter_wkwebview: 6e6160e04b1e85872253adc5322afe416d9cdddc
 
-PODFILE CHECKSUM: 73782c159a9e14ac03fa9469a83b9a8336289d43
+PODFILE CHECKSUM: 95d0c73cb92a33951ada250781cff777ce0317a4
 
 COCOAPODS: 1.16.2

@@ -12,7 +12,7 @@ import 'package:online_course/widgets/bottombar_item.dart';
 
 void main() {
   group('Profile & Monetization', () {
-    final freeUser = UserModel(
+    const freeUser = UserModel(
       id: '123',
       email: 'test@example.com',
       name: 'Test User',

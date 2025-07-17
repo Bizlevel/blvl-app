@@ -4,7 +4,7 @@ import 'package:online_course/services/supabase_service.dart';
 
 /// Provides список уровней с учётом прогресса пользователя.
 final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
-    final userId = SupabaseService.client.auth.currentUser?.id;
+  final userId = SupabaseService.client.auth.currentUser?.id;
   final rows = userId == null
       ? await SupabaseService.fetchLevelsRaw()
       : await SupabaseService.fetchLevelsWithProgress(userId);
