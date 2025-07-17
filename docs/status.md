@@ -357,3 +357,6 @@ The next steps are to finish the LevelCard UI update, add the fetchLevelsRaw hel
 - 12.7: `LessonWidget` показывает fallback с кнопкой «Пропустить», убран хардкод video URL.
 - 12.8: LessonProgressNotifier сохраняет состояние с дебаунсом 200 мс, снижая I/O.
 - 12.9: `_isLevelCompleted` проверяет просмотр каждого видео и квиз только для уроков, где он есть.
+
+## Задача 12.10
+- Добавлен интеграционный тест `test/level_flow_test.dart`, покрывающий прохождение уроков, квиза и кнопку завершения уровня с мок-провайдерами.
