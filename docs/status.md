@@ -340,3 +340,7 @@ The next steps are to finish the LevelCard UI update, add the fetchLevelsRaw hel
 ## Задача 12.2
 - Убран автоматический `jumpToPage()` в `build`; `PageController` теперь создаётся с `initialPage`, что устраняет произвольные "прыжки" между блоками.
 - Изменён файл `lib/screens/level_detail_screen.dart`.
+
+## Задача 12.3
+- Пересчитан `_currentIndex` на основе фактической позиции `page`, кнопка «Назад» активна во время анимации; условная блокировка удалена.
+- Обновлены методы `_goBack` и блок `_NavBar` в `lib/screens/level_detail_screen.dart`.

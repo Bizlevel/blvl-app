@@ -87,7 +87,11 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
                 Expanded(child: _buildPageView()),
                 _ProgressDots(current: _currentIndex, total: _blocks.length),
                 _NavBar(
-                  canBack: _currentIndex > 0,
+                  canBack: (_pageController.hasClients
+                      ? (_pageController.page ??
+                              _pageController.initialPage.toDouble()) >
+                          0
+                      : false),
                   canNext: _currentIndex < _progress.unlockedPage,
                   onBack: _goBack,
                   onNext: _goNext,
@@ -150,8 +154,14 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
 
   // Helpers ---------------------------------------------------------
 
-  int get _currentIndex =>
-      _pageController.hasClients ? _pageController.page?.round() ?? 0 : 0;
+  int get _currentIndex {
+    if (!_pageController.hasClients) return 0;
+    // Используем фактическую позицию страницы, а не только целые индексы,
+    // чтобы во время анимации «Назад» кнопка не блокировалась преждевременно.
+    final current =
+        _pageController.page ?? _pageController.initialPage.toDouble();
+    return current.round();
+  }
 
   // --- Leo chat helpers --------------------------------------------
   void _ensureChatCreated(String prompt) async {
@@ -179,7 +189,8 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
   }
 
   void _goBack() {
-    if (_currentIndex > 0) {
+    final pos = _pageController.page ?? _pageController.initialPage.toDouble();
+    if (pos > 0) {
       _pageController.previousPage(
           duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
     }
