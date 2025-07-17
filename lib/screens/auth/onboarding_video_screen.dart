@@ -1,16 +1,14 @@
 import 'dart:async';
 
-
 import 'package:flutter/material.dart';
 import 'package:chewie/chewie.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:video_player/video_player.dart';
 import 'package:online_course/services/supabase_service.dart';
-
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../root_app.dart';
 import '../../theme/color.dart';
-
 
 class OnboardingVideoScreen extends StatefulWidget {
   const OnboardingVideoScreen({Key? key}) : super(key: key);
@@ -35,9 +33,9 @@ class _OnboardingVideoScreenState extends State<OnboardingVideoScreen> {
 
   Future<void> _initVideo() async {
     try {
-            final signedUrl = await SupabaseService.getVideoSignedUrl(
-            _relativeVideoPath) ??
-        'https://acevqbdpzgbtqznbpgzr.supabase.co/storage/v1/object/public/video//DRAFT_1.2%20(1).mp4';
+      final signedUrl = await SupabaseService.getVideoSignedUrl(
+              _relativeVideoPath) ??
+          'https://acevqbdpzgbtqznbpgzr.supabase.co/storage/v1/object/public/video//DRAFT_1.2%20(1).mp4';
 
       // Для Web и Mobile используем потоковое воспроизведение
       _videoController = VideoPlayerController.network(signedUrl);
@@ -46,19 +44,19 @@ class _OnboardingVideoScreenState extends State<OnboardingVideoScreen> {
 
       if (!kIsWeb) {
         _chewieController = ChewieController(
-        videoPlayerController: _videoController!,
-        autoPlay: true,
-        looping: false,
-        allowPlaybackSpeedChanging: false,
-        materialProgressColors: ChewieProgressColors(
-          playedColor: AppColor.primary,
-          handleColor: AppColor.primary,
-          backgroundColor: Colors.grey.shade300,
-          bufferedColor: Colors.grey.shade400,
-        ),
-        autoInitialize: true,
-        showControls: true,
-      );
+          videoPlayerController: _videoController!,
+          autoPlay: true,
+          looping: false,
+          allowPlaybackSpeedChanging: false,
+          materialProgressColors: ChewieProgressColors(
+            playedColor: AppColor.primary,
+            handleColor: AppColor.primary,
+            backgroundColor: Colors.grey.shade300,
+            bufferedColor: Colors.grey.shade400,
+          ),
+          autoInitialize: true,
+          showControls: true,
+        );
       }
 
       // переход на RootApp после окончания
@@ -91,6 +89,9 @@ class _OnboardingVideoScreenState extends State<OnboardingVideoScreen> {
             .update({'onboarding_completed': true}).eq('id', user.id);
       } catch (_) {}
     }
+    // Локальный флаг, чтобы при offline доступе пропускать онбординг
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('onboarding_done', true);
 
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const RootApp()),
@@ -114,7 +115,8 @@ class _OnboardingVideoScreenState extends State<OnboardingVideoScreen> {
           children: [
             Center(
               child: kIsWeb
-                  ? (_videoController != null && _videoController!.value.isInitialized
+                  ? (_videoController != null &&
+                          _videoController!.value.isInitialized
                       ? AspectRatio(
                           aspectRatio: 9 / 16,
                           child: Stack(
@@ -132,7 +134,9 @@ class _OnboardingVideoScreenState extends State<OnboardingVideoScreen> {
                           ),
                         )
                       : const CircularProgressIndicator(color: Colors.white))
-                  : (_chewieController != null && _chewieController!.videoPlayerController.value.isInitialized
+                  : (_chewieController != null &&
+                          _chewieController!
+                              .videoPlayerController.value.isInitialized
                       ? AspectRatio(
                           aspectRatio: 9 / 16,
                           child: Chewie(controller: _chewieController!),

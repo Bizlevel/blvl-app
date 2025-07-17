@@ -4,8 +4,12 @@ class QuizWidget extends StatefulWidget {
   final Map<String, dynamic>
       questionData; // {'question': String, 'options': List<String>, 'correct': int}
   final VoidCallback onCorrect;
+  final bool initiallyPassed;
   const QuizWidget(
-      {Key? key, required this.questionData, required this.onCorrect})
+      {Key? key,
+      required this.questionData,
+      required this.onCorrect,
+      this.initiallyPassed = false})
       : super(key: key);
 
   @override
@@ -14,8 +18,15 @@ class QuizWidget extends StatefulWidget {
 
 class _QuizWidgetState extends State<QuizWidget> {
   int? _selected;
-  bool _checked = false;
+  late bool _checked;
   bool _isCorrect = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checked = widget.initiallyPassed;
+    _isCorrect = widget.initiallyPassed;
+  }
 
   @override
   Widget build(BuildContext context) {

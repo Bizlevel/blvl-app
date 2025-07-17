@@ -13,6 +13,7 @@ import 'screens/root_app.dart';
 import 'services/supabase_service.dart';
 import 'theme/color.dart';
 import 'screens/auth/onboarding_screens.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 Future<void> main() async {
   // КРИТИЧНО для web: Все инициализации должны быть в одной зоне
@@ -76,18 +77,24 @@ class MyApp extends ConsumerWidget {
         }
 
         // Пользователь авторизован – смотрим, завершён ли онбординг
-        return currentUserAsync.when(
-          data: (user) {
-            if (user == null || !(user.onboardingCompleted)) {
-              return const OnboardingProfileScreen();
-            }
-            return const RootApp();
-          },
-          loading: () => const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          ),
-          error: (_, __) => const RootApp(),
-        );
+        return FutureBuilder<bool>(
+            future: SharedPreferences.getInstance()
+                .then((p) => p.getBool('onboarding_done') ?? false),
+            builder: (context, snap) {
+              final localDone = snap.data ?? false;
+              return currentUserAsync.when(
+                data: (user) {
+                  final remoteDone = user?.onboardingCompleted ?? false;
+                  if (!localDone && !remoteDone) {
+                    return const OnboardingProfileScreen();
+                  }
+                  return const RootApp();
+                },
+                loading: () => const Scaffold(
+                    body: Center(child: CircularProgressIndicator())),
+                error: (_, __) => const RootApp(),
+              );
+            });
       },
       loading: () => const Scaffold(
         body: Center(child: CircularProgressIndicator()),
@@ -98,7 +105,7 @@ class MyApp extends ConsumerWidget {
     return MaterialApp(
       builder: (context, child) => ResponsiveWrapper.builder(
         BouncingScrollWrapper.builder(context, child!),
-        maxWidth: 600,
+        maxWidth: 480,
         minWidth: 320,
         defaultScale: true,
         breakpoints: const [

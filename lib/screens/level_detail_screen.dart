@@ -231,7 +231,7 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
       child: PageView.builder(
         scrollDirection: Axis.vertical,
         controller: _pageController,
-        physics: const PageScrollPhysics(),
+        physics: const NeverScrollableScrollPhysics(),
         itemCount: _blocks.length,
         itemBuilder: (context, index) {
           final locked = index > _progress.unlockedPage;
@@ -401,19 +401,25 @@ class _QuizBlock extends _PageBlock {
   _QuizBlock({required this.lesson, required this.onCorrect});
   @override
   Widget build(BuildContext context, int index) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-        child: QuizWidget(
-          questionData: {
-            'question': lesson.quizQuestions.first['question'],
-            'options': List<String>.from(lesson.quizQuestions.first['options']),
-            'correct': lesson.correctAnswers.first,
-          },
-          onCorrect: () => onCorrect(index),
+    return Consumer(builder: (context, ref, _) {
+      final progress = ref.watch(lessonProgressProvider(lesson.levelId));
+      final alreadyPassed = progress.passedQuizzes.contains(index);
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+          child: QuizWidget(
+            questionData: {
+              'question': lesson.quizQuestions.first['question'],
+              'options':
+                  List<String>.from(lesson.quizQuestions.first['options']),
+              'correct': lesson.correctAnswers.first,
+            },
+            initiallyPassed: alreadyPassed,
+            onCorrect: () => onCorrect(index),
+          ),
         ),
-      ),
-    );
+      );
+    });
   }
 }
 
