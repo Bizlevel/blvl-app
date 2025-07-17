@@ -363,3 +363,6 @@ The next steps are to finish the LevelCard UI update, add the fetchLevelsRaw hel
 - QuizWidget: добавлена кнопка «Попробовать снова» после неверного ответа.
 - Supabase: создан RPC `update_current_level` (migration) – ошибка PGRST202 устранена.
 - ProgressDots: отрисовываются вертикально справа, не перекрывают контент.
+
+## Задача 13.1
+- После выполнения completeLevel провайдер levelsProvider инвалидацируется; пользователь возвращается на карту с обновлёнными уровнями. Файлы: level_detail_screen.dart.

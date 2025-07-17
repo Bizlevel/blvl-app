@@ -10,6 +10,7 @@ import 'package:online_course/widgets/floating_chat_bubble.dart';
 import 'package:online_course/services/leo_service.dart';
 import 'package:online_course/widgets/quiz_widget.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:online_course/providers/levels_provider.dart';
 
 /// Shows a level as full-screen blocks (Intro → Lesson → Quiz → …).
 class LevelDetailScreen extends ConsumerStatefulWidget {
@@ -108,6 +109,8 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
                       ? () async {
                           try {
                             await SupabaseService.completeLevel(widget.levelId);
+                            // Обновляем карту уровней
+                            ref.invalidate(levelsProvider);
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
