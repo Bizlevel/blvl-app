@@ -366,3 +366,6 @@ The next steps are to finish the LevelCard UI update, add the fetchLevelsRaw hel
 
 ## Задача 13.1
 - После выполнения completeLevel провайдер levelsProvider инвалидацируется; пользователь возвращается на карту с обновлёнными уровнями. Файлы: level_detail_screen.dart.
+
+## Задача 13.6
+- Провайдеры теперь изменяются только в `addPostFrameCallback`, устраняя ошибку Sentry «modify provider while building».

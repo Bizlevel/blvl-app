@@ -63,14 +63,14 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
 
   void _videoWatched(int page) {
     // Отложим обновление, чтобы избежать модификации провайдера во время билда
-    Future(() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       _progressNotifier.markVideoWatched(page);
       _unlockNext(page);
     });
   }
 
   void _quizPassed(int page) {
-    Future(() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       _progressNotifier.markQuizPassed(page);
       _unlockNext(page);
     });
