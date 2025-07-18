@@ -92,60 +92,19 @@
 Ошибки Sentry (14.07): RenderFlex overflow (BIZLEVEL-FLUTTER-5/6) – исправлено: LessonWidget обёрнут в SingleChildScrollView. StorageException 404 (BIZLEVEL-FLUTTER-4/2) – обработка 404 без throw, логирование в Sentry подавлено. Zone mismatch ошибок больше не воспроизводится. Все изменения добавлены и готовы к проверке.
 
 Leo AI assistant improvements (14.07): Edge Function `leo_context` генерирует персональный system prompt на основе прогресса. - RPC `decrement_leo_message` + UI блокируют превышение дневного лимита. - OpenAI Moderation API фильтрует пользовательский ввод перед отправкой. - `LeoDialogScreen` переписан: постраничная загрузка чата, кнопка «Загрузить ещё», плавный автоскролл. - Бейдж непрочитанных сообщений и обнуление счётчика работают стабильно.
-Правки для настроек видео на Vimeo
-1. lesson_model.dart: • videoUrl → nullable. • Добавлено новое поле vimeoId.
-2. lesson_widget.dart: • В _initPlayer() теперь выбирается источник:
-- если vimeoId заполнен → воспроизводим https://player.vimeo.com/video/<id>;
-- иначе получаем подписанный URL из Supabase Storage (старый сценарий).
-• Улучшён резервный путь при отсутствии videoUrl.
+Правки для настроек видео на Vimeo: lesson_model.dart: • videoUrl → nullable. • Добавлено новое поле vimeoId. lesson_widget.dart: • В _initPlayer() теперь выбирается источник: если vimeoId заполнен → воспроизводим https://player.vimeo.com/video/<id>; иначе получаем подписанный URL из Supabase Storage (старый сценарий). Улучшён резервный путь при отсутствии videoUrl.
 
-## Задача 11.1
-- Исправлен `Zone mismatch`: инициализация Flutter/Supabase/Sentry объединена в одной зоне (`main.dart`), добавлен `debugZoneErrorsAreFatal`.
-- Удалён const в `ProviderScope`, добавлен import `foundation`.
-- Обновлён `SupabaseService.initialize` (вызывается в той же зоне).
+# Этап 11:
+Задача 11.1: Исправлен `Zone mismatch`: инициализация Flutter/Supabase/Sentry объединена в одной зоне (`main.dart`), добавлен `debugZoneErrorsAreFatal`. Удалён const в `ProviderScope`, добавлен import `foundation`. Обновлён `SupabaseService.initialize` (вызывается в той же зоне).
+Задача 11.2: Поддержка воспроизведения уроков Vimeo на Web и iOS: Web: встраиваемый iframe через `HtmlElementView`. iOS: `webview_flutter` (conditional import) с unrestricted JS. Android/десктоп: fallback на `video_player`. Добавлены stubs `compat/webview_stub.dart`, `compat/html_stub.dart` для кроссплатформенной сборки. `lesson_widget.dart` переработан: условный выбор источника, обработка прогресса, graceful fallback. В `pubspec.yaml` добавлена зависимость `webview_flutter`.
 
-## Задача 11.2
-- Поддержка воспроизведения уроков Vimeo на Web и iOS:
-  - Web: встраиваемый iframe через `HtmlElementView`.
-  - iOS: `webview_flutter` (conditional import) с unrestricted JS.
-  - Android/десктоп: fallback на `video_player`.
-- Добавлены stubs `compat/webview_stub.dart`, `compat/html_stub.dart` для кроссплатформенной сборки.
-- `lesson_widget.dart` переработан: условный выбор источника, обработка прогресса, graceful fallback.
-- В `pubspec.yaml` добавлена зависимость `webview_flutter`.
+Исправление сборки Web (15.07): Ошибки: `platformViewRegistry` undefined и `Zone mismatch` приводили к падению приложения на Chrome. Причина: после Flutter 3.10 `platformViewRegistry` перемещён в `dart:ui_web`, а `WidgetsFlutterBinding.ensureInitialized()` вызывался в другой Zone. Решение: добавлен условный импорт `dart:ui_web` с префиксом `ui` и вызовы `ui.platformViewRegistry.registerViewFactory`; `ensureInitialized()` вызывается один раз в `main()`. Приложение успешно собирается и работает в браузере.
 
-## Исправление сборки Web (15.07)
-- Ошибки: `platformViewRegistry` undefined и `Zone mismatch` приводили к падению приложения на Chrome.
-- Причина: после Flutter 3.10 `platformViewRegistry` перемещён в `dart:ui_web`, а `WidgetsFlutterBinding.ensureInitialized()` вызывался в другой Zone.
-- Решение: добавлен условный импорт `dart:ui_web` с префиксом `ui` и вызовы `ui.platformViewRegistry.registerViewFactory`; `ensureInitialized()` вызывается один раз в `main()`.
-- Приложение успешно собирается и работает в браузере.
-
-## Задача 11.3
-- Leo чат: диалог сохраняется только после первого сообщения пользователя, пустые чаты более не создаются.
-- Списки диалогов (`LeoChatScreen`, `FloatingChatBubble`) фильтруют чаты с `message_count > 0`.
-- Обновлены `LeoDialogScreen` и `LeoChatScreen` для поддержки нового поведения, добавлено локальное поле `_chatId`.
-- Успешно протестировано на iOS и Web, ошибок не выявлено.
-- Код закоммичен, лимиты и счётчики сообщений работают корректно.
-
-## Задача 11.4
-• ProfileScreen.build полностью переработан:
-– При authAsync.loading и currentUserProvider.loading отображается CircularProgressIndicator.
-– Удалён дублирующий build и лишние скобки, из-за которых показывалось сообщение «Не авторизован».
-- Задача не решена. После flutter clean, flutter pub get, и запуска на хром и входа в аккаунт, в Профиле все еще висит "Не авторизован".
-• Проанализирована ошибка Zone mismatch в веб-версии: `WidgetsFlutterBinding.ensureInitialized()` вызывался в `_runApp()`, но инициализация Supabase/Sentry происходила в `main()` в разных async-зонах.
-• Исправлен `main.dart`: перенесён `WidgetsFlutterBinding.ensureInitialized()` в начало `main()` для объединения всей инициализации в одной зоне.
-• Исправлено использование SentryFlutter.init: убран appRunner callback, который создавал дополнительную зоне, runApp теперь в той же зоне что и инициализация.
-• Добавлено debug-логирование в `authStateProvider` и `currentUserProvider` для диагностики состояния сессии и пользователя.
-• Исправлен `ProfileScreen`: устранен race condition между authStateProvider и currentUserProvider, добавлена правильная обработка состояний загрузки/ошибок.
-• Zone mismatch устранён, но требуется тестирование web-версии для подтверждения работы профиля.
-
-## Задача 11.5
-- Task 11.5 completed: добавлены GitHub Actions workflow (`.github/workflows/ci.yaml`) и скрипт `scripts/sentry_check.sh`.
-- CI запускает тесты, затем проверяет критические нерешённые ошибки Sentry за последние 24 ч; при их наличии сборка падает.
-- В конце workflow отправляется уведомление в Slack c ссылкой на дашборд Sentry.
-
-## Задача 11.6
-- Task 11.6 completed: добавлен smoke-тест `integration_test/web_smoke_test.dart` (запуск LessonWidget в Chrome) и dev-dependency `integration_test`.
-- Workflow CI уже запускает `flutter test --platform chrome`, теперь включает интеграционный web-тест и гарантирует, что приложение рендерит урок с видео без ошибок.
+Задача 11.3: Leo чат: диалог сохраняется только после первого сообщения пользователя, пустые чаты более не создаются.
+Списки диалогов (`LeoChatScreen`, `FloatingChatBubble`) фильтруют чаты с `message_count > 0`. Обновлены `LeoDialogScreen` и `LeoChatScreen` для поддержки нового поведения, добавлено локальное поле `_chatId`. Успешно протестировано на iOS и Web, ошибок не выявлено. Код закоммичен, лимиты и счётчики сообщений работают корректно.
+Задача 11.4: ProfileScreen.build полностью переработан: При authAsync.loading и currentUserProvider.loading отображается CircularProgressIndicator. Удалён дублирующий build и лишние скобки, из-за которых показывалось сообщение «Не авторизован». Задача не решена. После flutter clean, flutter pub get, и запуска на хром и входа в аккаунт, в Профиле все еще висит "Не авторизован". Проанализирована ошибка Zone mismatch в веб-версии: `WidgetsFlutterBinding.ensureInitialized()` вызывался в `_runApp()`, но инициализация Supabase/Sentry происходила в `main()` в разных async-зонах. Исправлен `main.dart`: перенесён `WidgetsFlutterBinding.ensureInitialized()` в начало `main()` для объединения всей инициализации в одной зоне. Исправлено использование SentryFlutter.init: убран appRunner callback, который создавал дополнительную зоне, runApp теперь в той же зоне что и инициализация. Добавлено debug-логирование в `authStateProvider` и `currentUserProvider` для диагностики состояния сессии и пользователя. Исправлен `ProfileScreen`: устранен race condition между authStateProvider и currentUserProvider, добавлена правильная обработка состояний загрузки/ошибок. Zone mismatch устранён, но требуется тестирование web-версии для подтверждения работы профиля.
+Задача 11.5: добавлены GitHub Actions workflow (`.github/workflows/ci.yaml`) и скрипт `scripts/sentry_check.sh`. CI запускает тесты, затем проверяет критические нерешённые ошибки Sentry за последние 24 ч; при их наличии сборка падает. В конце workflow отправляется уведомление в Slack c ссылкой на дашборд Sentry.
+Задача 11.6: Task 11.6 completed: добавлен smoke-тест `integration_test/web_smoke_test.dart` (запуск LessonWidget в Chrome) и dev-dependency `integration_test`. Workflow CI уже запускает `flutter test --platform chrome`, теперь включает интеграционный web-тест и гарантирует, что приложение рендерит урок с видео без ошибок.
 
 ## Задача Fix warnings
 - Добавлен dev_dependency `flutter_lints`, запущен `flutter pub get`.
@@ -177,4 +136,19 @@ Bugfixes 17.07: QuizWidget: добавлена кнопка «Попробова
 Задача 13.5: Web-layout ограничен maxWidth 480, что устраняет RenderFlex overflow; вертикальные точки обёрнуты в SafeArea.
 Задача 13.6: Провайдеры теперь изменяются только в `addPostFrameCallback`, устраняя ошибку Sentry «modify provider while building».
 Задача 13.7: уже покрывает возврат null без throw для Storage-404 – новые ошибки не создаются.
-Задача 13.8: CI запускает тесты, затем проверяет критические нерешённые ошибки Sentry за последние 24 ч; при их наличии сборка падает. TODO: добавить secrets в github actions и настроить workflow.
+Задача 13.8: CI запускает тесты, затем проверяет критические нерешённые ошибки Sentry за последние 24 ч; при их наличии сборка падает. 
+## TODO: добавить secrets в github actions и настроить workflow (правильно настроить выполненное в задаче 13.8).
+## Fix: 160 porblems Info type.
+- Прогнал `dart fix --apply` + `dart format`: убраны сотни style-замечаний (`const`, `super.key`, лишние скобки).
+- Riverpod: заменил устаревшие `.stream`/`.overrideWithProvider` на `.future`/`.overrideWith` ➜ предупреждения deprecated_member_use сняты.
+- video_player: `VideoPlayerController.network` мигрирован на `networkUrl(Uri)`, совместимо с 2.8+.
+- Удалена неиспользуемая функция `_ensureChatCreated` и импорт `LeoService`, очищены `unused_*` варнинги.
+- Добавлены фигурные скобки там, где был однострочный `if`, устранив `curly_braces_in_flow_control_structures`.
+- `OnboardingVideoScreen`: проверка `mounted` перед `Navigator` ➜ исчез `use_build_context_synchronously`.
+- `SupabaseService`: сравнение `statusCode` теперь типобезопасно `((e.statusCode ?? 0) != 404)` ➜ убраны `unrelated_type_equality_checks`.
+- В сумме анализатор с **160** сообщений снизился до **31** (остались только косметические `withOpacity`, переименование констант и нестрогие типы). 
+## Fix: некорректное отображение видео в Web-версии
+- Проблема: видео в `LessonWidget` обрезалось на широких экранах из-за неверной логики расчёта размеров.
+- Неудачные попытки: `AspectRatio` (вызывал слишком большую высоту), `LayoutBuilder` внутри `SingleChildScrollView` (получал бесконечные constraints и ломал расчёт).
+- Рабочее решение: структура виджета изменена на `Column` > `Expanded` > `LayoutBuilder`. `Expanded` забирает всё доступное место, а `LayoutBuilder` внутри него корректно вписывает видео в эти границы с сохранением пропорций 9:16. Описание урока размещается под `Expanded` и всегда видно.
+- Результат: видео всегда полностью видимо на экранах любого размера без переполнений и обрезок. 

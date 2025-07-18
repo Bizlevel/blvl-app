@@ -14,7 +14,8 @@ import 'package:online_course/providers/levels_provider.dart';
 /// Shows a level as full-screen blocks (Intro → Lesson → Quiz → …).
 class LevelDetailScreen extends ConsumerStatefulWidget {
   final int levelId;
-  const LevelDetailScreen({super.key, required this.levelId});
+  final int? levelNumber;
+  const LevelDetailScreen({super.key, required this.levelId, this.levelNumber});
 
   @override
   ConsumerState<LevelDetailScreen> createState() => _LevelDetailScreenState();
@@ -258,7 +259,9 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
 
   void _buildBlocks(List<LessonModel> lessons) {
     _blocks = [
-      _IntroBlock(levelId: widget.levelId),
+      _IntroBlock(
+          levelId: widget.levelId,
+          levelNumber: widget.levelNumber ?? widget.levelId),
       for (final lesson in lessons) ...[
         _LessonBlock(lesson: lesson, onWatched: _videoWatched),
         _QuizBlock(lesson: lesson, onCorrect: _quizPassed),
@@ -346,7 +349,8 @@ abstract class _PageBlock {
 // Intro -------------------------------------------------------------
 class _IntroBlock extends _PageBlock {
   final int levelId;
-  _IntroBlock({required this.levelId});
+  final int levelNumber;
+  _IntroBlock({required this.levelId, required this.levelNumber});
   @override
   Widget build(BuildContext context, int index) {
     return Center(
@@ -355,7 +359,7 @@ class _IntroBlock extends _PageBlock {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text('Уровень $levelId',
+            Text('Уровень $levelNumber',
                 style:
                     const TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
@@ -393,9 +397,9 @@ class _QuizBlock extends _PageBlock {
     return Consumer(builder: (context, ref, _) {
       final progress = ref.watch(lessonProgressProvider(lesson.levelId));
       final alreadyPassed = progress.passedQuizzes.contains(index);
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      return SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        child: Center(
           child: QuizWidget(
             questionData: {
               'question': lesson.quizQuestions.first['question'],

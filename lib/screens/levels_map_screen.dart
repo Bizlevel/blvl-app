@@ -91,7 +91,8 @@ class LevelsMapScreen extends ConsumerWidget {
                       Navigator.of(context).push(
                         MaterialPageRoute(
                           builder: (_) => LevelDetailScreen(
-                              levelId: levelData['id'] as int),
+                              levelId: levelData['id'] as int,
+                              levelNumber: levelData['level'] as int),
                         ),
                       );
                     },

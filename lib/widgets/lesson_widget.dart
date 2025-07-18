@@ -167,14 +167,33 @@ class _LessonWidgetState extends State<LessonWidget> {
       });
 
       return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          SizedBox(
-            height: 400,
-            child: HtmlElementView(viewType: viewId),
+          Expanded(
+            child: LayoutBuilder(builder: (context, constraints) {
+              const ratio = 9 / 16; // width / height for portrait
+              double maxH = constraints.maxHeight;
+              double maxW = constraints.maxWidth;
+              double h = maxW / ratio;
+              double w = maxW;
+              if (h > maxH) {
+                h = maxH;
+                w = h * ratio;
+              }
+              return Center(
+                child: SizedBox(
+                  width: w,
+                  height: h,
+                  child: HtmlElementView(viewType: viewId),
+                ),
+              );
+            }),
           ),
-          const SizedBox(height: 10),
-          Text(widget.lesson.description, style: const TextStyle(fontSize: 14)),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Text(widget.lesson.description,
+                style: const TextStyle(fontSize: 14)),
+          ),
         ],
       );
     }
@@ -182,17 +201,36 @@ class _LessonWidgetState extends State<LessonWidget> {
     // iOS WebView playback
     if (_useWebView && _embedUrl != null) {
       return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          SizedBox(
-            height: 400,
-            child: WebView(
-              initialUrl: _embedUrl,
-              javascriptMode: JavascriptMode.unrestricted,
-            ),
+          Expanded(
+            child: LayoutBuilder(builder: (context, constraints) {
+              const ratio = 9 / 16;
+              double maxH = constraints.maxHeight;
+              double maxW = constraints.maxWidth;
+              double h = maxW / ratio;
+              double w = maxW;
+              if (h > maxH) {
+                h = maxH;
+                w = h * ratio;
+              }
+              return Center(
+                child: SizedBox(
+                  width: w,
+                  height: h,
+                  child: WebView(
+                    initialUrl: _embedUrl,
+                    javascriptMode: JavascriptMode.unrestricted,
+                  ),
+                ),
+              );
+            }),
           ),
-          const SizedBox(height: 10),
-          Text(widget.lesson.description, style: const TextStyle(fontSize: 14)),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Text(widget.lesson.description,
+                style: const TextStyle(fontSize: 14)),
+          ),
         ],
       );
     }
@@ -223,23 +261,41 @@ class _LessonWidgetState extends State<LessonWidget> {
       );
     }
 
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          AspectRatio(
-            aspectRatio: _videoController!.value.aspectRatio == 0
-                ? 9 / 16
-                : _videoController!.value.aspectRatio,
-            child: Chewie(controller: _chewieController!),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final ratio = _videoController!.value.aspectRatio == 0
+                  ? 9 / 16
+                  : _videoController!.value.aspectRatio;
+              double maxH = constraints.maxHeight;
+              double maxW = constraints.maxWidth;
+              double h = maxW / ratio;
+              double w = maxW;
+              if (h > maxH) {
+                h = maxH;
+                w = h * ratio;
+              }
+              return Center(
+                child: SizedBox(
+                  width: w,
+                  height: h,
+                  child: Chewie(controller: _chewieController!),
+                ),
+              );
+            },
           ),
-          const SizedBox(height: 10),
-          Text(
+        ),
+        Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Text(
             widget.lesson.description,
             style: const TextStyle(fontSize: 14),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

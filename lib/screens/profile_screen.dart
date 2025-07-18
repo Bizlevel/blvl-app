@@ -13,6 +13,9 @@ import 'package:online_course/providers/levels_provider.dart';
 import 'package:online_course/screens/payment_screen.dart';
 import 'package:online_course/models/user_model.dart';
 import 'package:online_course/screens/auth/login_screen.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:io';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -207,7 +210,7 @@ class ProfileScreen extends ConsumerWidget {
   }
 }
 
-class _Body extends StatelessWidget {
+class _Body extends ConsumerStatefulWidget {
   const _Body({
     required this.userName,
     required this.avatarUrl,
@@ -227,6 +230,69 @@ class _Body extends StatelessWidget {
   final List<Map<String, dynamic>> artifacts;
 
   @override
+  ConsumerState<_Body> createState() => _BodyState();
+}
+
+class _BodyState extends ConsumerState<_Body> {
+  bool _isUploading = false;
+
+  Future<void> _uploadFile() async {
+    setState(() {
+      _isUploading = true;
+    });
+
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf'],
+      );
+
+      if (result == null || result.files.single.path == null) {
+        debugPrint('File picking cancelled.');
+        setState(() {
+          _isUploading = false;
+        });
+        return;
+      }
+
+      final file = result.files.single;
+      final filePath = file.path!;
+      final fileName = file.name;
+
+      debugPrint('Attempting to upload: $fileName');
+
+      final response = await Supabase.instance.client.storage
+          .from('artifacts')
+          .upload(
+            fileName,
+            File(filePath),
+            fileOptions: const FileOptions(cacheControl: '3600', upsert: false),
+          );
+
+      debugPrint('Upload successful: $response');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Upload successful!')),
+      );
+    } on StorageException catch (e) {
+      debugPrint('Detailed Storage Error: ${e.message}');
+      debugPrint('Detailed Storage Error statusCode: ${e.statusCode}');
+      debugPrint('Detailed Storage Error error: ${e.error}');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Storage Error: ${e.message}')),
+      );
+    } catch (e) {
+      debugPrint('An unexpected error occurred: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('An unexpected error occurred: $e')),
+      );
+    } finally {
+      setState(() {
+        _isUploading = false;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 15),
@@ -236,8 +302,8 @@ class _Body extends StatelessWidget {
           const SizedBox(height: 20),
           _buildRecord(),
           const SizedBox(height: 20),
-          if (!isPremium) _buildPremiumButton(context),
-          if (!isPremium) const SizedBox(height: 20),
+          if (!widget.isPremium) _buildPremiumButton(context),
+          if (!widget.isPremium) const SizedBox(height: 20),
           _buildSection1(context),
           const SizedBox(height: 20),
           _buildSection2(),
@@ -245,27 +311,50 @@ class _Body extends StatelessWidget {
           _buildSection3(),
           const SizedBox(height: 20),
           _buildArtifactsSection(),
+          const SizedBox(height: 20),
+          // Test Upload Button
+          ElevatedButton(
+            onPressed: _isUploading ? null : _uploadFile,
+            child: _isUploading
+                ? const CircularProgressIndicator(color: Colors.white)
+                : const Text('Test Upload PDF'),
+          ),
+          const SizedBox(height: 40),
         ],
       ),
     );
   }
 
   Widget _buildProfile() {
-    return Column(
+    return Row(
       children: [
         CustomImage(
-          avatarUrl ?? 'https://placehold.co/120x120?text=Avatar',
-          width: 70,
-          height: 70,
-          radius: 20,
+          widget.avatarUrl ??
+              "https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?ixlib=rb-1.2.1&ixid=MnwxMjA3fDB8MHxzZWFyY2h8MTd8fHByb2ZpbGV8ZW58MHx8MHx8&auto=format&fit=crop&w=800&q=60",
+          width: 80,
+          height: 80,
+          radius: 40,
         ),
-        const SizedBox(height: 10),
-        Text(
-          userName,
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w500,
-          ),
+        const SizedBox(width: 15),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              widget.userName,
+              style: const TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 5),
+            const Text(
+              "BizLevel",
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey,
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -277,22 +366,22 @@ class _Body extends StatelessWidget {
       children: [
         Expanded(
           child: SettingBox(
-            title: 'Уровень $currentLevel',
-            icon: 'assets/icons/work.svg',
+            title: "${widget.currentLevel} LVL",
+            icon: "assets/icons/work.svg",
           ),
         ),
         const SizedBox(width: 10),
         Expanded(
           child: SettingBox(
-            title: '$messagesLeft сообщений',
-            icon: 'assets/icons/chat.svg',
+            title: "${widget.messagesLeft} Leo",
+            icon: "assets/icons/chat.svg",
           ),
         ),
         const SizedBox(width: 10),
         Expanded(
           child: SettingBox(
-            title: '$artifactsCount артефактов',
-            icon: 'assets/icons/bag.svg',
+            title: "${widget.artifactsCount} Artfs",
+            icon: "assets/icons/shield.svg",
           ),
         ),
       ],
@@ -300,161 +389,101 @@ class _Body extends StatelessWidget {
   }
 
   Widget _buildPremiumButton(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      height: 48,
-      child: ElevatedButton(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColor.primary,
-        ),
-        onPressed: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Премиум скоро будет доступен')),
-          );
-        },
-        child: const Text('Получить Premium'),
-      ),
-    );
-  }
-
-  Widget _buildSection1(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 15),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(5),
-        color: AppColor.cardColor,
-        boxShadow: [
-          BoxShadow(
-            color: AppColor.shadowColor.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 1,
-            offset: const Offset(0, 1),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          const SettingItem(
-            title: 'Настройки',
-            leadingIcon: 'assets/icons/setting.svg',
-            bgIconColor: AppColor.blue,
-          ),
-          const DividerWrapper(),
-          SettingItem(
-            title: 'Оплата',
-            leadingIcon: 'assets/icons/wallet.svg',
-            bgIconColor: AppColor.green,
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const PaymentScreen()),
-              );
-            },
-          ),
-          const DividerWrapper(),
-          const SettingItem(
-            title: 'Закладки',
-            leadingIcon: 'assets/icons/bookmark.svg',
-            bgIconColor: AppColor.primary,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSection2() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 15),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(5),
-        color: AppColor.cardColor,
-        boxShadow: [
-          BoxShadow(
-            color: AppColor.shadowColor.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 1,
-            offset: const Offset(0, 1),
-          ),
-        ],
-      ),
-      child: const Column(
-        children: [
-          SettingItem(
-            title: 'Уведомления',
-            leadingIcon: 'assets/icons/bell.svg',
-            bgIconColor: AppColor.purple,
-          ),
-          DividerWrapper(),
-          SettingItem(
-            title: 'Приватность',
-            leadingIcon: 'assets/icons/shield.svg',
-            bgIconColor: AppColor.orange,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSection3() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 15),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(5),
-        color: AppColor.cardColor,
-        boxShadow: [
-          BoxShadow(
-            color: AppColor.shadowColor.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 1,
-            offset: const Offset(0, 1),
-          ),
-        ],
-      ),
-      child: SettingItem(
-        title: 'Выйти',
-        leadingIcon: 'assets/icons/logout.svg',
-        bgIconColor: AppColor.darker,
-        onTap: () async {
-          await AuthService.signOut();
-        },
-      ),
-    );
-  }
-
-  Widget _buildArtifactsSection() {
-    if (artifacts.isEmpty) {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(15),
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const PaymentScreen()),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(5),
-          color: AppColor.cardColor,
+          borderRadius: BorderRadius.circular(10),
+          color: AppColor.primary,
           boxShadow: [
             BoxShadow(
-              color: AppColor.shadowColor.withOpacity(0.1),
+              color: AppColor.primary.withOpacity(0.2),
               spreadRadius: 1,
               blurRadius: 1,
               offset: const Offset(0, 1),
             ),
           ],
         ),
-        child: const Text(
-          'Нет доступных артефактов',
-          style: TextStyle(fontSize: 16),
-        ),
-      );
-    }
-
-    return Column(
-      children: artifacts
-          .map(
-            (a) => ArtifactCard(
-              title: a['title'] as String,
-              description: a['description'] as String,
-              image: a['image'] as String,
-              url: a['url'] as String,
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.star, color: Colors.white, size: 20),
+            SizedBox(width: 10),
+            Text(
+              "Активировать премиум",
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
             ),
-          )
-          .toList(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSection1(BuildContext context) {
+    return SettingItem(
+      title: "Настройки",
+      leadingIcon: "assets/icons/setting.svg",
+      bgIconColor: AppColor.blue,
+      onTap: () {},
+    );
+  }
+
+  Widget _buildSection2() {
+    return SettingItem(
+      title: "Платежи",
+      leadingIcon: "assets/icons/wallet.svg",
+      bgIconColor: AppColor.orange,
+      onTap: () {},
+    );
+  }
+
+  Widget _buildSection3() {
+    return SettingItem(
+      title: "Выход",
+      leadingIcon: "assets/icons/logout.svg",
+      bgIconColor: AppColor.red,
+      onTap: () async {
+        await ref.read(authServiceProvider).signOut();
+      },
+    );
+  }
+
+  Widget _buildArtifactsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          "Артефакты",
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 10),
+        if (widget.artifacts.isEmpty)
+          const Center(child: Text("У вас пока нет артефактов."))
+        else
+          ...widget.artifacts.map(
+            (artifact) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: ArtifactCard(
+                title: artifact['title'],
+                description: artifact['description'],
+                url: artifact['url'],
+                image: artifact['image'],
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
