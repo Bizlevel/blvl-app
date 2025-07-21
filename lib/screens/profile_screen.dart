@@ -452,7 +452,7 @@ class _BodyState extends ConsumerState<_Body> {
       leadingIcon: "assets/icons/logout.svg",
       bgIconColor: AppColor.red,
       onTap: () async {
-        await ref.read(authServiceProvider).signOut();
+        await AuthService.signOut();
       },
     );
   }

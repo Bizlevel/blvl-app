@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/foundation.dart';
 
 import '../models/user_model.dart';
+import '../services/auth_service.dart';
 import '../services/supabase_service.dart';
 
 /// Emits [AuthState] updates from Supabase.
@@ -70,3 +71,5 @@ final currentUserProvider = FutureProvider<UserModel?>((ref) async {
     return null;
   }
 });
+
+// authServiceProvider removed – AuthService used statically
