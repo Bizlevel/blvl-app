@@ -155,3 +155,10 @@ Bugfixes 17.07: QuizWidget: добавлена кнопка «Попробова
 
 # Этап 14: Рефакторинг и стабилизация
 Задача 14.1: AuthService.updateProfile теперь принимает необязательный bool? onboardingCompleted и обновляет поле только при передаче параметра; жестко заданное значение удалено. 
+Задача 14.2: инстанцируемый AuthService + DI: Класс лишён static, принимает SupabaseClient в конструкторе. Созданы supabaseClientProvider, authServiceProvider. Код компилируется (сам сервис больше не зависит от SupabaseService напрямую).
+Задача 14.3: Все вызовы AuthService.* в UI заменены на ref.read(authServiceProvider).signX/..; Login, Register, OnboardingProfile, Profile экраны мигрированы, добавлены импорты провайдера. 
+Задача 14.4: В AuthService создан приватный _handleAuthCall с единым try/catch; публичные методы используют обёртку, устранено дублирование. 
+# Этап 15: Навигация
+Задача 15.1: добавлена зависимость `go_router`, создан `lib/routing/app_router.dart` с маршрутами /login, /register, /home; `main.dart` переведён на `MaterialApp.router` и подключён GoRouter. SentryNavigatorObserver интегрирован через GoRouter. 
+Задача 15.2: реализован `redirect` в GoRouter: перенаправляет неавторизованных на /login, авторизованных с /login|/register на /home; GoRouter обновляется при изменении authStateProvider.
+Задача 15.3: создан LoginController (StateNotifier), LoginScreen переработан в HookConsumerWidget, добавлены зависимости hooks_riverpod и flutter_hooks. Этап 15 завершён, сборки web и iOS проходят успешно. 

@@ -44,6 +44,16 @@ android {
         versionName flutterVersionName
     }
 
+    // Align Java and Kotlin compilation targets (AGP 8.x requires JDK 17)
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+
     buildTypes {
         release {
             // Signing config – still using debug keystore by default; replace with release keystore in CI.

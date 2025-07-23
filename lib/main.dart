@@ -7,13 +7,10 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:responsive_framework/responsive_framework.dart';
 
-import 'providers/auth_provider.dart';
-import 'screens/auth/login_screen.dart';
-import 'screens/root_app.dart';
+import 'routing/app_router.dart';
+import 'package:go_router/go_router.dart';
 import 'services/supabase_service.dart';
 import 'theme/color.dart';
-import 'screens/auth/onboarding_screens.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 Future<void> main() async {
   // КРИТИЧНО для web: Все инициализации должны быть в одной зоне
@@ -66,45 +63,10 @@ class MyApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final authAsync = ref.watch(authStateProvider);
-    final currentUserAsync = ref.watch(currentUserProvider);
+    final GoRouter router = ref.watch(goRouterProvider);
 
-    Widget home = authAsync.when(
-      data: (authState) {
-        // Проверяем наличие сессии
-        final session = authState.session;
-        final isLoggedIn = session != null;
-        if (!isLoggedIn) {
-          return const LoginScreen();
-        }
-
-        // Пользователь авторизован – смотрим, завершён ли онбординг
-        return FutureBuilder<bool>(
-            future: SharedPreferences.getInstance()
-                .then((p) => p.getBool('onboarding_done') ?? false),
-            builder: (context, snap) {
-              final localDone = snap.data ?? false;
-              return currentUserAsync.when(
-                data: (user) {
-                  final remoteDone = user?.onboardingCompleted ?? false;
-                  if (!localDone && !remoteDone) {
-                    return const OnboardingProfileScreen();
-                  }
-                  return const RootApp();
-                },
-                loading: () => const Scaffold(
-                    body: Center(child: CircularProgressIndicator())),
-                error: (_, __) => const RootApp(),
-              );
-            });
-      },
-      loading: () => const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      ),
-      error: (error, _) => const LoginScreen(),
-    );
-
-    return MaterialApp(
+    return MaterialApp.router(
+      routerConfig: router,
       builder: (context, child) => ResponsiveWrapper.builder(
         BouncingScrollWrapper.builder(context, child!),
         maxWidth: 480,
@@ -121,8 +83,7 @@ class MyApp extends ConsumerWidget {
       theme: ThemeData(
         primaryColor: AppColor.primary,
       ),
-      home: home,
-      navigatorObservers: [SentryNavigatorObserver()],
+      // Навигатор теперь управляется GoRouter; SentryObserver добавлен в конфигурацию роутера
     );
   }
 }

@@ -1,64 +1,44 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
 
-import '../../services/auth_service.dart';
-import '../../providers/auth_provider.dart';
+import '../../providers/login_controller.dart';
 import '../../theme/color.dart';
 import '../../widgets/custom_image.dart';
 import '../../widgets/custom_textfield.dart';
 import 'register_screen.dart';
 
-class LoginScreen extends ConsumerStatefulWidget {
+class LoginScreen extends HookConsumerWidget {
   const LoginScreen({super.key});
 
   @override
-  ConsumerState<LoginScreen> createState() => _LoginScreenState();
-}
-
-class _LoginScreenState extends ConsumerState<LoginScreen> {
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
-  bool _isLoading = false;
-
-  @override
-  void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _submit() async {
-    final email = _emailController.text.trim();
-    final password = _passwordController.text;
-    if (email.isEmpty || password.isEmpty) {
-      _showSnackBar('Введите email и пароль');
-      return;
-    }
-    setState(() => _isLoading = true);
-    try {
-      await ref.read(authServiceProvider).signIn(
-            email: email,
-            password: password,
-          );
-      // Навигация не требуется – AuthGate в main.dart отреагирует на изменение сессии.
-    } on AuthFailure catch (e) {
-      _showSnackBar(e.message);
-    } catch (e) {
-      _showSnackBar('Неизвестная ошибка входа');
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  void _showSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final size = MediaQuery.of(context).size;
+    final emailController = useTextEditingController();
+    final passwordController = useTextEditingController();
+
+    final isLoading = ref.watch(loginControllerProvider);
+
+    Future<void> submit() async {
+      final email = emailController.text.trim();
+      final password = passwordController.text;
+      if (email.isEmpty || password.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Введите email и пароль')));
+        return;
+      }
+
+      try {
+        await ref
+            .read(loginControllerProvider.notifier)
+            .signIn(email: email, password: password);
+      } on String catch (msg) {
+        // перехватываем сообщение ошибки, брошенное контроллером
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(msg)));
+      }
+    }
+
     return Scaffold(
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
@@ -76,13 +56,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             CustomTextBox(
               hint: 'Email',
               prefix: const Icon(Icons.email_outlined),
-              controller: _emailController,
+              controller: emailController,
             ),
             const SizedBox(height: 16),
             CustomTextBox(
               hint: 'Пароль',
               prefix: const Icon(Icons.lock_outline),
-              controller: _passwordController,
+              controller: passwordController,
             ),
             const SizedBox(height: 24),
             SizedBox(
@@ -92,8 +72,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColor.primary,
                 ),
-                onPressed: _isLoading ? null : _submit,
-                child: _isLoading
+                onPressed: isLoading ? null : submit,
+                child: isLoading
                     ? const CircularProgressIndicator(color: Colors.white)
                     : const Text('Войти'),
               ),
