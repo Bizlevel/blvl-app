@@ -5,10 +5,17 @@ import 'package:flutter/foundation.dart';
 import '../models/user_model.dart';
 import '../services/auth_service.dart';
 import '../services/supabase_service.dart';
+import '../repositories/user_repository.dart';
+
+/// Провайдер, отдающий инстанс `SupabaseService` для DI.
+final supabaseServiceProvider =
+    Provider<SupabaseService>((_) => SupabaseService());
 
 /// Provides access to the global [SupabaseClient].
-final supabaseClientProvider =
-    Provider<SupabaseClient>((ref) => SupabaseService.client);
+final supabaseClientProvider = Provider<SupabaseClient>((ref) {
+  final service = ref.watch(supabaseServiceProvider);
+  return service.client;
+});
 
 /// Instantiable [AuthService] that depends on [SupabaseClient].
 final authServiceProvider = Provider<AuthService>((ref) {
@@ -16,68 +23,38 @@ final authServiceProvider = Provider<AuthService>((ref) {
   return AuthService(client);
 });
 
+/// Репозиторий доступа к таблице `users`.
+final userRepositoryProvider = Provider<UserRepository>((ref) {
+  final client = ref.watch(supabaseClientProvider);
+  return UserRepository(client);
+});
+
 /// Emits [AuthState] updates from Supabase.
 final authStateProvider = StreamProvider<AuthState>((ref) {
-  return SupabaseService.client.auth.onAuthStateChange;
+  final client = ref.watch(supabaseClientProvider);
+  return client.auth.onAuthStateChange;
 });
 
 /// Loads current user profile from `users` table or returns null if not signed in.
 final currentUserProvider = FutureProvider<UserModel?>((ref) async {
-  // Ensure we have a session.
+  // Ждём актуальное состояние аутентификации.
   final auth = await ref.watch(authStateProvider.future);
-  final user = auth.session?.user;
+  final supabaseUser = auth.session?.user;
 
   if (kDebugMode) {
     debugPrint(
-        'currentUserProvider: auth session = ${auth.session != null}, user = ${user?.id}');
+        'currentUserProvider: auth session = ${auth.session != null}, user = ${supabaseUser?.id}');
   }
 
-  if (user == null) return null;
+  if (supabaseUser == null) return null;
 
-  try {
-    if (kDebugMode) {
-      debugPrint(
-          'currentUserProvider: querying users table for user ${user.id}');
-    }
+  // Загружаем профиль через репозиторий.
+  final repository = ref.read(userRepositoryProvider);
+  final profile = await repository.fetchProfile(supabaseUser.id);
 
-    final response = await SupabaseService.client
-        .from('users')
-        .select()
-        .eq('id', user.id)
-        .maybeSingle();
-
-    if (kDebugMode) {
-      debugPrint('currentUserProvider: users query response = $response');
-      debugPrint(
-          'currentUserProvider: response type = ${response.runtimeType}');
-    }
-
-    if (response == null) {
-      if (kDebugMode) {
-        debugPrint(
-            'currentUserProvider: no user found in users table for ${user.id}');
-      }
-      return null; // профиль ещё не заполнен
-    }
-
-    final userModel = UserModel.fromJson(response);
-    if (kDebugMode) {
-      debugPrint(
-          'currentUserProvider: successfully loaded user ${userModel.id}, onboardingCompleted = ${userModel.onboardingCompleted}');
-    }
-
-    return userModel;
-  } on PostgrestException catch (e) {
-    if (kDebugMode) {
-      debugPrint(
-          'currentUserProvider: PostgrestException = ${e.message}, code = ${e.code}');
-    }
-    // table exists but запись отсутствует – вернём null
-    return null;
-  } catch (e) {
-    if (kDebugMode) {
-      debugPrint('currentUserProvider: unexpected error = $e');
-    }
-    return null;
+  if (kDebugMode) {
+    debugPrint('currentUserProvider: repository returned ${profile != null}');
   }
+
+  return profile;
 });

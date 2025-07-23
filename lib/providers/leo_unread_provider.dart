@@ -1,9 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:online_course/services/supabase_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Streams `unread_count` for a given chat.
 final leoUnreadProvider = StreamProvider.family<int, String>((ref, chatId) {
-  final stream = SupabaseService.client
+  final stream = Supabase.instance.client
       .from('leo_chats')
       .stream(primaryKey: ['id'])
       .eq('id', chatId)

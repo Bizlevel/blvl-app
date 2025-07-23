@@ -6,8 +6,6 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'supabase_service.dart';
-
 /// Typed failure for any Leo related errors.
 class LeoFailure implements Exception {
   final String message;
@@ -20,9 +18,10 @@ class LeoFailure implements Exception {
 /// Centralised service for interacting with Leo AI mentor Edge Function
 /// and related Supabase data (лимиты, чаты).
 class LeoService {
-  LeoService._();
+  /// Инстанс сервиса, принимающий [SupabaseClient] через DI.
+  LeoService(this._client);
 
-  static final SupabaseClient _client = SupabaseService.client;
+  final SupabaseClient _client;
 
   // We use Dio because Edge Functions требуют произвольные HTTP-заголовки
   // и проще настраивать таймауты/перехватчики.
@@ -39,7 +38,7 @@ class LeoService {
   /// ответ ассистента + статистику токенов.
   /// Expects [messages] in chat completion API format.
   /// Проверка контента через OpenAI Moderation API. Бросает [LeoFailure] если flagged.
-  static Future<void> _moderationCheck(String content) async {
+  Future<void> _moderationCheck(String content) async {
     final openaiKey = dotenv.env['OPENAI_API_KEY'] ?? '';
     if (openaiKey.isEmpty) {
       return; // moderation доступна только при прямом OpenAI ключе
@@ -71,7 +70,7 @@ class LeoService {
     }
   }
 
-  static Future<Map<String, dynamic>> sendMessage(
+  Future<Map<String, dynamic>> sendMessage(
       {required List<Map<String, dynamic>> messages}) async {
     final session = _client.auth.currentSession;
     if (session == null) {
@@ -156,7 +155,7 @@ class LeoService {
   }
 
   /// Generic retry with exponential backoff (300ms, 600ms)
-  static Future<T> _withRetry<T>(Future<T> Function() action,
+  Future<T> _withRetry<T>(Future<T> Function() action,
       {int retries = 2}) async {
     int attempt = 0;
     while (true) {
@@ -172,13 +171,13 @@ class LeoService {
 
   /// Проверяет, сколько сообщений осталось у пользователя.
   /// Возвращает число оставшихся сообщений.
-  static Future<void> resetUnread(String chatId) async {
+  Future<void> resetUnread(String chatId) async {
     try {
       await _client.rpc('reset_leo_unread', params: {'p_chat_id': chatId});
     } catch (_) {}
   }
 
-  static Future<int> checkMessageLimit() async {
+  Future<int> checkMessageLimit() async {
     final user = _client.auth.currentUser;
     if (user == null) throw LeoFailure('Не авторизован');
 
@@ -206,7 +205,7 @@ class LeoService {
 
   /// Декрементирует счётчик сообщений пользователя. Для Premium – суточный,
   /// для Free – общий.
-  static Future<int> decrementMessageCount() async {
+  Future<int> decrementMessageCount() async {
     final user = _client.auth.currentUser;
     if (user == null) throw LeoFailure('Не авторизован');
 
@@ -225,7 +224,7 @@ class LeoService {
   /// Сохраняет одно сообщение в таблицу `leo_messages` и обновляет счётчик
   /// сообщений в `leo_chats`. Если чат новый – создаёт запись в `leo_chats`.
   /// Возвращает `chatId` (новый или существующий).
-  static Future<String> saveConversation({
+  Future<String> saveConversation({
     required String role,
     required String content,
     String? chatId,

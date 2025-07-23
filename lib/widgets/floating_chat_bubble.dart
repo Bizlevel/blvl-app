@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:online_course/screens/leo_dialog_screen.dart';
 import 'package:online_course/providers/leo_unread_provider.dart';
-import 'package:online_course/services/leo_service.dart';
+import 'package:online_course/providers/leo_service_provider.dart';
 import 'package:online_course/theme/color.dart';
 
 /// Floating chat bubble that opens the LeoDialogScreen.
@@ -61,7 +61,8 @@ class _FloatingChatBubbleState extends ConsumerState<FloatingChatBubble>
     // Сбрасываем счётчик непрочитанных, только если диалог уже создан
     if (widget.chatId != null) {
       try {
-        await LeoService.resetUnread(widget.chatId!);
+        final service = ref.read(leoServiceProvider);
+        await service.resetUnread(widget.chatId!);
       } catch (_) {}
     }
 

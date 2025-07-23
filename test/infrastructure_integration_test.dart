@@ -10,12 +10,12 @@ import 'package:online_course/services/supabase_service.dart';
 import 'package:online_course/providers/auth_provider.dart';
 
 void main() {
-  AuthService authService = AuthService(SupabaseService.client);
+  AuthService authService = AuthService(Supabase.instance.client);
 
   setUpAll(() async {
     // Ensure Supabase is ready before running any tests.
     await SupabaseService.initialize();
-    authService = AuthService(SupabaseService.client);
+    authService = AuthService(Supabase.instance.client);
   });
 
   group('Model serialization', () {

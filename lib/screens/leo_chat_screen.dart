@@ -1,17 +1,18 @@
 import 'package:flutter/material.dart';
-import 'package:online_course/services/leo_service.dart';
-import 'package:online_course/services/supabase_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:online_course/providers/leo_service_provider.dart';
 import 'package:online_course/widgets/chat_item.dart';
 import 'package:online_course/screens/leo_dialog_screen.dart';
 
-class LeoChatScreen extends StatefulWidget {
+class LeoChatScreen extends ConsumerStatefulWidget {
   const LeoChatScreen({super.key});
 
   @override
-  State<LeoChatScreen> createState() => _LeoChatScreenState();
+  ConsumerState<LeoChatScreen> createState() => _LeoChatScreenState();
 }
 
-class _LeoChatScreenState extends State<LeoChatScreen> {
+class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
   late Future<void> _loadFuture;
   int _messagesLeft = 0;
   List<Map<String, dynamic>> _chats = [];
@@ -25,9 +26,10 @@ class _LeoChatScreenState extends State<LeoChatScreen> {
   Future<void> _loadData() async {
     // Fetch messages limit & chats in parallel
     try {
-      final limitFuture = LeoService.checkMessageLimit();
+      final leo = ref.read(leoServiceProvider);
+      final limitFuture = leo.checkMessageLimit();
       _messagesLeft = await limitFuture;
-      final rawChats = await SupabaseService.client
+      final rawChats = await Supabase.instance.client
           .from('leo_chats')
           .select('id, title, updated_at, message_count')
           .gt('message_count', 0)

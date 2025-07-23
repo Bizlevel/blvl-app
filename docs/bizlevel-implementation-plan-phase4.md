@@ -139,3 +139,134 @@
   Проверяет корректность взаимодействия UI с бизнес-логикой без реальных сетевых запросов.
 - **Проверка результата:**
   Выполнение `flutter test test/screens/auth/login_screen_test.dart` проходит успешно.
+
+## Этап 17: Завершение DI и миграция навигации
+
+### Задача 17.1: Инстанцируемый SupabaseService + провайдер
+- **Файлы:** `lib/services/supabase_service.dart`, `lib/providers/*`, `lib/main.dart`
+- **Что делать:**
+  1. Убрать `static`-паттерн из `SupabaseService`, перевести в обычный класс.
+  2. Создать `supabaseServiceProvider = Provider<SupabaseService>((_) => SupabaseService())`.
+  3. Экспортировать `SupabaseClient` через геттер внутри сервиса.
+  4. Заменить прямые обращения `SupabaseService.client` на `ref.read(supabaseServiceProvider).client`.
+- **Почему это важно:** Завершает переход на DI и унифицирует доступ к Supabase.
+- **Проверка результата:** Приложение собирается и выполняет запросы к БД без ошибок.
+
+### Задача 17.2: Инстанцируемый LeoService + провайдер
+- **Файлы:** `lib/services/leo_service.dart`, `lib/providers/*`
+- **Зависимости:** 17.1
+- **Что делать:**
+  1. Аналогично 17.1, убрать `static` из `LeoService`.
+  2. Создать `leoServiceProvider` (Provider).
+  3. Обновить все вызовы `LeoService.*` на DI-вариант `ref.read(leoServiceProvider)`.
+- **Проверка результата:** Отправка сообщения Leo и загрузка истории работают.
+
+### Задача 17.3: LevelsRepository и LessonsRepository
+- **Файлы:** `lib/repositories/levels_repository.dart`, `lib/repositories/lessons_repository.dart`, `lib/providers/levels_provider.dart`, `lib/providers/lessons_provider.dart`
+- **Что делать:**
+  1. Создать два репозитория с методами `fetchLevels()` и `fetchLessons(levelId)`.
+  2. Переместить логику из текущих провайдеров в репозитории.
+  3. Провайдеры должны вызывать методы репозиториев, а не Supabase напрямую.
+  4. **Рефакторинг:** Перенести специфичные методы (`getVideoSignedUrl`, `getArtifactSignedUrl`) из `SupabaseService` в профильные репозитории для улучшения инкапсуляции.
+- **Проверка результата:** UI карт уровней и деталек загружается корректно, тесты проходят.
+
+### Задача 17.4: Миграция Onboarding и Profile на GoRouter
+- **Файлы:** `lib/routing/app_router.dart`, `lib/screens/auth/onboarding_*`, `lib/screens/profile_screen.dart`
+- **Зависимости:** 15.x
+- **Что делать:**
+  1. Добавить маршруты `/onboarding/profile`, `/onboarding/video`, `/profile`.
+  2. Заменить оставшиеся `Navigator.push` на `context.go()` / `context.push()`.
+  3. Удалить устаревшие импорты `Navigator` где они больше не нужны.
+- **Проверка результата:** Навигация через GoRouter работает во всех флоу без дублирования кода.
+
+### Задача 17.5: Базовый deep-linking `/levels/:id`
+- **Файлы:** `lib/routing/app_router.dart`, `lib/screens/level_detail_screen.dart`, `pubspec.yaml`
+- **Что делать:**
+  1. Подключить пакет `uni_links`.
+  2. Обработать URI с шаблоном `bizlevel://levels/<id>` и перенаправлять в GoRouter.
+  3. Добавить базовый тест на парсинг ссылки.
+- **Проверка результата:** Открытие deep-ссылки из браузера/терминала ведёт к нужному уровню.
+
+### Задача 17.6: Unit-тесты для репозиториев и сервисов
+- **Файлы:** `test/repositories/`, `test/services/`
+- **Зависимости:** 17.1, 17.2, 17.3
+- **Что делать:**
+  1. Написать Unit-тесты для `UserRepository`, `LevelsRepository`, `LessonsRepository`, используя мок `SupabaseClient`.
+  2. Написать Unit-тесты для инстанцируемого `LeoService`.
+  3. Проверить корректность обработки данных и исключений.
+- **Почему это важно:** Гарантирует стабильность слоя данных и бизнес-логики, защищает от регрессий.
+- **Проверка результата:** Тесты в директориях `test/repositories` и `test/services` успешно выполняются.
+
+### Задача 17.7: Widget-тесты для экранов уровней
+- **Файлы:** `test/screens/levels_map_screen_test.dart`, `test/screens/level_detail_screen_test.dart`
+- **Зависимости:** 17.6
+- **Что делать:**
+  1. Написать widget-тесты для `LevelsMapScreen` и `LevelDetailScreen`.
+  2. Использовать `ProviderScope(overrides: ...)` для подмены репозиториев на мок-версии.
+  3. Проверить корректное отображение состояний загрузки, данных и ошибок.
+- **Почему это важно:** Проверяет корректность интеграции UI со слоем данных.
+- **Проверка результата:** Тесты в директории `test/screens` успешно выполняются.
+
+## Этап 18: Безопасность, офлайн-кеш и платежи
+
+### Задача 18.1: RLS-аудит и автоматическая проверка
+- **Файлы:** `supabase/migrations/*`, `.github/workflows/ci.yaml`
+- **Что делать:**
+  1. В CI вызвать `mcp_supabase_get_advisors` (security) и упасть, если есть критические нарушения.
+  2. Добавить недостающие RLS-политики для `lessons`, `levels`, `leo_messages`, `user_progress`.
+- **Проверка результата:** Адвайзоры возвращают «0 критических», CI проходит.
+
+### Задача 18.2: Локальный кеш уровней и уроков через Hive
+- **Файлы:** `pubspec.yaml`, `lib/repositories/*`, `lib/providers/*`
+- **Зависимости:** 17.3
+- **Что делать:**
+  1. Добавить зависимость `hive` + генераторы.
+  2. В `LevelsRepository` и `LessonsRepository` реализовать стратегию `stale-while-revalidate`.
+  3. При отсутствии интернета отдавать кеш; при наличии — обновлять и сохранять.
+- **Проверка результата:** Уровни/уроки отображаются офлайн, а онлайн-режим обновляет данные.
+
+### Задача 18.3: Базовая схема подписок в Supabase
+- **Файлы:** `supabase/migrations/add_subscriptions.sql`
+- **Что делать:**
+  1. Создать таблицы `subscriptions` и `payments` с FK на `users`.
+  2. Добавить индексы и RLS (доступ только владельцу и сервисным ролям).
+- **Проверка результата:** Миграция выполняется без ошибок, таблицы видны в Studio.
+
+### Задача 18.4: Edge Function `create_checkout_session`
+- **Файлы:** `supabase/functions/create-checkout-session/index.ts`, `lib/services/payment_service.dart`
+- **Зависимости:** 18.3
+- **Что делать:**
+  1. Написать функцию, вызывающую Kaspi/Freedom Pay API и возвращающую URL платежа.
+  2. Создать `PaymentService` с методом `startCheckout()` (Dio + Edge Function).
+- **Проверка результата:** Вызов метода возвращает URL, который открывается в WebView и ведёт на кассу.
+
+### Задача 18.5: Экран Premium и состояние подписки
+- **Файлы:** `lib/screens/premium_screen.dart`, `lib/providers/subscription_provider.dart`, `lib/screens/profile_screen.dart`
+- **Зависимости:** 18.4
+- **Что делать:**
+  1. Создать экран c тарифами и кнопкой «Оформить» (вызывает `startCheckout`).
+  2. `subscriptionProvider` слушает статус из таблицы `subscriptions` (реaltime).
+  3. В `ProfileScreen` отображать бейдж Premium при активной подписке.
+- **Проверка результата:** После тестовой записи в `subscriptions.status = active` UI показывает Premium.
+
+### Задача 18.6: Ускорение CI/CD за счет кэширования
+- **Файлы:** `.github/workflows/ci.yaml`
+- **Что делать:**
+  1. В CI-workflow добавить шаги для кэширования зависимостей:
+     - `flutter pub get`
+     - `CocoaPods`
+     - `Gradle`
+- **Почему это важно:**
+  Значительно сокращает время выполнения CI/CD, экономит ресурсы и ускоряет получение обратной связи.
+- **Проверка результата:**
+  Последующие запуски CI-пайплайна выполняются быстрее на шагах установки зависимостей.
+
+### Задача 18.7: Улучшенное логирование в CI при падении тестов
+- **Файлы:** `.github/workflows/ci.yaml`
+- **Что делать:**
+  1. Добавить в workflow условный шаг, который выполняется только при падении шага `flutter test`.
+  2. Этот шаг должен вызывать `mcp_supabase_get_logs`, чтобы получить последние логи из сервисов Supabase.
+- **Почему это важно:**
+  Ускоряет диагностику проблем, связанных с бэкендом, позволяя увидеть ошибки Supabase прямо в логах CI, без необходимости идти в дашборд.
+- **Проверка результата:**
+  При падении интеграционного теста в логах CI появляется вывод логов Supabase.

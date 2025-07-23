@@ -3,14 +3,15 @@ import 'dart:math';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:online_course/services/auth_service.dart';
-import 'package:online_course/services/supabase_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:online_course/services/supabase_service.dart'; // for initialize
 
 void main() {
   late AuthService authService;
 
   setUpAll(() async {
     await SupabaseService.initialize();
-    authService = AuthService(SupabaseService.client);
+    authService = AuthService(Supabase.instance.client);
   });
 
   group('Полный флоу авторизации', () {
@@ -36,7 +37,7 @@ void main() {
 
       final user = authService.getCurrentUser();
       expect(user, isNotNull);
-      final data = await SupabaseService.client
+      final data = await Supabase.instance.client
           .from('users')
           .select()
           .eq('id', user!.id)

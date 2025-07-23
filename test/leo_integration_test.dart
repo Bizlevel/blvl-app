@@ -4,14 +4,15 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:online_course/services/auth_service.dart';
 import 'package:online_course/services/leo_service.dart';
-import 'package:online_course/services/supabase_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:online_course/services/supabase_service.dart'; // for initialize
 
 void main() {
   late AuthService authService;
 
   setUpAll(() async {
     await SupabaseService.initialize();
-    authService = AuthService(SupabaseService.client);
+    authService = AuthService(Supabase.instance.client);
   });
 
   group('Интеграция Leo AI', () {
@@ -29,16 +30,18 @@ void main() {
       expect(res.user, isNotNull);
 
       // после регистрации лимит должен быть 30 (Free)
-      initialLimit = await LeoService.checkMessageLimit();
+      final leo = LeoService(Supabase.instance.client);
+      initialLimit = await leo.checkMessageLimit();
       expect(initialLimit, greaterThan(0));
     });
 
     test('2) Отправка сообщения и получение ответа', () async {
       // создаём пустой чат
-      chatId = await LeoService.saveConversation(
-          role: 'user', content: 'Привет, Leo!');
+      final leo = LeoService(Supabase.instance.client);
+      chatId =
+          await leo.saveConversation(role: 'user', content: 'Привет, Leo!');
 
-      final response = await LeoService.sendMessage(messages: [
+      final response = await leo.sendMessage(messages: [
         {'role': 'user', 'content': 'Привет, Leo! Расскажи шутку из бизнеса.'}
       ]);
 
@@ -46,7 +49,7 @@ void main() {
       expect(response['message']['content'], isNotEmpty);
 
       // сохраняем ответ в историю
-      await LeoService.saveConversation(
+      await leo.saveConversation(
         chatId: chatId,
         role: 'assistant',
         content: response['message']['content'],
@@ -54,12 +57,13 @@ void main() {
     });
 
     test('3) Проверка уменьшения лимита', () async {
-      final afterLimit = await LeoService.checkMessageLimit();
+      final leo = LeoService(Supabase.instance.client);
+      final afterLimit = await leo.checkMessageLimit();
       expect(afterLimit, equals(initialLimit - 1));
     });
 
     test('4) Проверка истории сообщений', () async {
-      final history = await SupabaseService.client
+      final history = await Supabase.instance.client
           .from('leo_messages')
           .select()
           .eq('chat_id', chatId);
@@ -69,8 +73,9 @@ void main() {
     });
 
     test('5) Ошибка при пустом массиве messages', () async {
+      final leo = LeoService(Supabase.instance.client);
       expect(
-        () => LeoService.sendMessage(messages: []),
+        () => leo.sendMessage(messages: []),
         throwsA(isA<LeoFailure>()),
       );
     });

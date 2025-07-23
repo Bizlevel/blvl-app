@@ -14,13 +14,13 @@ void main() {
     });
 
     test('Supabase client is initialized', () {
-      expect(SupabaseService.client, isNotNull);
+      expect(Supabase.instance.client, isNotNull);
     });
 
     test('Fetch levels succeeds', () async {
       try {
         final response =
-            await SupabaseService.client.from('levels').select('*');
+            await Supabase.instance.client.from('levels').select('*');
         expect(response, isA<List<dynamic>>());
       } on PostgrestException {
         // In widget test environment, real HTTP calls return 400. We still consider it a successful
@@ -32,7 +32,7 @@ void main() {
     test('RLS blocks unauthorized users table access', () async {
       bool rlsWorks = false;
       try {
-        await SupabaseService.client.from('users').select();
+        await Supabase.instance.client.from('users').select();
       } on PostgrestException {
         rlsWorks = true;
       }

@@ -6,11 +6,12 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class SupabaseService {
-  SupabaseService._();
+  /// Создаём обычный инстанцируемый сервис для последующей передачи через DI.
+  SupabaseService();
 
   static bool _initialized = false;
 
-  /// Initializes Supabase. Call once at app startup.
+  /// Инициализирует Supabase. Вызывать один раз при старте приложения.
   static Future<void> initialize() async {
     if (_initialized) return;
 
@@ -24,14 +25,14 @@ class SupabaseService {
     _initialized = true;
   }
 
-  /// Convenient accessor to the Supabase client.
-  static SupabaseClient get client => Supabase.instance.client;
+  /// Экспортирует [SupabaseClient] для внешнего использования.
+  SupabaseClient get client => Supabase.instance.client;
 
   /// Fetches all levels ordered by number.
   static Future<List<Map<String, dynamic>>> fetchLevelsRaw() async {
     return _withRetry(() async {
       try {
-        final response = await client
+        final response = await Supabase.instance.client
             .from('levels')
             .select()
             .order('number', ascending: true);
@@ -42,7 +43,7 @@ class SupabaseService {
         await Sentry.captureException(e, stackTrace: st);
         // JWT expired – выходим из аккаунта, чтобы пользователь заново залогинился
         if (e.message.toLowerCase().contains('jwt')) {
-          await client.auth.signOut();
+          await Supabase.instance.client.auth.signOut();
         }
         rethrow;
       } on SocketException {
@@ -55,7 +56,7 @@ class SupabaseService {
   static Future<List<Map<String, dynamic>>> fetchLessonsRaw(int levelId) async {
     return _withRetry(() async {
       try {
-        final response = await client
+        final response = await Supabase.instance.client
             .from('lessons')
             .select()
             .eq('level_id', levelId)
@@ -67,7 +68,7 @@ class SupabaseService {
       } on PostgrestException catch (e, st) {
         await Sentry.captureException(e, stackTrace: st);
         if (e.message.toLowerCase().contains('jwt')) {
-          await client.auth.signOut();
+          await Supabase.instance.client.auth.signOut();
         }
         rethrow;
       } on SocketException catch (_) {
@@ -79,7 +80,7 @@ class SupabaseService {
   static Future<String?> getArtifactSignedUrl(String relativePath) async {
     return _withRetry(() async {
       try {
-        final response = await client.storage
+        final response = await Supabase.instance.client.storage
             .from('artifacts')
             .createSignedUrl(relativePath, 60 * 60);
         return response;
@@ -98,7 +99,7 @@ class SupabaseService {
       String userId) async {
     return _withRetry(() async {
       try {
-        final response = await client
+        final response = await Supabase.instance.client
             .from('levels')
             .select(
                 'id, number, title, description, image_url, is_free, lessons(count), user_progress(is_completed)')
@@ -117,19 +118,19 @@ class SupabaseService {
 
   /// Marks level as completed for current user and bumps current_level if needed.
   static Future<void> completeLevel(int levelId) async {
-    final user = client.auth.currentUser;
+    final user = Supabase.instance.client.auth.currentUser;
     if (user == null) throw Exception('Пользователь не авторизован');
     await _withRetry(() async {
       try {
         // Upsert into user_progress
-        await client.from('user_progress').upsert({
+        await Supabase.instance.client.from('user_progress').upsert({
           'user_id': user.id,
           'level_id': levelId,
           'is_completed': true,
           'updated_at': DateTime.now().toIso8601String(),
         });
         // Update users.current_level if we just completed it
-        await client
+        await Supabase.instance.client
             .rpc('update_current_level', params: {'p_level_id': levelId});
       } on PostgrestException catch (e, st) {
         await Sentry.captureException(e, stackTrace: st);
@@ -141,7 +142,7 @@ class SupabaseService {
   static Future<String?> getVideoSignedUrl(String relativePath) async {
     return _withRetry(() async {
       try {
-        final response = await client.storage
+        final response = await Supabase.instance.client.storage
             .from('video')
             .createSignedUrl(relativePath, 60 * 60);
         return response;

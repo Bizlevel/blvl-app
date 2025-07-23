@@ -162,3 +162,12 @@ Bugfixes 17.07: QuizWidget: добавлена кнопка «Попробова
 Задача 15.1: добавлена зависимость `go_router`, создан `lib/routing/app_router.dart` с маршрутами /login, /register, /home; `main.dart` переведён на `MaterialApp.router` и подключён GoRouter. SentryNavigatorObserver интегрирован через GoRouter. 
 Задача 15.2: реализован `redirect` в GoRouter: перенаправляет неавторизованных на /login, авторизованных с /login|/register на /home; GoRouter обновляется при изменении authStateProvider.
 Задача 15.3: создан LoginController (StateNotifier), LoginScreen переработан в HookConsumerWidget, добавлены зависимости hooks_riverpod и flutter_hooks. Этап 15 завершён, сборки web и iOS проходят успешно. 
+
+# Этап 16: Слой данных и Тестирование
+Задача 16.1: создан `UserRepository` (fetchProfile), добавлен `userRepositoryProvider`; `currentUserProvider` теперь грузит профиль через репозиторий и не обращается к Supabase напрямую. Код собран без ошибок. 
+Задача 16.2: добавлен пакет `mocktail`, создан файл `test/services/auth_service_test.dart` с юнит-тестами для AuthService, покрывающими signIn, signOut и updateProfile (payload, исключения). Все тесты проходят локально. 
+Задача 16.3: добавлен widget-тест `test/screens/auth/login_screen_test.dart`, проверяющий SnackBar при ошибке и индикатор загрузки кнопки. Используются mоки AuthService через mocktail; ProviderScope переопределяет authServiceProvider. Все тесты проходят. 
+
+# Этап 17: DI завершение
+Задача 17.1: SupabaseService переведён на инстансы, добавлен `supabaseServiceProvider`, `supabaseClientProvider` теперь использует его. Убрано статическое свойство `client`, все обращения обновлены на `Supabase.instance.client`. Тесты и провайдеры поправлены. 
+Задача 17.2: LeoService переведён на инстанс, создан `leoServiceProvider`; все вызовы заменены на DI через Riverpod. Экран диалога и чат-виджеты обновлены. 

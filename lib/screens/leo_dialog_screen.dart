@@ -1,23 +1,25 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:online_course/services/leo_service.dart';
-import 'package:online_course/services/supabase_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:online_course/providers/leo_service_provider.dart';
 import 'package:online_course/theme/color.dart';
 import 'package:online_course/widgets/leo_message_bubble.dart';
+import 'package:online_course/services/leo_service.dart';
 
 /// Dialog screen for chatting with Leo assistant.
 /// Supports pagination (30 messages per page), unread counter reset,
 /// message limit enforcement and auto-scroll to bottom.
-class LeoDialogScreen extends StatefulWidget {
+class LeoDialogScreen extends ConsumerStatefulWidget {
   final String? chatId;
   const LeoDialogScreen({super.key, this.chatId});
 
   @override
-  State<LeoDialogScreen> createState() => _LeoDialogScreenState();
+  ConsumerState<LeoDialogScreen> createState() => _LeoDialogScreenState();
 }
 
-class _LeoDialogScreenState extends State<LeoDialogScreen> {
+class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
   static const _pageSize = 30;
 
   String? _chatId;
@@ -32,11 +34,14 @@ class _LeoDialogScreenState extends State<LeoDialogScreen> {
   int _page = 0; // 0-based page counter
   int _remaining = -1; // −1 unknown
 
+  late final LeoService _leo;
+
   @override
   void initState() {
     super.initState();
-    _chatId = widget.chatId;
+    _leo = ref.read(leoServiceProvider);
     _fetchRemaining();
+    _chatId = widget.chatId;
     if (_chatId != null) {
       _loadMessages();
     }
@@ -44,7 +49,7 @@ class _LeoDialogScreenState extends State<LeoDialogScreen> {
 
   Future<void> _fetchRemaining() async {
     try {
-      final remaining = await LeoService.checkMessageLimit();
+      final remaining = await _leo.checkMessageLimit();
       if (!mounted) return;
       setState(() => _remaining = remaining);
     } catch (_) {
@@ -57,7 +62,7 @@ class _LeoDialogScreenState extends State<LeoDialogScreen> {
     final rangeStart = _page * _pageSize;
     final rangeEnd = rangeStart + _pageSize - 1;
 
-    final data = await SupabaseService.client
+    final data = await Supabase.instance.client
         .from('leo_messages')
         .select('role, content, created_at')
         .eq('chat_id', _chatId!)
@@ -118,22 +123,20 @@ class _LeoDialogScreenState extends State<LeoDialogScreen> {
       // Save user message & decrement limit atomically
       if (_chatId == null) {
         // создаём диалог при первом сообщении
-        _chatId =
-            await LeoService.saveConversation(role: 'user', content: text);
+        _chatId = await _leo.saveConversation(role: 'user', content: text);
         // сразу загрузим (чтобы появился счётчик и т.д.)
       } else {
-        await LeoService.saveConversation(
+        await _leo.saveConversation(
             chatId: _chatId, role: 'user', content: text);
       }
-      final rem = await LeoService.decrementMessageCount();
+      final rem = await _leo.decrementMessageCount();
       if (mounted) setState(() => _remaining = rem);
 
       // Get assistant response
-      final response =
-          await LeoService.sendMessage(messages: _buildChatContext());
+      final response = await _leo.sendMessage(messages: _buildChatContext());
       final assistantMsg = response['message']['content'] as String? ?? '';
 
-      await LeoService.saveConversation(
+      await _leo.saveConversation(
           chatId: _chatId, role: 'assistant', content: assistantMsg);
 
       if (!mounted) return;

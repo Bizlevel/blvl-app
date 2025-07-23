@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:chewie/chewie.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:video_player/video_player.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:online_course/services/supabase_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -81,10 +82,10 @@ class _OnboardingVideoScreenState extends State<OnboardingVideoScreen> {
 
   void _goToApp() async {
     // Помечаем, что онбординг пройден
-    final user = SupabaseService.client.auth.currentUser;
+    final user = Supabase.instance.client.auth.currentUser;
     if (user != null) {
       try {
-        await SupabaseService.client
+        await Supabase.instance.client
             .from('users')
             .update({'onboarding_completed': true}).eq('id', user.id);
       } catch (_) {}

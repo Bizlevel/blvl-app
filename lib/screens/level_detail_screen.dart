@@ -4,6 +4,7 @@ import 'package:online_course/models/lesson_model.dart';
 import 'package:online_course/providers/lessons_provider.dart';
 import 'package:online_course/theme/color.dart';
 import 'package:online_course/services/supabase_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:online_course/providers/lesson_progress_provider.dart';
 import 'package:online_course/widgets/lesson_widget.dart';
 import 'package:online_course/widgets/floating_chat_bubble.dart';
@@ -277,7 +278,7 @@ class _ArtifactBlock extends _PageBlock {
   _ArtifactBlock({required this.levelId});
 
   Future<Map<String, dynamic>?> _fetchArtifact() async {
-    final rows = await SupabaseService.client
+    final rows = await Supabase.instance.client
         .from('levels')
         .select('artifact_title, artifact_description, artifact_url')
         .eq('id', levelId)
