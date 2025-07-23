@@ -3,18 +3,18 @@ import 'dart:io';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'supabase_service.dart';
+// No longer importing SupabaseService directly to enable dependency injection.
 
 /// Centralized authentication service.
 /// Wraps Supabase Auth calls and provides typed error handling.
 class AuthService {
-  AuthService._();
+  final SupabaseClient _client;
 
-  static SupabaseClient get _client => SupabaseService.client;
+  AuthService(this._client);
 
   /// Signs in a user with email & password.
   /// Throws [AuthFailure] on known errors.
-  static Future<AuthResponse> signIn(
+  Future<AuthResponse> signIn(
       {required String email, required String password}) async {
     try {
       final response = await _client.auth
@@ -39,7 +39,7 @@ class AuthService {
   }
 
   /// Registers a new user with email & password.
-  static Future<AuthResponse> signUp(
+  Future<AuthResponse> signUp(
       {required String email, required String password}) async {
     try {
       final response =
@@ -57,7 +57,7 @@ class AuthService {
   }
 
   /// Signs the current user out.
-  static Future<void> signOut() async {
+  Future<void> signOut() async {
     try {
       await _client.auth.signOut();
       // Clear Sentry user context
@@ -74,10 +74,10 @@ class AuthService {
   }
 
   /// Returns the currently authenticated [User] or `null` if not signed in.
-  static User? getCurrentUser() => _client.auth.currentUser;
+  User? getCurrentUser() => _client.auth.currentUser;
 
   /// Updates profile fields in `users` table for the current user.
-  static Future<void> updateProfile({
+  Future<void> updateProfile({
     required String name,
     required String about,
     required String goal,

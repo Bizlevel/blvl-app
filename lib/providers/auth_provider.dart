@@ -6,6 +6,16 @@ import '../models/user_model.dart';
 import '../services/auth_service.dart';
 import '../services/supabase_service.dart';
 
+/// Provides access to the global [SupabaseClient].
+final supabaseClientProvider =
+    Provider<SupabaseClient>((ref) => SupabaseService.client);
+
+/// Instantiable [AuthService] that depends on [SupabaseClient].
+final authServiceProvider = Provider<AuthService>((ref) {
+  final client = ref.watch(supabaseClientProvider);
+  return AuthService(client);
+});
+
 /// Emits [AuthState] updates from Supabase.
 final authStateProvider = StreamProvider<AuthState>((ref) {
   return SupabaseService.client.auth.onAuthStateChange;
@@ -71,5 +81,3 @@ final currentUserProvider = FutureProvider<UserModel?>((ref) async {
     return null;
   }
 });
-
-// authServiceProvider removed – AuthService used statically

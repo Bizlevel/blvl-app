@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../services/auth_service.dart';
+import '../../providers/auth_provider.dart';
 import '../../theme/color.dart';
 import '../../widgets/custom_image.dart';
 import '../../widgets/custom_textfield.dart';
@@ -35,7 +36,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
     setState(() => _isLoading = true);
     try {
-      await AuthService.signIn(email: email, password: password);
+      await ref.read(authServiceProvider).signIn(
+            email: email,
+            password: password,
+          );
       // Навигация не требуется – AuthGate в main.dart отреагирует на изменение сессии.
     } on AuthFailure catch (e) {
       _showSnackBar(e.message);

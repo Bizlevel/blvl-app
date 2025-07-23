@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../theme/color.dart';
 import '../../services/auth_service.dart';
+import '../../providers/auth_provider.dart';
 import '../../widgets/custom_textfield.dart';
 import '../../widgets/custom_image.dart';
 import 'onboarding_screens.dart';
@@ -45,7 +46,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
     setState(() => _isLoading = true);
     try {
-      await AuthService.signUp(email: email, password: password);
+      await ref.read(authServiceProvider).signUp(
+            email: email,
+            password: password,
+          );
       if (!mounted) return;
       // Переходим на первый экран онбординга
       Navigator.of(context).pushAndRemoveUntil(

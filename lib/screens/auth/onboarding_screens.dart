@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../services/auth_service.dart';
+import '../../providers/auth_provider.dart';
 import '../../theme/color.dart';
 import '../../widgets/custom_textfield.dart';
 import '../../widgets/custom_image.dart';
@@ -43,7 +44,11 @@ class _OnboardingProfileScreenState
 
     setState(() => _saving = true);
     try {
-      await AuthService.updateProfile(name: name, about: about, goal: goal);
+      await ref.read(authServiceProvider).updateProfile(
+            name: name,
+            about: about,
+            goal: goal,
+          );
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => const OnboardingVideoScreen()),
