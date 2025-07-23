@@ -81,6 +81,7 @@ class AuthService {
     required String name,
     required String about,
     required String goal,
+    bool? onboardingCompleted,
   }) async {
     final user = _client.auth.currentUser;
     if (user == null) {
@@ -88,15 +89,22 @@ class AuthService {
     }
 
     try {
-      await _client.from('users').upsert({
+      // Build payload dynamically to avoid overwriting onboarding status when not provided.
+      final Map<String, dynamic> payload = {
         'id': user.id,
         'email': user.email,
         'name': name,
         'about': about,
         'goal': goal,
         'updated_at': DateTime.now().toIso8601String(),
-        'onboarding_completed': false,
-      });
+      };
+
+      // Only update onboarding flag when explicitly specified.
+      if (onboardingCompleted != null) {
+        payload['onboarding_completed'] = onboardingCompleted;
+      }
+
+      await _client.from('users').upsert(payload);
     } on PostgrestException catch (e, st) {
       await Sentry.captureException(e, stackTrace: st);
       throw AuthFailure(e.message);
