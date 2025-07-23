@@ -12,11 +12,33 @@ class AuthService {
 
   AuthService(this._client);
 
+  /// Generic wrapper to unify error handling for Supabase auth calls.
+  /// [unknownErrorMessage] – сообщение по умолчанию, если исключение не классифицировано.
+  Future<T> _handleAuthCall<T>(
+    Future<T> Function() action, {
+    required String unknownErrorMessage,
+  }) async {
+    try {
+      return await action();
+    } on AuthException catch (e, st) {
+      await Sentry.captureException(e, stackTrace: st);
+      throw AuthFailure(e.message);
+    } on PostgrestException catch (e, st) {
+      await Sentry.captureException(e, stackTrace: st);
+      throw AuthFailure(e.message);
+    } on SocketException {
+      throw AuthFailure('Нет соединения с интернетом');
+    } catch (e, st) {
+      await Sentry.captureException(e, stackTrace: st);
+      throw AuthFailure(unknownErrorMessage);
+    }
+  }
+
   /// Signs in a user with email & password.
   /// Throws [AuthFailure] on known errors.
   Future<AuthResponse> signIn(
       {required String email, required String password}) async {
-    try {
+    return _handleAuthCall(() async {
       final response = await _client.auth
           .signInWithPassword(email: email, password: password);
       // Set Sentry user context
@@ -27,50 +49,26 @@ class AuthService {
         });
       }
       return response;
-    } on AuthException catch (e, st) {
-      await Sentry.captureException(e, stackTrace: st);
-      throw AuthFailure(e.message);
-    } on SocketException {
-      throw AuthFailure('Нет соединения с интернетом');
-    } catch (e, st) {
-      await Sentry.captureException(e, stackTrace: st);
-      throw AuthFailure('Неизвестная ошибка входа');
-    }
+    }, unknownErrorMessage: 'Неизвестная ошибка входа');
   }
 
   /// Registers a new user with email & password.
   Future<AuthResponse> signUp(
       {required String email, required String password}) async {
-    try {
+    return _handleAuthCall(() async {
       final response =
           await _client.auth.signUp(email: email, password: password);
       return response;
-    } on AuthException catch (e, st) {
-      await Sentry.captureException(e, stackTrace: st);
-      throw AuthFailure(e.message);
-    } on SocketException {
-      throw AuthFailure('Нет соединения с интернетом');
-    } catch (e, st) {
-      await Sentry.captureException(e, stackTrace: st);
-      throw AuthFailure('Неизвестная ошибка регистрации');
-    }
+    }, unknownErrorMessage: 'Неизвестная ошибка регистрации');
   }
 
   /// Signs the current user out.
   Future<void> signOut() async {
-    try {
+    await _handleAuthCall(() async {
       await _client.auth.signOut();
       // Clear Sentry user context
       Sentry.configureScope((scope) => scope.setUser(null));
-    } on AuthException catch (e, st) {
-      await Sentry.captureException(e, stackTrace: st);
-      throw AuthFailure(e.message);
-    } on SocketException {
-      throw AuthFailure('Нет соединения с интернетом');
-    } catch (e, st) {
-      await Sentry.captureException(e, stackTrace: st);
-      throw AuthFailure('Неизвестная ошибка выхода');
-    }
+    }, unknownErrorMessage: 'Неизвестная ошибка выхода');
   }
 
   /// Returns the currently authenticated [User] or `null` if not signed in.
@@ -88,7 +86,7 @@ class AuthService {
       throw AuthFailure('Пользователь не авторизован');
     }
 
-    try {
+    await _handleAuthCall(() async {
       // Build payload dynamically to avoid overwriting onboarding status when not provided.
       final Map<String, dynamic> payload = {
         'id': user.id,
@@ -105,15 +103,7 @@ class AuthService {
       }
 
       await _client.from('users').upsert(payload);
-    } on PostgrestException catch (e, st) {
-      await Sentry.captureException(e, stackTrace: st);
-      throw AuthFailure(e.message);
-    } on SocketException {
-      throw AuthFailure('Нет соединения с интернетом');
-    } catch (e, st) {
-      await Sentry.captureException(e, stackTrace: st);
-      throw AuthFailure('Не удалось сохранить профиль');
-    }
+    }, unknownErrorMessage: 'Не удалось сохранить профиль');
   }
 }
 
