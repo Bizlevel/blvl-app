@@ -7,8 +7,11 @@ import 'package:online_course/services/leo_service.dart';
 import 'package:online_course/services/supabase_service.dart';
 
 void main() {
+  late AuthService authService;
+
   setUpAll(() async {
     await SupabaseService.initialize();
+    authService = AuthService(SupabaseService.client);
   });
 
   group('Интеграция Leo AI', () {
@@ -22,7 +25,7 @@ void main() {
       email =
           'leo_test_${DateTime.now().millisecondsSinceEpoch}${rng.nextInt(999)}@example.com';
 
-      final res = await AuthService.signUp(email: email, password: password);
+      final res = await authService.signUp(email: email, password: password);
       expect(res.user, isNotNull);
 
       // после регистрации лимит должен быть 30 (Free)

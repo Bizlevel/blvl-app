@@ -10,9 +10,12 @@ import 'package:online_course/services/supabase_service.dart';
 import 'package:online_course/providers/auth_provider.dart';
 
 void main() {
+  AuthService authService = AuthService(SupabaseService.client);
+
   setUpAll(() async {
     // Ensure Supabase is ready before running any tests.
     await SupabaseService.initialize();
+    authService = AuthService(SupabaseService.client);
   });
 
   group('Model serialization', () {
@@ -75,7 +78,7 @@ void main() {
   group('AuthService error handling', () {
     test('signIn with invalid creds throws AuthFailure', () async {
       expect(
-        () => AuthService.signIn(
+        () => authService.signIn(
             email: 'wrong@example.com', password: 'incorrect'),
         throwsA(isA<AuthFailure>()),
       );
