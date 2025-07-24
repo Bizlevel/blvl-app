@@ -10,7 +10,7 @@ import 'package:online_course/widgets/setting_box.dart';
 import 'package:online_course/widgets/setting_item.dart';
 import 'package:online_course/widgets/artifact_card.dart';
 import 'package:online_course/providers/levels_provider.dart';
-import 'package:online_course/screens/payment_screen.dart';
+import 'package:online_course/providers/subscription_provider.dart';
 import 'package:online_course/models/user_model.dart';
 import 'package:go_router/go_router.dart';
 import 'package:file_picker/file_picker.dart';
@@ -55,6 +55,7 @@ class ProfileScreen extends ConsumerWidget {
 
         // Есть сессия - загружаем пользователя
         final currentUserAsync = ref.watch(currentUserProvider);
+        final subAsync = ref.watch(subscriptionProvider);
 
         return currentUserAsync.when(
           data: (user) {
@@ -82,8 +83,11 @@ class ProfileScreen extends ConsumerWidget {
               );
             }
 
-            // Пользователь загружен - показываем профиль
-            return _buildProfileContent(context, ref, user);
+            // определяем премиум по полю БД или активной подписке
+            final isPremium = user.isPremium ||
+                (subAsync.asData?.value == 'active');
+            return _buildProfileContent(context, ref, user,
+                isPremiumOverride: isPremium);
           },
           loading: () => const Scaffold(
             body: Center(child: CircularProgressIndicator()),
@@ -139,9 +143,11 @@ class ProfileScreen extends ConsumerWidget {
   }
 
   Widget _buildProfileContent(
-      BuildContext context, WidgetRef ref, UserModel user) {
+      BuildContext context, WidgetRef ref, UserModel user,
+      {bool? isPremiumOverride}) {
+    final isPremium = isPremiumOverride ?? user.isPremium;
     final messagesLeft =
-        user.isPremium ? user.leoMessagesToday : user.leoMessagesTotal;
+        isPremium ? user.leoMessagesToday : user.leoMessagesTotal;
 
     final levelsAsync = ref.watch(levelsProvider);
 
@@ -195,7 +201,7 @@ class ProfileScreen extends ConsumerWidget {
                 currentLevel: user.currentLevel,
                 messagesLeft: messagesLeft,
                 artifactsCount: artifactsCount,
-                isPremium: user.isPremium,
+                isPremium: isPremium,
                 artifacts: artifacts,
               ),
             ),
@@ -266,6 +272,7 @@ class _BodyState extends ConsumerState<_Body> {
           );
 
       debugPrint('Upload successful: $response');
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Upload successful!')),
       );
@@ -273,11 +280,13 @@ class _BodyState extends ConsumerState<_Body> {
       debugPrint('Detailed Storage Error: ${e.message}');
       debugPrint('Detailed Storage Error statusCode: ${e.statusCode}');
       debugPrint('Detailed Storage Error error: ${e.error}');
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Storage Error: ${e.message}')),
       );
     } catch (e) {
       debugPrint('An unexpected error occurred: $e');
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('An unexpected error occurred: $e')),
       );
@@ -335,12 +344,30 @@ class _BodyState extends ConsumerState<_Body> {
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              widget.userName,
-              style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w600,
-              ),
+            Row(
+              children: [
+                Text(
+                  widget.userName,
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                if (widget.isPremium)
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppColor.primary,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Text(
+                      'Premium',
+                      style: TextStyle(fontSize: 12, color: Colors.white),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(height: 5),
             const Text(
@@ -387,10 +414,7 @@ class _BodyState extends ConsumerState<_Body> {
   Widget _buildPremiumButton(BuildContext context) {
     return GestureDetector(
       onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const PaymentScreen()),
-        );
+        context.go('/premium');
       },
       child: Container(
         padding: const EdgeInsets.all(10),

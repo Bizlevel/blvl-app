@@ -177,3 +177,14 @@ Bugfixes 17.07: QuizWidget: добавлена кнопка «Попробова
 Задача 17.6: unit-тесты репозиториев и сервисов. Добавлены тесты `user_repository_test.dart` и `leo_service_unit_test.dart` (mocktail). Покрывают нормальные сценарии и ошибки (Auth/LeoFailure). Моки SupabaseClient, GoTrueClient, SupabaseQueryBuilder. Все тесты проходят локально (`flutter test`).
 Задача 17.7: widget-тесты уровней: Добавлены `levels_map_screen_test.dart` и `level_detail_screen_test.dart`. Используют ProviderScope overrides с мок-репозиториями (levels/lessons). Проверяют отображение данных и наличие кнопок навигации. SharedPreferences замокана для LevelDetailScreen. Все тесты выполняются локально (`flutter test`).
 
+
+# Этап 18: Безопасность
+Задача 18.1: добавлен job supabase_advisors в CI, скрипт supabase_advisor_check.sh для проверки security-advisors, и миграция 20250724_0001_add_missing_rls_policies.sql включает RLS и базовые политики для lessons, levels, leo_messages, user_progress.
+Задача 18.2: добавлены зависимости hive/hive_flutter, инициализация Hive в main.dart, кеширование уровней и уроков (stale-while-revalidate) в LevelsRepository и LessonsRepository.
+Задача 18.3: добавлена миграция add_subscriptions.sql (tables subscriptions, payments, индексы, RLS) и применена к проекту Supabase.
+Задача 18.4: добавлена Edge Function create-checkout-session и PaymentService.startCheckout().
+Задача 18.5: реализованы PremiumScreen, subscriptionProvider (реальное время), маршрут /premium, значок Premium и навигация из ProfileScreen.
+Задача 18.6: в CI добавлено кэширование Gradle (Android) и CocoaPods (iOS) через actions/cache для ускорения сборок.
+Задача 18.7: в CI добавлен условный шаг для вывода логов Supabase (api) при падении тестов unit и Android integration.
+Этап 18 закрыт: применена миграция RLS, Edge Function задеплоена, ProfileScreen использует subscriptionProvider, логи Supabase собираются во всех тестовых job.
+

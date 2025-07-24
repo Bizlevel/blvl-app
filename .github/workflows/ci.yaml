@@ -12,6 +12,7 @@ env:
   SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
   SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
   SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+  SUPABASE_PROJECT_ID: acevqbdpzgbtqznbpgzr
 
 jobs:
   unit:
@@ -31,6 +32,12 @@ jobs:
 
       - name: Run unit tests
         run: flutter test --coverage
+
+      - name: Fetch Supabase logs on failure
+        if: failure()
+        run: |
+          npm install -g supabase-mcp-cli
+          supabase-mcp get_logs --project_id $SUPABASE_PROJECT_ID --service api
 
   integration_web:
     name: "Integration tests (Web)"
@@ -58,6 +65,12 @@ jobs:
       - name: Run integration tests (Chrome)
         run: flutter test integration_test -d chrome
 
+      - name: Fetch Supabase logs on failure
+        if: failure()
+        run: |
+          npm install -g supabase-mcp-cli
+          supabase-mcp get_logs --project_id $SUPABASE_PROJECT_ID --service api
+
   integration_android:
     name: "Integration tests (Android)"
     runs-on: ubuntu-latest
@@ -74,6 +87,16 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Cache Gradle
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
       - name: Run integration tests on Android emulator
         uses: ReactiveCircus/android-emulator-runner@v2
         with:
@@ -81,6 +104,12 @@ jobs:
           arch: x86_64
           profile: pixel_6
           script: flutter test integration_test -d emulator
+
+      - name: Fetch Supabase logs on failure
+        if: failure()
+        run: |
+          npm install -g supabase-mcp-cli
+          supabase-mcp get_logs --project_id $SUPABASE_PROJECT_ID --service api
 
   integration_ios:
     name: "Integration tests (iOS)"
@@ -100,11 +129,45 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Cache CocoaPods
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cocoapods
+            ios/Pods
+          key: ${{ runner.os }}-pods-${{ hashFiles('ios/Podfile.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-
+
       - name: Boot iOS simulator and run tests
         run: |
           xcrun simctl boot "iPhone 15" || true
           sleep 20
           flutter test integration_test -d "iPhone 15"
+
+      - name: Fetch Supabase logs on failure
+        if: failure()
+        run: |
+          npm install -g supabase-mcp-cli
+          supabase-mcp get_logs --project_id $SUPABASE_PROJECT_ID --service api
+
+  supabase_advisors:
+    name: "Supabase security advisors"
+    runs-on: ubuntu-latest
+    needs: [integration_web, integration_android, integration_ios]
+    env:
+      SUPABASE_PROJECT_ID: acevqbdpzgbtqznbpgzr
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install jq (for JSON processing)
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Install supabase-mcp CLI
+        run: npm install -g supabase-mcp-cli
+
+      - name: Run Supabase security advisors check
+        run: bash scripts/supabase_advisor_check.sh
 
   sentry_check:
     name: "Sentry unresolved check"
@@ -129,7 +192,7 @@ jobs:
   email_notify:
     name: "Email notification"
     runs-on: ubuntu-latest
-    needs: [unit, integration_web, integration_android, integration_ios, sentry_check]
+    needs: [unit, integration_web, integration_android, integration_ios, supabase_advisors, sentry_check]
     if: always()
     steps:
       - name: Send email
@@ -150,6 +213,7 @@ jobs:
               <li>Web: ${{ needs.integration_web.result }}</li>
               <li>Android: ${{ needs.integration_android.result }}</li>
               <li>iOS: ${{ needs.integration_ios.result }}</li>
+              <li>Supabase Advisors: ${{ needs.supabase_advisors.result }}</li>
               <li>Sentry: ${{ needs.sentry_check.result }}</li>
             </ul>
             <p>Details: <a href="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}">see workflow</a></p> 

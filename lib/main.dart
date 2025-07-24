@@ -14,6 +14,7 @@ import 'routing/app_router.dart';
 import 'package:go_router/go_router.dart';
 import 'services/supabase_service.dart';
 import 'theme/color.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
 Future<void> main() async {
   // КРИТИЧНО для web: Все инициализации должны быть в одной зоне
@@ -26,6 +27,11 @@ Future<void> main() async {
 
   // Инициализируем Supabase
   await SupabaseService.initialize();
+
+  // Инициализируем Hive и открываем нужные боксы для кеша
+  await Hive.initFlutter();
+  await Hive.openBox('levels');
+  await Hive.openBox('lessons');
 
   final dsn = dotenv.env['sentry_dsn'] ??
       const String.fromEnvironment('SENTRY_DSN', defaultValue: '');
