@@ -12,7 +12,7 @@ import 'package:online_course/widgets/artifact_card.dart';
 import 'package:online_course/providers/levels_provider.dart';
 import 'package:online_course/screens/payment_screen.dart';
 import 'package:online_course/models/user_model.dart';
-import 'package:online_course/screens/auth/login_screen.dart';
+import 'package:go_router/go_router.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:io';
@@ -42,12 +42,8 @@ class ProfileScreen extends ConsumerWidget {
                   const Text('Не авторизован'),
                   ElevatedButton(
                     onPressed: () {
-                      // Переход на LoginScreen
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(
-                            builder: (context) => const LoginScreen()),
-                      );
+                      // Перенаправление через GoRouter
+                      context.go('/login');
                     },
                     child: const Text('Войти'),
                   ),

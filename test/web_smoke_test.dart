@@ -4,9 +4,12 @@ import 'package:integration_test/integration_test.dart';
 
 import 'package:online_course/models/lesson_model.dart';
 import 'package:online_course/widgets/lesson_widget.dart';
+import 'package:flutter/widgets.dart';
 
 void main() {
-  IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  if (WidgetsBinding.instance == null) {
+    IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  }
 
   testWidgets('Smoke test – LessonWidget renders on Web', (tester) async {
     // Dummy lesson with Vimeo ID to avoid network calls to Supabase in tests.

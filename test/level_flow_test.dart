@@ -7,9 +7,12 @@ import 'package:online_course/models/lesson_model.dart';
 import 'package:online_course/screens/level_detail_screen.dart';
 import 'package:online_course/providers/lessons_provider.dart';
 import 'package:online_course/providers/lesson_progress_provider.dart';
+import 'package:flutter/widgets.dart';
 
 void main() {
-  IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  if (WidgetsBinding.instance == null) {
+    IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  }
 
   testWidgets('Полный поток LevelDetailScreen', (tester) async {
     // 1️⃣ Подготавливаем фейковые данные

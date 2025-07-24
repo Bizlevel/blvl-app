@@ -9,7 +9,7 @@ class MockSupabaseClient extends Mock implements SupabaseClient {}
 
 class MockGoTrueClient extends Mock implements GoTrueClient {}
 
-class MockAuthResponse extends Fake implements AuthResponse {}
+class MockAuthResponse extends Mock implements AuthResponse {}
 
 class MockSupabaseQueryBuilder extends Mock implements SupabaseQueryBuilder {}
 
@@ -66,7 +66,7 @@ void main() {
 
   group('signOut', () {
     test('делегирует вызов auth.signOut', () async {
-      when(() => auth.signOut()).thenAnswer((_) async => {});
+      when(() => auth.signOut()).thenAnswer((_) async {});
 
       await service.signOut();
 
@@ -89,7 +89,7 @@ void main() {
       builder = MockSupabaseQueryBuilder();
       when(() => client.from('users')).thenReturn(builder as dynamic);
       when(() => (builder as dynamic).upsert(any<dynamic>()))
-          .thenAnswer((_) async => Future.value());
+          .thenAnswer((_) async {});
     });
 
     test('формирует payload без onboarding_completed по умолчанию', () async {

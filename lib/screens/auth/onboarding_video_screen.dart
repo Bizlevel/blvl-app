@@ -7,8 +7,8 @@ import 'package:video_player/video_player.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:online_course/services/supabase_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:go_router/go_router.dart';
 
-import '../root_app.dart';
 import '../../theme/color.dart';
 
 class OnboardingVideoScreen extends StatefulWidget {
@@ -96,10 +96,7 @@ class _OnboardingVideoScreenState extends State<OnboardingVideoScreen> {
 
     if (!mounted) return;
 
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const RootApp()),
-      (_) => false,
-    );
+    context.go('/home');
   }
 
   @override

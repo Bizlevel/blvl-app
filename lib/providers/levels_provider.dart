@@ -1,14 +1,13 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:online_course/models/level_model.dart';
-import 'package:online_course/services/supabase_service.dart';
+import 'package:online_course/providers/levels_repository_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Provides список уровней с учётом прогресса пользователя.
 final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  final repo = ref.watch(levelsRepositoryProvider);
   final userId = Supabase.instance.client.auth.currentUser?.id;
-  final rows = userId == null
-      ? await SupabaseService.fetchLevelsRaw()
-      : await SupabaseService.fetchLevelsWithProgress(userId);
+  final rows = await repo.fetchLevels(userId: userId);
 
   // Сначала сортируем по номеру на случай, если order потерян
   rows.sort((a, b) => (a['number'] as int).compareTo(b['number'] as int));

@@ -11,6 +11,7 @@ import 'package:online_course/widgets/floating_chat_bubble.dart';
 import 'package:online_course/widgets/quiz_widget.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:online_course/providers/levels_provider.dart';
+import 'package:online_course/providers/levels_repository_provider.dart';
 
 /// Shows a level as full-screen blocks (Intro → Lesson → Quiz → …).
 class LevelDetailScreen extends ConsumerStatefulWidget {
@@ -319,8 +320,9 @@ class _ArtifactBlock extends _PageBlock {
               const SizedBox(height: 24),
               ElevatedButton.icon(
                 onPressed: () async {
-                  final url =
-                      await SupabaseService.getArtifactSignedUrl(relativePath);
+                  final repo = ProviderScope.containerOf(context, listen: false)
+                      .read(levelsRepositoryProvider);
+                  final url = await repo.getArtifactSignedUrl(relativePath);
                   if (url != null && await canLaunchUrl(Uri.parse(url))) {
                     await launchUrl(Uri.parse(url),
                         mode: LaunchMode.externalApplication);

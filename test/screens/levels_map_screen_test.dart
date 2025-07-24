@@ -1,0 +1,66 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
+
+import 'package:online_course/providers/levels_repository_provider.dart';
+import 'package:online_course/screens/levels_map_screen.dart';
+import 'package:online_course/repositories/levels_repository.dart';
+
+// -------------------- Моки --------------------
+class MockLevelsRepository extends Mock implements LevelsRepository {}
+
+void main() {
+  setUpAll(() {
+    registerFallbackValue(<String, dynamic>{});
+  });
+
+  testWidgets('LevelsMapScreen отображает уровни из репозитория',
+      (tester) async {
+    final repo = MockLevelsRepository();
+    when(() => repo.fetchLevels(userId: any(named: 'userId'))).thenAnswer(
+      (_) async => [
+        {
+          'id': 1,
+          'number': 1,
+          'title': 'Intro',
+          'description': '',
+          'image_url': '',
+          'is_free': true,
+          'lessons': [
+            {'count': 3}
+          ],
+          'user_progress': []
+        },
+        {
+          'id': 2,
+          'number': 2,
+          'title': 'Next',
+          'description': '',
+          'image_url': '',
+          'is_free': true,
+          'lessons': [
+            {'count': 4}
+          ],
+          'user_progress': []
+        }
+      ],
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          levelsRepositoryProvider.overrideWithValue(repo),
+        ],
+        child: const MaterialApp(home: LevelsMapScreen()),
+      ),
+    );
+
+    // Первоначальный кадр (loading)
+    await tester.pumpAndSettle();
+
+    // Ожидаем появления текста названий уровней
+    expect(find.text('Intro'), findsOneWidget);
+    expect(find.text('Next'), findsOneWidget);
+  });
+}

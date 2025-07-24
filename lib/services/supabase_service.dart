@@ -15,12 +15,16 @@ class SupabaseService {
   static Future<void> initialize() async {
     if (_initialized) return;
 
-    await Supabase.initialize(
-      url: dotenv.env['SUPABASE_URL'] ??
-          const String.fromEnvironment('SUPABASE_URL', defaultValue: ''),
-      anonKey: dotenv.env['SUPABASE_ANON_KEY'] ??
-          const String.fromEnvironment('SUPABASE_ANON_KEY', defaultValue: ''),
-    );
+    try {
+      await Supabase.initialize(
+        url: dotenv.env['SUPABASE_URL'] ??
+            const String.fromEnvironment('SUPABASE_URL', defaultValue: ''),
+        anonKey: dotenv.env['SUPABASE_ANON_KEY'] ??
+            const String.fromEnvironment('SUPABASE_ANON_KEY', defaultValue: ''),
+      );
+    } on AssertionError {
+      // Already initialized in current isolate (tests may initialize globally)
+    }
 
     _initialized = true;
   }

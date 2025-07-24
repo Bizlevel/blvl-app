@@ -1,5 +1,6 @@
 // Vimeo/WebView support
-import 'package:online_course/services/supabase_service.dart';
+import 'package:online_course/providers/lessons_repository_provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:chewie/chewie.dart';
 import 'package:flutter/foundation.dart'
@@ -15,17 +16,17 @@ import 'package:online_course/compat/ui_stub.dart'
 import 'package:online_course/compat/html_stub.dart'
     if (dart.library.html) 'dart:html' as html;
 
-class LessonWidget extends StatefulWidget {
+class LessonWidget extends ConsumerStatefulWidget {
   final LessonModel lesson;
   final VoidCallback onWatched;
   const LessonWidget(
       {super.key, required this.lesson, required this.onWatched});
 
   @override
-  State<LessonWidget> createState() => _LessonWidgetState();
+  ConsumerState<LessonWidget> createState() => _LessonWidgetState();
 }
 
-class _LessonWidgetState extends State<LessonWidget> {
+class _LessonWidgetState extends ConsumerState<LessonWidget> {
   VideoPlayerController? _videoController;
   ChewieController? _chewieController;
   bool _initialized = false;
@@ -81,8 +82,8 @@ class _LessonWidgetState extends State<LessonWidget> {
         // Fallback to Supabase Storage signed URL если указан путь
         if (widget.lesson.videoUrl != null &&
             widget.lesson.videoUrl!.isNotEmpty) {
-          final signed =
-              await SupabaseService.getVideoSignedUrl(widget.lesson.videoUrl!);
+          final repo = ref.read(lessonsRepositoryProvider);
+          final signed = await repo.getVideoSignedUrl(widget.lesson.videoUrl!);
           if (signed == null) {
             // Нет видео → помечаем как просмотренное и показываем заглушку
             _initialized = true;

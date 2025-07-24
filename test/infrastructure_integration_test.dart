@@ -9,6 +9,7 @@ import 'package:online_course/services/auth_service.dart';
 import 'package:online_course/services/supabase_service.dart';
 import 'package:online_course/providers/auth_provider.dart';
 
+@Skip('integration test – requires network')
 void main() {
   AuthService authService = AuthService(Supabase.instance.client);
 

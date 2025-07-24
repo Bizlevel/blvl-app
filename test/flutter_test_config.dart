@@ -51,11 +51,11 @@ Future<void> testExecutable(FutureOr<void> Function() testMain) async {
   // Подгружаем пустые переменные окружения, чтобы не падал dotenv.
   dotenv.dotenv.testLoad(fileInput: 'SUPABASE_URL=\nSUPABASE_ANON_KEY=\n');
 
+  // Заглушаем shared_preferences до любых обращений.
+  SharedPreferences.setMockInitialValues({});
+
   // Инициализируем Supabase с фиктивными значениями.
   await Supabase.initialize(url: 'https://test.supabase.co', anonKey: 'test');
-
-  // Заглушаем shared_preferences.
-  SharedPreferences.setMockInitialValues({});
 
   // Заменяем платформенную реализацию видеоплеера на фейк.
   VideoPlayerPlatform.instance = _FakeVideoPlayerPlatform();

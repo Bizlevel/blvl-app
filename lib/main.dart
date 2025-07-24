@@ -6,6 +6,9 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:responsive_framework/responsive_framework.dart';
+import 'package:uni_links/uni_links.dart';
+import 'dart:async';
+import 'utils/deep_link.dart';
 
 import 'routing/app_router.dart';
 import 'package:go_router/go_router.dart';
@@ -65,25 +68,75 @@ class MyApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final GoRouter router = ref.watch(goRouterProvider);
 
-    return MaterialApp.router(
-      routerConfig: router,
-      builder: (context, child) => ResponsiveWrapper.builder(
-        BouncingScrollWrapper.builder(context, child!),
-        maxWidth: 480,
-        minWidth: 320,
-        defaultScale: true,
-        breakpoints: const [
-          ResponsiveBreakpoint.resize(320, name: MOBILE),
-          ResponsiveBreakpoint.autoScale(600, name: TABLET),
-          ResponsiveBreakpoint.autoScale(800, name: DESKTOP),
-        ],
+    return _LinkListener(
+      router: router,
+      child: MaterialApp.router(
+        routerConfig: router,
+        builder: (context, child) => ResponsiveWrapper.builder(
+          BouncingScrollWrapper.builder(context, child!),
+          maxWidth: 480,
+          minWidth: 320,
+          defaultScale: true,
+          breakpoints: const [
+            ResponsiveBreakpoint.resize(320, name: MOBILE),
+            ResponsiveBreakpoint.autoScale(600, name: TABLET),
+            ResponsiveBreakpoint.autoScale(800, name: DESKTOP),
+          ],
+        ),
+        debugShowCheckedModeBanner: false,
+        title: 'BizLevel',
+        theme: ThemeData(
+          primaryColor: AppColor.primary,
+        ),
+        // Навигатор теперь управляется GoRouter; SentryObserver добавлен в конфигурацию роутера
       ),
-      debugShowCheckedModeBanner: false,
-      title: 'BizLevel',
-      theme: ThemeData(
-        primaryColor: AppColor.primary,
-      ),
-      // Навигатор теперь управляется GoRouter; SentryObserver добавлен в конфигурацию роутера
     );
   }
+}
+
+class _LinkListener extends StatefulWidget {
+  final GoRouter router;
+  final Widget child;
+  const _LinkListener({required this.router, required this.child});
+
+  @override
+  State<_LinkListener> createState() => _LinkListenerState();
+}
+
+class _LinkListenerState extends State<_LinkListener> {
+  StreamSubscription<Uri?>? _sub;
+
+  @override
+  void initState() {
+    super.initState();
+    _initLinks();
+    if (!kIsWeb) {
+      _sub = uriLinkStream.listen((Uri? uri) {
+        _handleLinkUri(uri);
+      }, onError: (_) {});
+    }
+  }
+
+  Future<void> _initLinks() async {
+    try {
+      final initial = await getInitialUri();
+      _handleLinkUri(initial);
+    } catch (_) {}
+  }
+
+  void _handleLinkUri(Uri? uri) {
+    final path = uri == null ? null : mapBizLevelDeepLink(uri.toString());
+    if (path != null) {
+      widget.router.go(path);
+    }
+  }
+
+  @override
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }

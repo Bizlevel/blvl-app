@@ -7,6 +7,10 @@ import '../screens/auth/login_screen.dart';
 import '../screens/auth/register_screen.dart';
 import '../screens/root_app.dart';
 import '../providers/auth_provider.dart';
+import '../screens/auth/onboarding_screens.dart';
+import '../screens/auth/onboarding_video_screen.dart';
+import '../screens/profile_screen.dart';
+import '../screens/level_detail_screen.dart';
 
 /// Riverpod provider that exposes the [GoRouter] instance used across the app.
 ///
@@ -36,6 +40,25 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/home',
         builder: (context, state) => const RootApp(),
+      ),
+      GoRoute(
+        path: '/onboarding/profile',
+        builder: (context, state) => const OnboardingProfileScreen(),
+      ),
+      GoRoute(
+        path: '/onboarding/video',
+        builder: (context, state) => const OnboardingVideoScreen(),
+      ),
+      GoRoute(
+        path: '/profile',
+        builder: (context, state) => const ProfileScreen(),
+      ),
+      GoRoute(
+        path: '/levels/:id',
+        builder: (context, state) {
+          final id = int.tryParse(state.pathParameters['id'] ?? '0') ?? 0;
+          return LevelDetailScreen(levelId: id);
+        },
       ),
     ],
     redirect: (context, state) {

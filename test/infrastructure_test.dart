@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -5,7 +6,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:online_course/services/supabase_service.dart';
 
 void main() {
-  TestWidgetsFlutterBinding.ensureInitialized();
+  if (WidgetsBinding.instance == null) {
+    TestWidgetsFlutterBinding.ensureInitialized();
+  }
 
   group('Supabase infrastructure', () {
     setUpAll(() async {

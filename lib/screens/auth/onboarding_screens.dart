@@ -6,7 +6,7 @@ import '../../providers/auth_provider.dart';
 import '../../theme/color.dart';
 import '../../widgets/custom_textfield.dart';
 import '../../widgets/custom_image.dart';
-import 'onboarding_video_screen.dart';
+import 'package:go_router/go_router.dart';
 
 class OnboardingProfileScreen extends ConsumerStatefulWidget {
   const OnboardingProfileScreen({super.key});
@@ -50,9 +50,7 @@ class _OnboardingProfileScreenState
             goal: goal,
           );
       if (!mounted) return;
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const OnboardingVideoScreen()),
-      );
+      context.go('/onboarding/video');
     } on AuthFailure catch (e) {
       _showSnackBar(e.message);
     } catch (e) {
