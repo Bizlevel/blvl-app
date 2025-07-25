@@ -53,7 +53,7 @@ Future<void> main() async {
       (options) {
         options
           ..dsn = dsn
-          ..tracesSampleRate = 1.0
+          ..tracesSampleRate = kReleaseMode ? 0.3 : 1.0
           ..environment = kReleaseMode ? 'prod' : 'dev'
           ..release =
               'bizlevel@${packageInfo.version}+${packageInfo.buildNumber}'
