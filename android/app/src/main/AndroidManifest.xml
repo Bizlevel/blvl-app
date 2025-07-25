@@ -1,5 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.sangvaleap.online_course">
+    package="kz.bizlevel.app">
 
     <!-- Required for network access (Supabase, Leo Edge Functions) -->
     <uses-permission android:name="android.permission.INTERNET" />
@@ -10,7 +10,7 @@
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
 
    <application
-        android:label="online_course"
+        android:label="BizLevel"
         android:icon="@mipmap/ic_launcher">
         <activity
             android:name=".MainActivity"

@@ -1,7 +1,7 @@
 # ProGuard rules for BizLevel release build
 # Keep Flutter classes
 -keep class io.flutter.** { *; }
--keep class com.sangvaleap.online_course.** { *; }
+-keep class kz.bizlevel.app.** { *; }
 # Keep Supabase SDK and generated models
 -keep class io.supabase.** { *; }
 -keep class com.supabase.** { *; }
