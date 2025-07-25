@@ -57,6 +57,9 @@ final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
               ? 'Только для премиум'
               : 'Завершите предыдущий уровень')
           : null,
+      'artifact_title': json['artifact_title'],
+      'artifact_description': json['artifact_description'],
+      'artifact_url': json['artifact_url'],
     };
   }).toList();
 });

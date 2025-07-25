@@ -158,15 +158,16 @@ class ProfileScreen extends ConsumerWidget {
         final completedLevelNumbers =
             List.generate(user.currentLevel - 1, (index) => index + 1);
 
-        final accessibleLevels = levelsData.where((lvl) {
-          final num = lvl['level'] as int;
-          if (user.isPremium) {
-            return num <= user.currentLevel; // все до текущего
-          }
-          return completedLevelNumbers.contains(num);
+        final completedLevels = levelsData.where((lvl) {
+          final levelNum = lvl['level'] as int;
+          final progressArr = lvl['user_progress'] as List?;
+          final bool isCompleted = progressArr != null && progressArr.isNotEmpty
+              ? (progressArr.first['is_completed'] as bool? ?? false)
+              : false;
+          return levelNum < user.currentLevel || isCompleted;
         }).toList();
 
-        final artifacts = accessibleLevels
+        final artifacts = completedLevels
             .map((lvl) => {
                   'title': lvl['artifact_title'] ?? 'Артефакт',
                   'description': lvl['artifact_description'] ?? '',
@@ -300,31 +301,23 @@ class _BodyState extends ConsumerState<_Body> {
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 15),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.medium),
       child: Column(
         children: [
           _buildProfile(),
-          const SizedBox(height: 20),
+          const SizedBox(height: AppSpacing.medium),
           _buildRecord(),
-          const SizedBox(height: 20),
+          const SizedBox(height: AppSpacing.medium),
           if (!widget.isPremium) _buildPremiumButton(context),
-          if (!widget.isPremium) const SizedBox(height: 20),
+          if (!widget.isPremium) const SizedBox(height: AppSpacing.medium),
           _buildSection1(context),
-          const SizedBox(height: 20),
+          const SizedBox(height: AppSpacing.medium),
           _buildSection2(),
-          const SizedBox(height: 20),
+          const SizedBox(height: AppSpacing.medium),
           _buildSection3(),
-          const SizedBox(height: 20),
+          const SizedBox(height: AppSpacing.medium),
           _buildArtifactsSection(),
-          const SizedBox(height: 20),
-          // Test Upload Button
-          ElevatedButton(
-            onPressed: _isUploading ? null : _uploadFile,
-            child: _isUploading
-                ? const CircularProgressIndicator(color: Colors.white)
-                : const Text('Test Upload PDF'),
-          ),
-          const SizedBox(height: 40),
+          const SizedBox(height: AppSpacing.medium),
         ],
       ),
     );
@@ -340,7 +333,7 @@ class _BodyState extends ConsumerState<_Body> {
           height: 80,
           radius: 40,
         ),
-        const SizedBox(width: 15),
+        const SizedBox(width: AppSpacing.small),
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -353,11 +346,11 @@ class _BodyState extends ConsumerState<_Body> {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(width: 6),
+                const SizedBox(width: AppSpacing.small),
                 if (widget.isPremium)
                   Container(
                     padding:
-                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        const EdgeInsets.symmetric(horizontal: AppSpacing.small, vertical: AppSpacing.small / 2),
                     decoration: BoxDecoration(
                       color: AppColor.primary,
                       borderRadius: BorderRadius.circular(4),
@@ -369,7 +362,7 @@ class _BodyState extends ConsumerState<_Body> {
                   ),
               ],
             ),
-            const SizedBox(height: 5),
+            const SizedBox(height: AppSpacing.small),
             const Text(
               "BizLevel",
               style: TextStyle(
@@ -393,14 +386,14 @@ class _BodyState extends ConsumerState<_Body> {
             icon: "assets/icons/work.svg",
           ),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: AppSpacing.small),
         Expanded(
           child: SettingBox(
             title: "${widget.messagesLeft} Leo",
             icon: "assets/icons/chat.svg",
           ),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: AppSpacing.small),
         Expanded(
           child: SettingBox(
             title: "${widget.artifactsCount} Artfs",
@@ -417,7 +410,7 @@ class _BodyState extends ConsumerState<_Body> {
         context.go('/premium');
       },
       child: Container(
-        padding: const EdgeInsets.all(10),
+        padding: const EdgeInsets.all(AppSpacing.medium),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(10),
           color: AppColor.primary,
@@ -434,7 +427,7 @@ class _BodyState extends ConsumerState<_Body> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(Icons.star, color: Colors.white, size: 20),
-            SizedBox(width: 10),
+            SizedBox(width: AppSpacing.small),
             Text(
               "Активировать премиум",
               style: TextStyle(
@@ -488,13 +481,13 @@ class _BodyState extends ConsumerState<_Body> {
             fontWeight: FontWeight.w600,
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: AppSpacing.small),
         if (widget.artifacts.isEmpty)
           const Center(child: Text("У вас пока нет артефактов."))
         else
           ...widget.artifacts.map(
             (artifact) => Padding(
-              padding: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.only(bottom: AppSpacing.small),
               child: ArtifactCard(
                 title: artifact['title'],
                 description: artifact['description'],

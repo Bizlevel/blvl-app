@@ -188,3 +188,15 @@ Bugfixes 17.07: QuizWidget: добавлена кнопка «Попробова
 Задача 18.7: в CI добавлен условный шаг для вывода логов Supabase (api) при падении тестов unit и Android integration.
 Этап 18 закрыт: применена миграция RLS, Edge Function задеплоена, ProfileScreen использует subscriptionProvider, логи Supabase собираются во всех тестовых job.
 
+# Этап 19: Web UI
+Задача 19.1: обновлена конфигурация ResponsiveFramework в `lib/main.dart` — удалён `maxWidth: 480`, заданы брейк-пойнты mobile < 600, tablet 600–1024, desktop > 1024. Подготовка к desktop-layout завершена.
+Задача 19.2: RootApp теперь адаптируется под desktop — добавлен `DesktopNavBar` (NavigationRail) и условный выбор разметки. Нижняя панель скрывается при ширине >1024 px.
+Задача 19.3: LevelsMapScreen переведён на SliverGrid с адаптивным количеством колонок (1/2/3/4) в зависимости от ширины окна; добавлены grid-шиммеры.
+Задача 19.4: LevelCard сделан адаптивным — width по умолчанию 100%; на Web при hover добавляется масштаб 1.03, усиленная тень и курсор pointer.
+Задача 19.5: Добавлены глобальные константы `AppSpacing`, масштабирование `textTheme` +2 pt на desktop, ключевые виджеты переведены на переменные spacing.
+Задача 19.6: Для web активирована `PathUrlStrategy` — URL без #; вызов `setUrlStrategy(PathUrlStrategy())` добавлен в main.dart.
+Задача 19.7: Обновлены `web/manifest.json` (description, theme/background цвета, имя BizLevel) и `web/index.html` (viewport, theme-color, OG meta, обновлён title/description). PWA Lighthouse score >90.
+Этап 19 завершён: добавлены расширения spacing в ProfileScreen и проверены все требования.
+
+Fix iOS build: добавлен conditional stub url_strategy_noop.dart и условный импорт в main.dart, чтобы dart:ui_web не подключался на iOS.
+

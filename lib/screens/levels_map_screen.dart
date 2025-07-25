@@ -24,7 +24,7 @@ class LevelsMapScreen extends ConsumerWidget {
             floating: true,
             title: _buildAppBar(ref),
           ),
-          _buildLevels(ref),
+          _buildLevels(context, ref),
         ],
       ),
     );
@@ -72,31 +72,37 @@ class LevelsMapScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildLevels(WidgetRef ref) {
+  Widget _buildLevels(BuildContext context, WidgetRef ref) {
     final levelsAsync = ref.watch(levelsProvider);
 
     return levelsAsync.when(
       data: (levels) {
         return SliverPadding(
-          padding: const EdgeInsets.fromLTRB(15, 10, 15, 20),
-          sliver: SliverList(
+          padding: const EdgeInsets.fromLTRB(AppSpacing.medium,
+              AppSpacing.small, AppSpacing.medium, AppSpacing.large),
+          sliver: SliverGrid(
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount:
+                  _calcCrossAxisCount(MediaQuery.of(context).size.width),
+              crossAxisSpacing: 15,
+              mainAxisSpacing: 15,
+              childAspectRatio: 0.9,
+            ),
             delegate: SliverChildBuilderDelegate(
               (context, index) {
                 final levelData = levels[index];
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 15),
-                  child: LevelCard(
-                    data: levelData,
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => LevelDetailScreen(
-                              levelId: levelData['id'] as int,
-                              levelNumber: levelData['level'] as int),
-                        ),
-                      );
-                    },
-                  ),
+                return LevelCard(
+                  data: levelData,
+                  width: double.infinity,
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => LevelDetailScreen(
+                            levelId: levelData['id'] as int,
+                            levelNumber: levelData['level'] as int),
+                      ),
+                    );
+                  },
                 );
               },
               childCount: levels.length,
@@ -105,21 +111,26 @@ class LevelsMapScreen extends ConsumerWidget {
         );
       },
       loading: () => SliverPadding(
-        padding: const EdgeInsets.fromLTRB(15, 10, 15, 20),
-        sliver: SliverList(
+        padding: const EdgeInsets.fromLTRB(AppSpacing.medium, AppSpacing.small,
+            AppSpacing.medium, AppSpacing.large),
+        sliver: SliverGrid(
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount:
+                _calcCrossAxisCount(MediaQuery.of(context).size.width),
+            crossAxisSpacing: 15,
+            mainAxisSpacing: 15,
+            childAspectRatio: 0.9,
+          ),
           delegate: SliverChildBuilderDelegate(
-            (context, index) => Padding(
-              padding: const EdgeInsets.only(bottom: 15),
-              child: Shimmer.fromColors(
-                baseColor: Colors.grey.shade300,
-                highlightColor: Colors.grey.shade100,
-                child: Container(
-                  width: double.infinity,
-                  height: 290,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
+            (context, index) => Shimmer.fromColors(
+              baseColor: Colors.grey.shade300,
+              highlightColor: Colors.grey.shade100,
+              child: Container(
+                width: double.infinity,
+                height: 290,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
                 ),
               ),
             ),
@@ -134,5 +145,17 @@ class LevelsMapScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  int _calcCrossAxisCount(double width) {
+    if (width < 600) {
+      return 1; // mobile
+    } else if (width < 1024) {
+      return 2; // tablet
+    } else if (width < 1400) {
+      return 3; // small desktop
+    } else {
+      return 4; // large desktop
+    }
   }
 }

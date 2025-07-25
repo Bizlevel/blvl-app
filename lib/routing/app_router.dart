@@ -6,12 +6,15 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/register_screen.dart';
 import '../screens/root_app.dart';
+import '../screens/app_shell.dart';
 import '../providers/auth_provider.dart';
 import '../screens/auth/onboarding_screens.dart';
 import '../screens/auth/onboarding_video_screen.dart';
 import '../screens/profile_screen.dart';
 import '../screens/level_detail_screen.dart';
 import '../screens/premium_screen.dart';
+import '../screens/levels_map_screen.dart';
+import '../screens/leo_chat_screen.dart';
 
 /// Riverpod provider that exposes the [GoRouter] instance used across the app.
 ///
@@ -24,6 +27,31 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       Supabase.instance.client.auth.currentSession;
 
   final initialLocation = session == null ? '/login' : '/home';
+
+  ShellRoute appShell = ShellRoute(
+    builder: (context, state, child) => AppShell(child: child),
+    routes: [
+      GoRoute(
+        path: '/home',
+        builder: (context, state) => const LevelsMapScreen(),
+      ),
+      GoRoute(
+        path: '/chat',
+        builder: (context, state) => const LeoChatScreen(),
+      ),
+      GoRoute(
+        path: '/profile',
+        builder: (context, state) => const ProfileScreen(),
+      ),
+      GoRoute(
+        path: '/levels/:id',
+        builder: (context, state) {
+          final id = int.tryParse(state.pathParameters['id'] ?? '0') ?? 0;
+          return LevelDetailScreen(levelId: id);
+        },
+      ),
+    ],
+  );
 
   return GoRouter(
     initialLocation: initialLocation,
@@ -39,10 +67,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const RegisterScreen(),
       ),
       GoRoute(
-        path: '/home',
-        builder: (context, state) => const RootApp(),
-      ),
-      GoRoute(
         path: '/onboarding/profile',
         builder: (context, state) => const OnboardingProfileScreen(),
       ),
@@ -51,20 +75,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const OnboardingVideoScreen(),
       ),
       GoRoute(
-        path: '/profile',
-        builder: (context, state) => const ProfileScreen(),
-      ),
-      GoRoute(
         path: '/premium',
         builder: (context, state) => const PremiumScreen(),
       ),
-      GoRoute(
-        path: '/levels/:id',
-        builder: (context, state) {
-          final id = int.tryParse(state.pathParameters['id'] ?? '0') ?? 0;
-          return LevelDetailScreen(levelId: id);
-        },
-      ),
+      appShell,
     ],
     redirect: (context, state) {
       final loggedIn = session != null;

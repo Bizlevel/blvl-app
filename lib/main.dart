@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:flutter/foundation.dart';
+import 'compat/url_strategy_noop.dart'
+    if (dart.library.html) 'package:flutter_web_plugins/flutter_web_plugins.dart';
 import 'package:responsive_framework/responsive_framework.dart';
 import 'package:uni_links/uni_links.dart';
 import 'dart:async';
@@ -19,6 +21,11 @@ import 'package:hive_flutter/hive_flutter.dart';
 Future<void> main() async {
   // КРИТИЧНО для web: Все инициализации должны быть в одной зоне
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Чистые URL без # — только для Web
+  if (kIsWeb) {
+    setUrlStrategy(PathUrlStrategy());
+  }
 
   // Загружаем переменные окружения (если файл есть)
   try {
@@ -78,17 +85,36 @@ class MyApp extends ConsumerWidget {
       router: router,
       child: MaterialApp.router(
         routerConfig: router,
-        builder: (context, child) => ResponsiveWrapper.builder(
-          BouncingScrollWrapper.builder(context, child!),
-          maxWidth: 480,
-          minWidth: 320,
-          defaultScale: true,
-          breakpoints: const [
-            ResponsiveBreakpoint.resize(320, name: MOBILE),
-            ResponsiveBreakpoint.autoScale(600, name: TABLET),
-            ResponsiveBreakpoint.autoScale(800, name: DESKTOP),
-          ],
-        ),
+        builder: (context, child) {
+          // создаём ResponsiveWrapper как обычно
+          final wrapped = ResponsiveWrapper.builder(
+            BouncingScrollWrapper.builder(context, child!),
+            minWidth: 320,
+            defaultScale: true,
+            breakpoints: const [
+              ResponsiveBreakpoint.resize(320, name: MOBILE),
+              ResponsiveBreakpoint.autoScale(600, name: TABLET),
+              ResponsiveBreakpoint.autoScale(1024, name: DESKTOP),
+            ],
+          );
+
+          // увеличиваем базовый размер шрифта на desktop (>=1024)
+          final bool isDesktop = MediaQuery.of(context).size.width >= 1024;
+          final textTheme = Theme.of(context).textTheme;
+          final scaledTextTheme = isDesktop
+              ? textTheme.copyWith(
+                  displayLarge: textTheme.displayLarge?.copyWith(
+                      fontSize: (textTheme.displayLarge?.fontSize ?? 24) + 2),
+                  bodyMedium: textTheme.bodyMedium?.copyWith(
+                      fontSize: (textTheme.bodyMedium?.fontSize ?? 14) + 2),
+                )
+              : textTheme;
+
+          return Theme(
+            data: Theme.of(context).copyWith(textTheme: scaledTextTheme),
+            child: wrapped,
+          );
+        },
         debugShowCheckedModeBanner: false,
         title: 'BizLevel',
         theme: ThemeData(

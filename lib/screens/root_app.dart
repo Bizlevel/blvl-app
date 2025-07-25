@@ -6,6 +6,8 @@ import 'package:online_course/theme/color.dart';
 import 'package:online_course/utils/constant.dart';
 import 'package:online_course/widgets/bottombar_item.dart';
 import 'package:online_course/screens/levels_map_screen.dart';
+import 'package:responsive_framework/responsive_framework.dart';
+import 'package:online_course/widgets/desktop_nav_bar.dart';
 
 // Provider to hold index of active tab
 final _rootTabProvider = StateProvider<int>((ref) => 0);
@@ -31,14 +33,37 @@ class RootApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final activeTab = ref.watch(_rootTabProvider);
+    final width = MediaQuery.of(context).size.width;
+    // desktop breakpoint >1024 (см. main.dart)
+    final bool isDesktop = width >= 1024;
+
+    final pageWidget = _tabs[activeTab]["page"] as Widget;
 
     return Scaffold(
       backgroundColor: AppColor.appBgColor,
-      bottomNavigationBar: _buildBottomBar(ref, activeTab),
-      body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: ANIMATED_BODY_MS),
-        child: _tabs[activeTab]["page"] as Widget,
-      ),
+      bottomNavigationBar: isDesktop ? null : _buildBottomBar(ref, activeTab),
+      body: isDesktop
+          ? Row(
+              children: [
+                DesktopNavBar(
+                  tabs: _tabs,
+                  activeIndex: activeTab,
+                  onTabSelected: (index) =>
+                      ref.read(_rootTabProvider.notifier).state = index,
+                ),
+                const VerticalDivider(width: 1),
+                Expanded(
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: ANIMATED_BODY_MS),
+                    child: pageWidget,
+                  ),
+                ),
+              ],
+            )
+          : AnimatedSwitcher(
+              duration: const Duration(milliseconds: ANIMATED_BODY_MS),
+              child: pageWidget,
+            ),
     );
   }
 

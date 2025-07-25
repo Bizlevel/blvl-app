@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:online_course/theme/color.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:go_router/go_router.dart';
 
 import 'custom_image.dart';
 
-class LevelCard extends StatelessWidget {
+class LevelCard extends StatefulWidget {
   const LevelCard({
     super.key,
     required this.data,
-    this.width = 280,
+    this.width = double.infinity,
     this.height = 290,
     this.onTap,
   });
@@ -18,32 +20,39 @@ class LevelCard extends StatelessWidget {
   final double height;
   final GestureTapCallback? onTap;
 
-  bool get _isLocked => data["isLocked"] == true;
+  @override
+  State<LevelCard> createState() => _LevelCardState();
+}
+
+class _LevelCardState extends State<LevelCard> {
+  bool _hover = false;
+
+  bool get _isLocked => widget.data["isLocked"] == true;
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    final enableHover = kIsWeb;
+
+    Widget card = GestureDetector(
       onTap: _isLocked
           ? null
           : () {
               HapticFeedback.lightImpact();
-              if (onTap != null) {
-                onTap!();
-              }
+              widget.onTap?.call();
             },
       child: Container(
-        width: width,
-        height: height,
-        padding: const EdgeInsets.all(10),
-        margin: const EdgeInsets.symmetric(vertical: 5),
+        width: widget.width,
+        height: widget.height,
+        padding: const EdgeInsets.all(AppSpacing.medium),
+        margin: const EdgeInsets.symmetric(vertical: AppSpacing.small),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: AppColor.shadowColor.withOpacity(0.1),
-              spreadRadius: 1,
-              blurRadius: 1,
+              color: AppColor.shadowColor.withOpacity(0.1 + (_hover ? 0.1 : 0)),
+              spreadRadius: _hover ? 2 : 1,
+              blurRadius: _hover ? 6 : 1,
               offset: const Offset(1, 1),
             ),
           ],
@@ -52,7 +61,7 @@ class LevelCard extends StatelessWidget {
           children: [
             // Preview image of the level
             CustomImage(
-              data["image"],
+              widget.data["image"],
               width: double.infinity,
               height: 190,
               radius: 15,
@@ -66,6 +75,8 @@ class LevelCard extends StatelessWidget {
             // Level info (title + lessons count)
             Positioned(
               top: 210,
+              left: 0,
+              right: 0,
               child: _buildInfo(),
             ),
             // Locked overlay
@@ -74,6 +85,21 @@ class LevelCard extends StatelessWidget {
         ),
       ),
     );
+
+    if (enableHover) {
+      card = MouseRegion(
+        cursor: _isLocked ? SystemMouseCursors.basic : SystemMouseCursors.click,
+        onEnter: (_) => setState(() => _hover = true),
+        onExit: (_) => setState(() => _hover = false),
+        child: AnimatedScale(
+          scale: _hover ? 1.03 : 1.0,
+          duration: const Duration(milliseconds: 150),
+          child: card,
+        ),
+      );
+    }
+
+    return card;
   }
 
   // ------------------ Widgets ------------------
@@ -98,13 +124,15 @@ class LevelCard extends StatelessWidget {
 
   Widget _buildInfo() {
     return Container(
-      width: width - 20,
+      width: widget.width == double.infinity
+          ? double.infinity
+          : widget.width - AppSpacing.medium,
       padding: const EdgeInsets.fromLTRB(5, 0, 5, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            data["name"],
+            widget.data["name"],
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
@@ -136,7 +164,7 @@ class LevelCard extends StatelessWidget {
         ],
       ),
       child: Text(
-        data["level"].toString(),
+        widget.data["level"].toString(),
         style: const TextStyle(
           color: Colors.white,
           fontWeight: FontWeight.w600,
@@ -155,7 +183,7 @@ class LevelCard extends StatelessWidget {
         ),
         const SizedBox(width: 3),
         Text(
-          "${data["lessons"]} уроков",
+          "${widget.data["lessons"]} уроков",
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: const TextStyle(color: AppColor.labelColor, fontSize: 13),

@@ -4,22 +4,22 @@
 
 ## Этап 19: Улучшение Web-версии
 
-### Задача 19.1: Введение `ResponsiveLayout` и брейк-поинтов
-- **Файлы:** новый `lib/responsive/responsive_layout.dart`, `lib/main.dart`
-- **Компоненты:** `ResponsiveLayout`, `MaterialApp`
+### Задача 19.1: Адаптация `ResponsiveFramework` и брейк-поинтов
+- **Файлы:** `lib/main.dart`
+- **Компоненты:** `ResponsiveWrapper`, `MaterialApp`
 - **Что делать:**
-  1. Создать виджет `ResponsiveLayout` со статическими брейк-поинтами `mobile < 600`, `tablet 600–1024`, `desktop > 1024`.
-  2. Виджет должен выбирать child (`mobile`, `tablet`, `desktop`) на основе `MediaQuery.size.width`.
-  3. Обернуть корневой `MaterialApp` в `ResponsiveLayout`, прокинув подходящий layout-builder вниз по дереву через `InheritedWidget`.
-- **Почему это важно:** Создаёт фундамент для дальнейших адаптивных изменений без дублирования кода.
-- **Проверка результата:** На разных ширинах эмулятора выводится текст «mobile / tablet / desktop» (временные заглушки).
+  1. Удалить ограничение `maxWidth: 480` в конфигурации `ResponsiveWrapper.builder`.
+  2. Задать новые брейк-поинты: `mobile < 600`, `tablet 600–1024`, `desktop > 1024` (использовать `ResponsiveBreakpoint.resize/autoScale`).
+  3. При необходимости прокинуть текущий breakpoint вниз по дереву через `InheritedWidget`/провайдер, **без** создания отдельного `ResponsiveLayout` виджета.
+- **Почему это важно:** Позволяет активировать desktop-layout без дублирования логики и конфликтов с уже используемым `responsive_framework`.
+- **Проверка результата:** При изменении ширины окна `LevelsMapScreen` меняет количество колонок, а в debug-overlay `ResponsiveFramework` отображается корректное название breakpoint.
 
 ### Задача 19.2: Адаптация `RootApp` под desktop (NavigationRail + TopBar)
 - **Файлы:** `lib/screens/root_app.dart`, новый `lib/widgets/desktop_nav_bar.dart`
 - **Компоненты:** `NavigationRail`, `BottomNavigationBar`
 - **Что делать:**
   1. В `RootApp` определить два layout-варианта: `mobile` — как есть, `desktop` — с `NavigationRail` или верхним `MenuBar`.
-  2. Использовать значение из `ResponsiveLayout.of(context)` для выбора варианта.
+  2. Использовать `ResponsiveBreakpoint.of(context).name` (или провайдер из 19.1) для выбора варианта.
   3. Вынести десктоп-навигацию в отдельный виджет `DesktopNavBar`.
 - **Почему это важно:** Десктоп-пользователи ожидают боковую/верхнюю навигацию вместо mobile bottom bar.
 - **Проверка результата:** При ширине окна > 1024 px отображается `NavigationRail`, а нижняя панель скрывается.

@@ -1,11 +1,11 @@
 {
-    "name": "online_course",
-    "short_name": "online_course",
+    "name": "BizLevel",
+    "short_name": "BizLevel",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#f77080",
+    "theme_color": "#f77080",
+    "description": "BizLevel — образовательная платформа с уровнями, видео-уроками и AI-ментором Leo.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

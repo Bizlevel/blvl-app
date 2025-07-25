@@ -81,12 +81,15 @@ class SupabaseService {
     });
   }
 
-  static Future<String?> getArtifactSignedUrl(String relativePath) async {
+  static Future<String?> getArtifactSignedUrl(String path) async {
+    // Если это уже абсолютный URL, возвращаем как есть
+    if (path.startsWith('http')) return path;
+
     return _withRetry(() async {
       try {
         final response = await Supabase.instance.client.storage
             .from('artifacts')
-            .createSignedUrl(relativePath, 60 * 60);
+            .createSignedUrl(path, 60 * 60);
         return response;
       } on StorageException catch (e, st) {
         if ((e.statusCode ?? 0) != 404) {
@@ -106,7 +109,7 @@ class SupabaseService {
         final response = await Supabase.instance.client
             .from('levels')
             .select(
-                'id, number, title, description, image_url, is_free, lessons(count), user_progress(is_completed)')
+                'id, number, title, description, image_url, artifact_title, artifact_description, artifact_url, is_free, lessons(count), user_progress(is_completed)')
             .order('number', ascending: true);
         return (response as List<dynamic>)
             .map((e) => Map<String, dynamic>.from(e as Map))
