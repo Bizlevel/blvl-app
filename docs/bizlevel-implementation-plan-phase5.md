@@ -73,3 +73,81 @@
   3. Проверить через Lighthouse и добиться PWA score > 90.
 - **Почему это важно:** Улучшает возможности установки приложения и повышает рейтинг Lighthouse.
 - **Проверка результата:** Lighthouse PWA аудит показывает зелёные галочки по манифесту.
+
+
+---
+
+## Этап 20: Имплементация по результатам аудита
+
+Этот этап направлен на устранение проблем и реализацию улучшений, выявленных в ходе полного технического аудита проекта. Задачи сгруппированы по приоритету.
+
+#### Задача 20.1: Создание юнит-теста для `PaymentService`
+- **Файлы:** `test/services/payment_service_test.dart` (новый)
+- **Компоненты:** `PaymentService`, `mocktail`
+- **Что делать:**
+  1. Создать моки для `SupabaseClient` и `FunctionsClient`.
+  2. Написать тест для `startCheckout`, который проверяет:
+     - Вызов Edge Function `create-checkout-session` с корректными параметрами.
+     - Возврат `PaymentRedirect` при успешном выполнении.
+     - Генерацию `PaymentFailure` при ошибке.
+- **Почему это важно:** Покрытие тестами критически важной логики монетизации.
+- **Проверка результата:** `flutter test test/services/payment_service_test.dart` выполняется успешно.
+
+#### Задача 20.2: Удаление неиспользуемых ассетов
+- **Файлы:** все файлы в `assets/icons/` и `assets/icons/categories/`
+- **Что делать:**
+  1. Удалить все неиспользуемые SVG-иконки, перечисленные в отчете `КОД_АНАЛИЗ.md`.
+  2. Удалить файл `lib/utils/data.dart`, который содержит тестовые данные.
+  3. Выполнить `flutter pub get`.
+- **Почему это важно:** Уменьшение размера приложения и устранение "мусора" из проекта перед рефакторингом.
+- **Проверка результата:** Проект компилируется, тесты проходят. Поиск удаленных файлов ничего не находит.
+
+#### Задача 20.3: Переименование пакета в `pubspec.yaml` и обновление импортов
+- **Файлы:** `pubspec.yaml`, все `*.dart` файлы в `lib/` и `test/`
+- **Что делать:**
+  1. В `pubspec.yaml` изменить `name: online_course` на `name: bizlevel`.
+  2. Выполнить `flutter pub get`.
+  3. Используя IDE, выполнить глобальный поиск и замену `package:online_course/` на `package:bizlevel/`.
+- **Почему это важно:** Центральный шаг для переименования Flutter-пакета.
+- **Проверка результата:** `flutter analyze` и `flutter test` проходят без ошибок.
+
+#### Задача 20.4: Переименование `applicationId` и `namespace` для Android
+- **Файлы:** `android/app/build.gradle`
+- **Что делать:**
+  1. Изменить `namespace "com.sangvaleap.online_course"` на `namespace "kz.bizlevel.app"`.
+  2. Изменить `applicationId "com.sangvaleap.online_course"` на `applicationId "kz.bizlevel.app"`.
+- **Почему это важно:** Приведение идентификатора Android-приложения в соответствие с новым брендом.
+- **Проверка результата:** Приложение запускается на Android-эмуляторе.
+
+#### Задача 20.5: Рефакторинг пути и контента `MainActivity.kt`
+- **Файлы:** `android/app/src/main/kotlin/com/sangvaleap/online_course/MainActivity.kt`
+- **Что делать:**
+  1. Переместить `MainActivity.kt` в новую директорию: `android/app/src/main/kotlin/kz/bizlevel/app/`.
+  2. В `MainActivity.kt` изменить объявление пакета на `package kz.bizlevel.app`.
+- **Почему это важно:** Путь к файлу и объявление пакета должны соответствовать `applicationId`.
+- **Проверка результата:** Проект успешно собирается для Android.
+
+#### Задача 20.6: Обновление остальных конфигураций Android и iOS
+- **Файлы:** `android/app/src/main/AndroidManifest.xml`, `ios/Runner/Info.plist`, `android/app/proguard-rules.pro`
+- **Что делать:**
+  1. В `AndroidManifest.xml` изменить `android:label="online_course"` на `android:label="BizLevel"`.
+  2. В `ios/Runner/Info.plist` изменить значение `CFBundleName` на `BizLevel`.
+  3. В `android/app/proguard-rules.pro` обновить правило: `-keep class kz.bizlevel.app.** { *; }`.
+- **Почему это важно:** Финализация переименования на нативных платформах.
+- **Проверка результата:** Название приложения "BizLevel" корректно отображается на обоих устройствах.
+
+#### Задача 20.7: Расширение тестового покрытия для репозиториев
+- **Файлы:** `test/repositories/levels_repository_test.dart`, `test/repositories/lessons_repository_test.dart` (новые)
+- **Что делать:**
+  1. Создать юнит-тесты для `LevelsRepository` и `LessonsRepository`.
+  2. Использовать `mocktail` для моков `SupabaseClient` и `Hive`.
+  3. Проверить корректность получения данных и взаимодействия с локальным кешем.
+- **Почему это важно:** Обеспечение надежности слоя данных, включая логику кеширования.
+- **Проверка результата:** Новые тесты успешно проходят.
+
+#### Задача 20.8: Оптимизация конфигурации Sentry
+- **Файлы:** `lib/main.dart`
+- **Что делать:**
+  1. Внутри `SentryFlutter.init` изменить `..tracesSampleRate = 1.0` на `..tracesSampleRate = kReleaseMode ? 0.3 : 1.0`.
+- **Почему это важно:** Снижение затрат на Sentry в production, сохраняя полную трассировку для разработки.
+- **Проверка результата:** Изменение внесено корректно.

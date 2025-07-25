@@ -200,3 +200,6 @@ Bugfixes 17.07: QuizWidget: добавлена кнопка «Попробова
 
 Fix iOS build: добавлен conditional stub url_strategy_noop.dart и условный импорт в main.dart, чтобы dart:ui_web не подключался на iOS.
 
+# Этап 20: Имплементация по результатам аудита
+Задача 20.1: добавлены PaymentRedirect/PaymentFailure, обновлён PaymentService, PremiumScreen адаптирован, создан юнит-тест test/services/payment_service_test.dart (mocktail). Все тесты проходят локально.
+

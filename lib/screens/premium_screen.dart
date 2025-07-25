@@ -19,9 +19,14 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
     setState(() => _isLoading = true);
     try {
       final paymentService = PaymentService(Supabase.instance.client);
-      final url = await paymentService.startCheckout(amount: 9990);
+      final redirect = await paymentService.startCheckout(amount: 9990);
       if (!mounted) return;
-      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+      await launchUrl(Uri.parse(redirect.url),
+          mode: LaunchMode.externalApplication);
+    } on PaymentFailure catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
