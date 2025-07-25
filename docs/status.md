@@ -206,4 +206,5 @@ Fix iOS build: добавлен conditional stub url_strategy_noop.dart и ус�
 Задача 20.3: переименован пакет в pubspec.yaml на bizlevel, заменены все импорты package:online_course/→package:bizlevel/.
 Задача 20.4: namespace и applicationId в android/app/build.gradle изменены на kz.bizlevel.app.
 Задача 20.6: обновлены AndroidManifest (package, label), Info.plist (CFBundleName=BizLevel), proguard rule под новый namespace.
+Задача 20.7: добавлены юнит-тесты levels_repository_test.dart и lessons_repository_test.dart (Hive in-memory, mock SupabaseClient) – проверяют кеш и offline сценарии.
 
