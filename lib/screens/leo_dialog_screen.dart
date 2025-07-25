@@ -3,10 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:online_course/providers/leo_service_provider.dart';
-import 'package:online_course/theme/color.dart';
-import 'package:online_course/widgets/leo_message_bubble.dart';
-import 'package:online_course/services/leo_service.dart';
+import 'package:bizlevel/providers/leo_service_provider.dart';
+import 'package:bizlevel/theme/color.dart';
+import 'package:bizlevel/widgets/leo_message_bubble.dart';
+import 'package:bizlevel/services/leo_service.dart';
 
 /// Dialog screen for chatting with Leo assistant.
 /// Supports pagination (30 messages per page), unread counter reset,

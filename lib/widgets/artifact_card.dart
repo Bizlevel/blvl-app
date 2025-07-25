@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:online_course/theme/color.dart';
-import 'package:online_course/widgets/custom_image.dart';
+import 'package:bizlevel/theme/color.dart';
+import 'package:bizlevel/widgets/custom_image.dart';
 
 class ArtifactCard extends StatelessWidget {
   const ArtifactCard({

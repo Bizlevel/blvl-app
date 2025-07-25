@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:online_course/theme/color.dart';
-import 'package:online_course/widgets/bottombar_item.dart';
-import 'package:online_course/widgets/desktop_nav_bar.dart';
+import 'package:bizlevel/theme/color.dart';
+import 'package:bizlevel/widgets/bottombar_item.dart';
+import 'package:bizlevel/widgets/desktop_nav_bar.dart';
 
 class AppShell extends ConsumerWidget {
   final Widget child;

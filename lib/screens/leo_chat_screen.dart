@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:online_course/providers/leo_service_provider.dart';
-import 'package:online_course/widgets/chat_item.dart';
-import 'package:online_course/screens/leo_dialog_screen.dart';
+import 'package:bizlevel/providers/leo_service_provider.dart';
+import 'package:bizlevel/widgets/chat_item.dart';
+import 'package:bizlevel/screens/leo_dialog_screen.dart';
 
 class LeoChatScreen extends ConsumerStatefulWidget {
   const LeoChatScreen({super.key});

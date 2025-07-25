@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:online_course/theme/color.dart';
-import 'package:online_course/widgets/custom_image.dart';
+import 'package:bizlevel/theme/color.dart';
+import 'package:bizlevel/widgets/custom_image.dart';
 
 class RecommendItem extends StatelessWidget {
   const RecommendItem({

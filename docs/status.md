@@ -203,4 +203,5 @@ Fix iOS build: добавлен conditional stub url_strategy_noop.dart и ус�
 # Этап 20: Имплементация по результатам аудита
 Задача 20.1: добавлены PaymentRedirect/PaymentFailure, обновлён PaymentService, PremiumScreen адаптирован, создан юнит-тест test/services/payment_service_test.dart (mocktail). Все тесты проходят локально.
 Задача 20.2: удалены неиспользуемые SVG-иконки (7 шт. + 9 категорий), удалён lib/utils/data.dart, строка categories в pubspec.yaml убрана.
+Задача 20.3: переименован пакет в pubspec.yaml на bizlevel, заменены все импорты package:online_course/→package:bizlevel/.
 

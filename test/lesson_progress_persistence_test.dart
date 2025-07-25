@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:online_course/providers/lesson_progress_provider.dart';
+import 'package:bizlevel/providers/lesson_progress_provider.dart';
 
 void main() {
   group('Requirement 4 – Progress persistence', () {

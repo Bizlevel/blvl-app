@@ -3,10 +3,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:online_course/models/lesson_model.dart';
-import 'package:online_course/screens/level_detail_screen.dart';
-import 'package:online_course/providers/lessons_provider.dart';
-import 'package:online_course/providers/lesson_progress_provider.dart';
+import 'package:bizlevel/models/lesson_model.dart';
+import 'package:bizlevel/screens/level_detail_screen.dart';
+import 'package:bizlevel/providers/lessons_provider.dart';
+import 'package:bizlevel/providers/lesson_progress_provider.dart';
 import 'package:flutter/widgets.dart';
 
 void main() {

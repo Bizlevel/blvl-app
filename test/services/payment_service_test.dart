@@ -2,7 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'package:online_course/services/payment_service.dart';
+import 'package:bizlevel/services/payment_service.dart';
 
 class _MockSupabaseClient extends Mock implements SupabaseClient {}
 

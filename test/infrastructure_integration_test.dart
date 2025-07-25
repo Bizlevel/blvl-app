@@ -2,12 +2,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'package:online_course/models/user_model.dart';
-import 'package:online_course/models/level_model.dart';
-import 'package:online_course/models/lesson_model.dart';
-import 'package:online_course/services/auth_service.dart';
-import 'package:online_course/services/supabase_service.dart';
-import 'package:online_course/providers/auth_provider.dart';
+import 'package:bizlevel/models/user_model.dart';
+import 'package:bizlevel/models/level_model.dart';
+import 'package:bizlevel/models/lesson_model.dart';
+import 'package:bizlevel/services/auth_service.dart';
+import 'package:bizlevel/services/supabase_service.dart';
+import 'package:bizlevel/providers/auth_provider.dart';
 
 @Skip('integration test – requires network')
 void main() {

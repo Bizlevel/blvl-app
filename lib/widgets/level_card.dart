@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:online_course/theme/color.dart';
+import 'package:bizlevel/theme/color.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:go_router/go_router.dart';

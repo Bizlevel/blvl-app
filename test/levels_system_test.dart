@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:online_course/providers/levels_provider.dart';
-import 'package:online_course/providers/lessons_provider.dart';
-import 'package:online_course/screens/level_detail_screen.dart';
-import 'package:online_course/screens/levels_map_screen.dart';
-import 'package:online_course/widgets/level_card.dart';
+import 'package:bizlevel/providers/levels_provider.dart';
+import 'package:bizlevel/providers/lessons_provider.dart';
+import 'package:bizlevel/screens/level_detail_screen.dart';
+import 'package:bizlevel/screens/levels_map_screen.dart';
+import 'package:bizlevel/widgets/level_card.dart';
 
 void main() {
   group('Levels system', () {

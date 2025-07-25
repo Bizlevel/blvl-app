@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:online_course/theme/color.dart';
-import 'package:online_course/providers/auth_provider.dart';
-import 'package:online_course/providers/levels_provider.dart';
-import 'package:online_course/widgets/level_card.dart';
-import 'package:online_course/widgets/notification_box.dart';
+import 'package:bizlevel/theme/color.dart';
+import 'package:bizlevel/providers/auth_provider.dart';
+import 'package:bizlevel/providers/levels_provider.dart';
+import 'package:bizlevel/widgets/level_card.dart';
+import 'package:bizlevel/widgets/notification_box.dart';
 import 'package:shimmer/shimmer.dart';
-import 'package:online_course/screens/level_detail_screen.dart';
+import 'package:bizlevel/screens/level_detail_screen.dart';
 
 class LevelsMapScreen extends ConsumerWidget {
   const LevelsMapScreen({super.key});

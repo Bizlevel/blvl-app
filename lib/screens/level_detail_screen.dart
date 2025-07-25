@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:online_course/models/lesson_model.dart';
-import 'package:online_course/providers/lessons_provider.dart';
-import 'package:online_course/theme/color.dart';
-import 'package:online_course/services/supabase_service.dart';
+import 'package:bizlevel/models/lesson_model.dart';
+import 'package:bizlevel/providers/lessons_provider.dart';
+import 'package:bizlevel/theme/color.dart';
+import 'package:bizlevel/services/supabase_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:online_course/providers/lesson_progress_provider.dart';
-import 'package:online_course/widgets/lesson_widget.dart';
-import 'package:online_course/widgets/floating_chat_bubble.dart';
-import 'package:online_course/widgets/quiz_widget.dart';
+import 'package:bizlevel/providers/lesson_progress_provider.dart';
+import 'package:bizlevel/widgets/lesson_widget.dart';
+import 'package:bizlevel/widgets/floating_chat_bubble.dart';
+import 'package:bizlevel/widgets/quiz_widget.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:online_course/providers/levels_provider.dart';
-import 'package:online_course/providers/levels_repository_provider.dart';
+import 'package:bizlevel/providers/levels_provider.dart';
+import 'package:bizlevel/providers/levels_repository_provider.dart';
 
 /// Shows a level as full-screen blocks (Intro → Lesson → Quiz → …).
 class LevelDetailScreen extends ConsumerStatefulWidget {

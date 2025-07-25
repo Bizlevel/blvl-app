@@ -4,10 +4,10 @@ import 'package:mocktail/mocktail.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'package:online_course/screens/auth/login_screen.dart';
-import 'package:online_course/services/auth_service.dart';
-import 'package:online_course/providers/auth_provider.dart';
-import 'package:online_course/providers/login_controller.dart';
+import 'package:bizlevel/screens/auth/login_screen.dart';
+import 'package:bizlevel/services/auth_service.dart';
+import 'package:bizlevel/providers/auth_provider.dart';
+import 'package:bizlevel/providers/login_controller.dart';
 
 // -------------------- Моки --------------------
 class MockAuthService extends Mock implements AuthService {}

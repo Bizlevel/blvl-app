@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:online_course/utils/deep_link.dart';
+import 'package:bizlevel/utils/deep_link.dart';
 
 void main() {
   group('Deep link mapping', () {

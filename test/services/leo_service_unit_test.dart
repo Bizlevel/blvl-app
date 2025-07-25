@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:online_course/services/leo_service.dart';
+import 'package:bizlevel/services/leo_service.dart';
 
 // -------------------- Моки --------------------
 class MockSupabaseClient extends Mock implements SupabaseClient {}

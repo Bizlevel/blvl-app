@@ -2,9 +2,9 @@ import 'dart:math';
 
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:online_course/services/auth_service.dart';
+import 'package:bizlevel/services/auth_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:online_course/services/supabase_service.dart'; // for initialize
+import 'package:bizlevel/services/supabase_service.dart'; // for initialize
 
 void main() {
   late AuthService authService;

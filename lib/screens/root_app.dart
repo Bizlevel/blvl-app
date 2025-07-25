@@ -1,13 +1,13 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/material.dart';
-import 'package:online_course/screens/profile_screen.dart';
-import 'package:online_course/screens/leo_chat_screen.dart';
-import 'package:online_course/theme/color.dart';
-import 'package:online_course/utils/constant.dart';
-import 'package:online_course/widgets/bottombar_item.dart';
-import 'package:online_course/screens/levels_map_screen.dart';
+import 'package:bizlevel/screens/profile_screen.dart';
+import 'package:bizlevel/screens/leo_chat_screen.dart';
+import 'package:bizlevel/theme/color.dart';
+import 'package:bizlevel/utils/constant.dart';
+import 'package:bizlevel/widgets/bottombar_item.dart';
+import 'package:bizlevel/screens/levels_map_screen.dart';
 import 'package:responsive_framework/responsive_framework.dart';
-import 'package:online_course/widgets/desktop_nav_bar.dart';
+import 'package:bizlevel/widgets/desktop_nav_bar.dart';
 
 // Provider to hold index of active tab
 final _rootTabProvider = StateProvider<int>((ref) => 0);

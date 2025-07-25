@@ -1,19 +1,19 @@
 // Vimeo/WebView support
-import 'package:online_course/providers/lessons_repository_provider.dart';
+import 'package:bizlevel/providers/lessons_repository_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:chewie/chewie.dart';
 import 'package:flutter/foundation.dart'
     show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
-import 'package:online_course/models/lesson_model.dart';
+import 'package:bizlevel/models/lesson_model.dart';
 import 'package:video_player/video_player.dart';
-import 'package:online_course/compat/webview_stub.dart'
+import 'package:bizlevel/compat/webview_stub.dart'
     if (dart.library.io) 'package:webview_flutter/webview_flutter.dart';
-import 'package:online_course/compat/ui_stub.dart'
+import 'package:bizlevel/compat/ui_stub.dart'
     if (dart.library.html) 'dart:ui_web' as ui;
 // ignore: avoid_web_libraries_in_flutter
-import 'package:online_course/compat/html_stub.dart'
+import 'package:bizlevel/compat/html_stub.dart'
     if (dart.library.html) 'dart:html' as html;
 
 class LessonWidget extends ConsumerStatefulWidget {

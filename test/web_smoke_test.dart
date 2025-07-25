@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 
-import 'package:online_course/models/lesson_model.dart';
-import 'package:online_course/widgets/lesson_widget.dart';
+import 'package:bizlevel/models/lesson_model.dart';
+import 'package:bizlevel/widgets/lesson_widget.dart';
 import 'package:flutter/widgets.dart';
 
 void main() {

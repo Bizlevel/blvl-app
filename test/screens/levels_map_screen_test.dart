@@ -3,9 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
-import 'package:online_course/providers/levels_repository_provider.dart';
-import 'package:online_course/screens/levels_map_screen.dart';
-import 'package:online_course/repositories/levels_repository.dart';
+import 'package:bizlevel/providers/levels_repository_provider.dart';
+import 'package:bizlevel/screens/levels_map_screen.dart';
+import 'package:bizlevel/repositories/levels_repository.dart';
 
 // -------------------- Моки --------------------
 class MockLevelsRepository extends Mock implements LevelsRepository {}

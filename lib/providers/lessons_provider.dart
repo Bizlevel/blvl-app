@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:online_course/models/lesson_model.dart';
-import 'package:online_course/providers/lessons_repository_provider.dart';
+import 'package:bizlevel/models/lesson_model.dart';
+import 'package:bizlevel/providers/lessons_repository_provider.dart';
 
 /// Provides list of lessons for a given levelId.
 final lessonsProvider =

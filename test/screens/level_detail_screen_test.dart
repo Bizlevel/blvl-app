@@ -4,9 +4,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:online_course/screens/level_detail_screen.dart';
-import 'package:online_course/providers/lessons_repository_provider.dart';
-import 'package:online_course/repositories/lessons_repository.dart';
+import 'package:bizlevel/screens/level_detail_screen.dart';
+import 'package:bizlevel/providers/lessons_repository_provider.dart';
+import 'package:bizlevel/repositories/lessons_repository.dart';
 
 // -------------------- Моки --------------------
 class MockLessonsRepository extends Mock implements LessonsRepository {}

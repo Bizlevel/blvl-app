@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:online_course/models/user_model.dart';
-import 'package:online_course/providers/auth_provider.dart';
-import 'package:online_course/providers/levels_provider.dart';
-import 'package:online_course/screens/payment_screen.dart';
-import 'package:online_course/screens/profile_screen.dart';
-import 'package:online_course/screens/root_app.dart';
-import 'package:online_course/widgets/artifact_card.dart';
-import 'package:online_course/widgets/bottombar_item.dart';
+import 'package:bizlevel/models/user_model.dart';
+import 'package:bizlevel/providers/auth_provider.dart';
+import 'package:bizlevel/providers/levels_provider.dart';
+import 'package:bizlevel/screens/payment_screen.dart';
+import 'package:bizlevel/screens/profile_screen.dart';
+import 'package:bizlevel/screens/root_app.dart';
+import 'package:bizlevel/widgets/artifact_card.dart';
+import 'package:bizlevel/widgets/bottombar_item.dart';
 
 void main() {
   group('Profile & Monetization', () {

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:online_course/theme/color.dart';
+import 'package:bizlevel/theme/color.dart';
 
 class CategoryBox extends StatelessWidget {
   const CategoryBox({

@@ -1,5 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:online_course/services/leo_service.dart';
+import 'package:bizlevel/services/leo_service.dart';
 import 'auth_provider.dart';
 
 /// DI-провайдер для [LeoService].
