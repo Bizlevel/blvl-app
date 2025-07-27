@@ -1,11 +1,26 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:bizlevel/models/level_model.dart';
 import 'package:bizlevel/providers/levels_repository_provider.dart';
+import 'package:bizlevel/providers/subscription_provider.dart';
+import 'package:bizlevel/providers/auth_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Provides список уровней с учётом прогресса пользователя.
 final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final repo = ref.watch(levelsRepositoryProvider);
+
+  // Информация о пользователе и подписке
+  final currentUserAsync = ref.watch(currentUserProvider);
+  final subscriptionAsync = ref.watch(subscriptionProvider);
+
+  bool hasPremium = false;
+  if (currentUserAsync is AsyncData) {
+    hasPremium = currentUserAsync.value?.isPremium ?? false;
+  }
+  if (subscriptionAsync is AsyncData<String?>) {
+    hasPremium = hasPremium || (subscriptionAsync.value == 'active');
+  }
+
   final userId = Supabase.instance.client.auth.currentUser?.id;
   final rows = await repo.fetchLevels(userId: userId);
 
@@ -28,8 +43,8 @@ final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
     if (level.number == 1) {
       isAccessible = true;
     } else if (!level.isFree && level.number > 3) {
-      // Премиум лимит
-      isAccessible = false;
+      // Премиум уровни открываются только при активной подписке/флаге
+      isAccessible = hasPremium && previousCompleted;
     } else {
       isAccessible = previousCompleted;
     }
