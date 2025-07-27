@@ -1,27 +1,60 @@
-# Online Course App - Flutter
+# BizLevel – образовательная платформа с уровнями
 
-The application serves as a platform that facilitates the creation, delivery, and management of educational content over the Internet. The purpose of such applications is to provide a digital environment for learners and instructors to engage in online learning experiences. The users (learners) find it easier to access course materials and participate in classes from any location with an internet connection, offering flexibility in learning schedules.
+BizLevel — это мобильное и веб-приложение (Flutter + Supabase), где пользователи последовательно проходят уровни по бизнес-темам, смотрят короткие видео-уроки, решают квизы и общаются с AI-ментором Leo.
 
-By this version, features include:
-- List of Courses: this module allows users to view a list of courses by category.
-- Course Detail: this module allows users to view the course's information including its objective, lessons, timeline, reviews, price, etc.
-- Course Tracking: this module allows users to view their in-progress and completed courses.
-- Chat with Instructors: this module allows users to chat directly with the course owner/instructor in real-time.
-- Settings Page: this module allows users to manage the settings of their account in the application such as stat, payment, notifications, privacy and security, and theme.
+## Ключевые возможности
 
-# Development Setup
+| Модуль | Описание |
+|--------|----------|
+| Карта уровней | 10+ уровней, открываются по порядку. Бесплатны первые 3, остальные доступны по подписке. |
+| Видео-уроки | Вертикальный формат 9:16, офлайн-кэширование, безопасные signed URL из Supabase Storage. |
+| Квизы | Проверка понимания материала, логика разблокировки следующего урока. |
+| AI-ментор Leo | Edge Function + OpenAI, персональный контекст, лимиты сообщений по тарифу. |
+| Профиль | Статистика прогресса, выбор аватара, скачивание артефактов уровня. |
+| Подписка Premium | Edge Function create-checkout-session, Stripe/Kaspi mock, разблокировка контента. |
+| PWA/Web | Адаптивный layout (Responsive Framework), чистые URL, Lighthouse 90+. |
+| Sentry & CI | Полный трейс в dev, 30 % в prod; GitHub Actions запускает тесты и nightly storage-integrity-check. |
 
-- flutter pub get
-- flutter run
+## Технологии
 
-# Links
-- Preview video: https://youtu.be/DAdxI8mrTjI
-- Support my work: https://www.patreon.com/sangvaleap
-- My Twitter: https://twitter.com/sangvaleap
+* **Flutter 3.22** (Web, iOS, Android)
+* **Supabase** (Postgres + Storage + Edge Functions)
+* Riverpod 2, GoRouter, Hive, Sentry, mocktail
+* CI — GitHub Actions с кешем Gradle/CocoaPods
 
-<img width="600" alt="Screen Shot 2022-02-16 at 8 28 31 PM" src="https://user-images.githubusercontent.com/86506519/154279567-9b5677dd-984a-4096-8112-e02fbf5bab50.png">
-<img width="600" alt="Screen Shot 2022-02-16 at 8 28 53 PM" src="https://user-images.githubusercontent.com/86506519/154279582-a65b4792-3ed3-4b3c-8fc1-fb4b694224e7.png">
-<img width="600" alt="Screen Shot 2022-02-16 at 8 29 57 PM" src="https://user-images.githubusercontent.com/86506519/154279596-f5117821-fbe4-47d3-aef5-0ec75674ac04.png">
-<img width="600" alt="Screen Shot 2022-02-16 at 8 29 10 PM" src="https://user-images.githubusercontent.com/86506519/154279590-66ae8b8b-f70a-4f69-857e-f7c35129410a.png">
-<img width="600" alt="Screen Shot 2022-02-16 at 8 30 26 PM" src="https://user-images.githubusercontent.com/86506519/154279603-13a425c8-0b9a-4e53-a8ba-17ae40fc4035.png">
-<img width="596" alt="Screen Shot 2022-02-16 at 8 30 44 PM" src="https://user-images.githubusercontent.com/86506519/154279628-e180bcc9-d225-46f6-8b1a-879bf4d99a2b.png">
+## Быстрый старт
+
+```bash
+# 1. Клонируем репозиторий
+git clone https://github.com/Yerlanalim/blvl-flutter-1007-2.git
+cd blvl-flutter-1007-2
+
+# 2. Устанавливаем зависимости
+flutter pub get
+
+# 3. Запускаем (выберите нужную платформу)
+flutter run -d chrome     # Web
+flutter run -d ios        # iOS
+flutter run -d android    # Android
+```
+
+> Перед запуском убедитесь, что переменные окружения `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SENTRY_DSN` заданы через `.env` или `--dart-define`.
+
+## Структура репозитория (выдержка)
+
+```
+lib/
+  models/         – Freezed-модели
+  services/       – Supabase, Auth, Payment, Leo
+  providers/      – Riverpod-состояние
+  repositories/   – Кэш + RLS-запросы
+  screens/        – UI-экраны
+  widgets/        – Переиспользуемые компоненты
+supabase/
+  functions/      – Edge Functions (leo-chat, create-checkout-session, storage-integrity-check)
+  migrations/     – SQL-миграции схемы и безопасные функции
+```
+
+## Лицензия
+
+MIT © BizLevel Team
