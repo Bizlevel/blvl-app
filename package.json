@@ -1,0 +1,9 @@
+{
+  "name": "bizlevel-web",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "vercel-build": "bash ./scripts/vercel_build.sh"
+  },
+  "devDependencies": {}
+} 
