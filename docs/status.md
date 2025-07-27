@@ -208,4 +208,5 @@ Fix iOS build: добавлен conditional stub url_strategy_noop.dart и ус�
 Задача 20.6: обновлены AndroidManifest (package, label), Info.plist (CFBundleName=BizLevel), proguard rule под новый namespace.
 Задача 20.7: добавлены юнит-тесты levels_repository_test.dart и lessons_repository_test.dart (Hive in-memory, mock SupabaseClient) – проверяют кеш и offline сценарии.
 Задача 20.8: оптимизирован Sentry – tracesSampleRate теперь kReleaseMode ? 0.3 : 1.0 в main.dart.
+Проведен пост-аудит этапа 20: задачи 20.1–20.8 реализованы, критических недочётов не выявлено.
 
