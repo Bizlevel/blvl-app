@@ -190,27 +190,27 @@
 
 #### Задача 21.3: Обложки уровней в Supabase Storage
 - **Файлы:** миграция `supabase/migrations/20250801_add_cover_path_to_levels.sql`, `lib/repositories/levels_repository.dart`
-- **Компоненты:** таблица `levels.cover_path`, bucket `level_covers`
+- **Компоненты:** таблица `levels.cover_path`, bucket `level-covers`
 - **Что делать:**
   1. Добавить колонку `cover_path TEXT` и RLS-правила.
-  2. Загрузить изображения `level_<id>.jpg` в bucket `level_covers`.
+  2. Загрузить изображения `level_<id>.jpg` в bucket `level-covers`.
   3. В `LevelsRepository` запрашивать подписанный URL для `cover_path`.
 - **Почему это важно:** Визуальное различие уровней и привлекательность контента.
 - **Проверка результата:** На карте уровней отображаются реальные обложки.
 
 #### Задача 21.4: Выбор аватара из набора
-- **Файлы:** `assets/images/avatars/` (10 PNG/SVG), `pubspec.yaml`, `lib/screens/profile_screen.dart`, `lib/services/auth_service.dart`, миграция Supabase (`avatar_id` INT)
+- **Файлы:** `assets/images/avatars/` (7 PNG/SVG), `pubspec.yaml`, `lib/screens/profile_screen.dart`, `lib/services/auth_service.dart`, миграция Supabase (`avatar_id` INT)
 - **Компоненты:** сетка выбора, сохранение ID
 - **Что делать:**
-  1. Подготовить 10 иллюстративных аватаров (например, generatedavatars.io / DiceBear) и положить в `assets/images/avatars/` с именами `avatar_0.png` … `avatar_9.png`; добавить в `pubspec.yaml`.
+  1. Подготовить 7 иллюстративных аватаров (например, generatedavatars.io / DiceBear) и положить в `assets/images/avatars/` с именами `avatar_1.png` … `avatar_7.png`; добавить в `pubspec.yaml`.
   2. В `ProfileScreen` отобразить модальное окно/BottomSheet с `GridView` аватаров; выбранный отмечается рамкой.
-  3. При выборе сохранять `avatar_id` (0–9) в колонку `users.avatar_id` (INT) вместо загрузки файла.
+  3. При выборе сохранять `avatar_id` (1–7) в колонку `users.avatar_id` (INT) вместо загрузки файла.
   4. При отображении профиля показывать картинку по `avatar_id`; если null — показывать placeholder.
 - **Почему это важно:** Избавляет от сложностей загрузки файлов и даёт быстрый выбор, подходящий для MVP.
-- **Проверка результата:** Пользователь выбирает один из 10 аватаров, изображение сохраняется и отображается после перезапуска.
+- **Проверка результата:** Пользователь выбирает один из 7 аватаров, изображение сохраняется и отображается после перезапуска.
 
 #### Задача 21.5: Интеграция логотипа BizLevel
-- **Файлы:** `assets/images/logo_dark.png`, `assets/images/logo_light.png`, `pubspec.yaml`, `lib/screens/auth/login_screen.dart`, `lib/screens/root_app.dart`, `android/app/src/main/res/drawable-v21/launch_background.xml`, `ios/Runner/Assets.xcassets/LaunchImage.imageset`
+- **Файлы:** `assets/images/logo_light.png`, `pubspec.yaml`, `lib/screens/auth/login_screen.dart`, `lib/screens/root_app.dart`, `android/app/src/main/res/drawable-v21/launch_background.xml`, `ios/Runner/Assets.xcassets/LaunchImage.imageset`
 - **Компоненты:** логотип на сплэш, в AppBar и Login
 - **Что делать:**
   1. Добавить логотипы в assets и подключить в `pubspec.yaml`.

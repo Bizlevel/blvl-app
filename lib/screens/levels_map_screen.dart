@@ -41,8 +41,13 @@ class LevelsMapScreen extends ConsumerWidget {
     });
 
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
+        Image.asset(
+          'assets/images/logo_light.png',
+          width: 32,
+          height: 32,
+        ),
+        const SizedBox(width: 12),
         Expanded(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,

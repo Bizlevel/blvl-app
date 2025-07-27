@@ -60,4 +60,6 @@ flutter:
   assets:
     - assets/icons/
     - assets/images/onboarding/
+    - assets/images/avatars/
+    - assets/images/
     - .env

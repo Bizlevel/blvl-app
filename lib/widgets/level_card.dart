@@ -29,6 +29,24 @@ class _LevelCardState extends State<LevelCard> {
 
   bool get _isLocked => widget.data["isLocked"] == true;
 
+  bool get _isPremium => widget.data["isPremium"] == true;
+
+  /// Выбор градиента по номеру уровня и флагу премиума
+  LinearGradient _selectGradient() {
+    if (_isPremium) {
+      return AppColor.levelGradients[4]; // премиум
+    }
+
+    final int level = (widget.data["level"] ?? 1) as int;
+    if (level <= 3) {
+      return AppColor.levelGradients[0];
+    }
+
+    // Advanced уровни 4–10 распределяем по трём градиентам 1..3
+    final int advancedIndex = ((level - 4) % 3) + 1;
+    return AppColor.levelGradients[advancedIndex];
+  }
+
   @override
   Widget build(BuildContext context) {
     final enableHover = kIsWeb;
@@ -46,7 +64,7 @@ class _LevelCardState extends State<LevelCard> {
         padding: const EdgeInsets.all(AppSpacing.medium),
         margin: const EdgeInsets.symmetric(vertical: AppSpacing.small),
         decoration: BoxDecoration(
-          color: Colors.white,
+          gradient: _selectGradient(),
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(

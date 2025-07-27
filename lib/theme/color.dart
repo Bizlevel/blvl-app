@@ -1,44 +1,71 @@
 import 'package:flutter/material.dart';
 
 class AppColor {
-  static const primary = Color(0xFFf77080);
-  static const secondary = Color(0xFFe96561);
+  static const primary = Color(0xFF4338CA);
+  // --- BizLevel brand palette (21.1) ---
+  static const success = Color(0xFF10B981);
+  static const premium = Color(0xFFF59E0B);
+  static const error = Color(0xFFDC2626);
+  static const info = Color(0xFF3B82F6);
+  static const warning = Color(0xFFF59E0B);
 
-  static const mainColor = Color(0xFF000000);
-  static const darker = Color(0xFF3E4249);
+  static const darker = Color(0xFF475569);
   static const cardColor = Colors.white;
-  static const appBgColor = Color(0xFFF7F7F7);
-  static const appBarColor = Color(0xFFF7F7F7);
+  static const appBgColor = Color(0xFFFAFBFC);
+  static const appBarColor = Color(0xFFF1F5F9);
   static const bottomBarColor = Colors.white;
   static const inActiveColor = Colors.grey;
-  static const shadowColor = Colors.black87;
+  static const shadowColor = Colors.black12;
   static const textBoxColor = Colors.white;
-  static const textColor = Color(0xFF333333);
+  static const textColor = Color(0xFF0F172A);
   static const glassTextColor = Colors.white;
-  static const labelColor = Color(0xFF8A8989);
+  static const labelColor = Color(0xFF94A3B8);
   static const glassLabelColor = Colors.white;
-  static const actionColor = Color(0xFFe54140);
+  static const borderColor = Color(0xFFCBD5E1);
+  static const dividerColor = Color(0xFFE2E8F0);
 
-  static const yellow = Color(0xFFffcb66);
-  static const green = Color(0xFFa2e1a6);
-  static const pink = Color(0xFFf5bde8);
-  static const purple = Color(0xFFcdacf9);
-  static const red = Color(0xFFf77080);
-  static const orange = Color(0xFFf5ba92);
-  static const sky = Color(0xFFABDEE6);
-  static const blue = Color(0xFF509BE4);
+  // ---- Backward-compatibility aliases (to мигрировать позднее) ----
+  static const red = error;
+  static const orange = warning;
+  static const yellow = premium;
+  static const blue = info;
+  static const actionColor = primary;
 
+  // Градиенты карточек уровней (свободные, продвинутые, премиум)
+  static const levelGradients = <LinearGradient>[
+    LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [Color(0xFF4338CA), Color(0xFF5B21B6)],
+    ),
+    LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [Color(0xFF4338CA), Color(0xFF2563EB)],
+    ),
+    LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [Color(0xFF2563EB), Color(0xFF3B82F6)],
+    ),
+    LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [Color(0xFF3B82F6), Color(0xFF06B6D4)],
+    ),
+    LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [Color(0xFFF59E0B), Color(0xFFEF4444)],
+    ),
+  ];
   static const listColors = [
-    green,
-    purple,
-    yellow,
-    orange,
-    sky,
-    secondary,
-    red,
-    blue,
-    pink,
-    yellow,
+    primary,
+    info,
+    premium,
+    success,
+    error,
+    warning,
   ];
 }
 

@@ -84,8 +84,8 @@ class ProfileScreen extends ConsumerWidget {
             }
 
             // определяем премиум по полю БД или активной подписке
-            final isPremium = user.isPremium ||
-                (subAsync.asData?.value == 'active');
+            final isPremium =
+                user.isPremium || (subAsync.asData?.value == 'active');
             return _buildProfileContent(context, ref, user,
                 isPremiumOverride: isPremium);
           },
@@ -198,7 +198,7 @@ class ProfileScreen extends ConsumerWidget {
             SliverToBoxAdapter(
               child: _Body(
                 userName: user.name,
-                avatarUrl: user.avatarUrl,
+                avatarId: user.avatarId,
                 currentLevel: user.currentLevel,
                 messagesLeft: messagesLeft,
                 artifactsCount: artifactsCount,
@@ -216,7 +216,7 @@ class ProfileScreen extends ConsumerWidget {
 class _Body extends ConsumerStatefulWidget {
   const _Body({
     required this.userName,
-    required this.avatarUrl,
+    required this.avatarId,
     required this.currentLevel,
     required this.messagesLeft,
     required this.artifactsCount,
@@ -225,7 +225,7 @@ class _Body extends ConsumerStatefulWidget {
   });
 
   final String userName;
-  final String? avatarUrl;
+  final int? avatarId;
   final int currentLevel;
   final int messagesLeft;
   final int artifactsCount;
@@ -238,6 +238,56 @@ class _Body extends ConsumerStatefulWidget {
 
 class _BodyState extends ConsumerState<_Body> {
   bool _isUploading = false;
+
+  Future<void> _showAvatarPicker() async {
+    final selectedId = await showModalBottomSheet<int>(
+      context: context,
+      backgroundColor: Colors.white,
+      builder: (ctx) {
+        return GridView.builder(
+          padding: const EdgeInsets.all(AppSpacing.medium),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            mainAxisSpacing: AppSpacing.medium,
+            crossAxisSpacing: AppSpacing.medium,
+          ),
+          itemCount: 7,
+          itemBuilder: (_, index) {
+            final id = index + 1;
+            final asset = 'assets/images/avatars/avatar_${id}.png';
+            final isSelected = id == widget.avatarId;
+            return GestureDetector(
+              onTap: () => Navigator.of(ctx).pop(id),
+              child: Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(40),
+                    child: Image.asset(asset, fit: BoxFit.cover),
+                  ),
+                  if (isSelected)
+                    Positioned.fill(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          border: Border.all(color: AppColor.primary, width: 3),
+                          borderRadius: BorderRadius.circular(40),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    if (selectedId != null && selectedId != widget.avatarId) {
+      // Обновляем аватар в Supabase
+      await ref.read(authServiceProvider).updateAvatar(selectedId);
+      // Инвалидируем профиль
+      ref.invalidate(currentUserProvider);
+    }
+  }
 
   Future<void> _uploadFile() async {
     setState(() {
@@ -324,14 +374,22 @@ class _BodyState extends ConsumerState<_Body> {
   }
 
   Widget _buildProfile() {
+    final String localAsset = widget.avatarId != null
+        ? 'assets/images/avatars/avatar_${widget.avatarId}.png'
+        : '';
+
     return Row(
       children: [
-        CustomImage(
-          widget.avatarUrl ??
-              "https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?ixlib=rb-1.2.1&ixid=MnwxMjA3fDB8MHxzZWFyY2h8MTd8fHByb2ZpbGV8ZW58MHx8MHx8&auto=format&fit=crop&w=800&q=60",
-          width: 80,
-          height: 80,
-          radius: 40,
+        GestureDetector(
+          onTap: _showAvatarPicker,
+          child: CustomImage(
+            (localAsset.isNotEmpty
+                ? localAsset
+                : "https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=800&q=60"),
+            width: 80,
+            height: 80,
+            radius: 40,
+          ),
         ),
         const SizedBox(width: AppSpacing.small),
         Column(
@@ -349,8 +407,9 @@ class _BodyState extends ConsumerState<_Body> {
                 const SizedBox(width: AppSpacing.small),
                 if (widget.isPremium)
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: AppSpacing.small, vertical: AppSpacing.small / 2),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.small,
+                        vertical: AppSpacing.small / 2),
                     decoration: BoxDecoration(
                       color: AppColor.primary,
                       borderRadius: BorderRadius.circular(4),

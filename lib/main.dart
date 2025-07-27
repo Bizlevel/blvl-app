@@ -118,7 +118,24 @@ class MyApp extends ConsumerWidget {
         debugShowCheckedModeBanner: false,
         title: 'BizLevel',
         theme: ThemeData(
-          primaryColor: AppColor.primary,
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: AppColor.primary,
+            brightness: Brightness.light,
+          ),
+          elevatedButtonTheme: ElevatedButtonThemeData(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColor.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          ),
+          snackBarTheme: const SnackBarThemeData(
+            backgroundColor: AppColor.primary,
+            contentTextStyle: TextStyle(color: Colors.white),
+            actionTextColor: AppColor.premium,
+          ),
         ),
         // Навигатор теперь управляется GoRouter; SentryObserver добавлен в конфигурацию роутера
       ),

@@ -105,6 +105,21 @@ class AuthService {
       await _client.from('users').upsert(payload);
     }, unknownErrorMessage: 'Не удалось сохранить профиль');
   }
+
+  /// Updates the avatar id (1..7) for current user.
+  Future<void> updateAvatar(int avatarId) async {
+    final user = _client.auth.currentUser;
+    if (user == null) {
+      throw AuthFailure('Пользователь не авторизован');
+    }
+
+    await _handleAuthCall(() async {
+      await _client.from('users').update({
+        'avatar_id': avatarId,
+        'updated_at': DateTime.now().toIso8601String(),
+      }).eq('id', user.id);
+    }, unknownErrorMessage: 'Не удалось обновить аватар');
+  }
 }
 
 /// A typed failure returned by [AuthService] methods.

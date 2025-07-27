@@ -25,6 +25,8 @@ mixin _$UserModel {
   String get name => throw _privateConstructorUsedError;
   @JsonKey(name: 'avatar_url')
   String? get avatarUrl => throw _privateConstructorUsedError;
+  @JsonKey(name: 'avatar_id')
+  int? get avatarId => throw _privateConstructorUsedError;
   String? get about => throw _privateConstructorUsedError;
   String? get goal => throw _privateConstructorUsedError;
   @JsonKey(name: 'is_premium')
@@ -64,6 +66,7 @@ abstract class $UserModelCopyWith<$Res> {
       String email,
       String name,
       @JsonKey(name: 'avatar_url') String? avatarUrl,
+      @JsonKey(name: 'avatar_id') int? avatarId,
       String? about,
       String? goal,
       @JsonKey(name: 'is_premium') bool isPremium,
@@ -95,6 +98,7 @@ class _$UserModelCopyWithImpl<$Res, $Val extends UserModel>
     Object? email = null,
     Object? name = null,
     Object? avatarUrl = freezed,
+    Object? avatarId = freezed,
     Object? about = freezed,
     Object? goal = freezed,
     Object? isPremium = null,
@@ -123,6 +127,10 @@ class _$UserModelCopyWithImpl<$Res, $Val extends UserModel>
           ? _value.avatarUrl
           : avatarUrl // ignore: cast_nullable_to_non_nullable
               as String?,
+      avatarId: freezed == avatarId
+          ? _value.avatarId
+          : avatarId // ignore: cast_nullable_to_non_nullable
+              as int?,
       about: freezed == about
           ? _value.about
           : about // ignore: cast_nullable_to_non_nullable
@@ -180,6 +188,7 @@ abstract class _$$UserModelImplCopyWith<$Res>
       String email,
       String name,
       @JsonKey(name: 'avatar_url') String? avatarUrl,
+      @JsonKey(name: 'avatar_id') int? avatarId,
       String? about,
       String? goal,
       @JsonKey(name: 'is_premium') bool isPremium,
@@ -209,6 +218,7 @@ class __$$UserModelImplCopyWithImpl<$Res>
     Object? email = null,
     Object? name = null,
     Object? avatarUrl = freezed,
+    Object? avatarId = freezed,
     Object? about = freezed,
     Object? goal = freezed,
     Object? isPremium = null,
@@ -237,6 +247,10 @@ class __$$UserModelImplCopyWithImpl<$Res>
           ? _value.avatarUrl
           : avatarUrl // ignore: cast_nullable_to_non_nullable
               as String?,
+      avatarId: freezed == avatarId
+          ? _value.avatarId
+          : avatarId // ignore: cast_nullable_to_non_nullable
+              as int?,
       about: freezed == about
           ? _value.about
           : about // ignore: cast_nullable_to_non_nullable
@@ -289,6 +303,7 @@ class _$UserModelImpl implements _UserModel {
       required this.email,
       required this.name,
       @JsonKey(name: 'avatar_url') this.avatarUrl,
+      @JsonKey(name: 'avatar_id') this.avatarId,
       this.about,
       this.goal,
       @JsonKey(name: 'is_premium') this.isPremium = false,
@@ -312,6 +327,9 @@ class _$UserModelImpl implements _UserModel {
   @override
   @JsonKey(name: 'avatar_url')
   final String? avatarUrl;
+  @override
+  @JsonKey(name: 'avatar_id')
+  final int? avatarId;
   @override
   final String? about;
   @override
@@ -343,7 +361,7 @@ class _$UserModelImpl implements _UserModel {
 
   @override
   String toString() {
-    return 'UserModel(id: $id, email: $email, name: $name, avatarUrl: $avatarUrl, about: $about, goal: $goal, isPremium: $isPremium, currentLevel: $currentLevel, leoMessagesTotal: $leoMessagesTotal, leoMessagesToday: $leoMessagesToday, leoResetAt: $leoResetAt, onboardingCompleted: $onboardingCompleted, createdAt: $createdAt, updatedAt: $updatedAt)';
+    return 'UserModel(id: $id, email: $email, name: $name, avatarUrl: $avatarUrl, avatarId: $avatarId, about: $about, goal: $goal, isPremium: $isPremium, currentLevel: $currentLevel, leoMessagesTotal: $leoMessagesTotal, leoMessagesToday: $leoMessagesToday, leoResetAt: $leoResetAt, onboardingCompleted: $onboardingCompleted, createdAt: $createdAt, updatedAt: $updatedAt)';
   }
 
   @override
@@ -356,6 +374,8 @@ class _$UserModelImpl implements _UserModel {
             (identical(other.name, name) || other.name == name) &&
             (identical(other.avatarUrl, avatarUrl) ||
                 other.avatarUrl == avatarUrl) &&
+            (identical(other.avatarId, avatarId) ||
+                other.avatarId == avatarId) &&
             (identical(other.about, about) || other.about == about) &&
             (identical(other.goal, goal) || other.goal == goal) &&
             (identical(other.isPremium, isPremium) ||
@@ -384,6 +404,7 @@ class _$UserModelImpl implements _UserModel {
       email,
       name,
       avatarUrl,
+      avatarId,
       about,
       goal,
       isPremium,
@@ -417,6 +438,7 @@ abstract class _UserModel implements UserModel {
           required final String email,
           required final String name,
           @JsonKey(name: 'avatar_url') final String? avatarUrl,
+          @JsonKey(name: 'avatar_id') final int? avatarId,
           final String? about,
           final String? goal,
           @JsonKey(name: 'is_premium') final bool isPremium,
@@ -441,6 +463,9 @@ abstract class _UserModel implements UserModel {
   @override
   @JsonKey(name: 'avatar_url')
   String? get avatarUrl;
+  @override
+  @JsonKey(name: 'avatar_id')
+  int? get avatarId;
   @override
   String? get about;
   @override

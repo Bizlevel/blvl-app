@@ -46,11 +46,13 @@ class LoginScreen extends HookConsumerWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             SizedBox(height: size.height * 0.1),
-            // Логотип – временный placeholder
+            // Логотип BizLevel
             const CustomImage(
-              'https://placehold.co/120x120',
+              'assets/images/logo_light.png',
               width: 120,
               height: 120,
+              isNetwork: false,
+              fit: BoxFit.contain,
             ),
             const SizedBox(height: 32),
             CustomTextBox(

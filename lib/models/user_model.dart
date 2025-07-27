@@ -11,6 +11,7 @@ class UserModel with _$UserModel {
     required String email,
     required String name,
     @JsonKey(name: 'avatar_url') String? avatarUrl,
+    @JsonKey(name: 'avatar_id') int? avatarId,
     String? about,
     String? goal,
     @JsonKey(name: 'is_premium') @Default(false) bool isPremium,

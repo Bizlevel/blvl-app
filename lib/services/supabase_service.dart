@@ -102,6 +102,27 @@ class SupabaseService {
     }, retries: 1);
   }
 
+  static Future<String?> getCoverSignedUrl(String relativePath) async {
+    // Абсолютный URL возвращаем сразу
+    if (relativePath.startsWith('http')) return relativePath;
+
+    return _withRetry(() async {
+      try {
+        final response = await Supabase.instance.client.storage
+            .from('level-covers')
+            .createSignedUrl(relativePath, 60 * 60);
+        return response;
+      } on StorageException catch (e, st) {
+        if ((e.statusCode ?? 0) != 404) {
+          await Sentry.captureException(e, stackTrace: st);
+        }
+        return null;
+      } on SocketException {
+        throw Exception('Нет соединения с интернетом');
+      }
+    }, retries: 1);
+  }
+
   static Future<List<Map<String, dynamic>>> fetchLevelsWithProgress(
       String userId) async {
     return _withRetry(() async {
@@ -109,7 +130,7 @@ class SupabaseService {
         final response = await Supabase.instance.client
             .from('levels')
             .select(
-                'id, number, title, description, image_url, artifact_title, artifact_description, artifact_url, is_free, lessons(count), user_progress(is_completed)')
+                'id, number, title, description, image_url, cover_path, artifact_title, artifact_description, artifact_url, is_free, lessons(count), user_progress(is_completed)')
             .order('number', ascending: true);
         return (response as List<dynamic>)
             .map((e) => Map<String, dynamic>.from(e as Map))

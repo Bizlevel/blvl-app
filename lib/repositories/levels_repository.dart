@@ -21,8 +21,19 @@ class LevelsRepository {
           : await SupabaseService.fetchLevelsWithProgress(userId);
 
       // Сохраняем в кеш (Hive поддерживает Map/List примитивов)
-      await cache.put(cacheKey, data);
-      return data;
+      final resolved = await Future.wait(data.map((level) async {
+        final String? coverPath = level['cover_path'] as String?;
+        String? imageUrl;
+        if (coverPath != null && coverPath.isNotEmpty) {
+          imageUrl = await SupabaseService.getCoverSignedUrl(coverPath);
+        }
+
+        level['image'] = imageUrl ?? level['image_url'] ?? level['image'];
+        return level;
+      }));
+
+      await cache.put(cacheKey, resolved);
+      return resolved;
     } on SocketException {
       // Нет интернета → читаем из кеша
       final cached = cache.get(cacheKey);
