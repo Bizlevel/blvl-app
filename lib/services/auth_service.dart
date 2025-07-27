@@ -86,16 +86,26 @@ class AuthService {
       throw AuthFailure('Пользователь не авторизован');
     }
 
+    // Если e-mail не подтверждён/отсутствует – блокируем сохранение профиля,
+    // чтобы избежать NOT-NULL нарушения в базе (#21.6.1).
+    if (user.email == null) {
+      throw AuthFailure('Подтвердите e-mail, прежде чем продолжить');
+    }
+
     await _handleAuthCall(() async {
-      // Build payload dynamically to avoid overwriting onboarding status when not provided.
+      // Формируем payload динамически и добавляем email только при наличии.
       final Map<String, dynamic> payload = {
         'id': user.id,
-        'email': user.email,
         'name': name,
         'about': about,
         'goal': goal,
         'updated_at': DateTime.now().toIso8601String(),
       };
+
+      // Добавляем email, только если он гарантированно не null.
+      if (user.email != null) {
+        payload['email'] = user.email;
+      }
 
       // Only update onboarding flag when explicitly specified.
       if (onboardingCompleted != null) {

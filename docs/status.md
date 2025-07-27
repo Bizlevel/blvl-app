@@ -216,3 +216,8 @@ Fix iOS build: добавлен conditional stub url_strategy_noop.dart и ус�
 Задача 21.3: добавлена колонка cover_path (migration 20250801), метод getCoverSignedUrl, LevelsRepository подхватывает обложки из bucket level-covers.
 Задача 21.4: добавлены 7 аватаров, assets path в pubspec.yaml, миграция avatar_id, метод AuthService.updateAvatar, выбор аватара BottomSheet в ProfileScreen.
 Задача 21.5: интегрирован логотип BizLevel – добавлен путь assets/images/ в pubspec, логотип подключён в LoginScreen и LevelsMapScreen (AppBar).
+Этап 21.6: устранены критические ошибки Sentry (NULL email & Storage 404)
+- AuthService теперь блокирует сохранение без подтверждённого email, добавляя поле email условно
+- OnboardingProfileScreen показывает SnackBar при отсутствии email
+- Добавлен unit-тест, проверяющий выброс AuthFailure при NULL email
+- Edge Function storage-integrity-check проверяет наличие файлов в Storage

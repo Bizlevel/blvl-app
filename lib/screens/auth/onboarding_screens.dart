@@ -33,6 +33,13 @@ class _OnboardingProfileScreenState
   }
 
   Future<void> _save() async {
+    // Проверяем, подтверждён ли e-mail – без него нельзя сохранить профиль.
+    final user = ref.read(authServiceProvider).getCurrentUser();
+    if (user?.email == null) {
+      _showSnackBar('Подтвердите e-mail, прежде чем продолжить');
+      return;
+    }
+
     final name = _nameController.text.trim();
     final about = _aboutController.text.trim();
     final goal = _goalController.text.trim();

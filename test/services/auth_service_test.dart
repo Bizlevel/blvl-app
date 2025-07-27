@@ -122,5 +122,18 @@ void main() {
         throwsA(isA<AuthFailure>()),
       );
     });
+
+    test('бросает AuthFailure, если email пользователя null', () async {
+      // email отсутствует
+      when(() => user.email).thenReturn(null);
+
+      expect(
+        () => service.updateProfile(name: 'N', about: 'A', goal: 'G'),
+        throwsA(isA<AuthFailure>()),
+      );
+
+      // Проверяем, что upsert НЕ вызывается
+      verifyNever(() => (builder as dynamic).upsert(any<dynamic>()));
+    });
   });
 }

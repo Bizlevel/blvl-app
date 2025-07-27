@@ -220,14 +220,21 @@
 - **Почему это важно:** Закрепляет идентичность бренда при первом контакте.
 - **Проверка результата:** Логотип виден на сплэше и ключевых экранах.
 
-#### Задача 21.6: Рефакторинг иконок
-- **Файлы:** `assets/icons/`, скрипт перекраски (опционально), `lib/widgets/*`
-- **Компоненты:** SVG-иконки
-- **Что делать:**
-  1. Перекрасить актуальные SVG-иконки в `currentColor` или прямой цвет Primary.
-  2. Удалить папку `assets/icons/categories` и неиспользуемые файлы.
-  3. При необходимости применить `colorFilter` для адаптации под тему.
-- **Почему это важно:** Консистентность и уменьшение размера приложения.
-- **Проверка результата:** Все иконки имеют единый стиль, ненужные ресурсы отсутствуют.
+#### Задача 21.6: Устранение критических ошибок Sentry (NOT-NULL email & Storage 404)
 
----
+> Цель — полностью убрать повторения ошибок BIZLEVEL-FLUTTER-10/-Z (NULL email) и BIZLEVEL-FLUTTER-F (Storage 404), снизив шум в Sentry и улучшив UX.
+
+| Подзадача | Файлы | Что делать | Почему |
+|-----------|-------|------------|---------|
+| **21.6.1** Защита payload в **AuthService.updateProfile** | `lib/services/auth_service.dart`, `test/services/auth_service_test.dart` | 1. В `payload` добавлять ключ `email` **только** если `user.email != null`. <br/>2. Если `email == null` — бросать `AuthFailure('Подтвердите e-mail …')`. | Предотвращает вставку `NULL` в колонку `users.email`, устраняя ошибку 23502.
+| **21.6.2** Клиентская валидация на экранах профиля/онбординга | `lib/screens/auth/onboarding_profile_screen.dart`, `lib/screens/profile_screen.dart` | Перед вызовом `updateProfile` проверять наличие `user.email`, показывать SnackBar, если нет. | Пользователь получает понятное сообщение вместо «Неизвестная ошибка».
+| **21.6.3** Unit-тесты на NULL-email | `test/services/auth_service_test.dart` (расширить) | Добавить тест, который мокает `currentUser.email = null` и проверяет, что метод выбрасывает `AuthFailure` *до* обращения к Postgrest. | Гарантирует, что регрессии будут пойманы CI.
+| **21.6.4** Lazy-probe Supabase Storage | `lib/repositories/lessons_repository.dart`, `lib/repositories/levels_repository.dart`, `lib/services/supabase_service.dart` | Обернуть получение signed URL в try/catch: при `StorageException.statusCode == 404` — вернуть `null`, залогировать в Sentry с `warn` уровнем и показать fallback-UI. | Исключает выброс исключения в runtime и помогает анализировать отсутствующие файлы без краха UX.
+| **21.6.5** Edge Function «storage-integrity-check» | `supabase/functions/storage-integrity-check/index.ts`, GitHub Action nightly | 1. Обходит таблицы `lessons`/`levels` и проверяет наличие файлов в bucket’ах. <br/>2. Логирует недостающие пути в Sentry как `warning`. <br/>3. (CI) Запускать раз в сутки через cron GH-Actions. | Автоматический мониторинг консистентности данных, предотвращение будущих 404.
+| **21.6.6** Документация и миграции | `docs/КОД_АНАЛИЗ.md`, `supabase/migrations/` | Обновить документацию по ошибкам; при необходимости добавить миграцию для изменения NOT NULL правила, если стратегия хранения email изменится. | Поддерживает актуальное состояние схемы и процессов.
+
+**Критерии готовности:**
+- В Sentry отсутствуют новые события с кодами 23502 и Storage 404 в течение 7 дней после релиза.
+- Все unit- и widget-тесты зелёные; добавлены тесты, покрывающие новый код.
+- Edge Function успешно запускается из CI и пишет отчёт (Sentry level: info/warning).
+- UX: вместо крита показывается SnackBar «Файл недоступен» или «Подтвердите e-mail». 
