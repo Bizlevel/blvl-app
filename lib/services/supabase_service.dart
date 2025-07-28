@@ -3,7 +3,7 @@ import 'dart:io';
 
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import '../utils/env_helper.dart';
 
 class SupabaseService {
   /// Создаём обычный инстанцируемый сервис для последующей передачи через DI.
@@ -17,10 +17,8 @@ class SupabaseService {
 
     try {
       await Supabase.initialize(
-        url: dotenv.env['SUPABASE_URL'] ??
-            const String.fromEnvironment('SUPABASE_URL', defaultValue: ''),
-        anonKey: dotenv.env['SUPABASE_ANON_KEY'] ??
-            const String.fromEnvironment('SUPABASE_ANON_KEY', defaultValue: ''),
+        url: envOrDefine('SUPABASE_URL'),
+        anonKey: envOrDefine('SUPABASE_ANON_KEY'),
       );
     } on AssertionError {
       // Already initialized in current isolate (tests may initialize globally)

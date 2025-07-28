@@ -3,7 +3,7 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import '../utils/env_helper.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Typed failure for any Leo related errors.
@@ -39,7 +39,7 @@ class LeoService {
   /// Expects [messages] in chat completion API format.
   /// Проверка контента через OpenAI Moderation API. Бросает [LeoFailure] если flagged.
   Future<void> _moderationCheck(String content) async {
-    final openaiKey = dotenv.env['OPENAI_API_KEY'] ?? '';
+    final openaiKey = envOrDefine('OPENAI_API_KEY');
     if (openaiKey.isEmpty) {
       return; // moderation доступна только при прямом OpenAI ключе
     }
@@ -77,7 +77,7 @@ class LeoService {
       throw LeoFailure('Пользователь не авторизован');
     }
 
-    final openaiKey = dotenv.env['OPENAI_API_KEY'] ?? '';
+    final openaiKey = envOrDefine('OPENAI_API_KEY');
     if (openaiKey.isNotEmpty) {
       // Run moderation on the latest user message (last in list)
       final last = messages.isNotEmpty ? messages.last : null;

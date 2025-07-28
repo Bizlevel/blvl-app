@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'utils/env_helper.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -40,8 +41,7 @@ Future<void> main() async {
   await Hive.openBox('levels');
   await Hive.openBox('lessons');
 
-  final dsn = dotenv.env['sentry_dsn'] ??
-      const String.fromEnvironment('SENTRY_DSN', defaultValue: '');
+  final dsn = envOrDefine('SENTRY_DSN');
 
   if (dsn.isEmpty) {
     // Без Sentry
