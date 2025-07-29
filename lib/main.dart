@@ -9,7 +9,7 @@ import 'package:flutter/foundation.dart';
 import 'compat/url_strategy_noop.dart'
     if (dart.library.html) 'package:flutter_web_plugins/flutter_web_plugins.dart';
 import 'package:responsive_framework/responsive_framework.dart';
-import 'package:uni_links/uni_links.dart';
+import 'package:app_links/app_links.dart';
 import 'dart:async';
 import 'utils/deep_link.dart';
 
@@ -153,39 +153,44 @@ class _LinkListener extends StatefulWidget {
 }
 
 class _LinkListenerState extends State<_LinkListener> {
-  StreamSubscription<Uri?>? _sub;
+  late AppLinks _appLinks;
+  StreamSubscription<Uri>? _linkSubscription;
 
   @override
   void initState() {
     super.initState();
-    _initLinks();
-    if (!kIsWeb) {
-      _sub = uriLinkStream.listen((Uri? uri) {
-        _handleLinkUri(uri);
-      }, onError: (_) {});
+    _appLinks = AppLinks();
+    _initDeepLinks();
+  }
+
+  @override
+  void dispose() {
+    _linkSubscription?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _initDeepLinks() async {
+    // Listen to all incoming links
+    _linkSubscription = _appLinks.uriLinkStream.listen((uri) {
+      _handleLinkUri(uri);
+    });
+
+    // Get the initial link
+    final initialUri = await _appLinks.getInitialLink();
+    if (initialUri != null) {
+      _handleLinkUri(initialUri);
     }
   }
 
-  Future<void> _initLinks() async {
-    try {
-      final initial = await getInitialUri();
-      _handleLinkUri(initial);
-    } catch (_) {}
-  }
-
-  void _handleLinkUri(Uri? uri) {
-    final path = uri == null ? null : mapBizLevelDeepLink(uri.toString());
+  void _handleLinkUri(Uri uri) {
+    final path = mapBizLevelDeepLink(uri.toString());
     if (path != null) {
       widget.router.go(path);
     }
   }
 
   @override
-  void dispose() {
-    _sub?.cancel();
-    super.dispose();
+  Widget build(BuildContext context) {
+    return widget.child;
   }
-
-  @override
-  Widget build(BuildContext context) => widget.child;
 }

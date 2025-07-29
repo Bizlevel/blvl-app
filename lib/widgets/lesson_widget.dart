@@ -8,8 +8,7 @@ import 'package:flutter/foundation.dart'
 import 'package:flutter/material.dart';
 import 'package:bizlevel/models/lesson_model.dart';
 import 'package:video_player/video_player.dart';
-import 'package:bizlevel/compat/webview_stub.dart'
-    if (dart.library.io) 'package:webview_flutter/webview_flutter.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 import 'package:bizlevel/compat/ui_stub.dart'
     if (dart.library.html) 'dart:ui_web' as ui;
 // ignore: avoid_web_libraries_in_flutter
@@ -29,6 +28,7 @@ class LessonWidget extends ConsumerStatefulWidget {
 class _LessonWidgetState extends ConsumerState<LessonWidget> {
   VideoPlayerController? _videoController;
   ChewieController? _chewieController;
+  late final WebViewController _webViewController;
   bool _initialized = false;
   bool _progressSent = false;
 
@@ -68,15 +68,19 @@ class _LessonWidgetState extends ConsumerState<LessonWidget> {
           _autoMarkWatched();
           return;
         }
-        if (defaultTargetPlatform == TargetPlatform.iOS) {
+        if (defaultTargetPlatform == TargetPlatform.iOS ||
+            defaultTargetPlatform == TargetPlatform.android) {
           _embedUrl = embed;
           _useWebView = true;
+          _webViewController = WebViewController()
+            ..setJavaScriptMode(JavaScriptMode.unrestricted)
+            ..loadRequest(Uri.parse(_embedUrl!));
           _initialized = true;
           setState(() {});
           _autoMarkWatched();
           return;
         }
-        // Android/Desktop fallback: try to use video_player (may fail if Vimeo forbids)
+        // Desktop fallback: try to use video_player (may fail if Vimeo forbids)
         directUrl = embed;
       } else {
         // Fallback to Supabase Storage signed URL если указан путь
@@ -199,8 +203,8 @@ class _LessonWidgetState extends ConsumerState<LessonWidget> {
       );
     }
 
-    // iOS WebView playback
-    if (_useWebView && _embedUrl != null) {
+    // iOS/Android WebView playback
+    if (_useWebView) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -219,10 +223,7 @@ class _LessonWidgetState extends ConsumerState<LessonWidget> {
                 child: SizedBox(
                   width: w,
                   height: h,
-                  child: WebView(
-                    initialUrl: _embedUrl,
-                    javascriptMode: JavascriptMode.unrestricted,
-                  ),
+                  child: WebViewWidget(controller: _webViewController),
                 ),
               );
             }),
