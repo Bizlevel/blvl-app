@@ -224,3 +224,33 @@ Fix iOS build: добавлен conditional stub url_strategy_noop.dart и ус�
 21 фикс: 
 - Исправлена функция update_current_level: теперь пишет номер следующего уровня, а не id; добавлена миграция 20250806_fix_update_current_level.sql и исправлены некорректные значения current_level.
 - levels_provider теперь учитывает is_premium и статус подписки, открывая уровни 4-10 для премиум-пользователей. 
+## Задача Fix-vercel
+- Добавлен `vercel.json` (static build, SPA rewrite, cache headers) – обеспечивает корректный деплой Flutter Web на Vercel.
+- Создан `package.json` со скриптом `vercel-build`, вызывающим `scripts/vercel_build.sh`.
+- `scripts/vercel_build.sh` скачивает Flutter SDK, выполняет `flutter build web --release` с передачей dart-define переменных среды.
+- Удалено поле `framework` и источник `pubspec.yaml` в `vercel.json`, теперь `src` указывает на `package.json` (требование Vercel).
+- Из секции `assets:` в `pubspec.yaml` убран `.env`, чтобы сборка Web не требовала локальный файл.
+- Добавлен `lib/utils/env_helper.dart` с функцией `envOrDefine` – берёт значение из `dotenv`, иначе из compile-time `String.fromEnvironment`.
+- Обновлены файлы `lib/main.dart`, `lib/services/supabase_service.dart`, `lib/services/leo_service.dart` для использования `envOrDefine` вместо прямого доступа к `dotenv.env`.
+- Добавлен `assets/images/onboarding/logo.png` — устранил ошибку «directory entry in pubspec.yaml».
+- Все изменения запушены (
+  * `fix(vercel): use package.json as build entry`
+  * `fix(vercel): remove unsupported framework property`
+  * `chore: remove .env from asset list for web build`
+  * `feat: optional dotenv with envOrDefine helper to support web` ).
+- Локальный Web-запуск теперь требует передавать переменные через `--dart-define`; mobile чтение из `.env` осталось прежним. 
+- добавлен подпроект `vercel-mcp` (git clone), выполнен `npm install && npm run build`,
+создан `src/config/constants.ts` c чтением `VERCEL_ACCESS_TOKEN`, index.ts переведён на использование этих констант.
+Сервер MCP запускается командой `VERCEL_ACCESS_TOKEN=$vercel_access_token npm start` и предоставляет Cursor полный набор Vercel-tools. 
+- проанализированы логи последнего деплоя Vercel, критических ошибок нет; выявлены рекомендации (кеш Flutter SDK, устранить root-warning, плановое обновление Flutter и пакетов). TODO: внедрить кеш SDK и обновить зависимости в рамках техдолга. 
+- Исправлен корневой редирект и онбординг в `lib/routing/app_router.dart`; добавлен маршрут '/' и проверка `onboarding_completed`.
+- Выставлен `unlockedPage: 0` в `LessonProgressState.empty` (`lib/providers/lesson_progress_provider.dart`) для корректного показа интро-блока уровня. 
+
+## Задача Fix (ветка feature/android)
+- Android build-система: • Переход с Groovy на Kotlin DSL: − `android/build.gradle` → `android/build.gradle.kts`; − `android/app/build.gradle` → `android/app/build.gradle.kts`. • Удалён `android/app/proguard-rules.pro` (заменён упрощённым набором правил). • Обновлены AGP до 8.4, Java 17, добавлен `ndkVersion = \"27.0.12077973\"`.
+- Namespace / манифесты: • `android/app/src/main/AndroidManifest.xml` (+debug/profile) — упрощены разрешения, добавлен блок `<queries>`. • `MainActivity.kt` перемещён из `kz/bizlevel/app/` в `com/example/bizlevel/` (namespace `com.example.bizlevel`). • В `main` остаётся namespace `kz.bizlevel.app` — при слиянии нужно выбрать.
+- Поддержка Windows desktop: • Полностью добавлена директория `windows/` (CMake, runner, ресурсы, icon). • Дополнены `.gitignore`, CMake-скрипты. • Использовать только если планируем Flutter desktop; иначе папку игнорировать.
+- Инфраструктура: • Новые файлы `.gradle/**`, изменения в `.metadata`, `.vscode/settings.json`. • `vercel.json` совпадает с версией, уже присутствующей в `main`.
+
+# Этап 22: Web визуальный рефреш
+Задача 22.1: добавлен `bgGradient` (#F0F4FF→#DDE8FF) в AppColor, ThemeData обновлено, глобальный градиент подключён через Container; scaffold фон сделан прозрачным.

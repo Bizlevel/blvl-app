@@ -110,9 +110,17 @@ class MyApp extends ConsumerWidget {
                 )
               : textTheme;
 
-          return Theme(
-            data: Theme.of(context).copyWith(textTheme: scaledTextTheme),
-            child: wrapped,
+          return Container(
+            decoration: const BoxDecoration(
+              gradient: AppColor.bgGradient,
+            ),
+            child: Theme(
+              data: Theme.of(context).copyWith(
+                textTheme: scaledTextTheme,
+                scaffoldBackgroundColor: Colors.transparent,
+              ),
+              child: wrapped,
+            ),
           );
         },
         debugShowCheckedModeBanner: false,

@@ -24,6 +24,13 @@ class AppColor {
   static const borderColor = Color(0xFFCBD5E1);
   static const dividerColor = Color(0xFFE2E8F0);
 
+  // Градиент фона приложения (базовый)
+  static const bgGradient = LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [Color(0xFFF0F4FF), Color(0xFFDDE8FF)],
+  );
+
   // ---- Backward-compatibility aliases (to мигрировать позднее) ----
   static const red = error;
   static const orange = warning;
