@@ -1,3 +1,4 @@
+import 'dart:developer';
 import 'dart:io';
 
 import 'package:sentry_flutter/sentry_flutter.dart';
@@ -21,14 +22,18 @@ class AuthService {
     try {
       return await action();
     } on AuthException catch (e, st) {
+      log('AuthException caught in AuthService', error: e, stackTrace: st);
       await Sentry.captureException(e, stackTrace: st);
       throw AuthFailure(e.message);
     } on PostgrestException catch (e, st) {
+      log('PostgrestException caught in AuthService', error: e, stackTrace: st);
       await Sentry.captureException(e, stackTrace: st);
       throw AuthFailure(e.message);
-    } on SocketException {
+    } on SocketException catch (e, st) {
+      log('SocketException caught in AuthService', error: e, stackTrace: st);
       throw AuthFailure('Нет соединения с интернетом');
     } catch (e, st) {
+      log('Unknown error caught in AuthService', error: e, stackTrace: st);
       await Sentry.captureException(e, stackTrace: st);
       throw AuthFailure(unknownErrorMessage);
     }

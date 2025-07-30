@@ -1,3 +1,5 @@
+import 'dart:developer';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../services/auth_service.dart';
@@ -13,13 +15,17 @@ class LoginController extends StateNotifier<bool> {
   Future<void> signIn({required String email, required String password}) async {
     if (state) return; // уже выполняется
     state = true;
+    log('Attempting to sign in with email: $email');
     try {
       await ref
           .read(authServiceProvider)
           .signIn(email: email, password: password);
+      log('Sign in successful for email: $email');
     } on AuthFailure catch (e) {
+      log('AuthFailure during sign in for $email', error: e);
       _showError(e.message);
-    } catch (_) {
+    } catch (e, st) {
+      log('Unknown error during sign in for $email', error: e, stackTrace: st);
       _showError('Неизвестная ошибка входа');
     } finally {
       state = false;

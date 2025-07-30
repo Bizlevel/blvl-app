@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 
@@ -82,13 +83,7 @@ class LoginScreen extends HookConsumerWidget {
             ),
             const SizedBox(height: 16),
             TextButton(
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const RegisterScreen(),
-                  ),
-                );
-              },
+              onPressed: () => context.go('/register'),
               child: const Text('Нет аккаунта? Зарегистрироваться'),
             ),
           ],

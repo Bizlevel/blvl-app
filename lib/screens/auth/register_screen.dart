@@ -1,5 +1,8 @@
+import 'dart:developer';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../theme/color.dart';
 import '../../services/auth_service.dart';
@@ -45,22 +48,22 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     }
 
     setState(() => _isLoading = true);
+    log('Attempting to sign up with email: $email');
     try {
       await ref.read(authServiceProvider).signUp(
             email: email,
             password: password,
           );
+      log('Sign up successful for email: $email');
       if (!mounted) return;
-      // Переходим на первый экран онбординга
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(
-          builder: (_) => const OnboardingProfileScreen(),
-        ),
-        (_) => false,
-      );
+      _showSnackBar(
+          'Регистрация прошла успешно! Пожалуйста, подтвердите свой e-mail, перейдя по ссылке в письме.');
+      // Не переходим на другой экран, даём пользователю прочитать сообщение
     } on AuthFailure catch (e) {
+      log('AuthFailure during sign up for $email', error: e);
       _showSnackBar(e.message);
-    } catch (e) {
+    } catch (e, st) {
+      log('Unknown error during sign up for $email', error: e, stackTrace: st);
       _showSnackBar('Неизвестная ошибка регистрации');
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -119,6 +122,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     ? const CircularProgressIndicator(color: Colors.white)
                     : const Text('Создать аккаунт'),
               ),
+            ),
+            const SizedBox(height: 16),
+            TextButton(
+              onPressed: () => context.go('/login'),
+              child: const Text('Уже есть аккаунт? Войти'),
             ),
           ],
         ),
