@@ -29,16 +29,18 @@ require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelpe
 flutter_ios_podfile_setup
 
 target 'Runner' do
-  # Соберём все Flutter‑плагины как статические фреймворки,
-  # чтобы @import их корректно работал
+  # Линкуем все Flutter‑плагины как статические фреймворки
   use_frameworks! :linkage => :static
 
-  # Подключаем все плагины из Flutter
+  # Подхватываем плагины, сгенерированные Flutter
   flutter_install_all_ios_pods(File.dirname(File.realpath(__FILE__)))
 
-  # Ваши ручные Pod’ы, например:
-  pod 'Sentry', '9.5.0'
+  # Явно указываем Sentry/HybridSDK из GitHub, чтобы podspec точно подтянулся
+  pod 'Sentry/HybridSDK', '8.52.1',
+      :git => 'https://github.com/getsentry/sentry-cocoa.git',
+      :tag => '8.52.1'
 end
+
 
 
 post_install do |installer|
