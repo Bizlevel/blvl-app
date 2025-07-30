@@ -36,9 +36,10 @@ target 'Runner' do
   flutter_install_all_ios_pods(File.dirname(File.realpath(__FILE__)))
 
   # Явно указываем Sentry/HybridSDK из GitHub, чтобы podspec точно подтянулся
-  pod 'Sentry/HybridSDK', '8.52.1',
-      :git => 'https://github.com/getsentry/sentry-cocoa.git',
-      :tag => '8.52.1'
+  pod 'Sentry/HybridSDK',
+    :git => 'https://github.com/getsentry/sentry-cocoa.git',
+    :tag => '8.52.1'
+
 end
 
 
