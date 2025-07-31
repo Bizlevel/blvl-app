@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:bizlevel/theme/color.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:go_router/go_router.dart';
 
 import 'custom_image.dart';
 
@@ -29,23 +28,8 @@ class _LevelCardState extends State<LevelCard> {
 
   bool get _isLocked => widget.data["isLocked"] == true;
 
-  bool get _isPremium => widget.data["isPremium"] == true;
-
-  /// Выбор градиента по номеру уровня и флагу премиума
-  LinearGradient _selectGradient() {
-    if (_isPremium) {
-      return AppColor.levelGradients[4]; // премиум
-    }
-
-    final int level = (widget.data["level"] ?? 1) as int;
-    if (level <= 3) {
-      return AppColor.levelGradients[0];
-    }
-
-    // Advanced уровни 4–10 распределяем по трём градиентам 1..3
-    final int advancedIndex = ((level - 4) % 3) + 1;
-    return AppColor.levelGradients[advancedIndex];
-  }
+  bool get _isCompleted => widget.data["isCompleted"] == true;
+  bool get _isCurrent => widget.data["isCurrent"] == true;
 
   @override
   Widget build(BuildContext context) {
@@ -59,12 +43,14 @@ class _LevelCardState extends State<LevelCard> {
               widget.onTap?.call();
             },
       child: Container(
+        key: const Key('level_card'),
         width: widget.width,
         height: widget.height,
         padding: const EdgeInsets.all(AppSpacing.medium),
         margin: const EdgeInsets.symmetric(vertical: AppSpacing.small),
         decoration: BoxDecoration(
-          gradient: _selectGradient(),
+          color: Colors.transparent,
+          border: Border.all(color: Colors.grey.withOpacity(0.3)),
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
@@ -73,6 +59,12 @@ class _LevelCardState extends State<LevelCard> {
               blurRadius: _hover ? 6 : 1,
               offset: const Offset(1, 1),
             ),
+            if (_isCurrent)
+              BoxShadow(
+                color: AppColor.premium.withOpacity(0.6),
+                spreadRadius: 0,
+                blurRadius: 12,
+              ),
           ],
         ),
         child: Stack(
@@ -97,6 +89,10 @@ class _LevelCardState extends State<LevelCard> {
               right: 0,
               child: _buildInfo(),
             ),
+            // Completed overlay
+            if (_isCompleted && !_isLocked) _buildCompletedOverlay(),
+            // Current level overlay
+            if (_isCurrent && !_isLocked) _buildCurrentOverlay(),
             // Locked overlay
             if (_isLocked) _buildLockedOverlay(),
           ],
@@ -121,6 +117,53 @@ class _LevelCardState extends State<LevelCard> {
   }
 
   // ------------------ Widgets ------------------
+
+  Widget _buildCompletedOverlay() {
+    return Positioned(
+      top: 10,
+      left: 10,
+      child: Container(
+        padding: const EdgeInsets.all(6),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.8),
+          shape: BoxShape.circle,
+        ),
+        child: const Icon(
+          Icons.check,
+          color: AppColor.success,
+          size: 20,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCurrentOverlay() {
+    return Positioned(
+      top: 10,
+      left: 10,
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(begin: 1.0, end: 1.2),
+        duration: const Duration(milliseconds: 800),
+        curve: Curves.easeInOut,
+        builder: (context, scale, child) {
+          return Transform.scale(scale: scale, child: child);
+        },
+        onEnd: () => setState(() {}),
+        child: Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.9),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(
+            Icons.star,
+            color: AppColor.premium,
+            size: 20,
+          ),
+        ),
+      ),
+    );
+  }
 
   Widget _buildLockedOverlay() {
     return Positioned.fill(
@@ -167,11 +210,12 @@ class _LevelCardState extends State<LevelCard> {
   }
 
   Widget _buildLevelNumber() {
+    final level = widget.data["level"].toString();
     return Container(
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         color: AppColor.primary,
-        shape: BoxShape.circle,
+        borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
             color: AppColor.shadowColor.withOpacity(0.05),
@@ -182,10 +226,11 @@ class _LevelCardState extends State<LevelCard> {
         ],
       ),
       child: Text(
-        widget.data["level"].toString(),
+        'Уровень $level',
         style: const TextStyle(
           color: Colors.white,
           fontWeight: FontWeight.w600,
+          fontSize: 12,
         ),
       ),
     );

@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import 'package:bizlevel/providers/leo_service_provider.dart';
 import 'package:bizlevel/widgets/chat_item.dart';
 import 'package:bizlevel/screens/leo_dialog_screen.dart';
+
+import 'package:bizlevel/theme/color.dart';
 
 class LeoChatScreen extends ConsumerStatefulWidget {
   const LeoChatScreen({super.key});
@@ -24,44 +27,55 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
   }
 
   Future<void> _loadData() async {
-    // Fetch messages limit & chats in parallel
     try {
       final leo = ref.read(leoServiceProvider);
+      // Параллельно получаем лимит сообщений и список чатов
       final limitFuture = leo.checkMessageLimit();
-      _messagesLeft = await limitFuture;
-      final rawChats = await Supabase.instance.client
+      final chatsFuture = Supabase.instance.client
           .from('leo_chats')
           .select('id, title, updated_at, message_count')
           .gt('message_count', 0)
           .order('updated_at', ascending: false);
+
+      _messagesLeft = await limitFuture;
+      final rawChats = await chatsFuture;
       _chats =
           rawChats.map((e) => Map<String, dynamic>.from(e as Map)).toList();
     } catch (_) {
-      // ignore errors for now
+      // silently ignore, UI отобразит пустые данные
     }
     if (mounted) setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<void>(
-      future: _loadFuture,
-      builder: (context, snapshot) {
-        return SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 15),
-          child: Column(
-            children: [
-              _buildHeader(),
-              const SizedBox(height: 10),
-              _buildChats(),
-            ],
-          ),
-        );
-      },
+    return Scaffold(
+      floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: AppColor.primary,
+        onPressed: _onNewChat,
+        icon: const Icon(Icons.add_comment),
+        label: const Text('Обсудить с Лео',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+      ),
+      body: FutureBuilder<void>(
+        future: _loadFuture,
+        builder: (context, snapshot) {
+          return SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 15),
+            child: Column(
+              children: [
+                _buildHeader(context),
+                const SizedBox(height: 10),
+                _buildChats(),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(0, 60, 0, 5),
       child: Column(
@@ -70,24 +84,45 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Leo AI',
-                style: TextStyle(
-                  fontSize: 28,
-                  color: Colors.black87,
-                  fontWeight: FontWeight.w600,
+              // Блок с аватаром и подзаголовком
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 25,
+                    backgroundImage: const AssetImage(
+                        'assets/images/avatars/avatar_leo.png'),
+                    backgroundColor: Colors.transparent,
+                  ),
+                  const SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      Text(
+                        'Leo AI',
+                        style: TextStyle(
+                          fontSize: 24,
+                          color: Colors.black87,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'Твой бизнес-ментор',
+                        style: TextStyle(fontSize: 14, color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              Text(
+                '$_messagesLeft сообщений Leo',
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Colors.black54,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
-              ElevatedButton(
-                onPressed: _onNewChat,
-                child: const Text('Новый диалог'),
-              ),
             ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            'Осталось $_messagesLeft сообщений',
-            style: const TextStyle(fontSize: 14, color: Colors.grey),
           ),
         ],
       ),
@@ -118,7 +153,7 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
           'name': chat['title'] ?? 'Диалог',
           'last_text': '${chat['message_count']} сообщений',
           'date': formattedDate,
-          'image': 'assets/icons/chat.svg',
+          // без image, чтобы не отображать иконку в списке
           'notify': 0,
         };
         return ChatItem(
@@ -138,9 +173,7 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
 
   void _onNewChat() {
     Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const LeoDialogScreen(),
-      ),
+      MaterialPageRoute(builder: (_) => const LeoDialogScreen()),
     );
   }
 }

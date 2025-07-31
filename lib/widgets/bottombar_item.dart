@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:bizlevel/theme/color.dart';
 
 class BottomBarItem extends StatelessWidget {
@@ -13,7 +12,7 @@ class BottomBarItem extends StatelessWidget {
     this.isNotified = false,
   });
 
-  final String icon;
+  final IconData icon;
   final Color color;
   final Color activeColor;
   final bool isNotified;
@@ -41,11 +40,10 @@ class BottomBarItem extends StatelessWidget {
               ),
           ],
         ),
-        child: SvgPicture.asset(
+        child: Icon(
           icon,
           color: isActive ? activeColor : color,
-          width: 23,
-          height: 23,
+          size: 26,
         ),
       ),
     );

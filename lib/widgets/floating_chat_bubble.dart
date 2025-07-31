@@ -71,7 +71,8 @@ class _FloatingChatBubbleState extends ConsumerState<FloatingChatBubble>
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+      backgroundColor: Colors.white,
+      barrierColor: Colors.black54,
       builder: (_) => FractionallySizedBox(
         heightFactor: 0.9,
         child: LeoDialogScreen(chatId: widget.chatId),
@@ -95,10 +96,13 @@ class _FloatingChatBubbleState extends ConsumerState<FloatingChatBubble>
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          FloatingActionButton(
+          FloatingActionButton.extended(
             backgroundColor: AppColor.primary,
             onPressed: _openDialog,
-            child: const Icon(Icons.chat_bubble_outline),
+            icon: const Icon(Icons.chat_bubble_outline),
+            label: const Text('Обсудить с Лео',
+                style: TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.w600)),
           ),
           if (unread > 0)
             Positioned(

@@ -9,7 +9,6 @@ import '../../services/auth_service.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/custom_textfield.dart';
 import '../../widgets/custom_image.dart';
-import 'onboarding_screens.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -24,6 +23,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _confirmController = TextEditingController();
 
   bool _isLoading = false;
+
+  bool _obscurePassword = true;
+  bool _obscureConfirm = true;
 
   @override
   void dispose() {
@@ -78,57 +80,123 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
     return Scaffold(
-      appBar: AppBar(title: const Text('Регистрация')),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
-        child: Column(
-          children: [
-            SizedBox(height: size.height * 0.05),
-            const CustomImage(
-              'https://placehold.co/100x100',
-              width: 100,
-              height: 100,
-            ),
-            const SizedBox(height: 24),
-            CustomTextBox(
-              hint: 'Email',
-              prefix: const Icon(Icons.email_outlined),
-              controller: _emailController,
-            ),
-            const SizedBox(height: 16),
-            CustomTextBox(
-              hint: 'Пароль',
-              prefix: const Icon(Icons.lock_outline),
-              controller: _passwordController,
-            ),
-            const SizedBox(height: 16),
-            CustomTextBox(
-              hint: 'Подтвердите пароль',
-              prefix: const Icon(Icons.lock_person_outlined),
-              controller: _confirmController,
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColor.primary,
-                ),
-                onPressed: _isLoading ? null : _submit,
-                child: _isLoading
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text('Создать аккаунт'),
+      backgroundColor: Colors.transparent,
+      body: Container(
+        decoration: const BoxDecoration(gradient: AppColor.bgGradient),
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
+            child: Container(
+              key: const Key('register_form'),
+              width: 420,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    width: 96,
+                    height: 96,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    padding: const EdgeInsets.all(8),
+                    child: const CustomImage(
+                      'assets/images/logo_light.png',
+                      width: 80,
+                      height: 80,
+                      isNetwork: false,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  CustomTextBox(
+                    hint: 'Email',
+                    prefix: const Icon(Icons.email_outlined),
+                    controller: _emailController,
+                  ),
+                  const SizedBox(height: 16),
+                  CustomTextBox(
+                    hint: 'Пароль',
+                    prefix: const Icon(Icons.lock_outline),
+                    controller: _passwordController,
+                    obscureText: _obscurePassword,
+                    suffix: IconButton(
+                      icon: Icon(_obscurePassword
+                          ? Icons.visibility_off
+                          : Icons.visibility),
+                      onPressed: () =>
+                          setState(() => _obscurePassword = !_obscurePassword),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  CustomTextBox(
+                    hint: 'Подтвердите пароль',
+                    prefix: const Icon(Icons.lock_person_outlined),
+                    controller: _confirmController,
+                    obscureText: _obscureConfirm,
+                    suffix: IconButton(
+                      icon: Icon(_obscureConfirm
+                          ? Icons.visibility_off
+                          : Icons.visibility),
+                      onPressed: () =>
+                          setState(() => _obscureConfirm = !_obscureConfirm),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  GestureDetector(
+                    onTap: _isLoading ? null : _submit,
+                    child: Container(
+                      height: 48,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [AppColor.primary, Color(0xFF1273C4)],
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      alignment: Alignment.center,
+                      child: _isLoading
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 3,
+                              ),
+                            )
+                          : const Text(
+                              'Создать аккаунт',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextButton(
+                    onPressed: () => context.go('/login'),
+                    child: const Text('Уже есть аккаунт? Войти'),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 16),
-            TextButton(
-              onPressed: () => context.go('/login'),
-              child: const Text('Уже есть аккаунт? Войти'),
-            ),
-          ],
+          ),
         ),
       ),
     );

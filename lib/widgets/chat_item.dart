@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:bizlevel/theme/color.dart';
 import 'chat_notify.dart';
 import 'custom_image.dart';
 
-class ChatItem extends StatelessWidget {
+class ChatItem extends StatefulWidget {
   const ChatItem(
     this.chatData, {
     super.key,
@@ -12,47 +13,68 @@ class ChatItem extends StatelessWidget {
     this.profileSize = 50,
   });
 
-  final chatData;
+  final Map<String, dynamic> chatData;
   final bool isNotified;
   final GestureTapCallback? onTap;
   final double profileSize;
 
   @override
+  State<ChatItem> createState() => _ChatItemState();
+}
+
+class _ChatItemState extends State<ChatItem> {
+  bool _isHover = false;
+
+  @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.fromLTRB(10, 12, 10, 10),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(10),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
-              spreadRadius: 1,
-              blurRadius: 1,
-              offset: const Offset(1, 1),
+    final String imagePath = widget.chatData['image'] as String? ?? '';
+    final bool showPhoto = imagePath.isNotEmpty;
+
+    return MouseRegion(
+      onEnter: (_) {
+        if (kIsWeb) setState(() => _isHover = true);
+      },
+      onExit: (_) {
+        if (kIsWeb) setState(() => _isHover = false);
+      },
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedScale(
+          scale: _isHover ? 1.03 : 1.0,
+          duration: const Duration(milliseconds: 120),
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.fromLTRB(10, 12, 10, 10),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(_isHover ? 0.2 : 0.1),
+                  spreadRadius: _isHover ? 2 : 1,
+                  blurRadius: _isHover ? 4 : 1,
+                  offset: const Offset(1, 1),
+                ),
+              ],
             ),
-          ],
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            _buildPhoto(),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                children: [
-                  buildNameAndTime(),
-                  const SizedBox(
-                    height: 5,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                if (showPhoto) _buildPhoto(imagePath),
+                if (showPhoto) const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildNameAndTime(),
+                      const SizedBox(height: 5),
+                      _buildTextAndNotified(),
+                    ],
                   ),
-                  _buildTextAndNotified(),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -63,17 +85,17 @@ class ChatItem extends StatelessWidget {
       children: <Widget>[
         Expanded(
           child: Text(
-            chatData['last_text'],
+            widget.chatData['last_text'] ?? '',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(fontSize: 13),
           ),
         ),
-        if (isNotified)
+        if (widget.isNotified)
           Padding(
             padding: const EdgeInsets.only(right: 5),
             child: ChatNotify(
-              number: chatData['notify'],
+              number: widget.chatData['notify'] ?? 0,
               boxSize: 17,
               color: AppColor.red,
             ),
@@ -82,21 +104,21 @@ class ChatItem extends StatelessWidget {
     );
   }
 
-  Widget _buildPhoto() {
+  Widget _buildPhoto(String imagePath) {
     return CustomImage(
-      chatData['image'],
-      width: profileSize,
-      height: profileSize,
+      imagePath,
+      width: widget.profileSize,
+      height: widget.profileSize,
     );
   }
 
-  Widget buildNameAndTime() {
+  Widget _buildNameAndTime() {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         Expanded(
           child: Text(
-            chatData['name'],
+            widget.chatData['name'] ?? '',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
@@ -104,14 +126,11 @@ class ChatItem extends StatelessWidget {
         ),
         const SizedBox(width: 5),
         Text(
-          chatData['date'],
+          widget.chatData['date'] ?? '',
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            fontSize: 11,
-            color: Colors.grey,
-          ),
-        )
+          style: const TextStyle(fontSize: 11, color: Colors.grey),
+        ),
       ],
     );
   }

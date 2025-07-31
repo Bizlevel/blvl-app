@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 class AppColor {
-  static const primary = Color(0xFF4338CA);
+  static const primary = Color(0xFF1995F0);
   // --- BizLevel brand palette (21.1) ---
   static const success = Color(0xFF10B981);
   static const premium = Color(0xFFF59E0B);
@@ -39,11 +39,13 @@ class AppColor {
   static const actionColor = primary;
 
   // Градиенты карточек уровней (свободные, продвинутые, премиум)
+  static const levelCardBg = Color(0x809FC5E8); // 50% opacity
+
   static const levelGradients = <LinearGradient>[
     LinearGradient(
       begin: Alignment.topLeft,
       end: Alignment.bottomRight,
-      colors: [Color(0xFF4338CA), Color(0xFF5B21B6)],
+      colors: [Color(0xFF1995F0), Color(0xFF62B4FF)],
     ),
     LinearGradient(
       begin: Alignment.topLeft,

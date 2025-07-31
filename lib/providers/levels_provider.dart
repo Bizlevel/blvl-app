@@ -14,8 +14,13 @@ final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final subscriptionAsync = ref.watch(subscriptionProvider);
 
   bool hasPremium = false;
+  int userCurrentLevel = 1;
   if (currentUserAsync is AsyncData) {
-    hasPremium = currentUserAsync.value?.isPremium ?? false;
+    final user = currentUserAsync.value;
+    hasPremium = user?.isPremium ?? false;
+    if (user != null) {
+      userCurrentLevel = user.currentLevel;
+    }
   }
   if (subscriptionAsync is AsyncData<String?>) {
     hasPremium = hasPremium || (subscriptionAsync.value == 'active');
@@ -67,6 +72,8 @@ final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
         return 0;
       }(),
       'isLocked': isLocked,
+      'isCompleted': isCompleted,
+      'isCurrent': level.number == userCurrentLevel,
       'lockReason': isLocked
           ? (level.number > 3 && !level.isFree
               ? 'Только для премиум'

@@ -9,12 +9,14 @@ class CustomTextBox extends StatelessWidget {
     this.suffix,
     this.controller,
     this.readOnly = false,
+    this.obscureText = false,
   });
 
   final String hint;
   final Widget? prefix;
   final Widget? suffix;
   final bool readOnly;
+  final bool obscureText;
   final TextEditingController? controller;
 
   @override
@@ -39,6 +41,7 @@ class CustomTextBox extends StatelessWidget {
       child: TextField(
         readOnly: readOnly,
         controller: controller,
+        obscureText: obscureText,
         decoration: InputDecoration(
           prefixIcon: prefix,
           suffixIcon: suffix,

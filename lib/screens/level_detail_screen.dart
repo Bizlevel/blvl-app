@@ -7,7 +7,7 @@ import 'package:bizlevel/services/supabase_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bizlevel/providers/lesson_progress_provider.dart';
 import 'package:bizlevel/widgets/lesson_widget.dart';
-import 'package:bizlevel/widgets/floating_chat_bubble.dart';
+import 'package:bizlevel/screens/leo_dialog_screen.dart';
 import 'package:bizlevel/widgets/quiz_widget.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:bizlevel/providers/levels_provider.dart';
@@ -37,9 +37,9 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
   void initState() {
     super.initState();
     // Берём последнюю разблокированную страницу, чтобы открывать уровень там, где пользователь остановился.
-    final initialUnlockedPage =
-        ref.read(lessonProgressProvider(widget.levelId)).unlockedPage;
-    _pageController = PageController(initialPage: initialUnlockedPage);
+    _pageController = PageController(initialPage: 0);
+    // Гарантируем разблокировку Intro (0) и следующей страницы (1)
+    _progressNotifier.unlockPage(1);
     // Listen for page changes to rebuild so that chat bubble visibility updates
     _pageController.addListener(() {
       if (mounted) setState(() {});
@@ -104,6 +104,18 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
                       _currentIndex + 1 == _progress.unlockedPage,
                   onBack: _goBack,
                   onNext: _goNext,
+                  onDiscuss: () {
+                    showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.white,
+                      barrierColor: Colors.black54,
+                      builder: (_) => FractionallySizedBox(
+                        heightFactor: 0.9,
+                        child: LeoDialogScreen(chatId: _chatId),
+                      ),
+                    );
+                  },
                 ),
                 const SizedBox(height: 10),
                 ElevatedButton.icon(
@@ -152,17 +164,6 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
                   vertical: true,
                 ),
               ),
-              if (_blocks[_currentIndex] is _LessonBlock ||
-                  _blocks[_currentIndex] is _QuizBlock)
-                Positioned(
-                  bottom: 20,
-                  right: 20,
-                  child: FloatingChatBubble(
-                    chatId: _chatId,
-                    systemPrompt: _buildSystemPrompt(),
-                    unreadCount: 0,
-                  ),
-                ),
             ],
           );
           return stack;
@@ -459,11 +460,14 @@ class _NavBar extends StatelessWidget {
   final bool canNext;
   final VoidCallback onBack;
   final VoidCallback onNext;
-  const _NavBar(
-      {required this.canBack,
-      required this.canNext,
-      required this.onBack,
-      required this.onNext});
+  final VoidCallback onDiscuss;
+  const _NavBar({
+    required this.canBack,
+    required this.canNext,
+    required this.onBack,
+    required this.onNext,
+    required this.onDiscuss,
+  });
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -475,6 +479,12 @@ class _NavBar extends StatelessWidget {
             onPressed: canBack ? onBack : null,
             style: ElevatedButton.styleFrom(backgroundColor: AppColor.primary),
             child: const Text('Назад'),
+          ),
+          ElevatedButton(
+            onPressed: onDiscuss,
+            style: ElevatedButton.styleFrom(backgroundColor: AppColor.primary),
+            child: const Text('Обсудить с Лео',
+                style: TextStyle(fontWeight: FontWeight.w600)),
           ),
           ElevatedButton(
             onPressed: canNext ? onNext : null,

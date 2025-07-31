@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:bizlevel/theme/color.dart';
+import 'dart:ui';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class DesktopNavBar extends StatelessWidget {
   const DesktopNavBar({
@@ -10,38 +11,37 @@ class DesktopNavBar extends StatelessWidget {
     required this.onTabSelected,
   });
 
-  final List<Map<String, Object>> tabs;
+  final List<Map<String, Object>> tabs; // {icon: IconData, label: String}
   final int activeIndex;
   final ValueChanged<int> onTabSelected;
 
   @override
   Widget build(BuildContext context) {
-    return NavigationRail(
-      backgroundColor: AppColor.bottomBarColor,
+    final navRail = NavigationRail(
+      extended: true,
+      backgroundColor: Colors.white.withOpacity(0.8),
       selectedIndex: activeIndex,
       onDestinationSelected: onTabSelected,
-      labelType: NavigationRailLabelType.selected,
+      labelType: NavigationRailLabelType.none,
       selectedIconTheme: const IconThemeData(color: AppColor.primary),
-      destinations: List.generate(
-        tabs.length,
-        (index) {
-          final iconPath = tabs[index]['icon'] as String;
-          return NavigationRailDestination(
-            icon: SvgPicture.asset(
-              iconPath,
-              color: Colors.grey,
-              width: 24,
-              height: 24,
-            ),
-            selectedIcon: SvgPicture.asset(
-              iconPath,
-              color: AppColor.primary,
-              width: 24,
-              height: 24,
-            ),
-            label: const SizedBox.shrink(),
-          );
-        },
+      destinations: [
+        for (final tab in tabs)
+          NavigationRailDestination(
+            icon: Icon(tab['icon'] as IconData, color: Colors.grey, size: 24),
+            selectedIcon: Icon(tab['icon'] as IconData,
+                color: AppColor.primary, size: 24),
+            label: Text(tab['label'] as String? ?? ''),
+          ),
+      ],
+    );
+
+    // Эффект blur оставляем только для Web, чтобы избежать проблем с производительностью
+    if (!kIsWeb) return navRail;
+
+    return ClipRRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+        child: navRail,
       ),
     );
   }

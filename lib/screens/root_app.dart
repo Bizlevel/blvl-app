@@ -6,7 +6,6 @@ import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/utils/constant.dart';
 import 'package:bizlevel/widgets/bottombar_item.dart';
 import 'package:bizlevel/screens/levels_map_screen.dart';
-import 'package:responsive_framework/responsive_framework.dart';
 import 'package:bizlevel/widgets/desktop_nav_bar.dart';
 
 // Provider to hold index of active tab
@@ -17,15 +16,15 @@ class RootApp extends ConsumerWidget {
 
   static final _tabs = [
     {
-      "icon": "assets/icons/home.svg",
+      "icon": Icons.school_outlined,
       "page": const LevelsMapScreen(),
     },
     {
-      "icon": "assets/icons/chat.svg",
+      "icon": Icons.chat_bubble_outline,
       "page": const LeoChatScreen(),
     },
     {
-      "icon": "assets/icons/profile.svg",
+      "icon": Icons.person_outline,
       "page": const ProfileScreen(),
     },
   ];
@@ -93,7 +92,7 @@ class RootApp extends ConsumerWidget {
           children: List.generate(
             _tabs.length,
             (index) => BottomBarItem(
-              _tabs[index]["icon"] as String,
+              _tabs[index]["icon"] as IconData,
               isActive: activeTab == index,
               activeColor: AppColor.primary,
               onTap: () => ref.read(_rootTabProvider.notifier).state = index,

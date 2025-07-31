@@ -22,26 +22,22 @@ void main() {
       (_) async => [
         {
           'id': 1,
-          'number': 1,
-          'title': 'Intro',
+          'level': 1,
+          'name': 'Intro',
           'description': '',
           'image_url': '',
           'is_free': true,
-          'lessons': [
-            {'count': 3}
-          ],
+          'lessons': 3,
           'user_progress': []
         },
         {
           'id': 2,
-          'number': 2,
-          'title': 'Next',
+          'level': 2,
+          'name': 'Next',
           'description': '',
           'image_url': '',
           'is_free': true,
-          'lessons': [
-            {'count': 4}
-          ],
+          'lessons': 4,
           'user_progress': []
         }
       ],

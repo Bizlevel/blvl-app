@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:bizlevel/theme/color.dart';
-import 'package:bizlevel/providers/auth_provider.dart';
 import 'package:bizlevel/providers/levels_provider.dart';
 import 'package:bizlevel/widgets/level_card.dart';
+import 'package:bizlevel/widgets/user_info_bar.dart';
 import 'package:bizlevel/widgets/notification_box.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:bizlevel/screens/level_detail_screen.dart';
@@ -31,48 +31,12 @@ class LevelsMapScreen extends ConsumerWidget {
   }
 
   Widget _buildAppBar(WidgetRef ref) {
-    final userAsync = ref.watch(currentUserProvider);
-
-    String userName = 'Добро пожаловать';
-    userAsync.whenData((user) {
-      if (user != null && user.name.isNotEmpty) {
-        userName = user.name;
-      }
-    });
-
+    // Используем переиспользуемый виджет UserInfoBar
     return Row(
-      children: [
-        Image.asset(
-          'assets/images/logo_light.png',
-          width: 32,
-          height: 32,
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                userName,
-                style: const TextStyle(
-                  color: AppColor.labelColor,
-                  fontSize: 14,
-                ),
-              ),
-              const SizedBox(height: 5),
-              const Text(
-                "Good Morning!",
-                style: TextStyle(
-                  color: AppColor.textColor,
-                  fontWeight: FontWeight.w500,
-                  fontSize: 18,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const NotificationBox(notifiedNumber: 1),
+      children: const [
+        UserInfoBar(),
+        Spacer(),
+        NotificationBox(notifiedNumber: 1),
       ],
     );
   }

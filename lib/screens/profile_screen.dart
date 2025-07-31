@@ -6,6 +6,7 @@ import 'package:bizlevel/providers/auth_provider.dart';
 import 'package:bizlevel/services/auth_service.dart';
 import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/widgets/custom_image.dart';
+import 'package:bizlevel/widgets/stat_card.dart';
 import 'package:bizlevel/widgets/setting_box.dart';
 import 'package:bizlevel/widgets/setting_item.dart';
 import 'package:bizlevel/widgets/artifact_card.dart';
@@ -440,23 +441,23 @@ class _BodyState extends ConsumerState<_Body> {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Expanded(
-          child: SettingBox(
-            title: "${widget.currentLevel} LVL",
-            icon: "assets/icons/work.svg",
+          child: StatCard(
+            title: "${widget.currentLevel} Уровень",
+            icon: Icons.work,
           ),
         ),
         const SizedBox(width: AppSpacing.small),
         Expanded(
-          child: SettingBox(
-            title: "${widget.messagesLeft} Leo",
-            icon: "assets/icons/chat.svg",
+          child: StatCard(
+            title: "${widget.messagesLeft} Сообщений Лео",
+            icon: Icons.chat_bubble_outline,
           ),
         ),
         const SizedBox(width: AppSpacing.small),
         Expanded(
-          child: SettingBox(
-            title: "${widget.artifactsCount} Artfs",
-            icon: "assets/icons/shield.svg",
+          child: StatCard(
+            title: "${widget.artifactsCount} Артефакта",
+            icon: Icons.shield_outlined,
           ),
         ),
       ],
@@ -544,16 +545,26 @@ class _BodyState extends ConsumerState<_Body> {
         if (widget.artifacts.isEmpty)
           const Center(child: Text("У вас пока нет артефактов."))
         else
-          ...widget.artifacts.map(
-            (artifact) => Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.small),
-              child: ArtifactCard(
-                title: artifact['title'],
-                description: artifact['description'],
-                url: artifact['url'],
-                image: artifact['image'],
-              ),
-            ),
+          Wrap(
+            spacing: AppSpacing.small,
+            runSpacing: AppSpacing.small,
+            children: widget.artifacts
+                .map((artifact) => SizedBox(
+                      width: (MediaQuery.of(context).size.width < 600)
+                          ? double.infinity
+                          : (MediaQuery.of(context).size.width < 1024
+                              ? (MediaQuery.of(context).size.width / 2 -
+                                  AppSpacing.medium * 2)
+                              : (MediaQuery.of(context).size.width / 3 -
+                                  AppSpacing.medium * 2)),
+                      child: ArtifactCard(
+                        title: artifact['title'],
+                        description: artifact['description'],
+                        url: artifact['url'],
+                        image: artifact['image'],
+                      ),
+                    ))
+                .toList(),
           ),
       ],
     );

@@ -61,10 +61,10 @@ class AppShell extends ConsumerWidget {
                     _routes.length,
                     (index) => BottomBarItem(
                       index == 0
-                          ? 'assets/icons/home.svg'
+                          ? Icons.school
                           : index == 1
-                              ? 'assets/icons/chat.svg'
-                              : 'assets/icons/profile.svg',
+                              ? Icons.chat_bubble
+                              : Icons.person,
                       isActive: activeTab == index,
                       activeColor: AppColor.primary,
                       onTap: () => _goTab(index),
@@ -78,9 +78,9 @@ class AppShell extends ConsumerWidget {
               children: [
                 DesktopNavBar(
                   tabs: [
-                    {'icon': 'assets/icons/home.svg'},
-                    {'icon': 'assets/icons/chat.svg'},
-                    {'icon': 'assets/icons/profile.svg'},
+                    {'icon': Icons.map, 'label': 'Карта уровней'},
+                    {'icon': Icons.chat_bubble, 'label': 'Чат'},
+                    {'icon': Icons.person, 'label': 'Профиль'},
                   ],
                   activeIndex: activeTab,
                   onTabSelected: _goTab,

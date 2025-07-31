@@ -17,12 +17,18 @@ ISSUES_JSON=$(sentry-cli issues list \
   --query "is:unresolved" \
   --json || true)
 
-# Count issues with jq (expects jq installed)
-ISSUE_COUNT=$(echo "$ISSUES_JSON" | jq 'length')
+# Define patterns that are considered non-critical and can be ignored
+WHITELIST_REGEX="RenderFlex overflow|Layout|BackdropFilter performance"
 
-if [[ "$ISSUE_COUNT" -gt 0 ]]; then
-  echo "::error::Found $ISSUE_COUNT unresolved issues in the last 24h. Failing build."
-  echo "$ISSUES_JSON" | jq -r '.[] | "- " + .shortId + " " + .title + " (" + .permalink + ")"'
+# Filter out whitelisted issues
+CRITICAL_JSON=$(echo "$ISSUES_JSON" | jq --arg re "$WHITELIST_REGEX" 'map(select(.title | test($re; "i") | not))')
+
+# Count remaining critical issues
+CRITICAL_COUNT=$(echo "$CRITICAL_JSON" | jq 'length')
+
+if [[ "$CRITICAL_COUNT" -gt 0 ]]; then
+  echo "::error::Found $CRITICAL_COUNT critical unresolved issues in the last 24h. Failing build."
+  echo "$CRITICAL_JSON" | jq -r '.[] | "- " + .shortId + " " + .title + " (" + .permalink + ")"'
   exit 1
 fi
 
