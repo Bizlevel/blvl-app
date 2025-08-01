@@ -186,6 +186,7 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
   }
 
   // --- Leo chat helpers --------------------------------------------
+  // ignore: unused_element
   String _buildSystemPrompt() {
     if (_currentIndex == 0) {
       return 'Пользователь читает вводный блок уровня ${widget.levelId}. Помогите разобраться со структурой уровня.';

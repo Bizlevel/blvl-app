@@ -54,7 +54,14 @@ class LoginScreen extends HookConsumerWidget {
                 // белая карта формы
                 Container(
                   key: const Key('login_form'),
-                  width: 420,
+                  // adaptive width
+                  width: () {
+                    final w = MediaQuery.of(context).size.width;
+                    if (w >= 600 && w < 1024) {
+                      return 480.0;
+                    }
+                    return 420.0;
+                  }(),
                   padding:
                       const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
                   decoration: BoxDecoration(

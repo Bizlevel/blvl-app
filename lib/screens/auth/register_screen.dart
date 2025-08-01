@@ -89,7 +89,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
             child: Container(
               key: const Key('register_form'),
-              width: 420,
+              // adaptive width
+              width: () {
+                final w = MediaQuery.of(context).size.width;
+                if (w >= 600 && w < 1024) {
+                  return 480.0;
+                }
+                return 420.0;
+              }(),
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
               decoration: BoxDecoration(
                 color: Colors.white,

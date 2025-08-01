@@ -1,4 +1,5 @@
 import 'package:flutter/widgets.dart';
+// ignore_for_file: dead_code, constant_condition
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -6,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:bizlevel/services/supabase_service.dart';
 
 void main() {
+  // ignore: unnecessary_null_comparison
   if (WidgetsBinding.instance == null) {
     TestWidgetsFlutterBinding.ensureInitialized();
   }

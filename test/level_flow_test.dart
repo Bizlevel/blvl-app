@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+// ignore_for_file: dead_code, constant_condition
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,6 +11,7 @@ import 'package:bizlevel/providers/lesson_progress_provider.dart';
 import 'package:flutter/widgets.dart';
 
 void main() {
+  // ignore: unnecessary_null_comparison
   if (WidgetsBinding.instance == null) {
     IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   }

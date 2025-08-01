@@ -3,11 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/foundation.dart';
 
 import 'package:bizlevel/providers/auth_provider.dart';
-import 'package:bizlevel/services/auth_service.dart';
 import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/widgets/custom_image.dart';
 import 'package:bizlevel/widgets/stat_card.dart';
-import 'package:bizlevel/widgets/setting_box.dart';
 import 'package:bizlevel/widgets/setting_item.dart';
 import 'package:bizlevel/widgets/artifact_card.dart';
 import 'package:bizlevel/providers/levels_provider.dart';
@@ -156,9 +154,6 @@ class ProfileScreen extends ConsumerWidget {
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, s) => const Center(child: Text('Ошибка уровней')),
       data: (levelsData) {
-        final completedLevelNumbers =
-            List.generate(user.currentLevel - 1, (index) => index + 1);
-
         final completedLevels = levelsData.where((lvl) {
           final levelNum = lvl['level'] as int;
           final progressArr = lvl['user_progress'] as List?;
@@ -238,6 +233,7 @@ class _Body extends ConsumerStatefulWidget {
 }
 
 class _BodyState extends ConsumerState<_Body> {
+  // ignore: unused_field
   bool _isUploading = false;
 
   Future<void> _showAvatarPicker() async {
@@ -290,6 +286,7 @@ class _BodyState extends ConsumerState<_Body> {
     }
   }
 
+  // ignore: unused_element
   Future<void> _uploadFile() async {
     setState(() {
       _isUploading = true;
@@ -381,18 +378,46 @@ class _BodyState extends ConsumerState<_Body> {
 
     return Row(
       children: [
-        GestureDetector(
-          onTap: _showAvatarPicker,
-          child: CustomImage(
-            (localAsset.isNotEmpty
-                ? localAsset
-                : "https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=800&q=60"),
-            width: 80,
-            height: 80,
-            radius: 40,
-          ),
+        Stack(
+          alignment: Alignment.bottomRight,
+          children: [
+            GestureDetector(
+              onTap: _showAvatarPicker,
+              child: CustomImage(
+                (localAsset.isNotEmpty
+                    ? localAsset
+                    : "https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=800&q=60"),
+                width: 80,
+                height: 80,
+                radius: 40,
+              ),
+            ),
+            Positioned(
+              bottom: 0,
+              right: 0,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 2,
+                    ),
+                  ],
+                ),
+                child: const Padding(
+                  padding: EdgeInsets.all(4.0),
+                  child: Icon(
+                    Icons.camera_alt,
+                    size: 16,
+                    color: AppColor.primary,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
-        const SizedBox(width: AppSpacing.small),
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -405,21 +430,19 @@ class _BodyState extends ConsumerState<_Body> {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(width: AppSpacing.small),
-                if (widget.isPremium)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.small,
-                        vertical: AppSpacing.small / 2),
-                    decoration: BoxDecoration(
-                      color: AppColor.primary,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: const Text(
-                      'Premium',
-                      style: TextStyle(fontSize: 12, color: Colors.white),
-                    ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.small,
+                      vertical: AppSpacing.small / 2),
+                  decoration: BoxDecoration(
+                    color: widget.isPremium ? AppColor.primary : Colors.grey,
+                    borderRadius: BorderRadius.circular(4),
                   ),
+                  child: Text(
+                    widget.isPremium ? 'Premium' : 'Free',
+                    style: const TextStyle(fontSize: 12, color: Colors.white),
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: AppSpacing.small),

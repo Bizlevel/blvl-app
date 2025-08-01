@@ -5,7 +5,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/register_screen.dart';
-import '../screens/root_app.dart';
 import '../screens/app_shell.dart';
 import '../providers/auth_provider.dart';
 import '../screens/auth/onboarding_screens.dart';
