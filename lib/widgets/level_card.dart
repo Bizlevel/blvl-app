@@ -33,71 +33,82 @@ class _LevelCardState extends State<LevelCard> {
 
   @override
   Widget build(BuildContext context) {
-    final enableHover = kIsWeb;
+    final enableHover = kIsWeb && MediaQuery.of(context).size.width >= 600;
 
-    Widget card = GestureDetector(
-      onTap: _isLocked
-          ? null
-          : () {
-              HapticFeedback.lightImpact();
-              widget.onTap?.call();
-            },
-      child: Container(
-        key: const Key('level_card'),
-        width: widget.width,
-        height: widget.height,
-        padding: const EdgeInsets.all(AppSpacing.medium),
-        margin: const EdgeInsets.symmetric(vertical: AppSpacing.small),
-        decoration: BoxDecoration(
-          color: Colors.transparent,
-          border: Border.all(color: Colors.grey.withOpacity(0.3)),
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: AppColor.shadowColor.withOpacity(0.1 + (_hover ? 0.1 : 0)),
-              spreadRadius: _hover ? 2 : 1,
-              blurRadius: _hover ? 6 : 1,
-              offset: const Offset(1, 1),
+    Widget card = LayoutBuilder(
+      builder: (context, constraints) {
+        final double cardWidth = constraints.maxWidth;
+        // Отношение ширины к высоте изображения ~ 5:3
+        final bool isMobile = MediaQuery.of(context).size.width < 600;
+        final double imageRatio = isMobile ? 0.5 : 0.6;
+        final double imageHeight = cardWidth * imageRatio;
+
+        return GestureDetector(
+          onTap: _isLocked
+              ? null
+              : () {
+                  HapticFeedback.lightImpact();
+                  widget.onTap?.call();
+                },
+          child: Container(
+            key: const Key('level_card'),
+            width: widget.width,
+            padding: const EdgeInsets.all(AppSpacing.medium),
+            margin: const EdgeInsets.symmetric(vertical: AppSpacing.small),
+            decoration: BoxDecoration(
+              color: Colors.transparent,
+              border: Border.all(color: Colors.grey.withOpacity(0.3)),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColor.shadowColor.withOpacity(
+                    0.1 + (_hover ? 0.1 : 0),
+                  ),
+                  spreadRadius: _hover ? 2 : 1,
+                  blurRadius: _hover ? 6 : 1,
+                  offset: const Offset(1, 1),
+                ),
+                if (_isCurrent)
+                  BoxShadow(
+                    color: AppColor.premium.withOpacity(0.6),
+                    spreadRadius: 0,
+                    blurRadius: 12,
+                  ),
+              ],
             ),
-            if (_isCurrent)
-              BoxShadow(
-                color: AppColor.premium.withOpacity(0.6),
-                spreadRadius: 0,
-                blurRadius: 12,
-              ),
-          ],
-        ),
-        child: Stack(
-          children: [
-            // Preview image of the level
-            CustomImage(
-              widget.data["image"],
-              width: double.infinity,
-              height: 190,
-              radius: 15,
+            child: Stack(
+              children: [
+                // Preview image of the level
+                CustomImage(
+                  widget.data["image"],
+                  width: double.infinity,
+                  height: imageHeight,
+                  radius: 15,
+                ),
+                // Level number badge
+                Positioned(
+                  top: imageHeight - 20,
+                  right: 15,
+                  child: _buildLevelNumber(),
+                ),
+                // Level info (title + lessons count)
+                Positioned(
+                  top: imageHeight + 10,
+                  left: 0,
+                  right: 0,
+                  child: _buildInfo(),
+                ),
+                // Completed overlay
+                if (_isCompleted && !_isLocked) _buildCompletedOverlay(),
+                // Current level overlay
+                if (_isCurrent && !_isLocked) _buildCurrentOverlay(),
+                // Locked overlay
+                if (_isLocked) _buildLockedOverlay(),
+              ],
             ),
-            // Level number badge
-            Positioned(
-              top: 170,
-              right: 15,
-              child: _buildLevelNumber(),
-            ),
-            // Level info (title + lessons count)
-            Positioned(
-              top: 210,
-              left: 0,
-              right: 0,
-              child: _buildInfo(),
-            ),
-            // Completed overlay
-            if (_isCompleted && !_isLocked) _buildCompletedOverlay(),
-            // Current level overlay
-            if (_isCurrent && !_isLocked) _buildCurrentOverlay(),
-            // Locked overlay
-            if (_isLocked) _buildLockedOverlay(),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
 
     if (enableHover) {
@@ -128,11 +139,7 @@ class _LevelCardState extends State<LevelCard> {
           color: Colors.white.withOpacity(0.8),
           shape: BoxShape.circle,
         ),
-        child: const Icon(
-          Icons.check,
-          color: AppColor.success,
-          size: 20,
-        ),
+        child: const Icon(Icons.check, color: AppColor.success, size: 20),
       ),
     );
   }
@@ -155,11 +162,7 @@ class _LevelCardState extends State<LevelCard> {
             color: Colors.white.withOpacity(0.9),
             shape: BoxShape.circle,
           ),
-          child: const Icon(
-            Icons.star,
-            color: AppColor.premium,
-            size: 20,
-          ),
+          child: const Icon(Icons.star, color: AppColor.premium, size: 20),
         ),
       ),
     );
@@ -173,11 +176,7 @@ class _LevelCardState extends State<LevelCard> {
           borderRadius: BorderRadius.circular(20),
         ),
         child: const Center(
-          child: Icon(
-            Icons.lock,
-            color: Colors.white,
-            size: 48,
-          ),
+          child: Icon(Icons.lock, color: Colors.white, size: 48),
         ),
       ),
     );
@@ -194,10 +193,9 @@ class _LevelCardState extends State<LevelCard> {
         children: [
           Text(
             widget.data["name"],
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 17,
+            softWrap: true,
+            style: TextStyle(
+              fontSize: (MediaQuery.of(context).size.width < 600) ? 15 : 17,
               color: AppColor.textColor,
               fontWeight: FontWeight.w600,
             ),

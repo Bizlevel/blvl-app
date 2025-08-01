@@ -55,7 +55,8 @@ class LevelsMapScreen extends ConsumerWidget {
                   _calcCrossAxisCount(MediaQuery.of(context).size.width),
               crossAxisSpacing: 15,
               mainAxisSpacing: 15,
-              childAspectRatio: 0.9,
+              childAspectRatio:
+                  _calcChildAspectRatio(MediaQuery.of(context).size.width),
             ),
             delegate: SliverChildBuilderDelegate(
               (context, index) {
@@ -88,7 +89,8 @@ class LevelsMapScreen extends ConsumerWidget {
                 _calcCrossAxisCount(MediaQuery.of(context).size.width),
             crossAxisSpacing: 15,
             mainAxisSpacing: 15,
-            childAspectRatio: 0.9,
+            childAspectRatio:
+                _calcChildAspectRatio(MediaQuery.of(context).size.width),
           ),
           delegate: SliverChildBuilderDelegate(
             (context, index) => Shimmer.fromColors(
@@ -114,6 +116,21 @@ class LevelsMapScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  double _calcChildAspectRatio(double width) {
+    // Подбираем коэффициент так, чтобы высота карточки заполняла ячейку без лишнего пространства
+    // На мобильных (1 колонка) карточка выше, поэтому aspectRatio ≈1.25;
+    // На планшете/десктопе, где несколько колонок, карточка шире, поэтому высота относительно меньшая – повышаем aspect.
+    if (width < 600) {
+      return 1.25;
+    } else if (width < 1024) {
+      return 1.4;
+    } else if (width < 1400) {
+      return 1.6;
+    } else {
+      return 1.8;
+    }
   }
 
   int _calcCrossAxisCount(double width) {
