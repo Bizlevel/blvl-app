@@ -1,8 +1,14 @@
-<svg width="24px" height="24px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-<g id="Iconly/Curved/Time Circle">
-<g id="Time Circle">
-<path id="Stroke 1" fill-rule="evenodd" clip-rule="evenodd" d="M21.2498 12C21.2498 17.108 17.1088 21.25 11.9998 21.25C6.89176 21.25 2.74976 17.108 2.74976 12C2.74976 6.891 6.89176 2.75 11.9998 2.75C17.1088 2.75 21.2498 6.891 21.2498 12Z" stroke="#130F26" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-<path id="Stroke 3" d="M16.1906 12.7672L11.6606 12.6932V7.84619" stroke="#130F26" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-</g>
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generator: Adobe Illustrator 27.9.6, SVG Export Plug-In . SVG Version: 9.03 Build 54986)  -->
+<svg version="1.2" baseProfile="tiny" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+	 x="0px" y="0px" viewBox="0 0 24 24" overflow="visible" xml:space="preserve">
+<g id="Iconly_x2F_Curved_x2F_Time_Circle">
+	<g id="Time_Circle">
+		<path id="Stroke_1" fill="none" stroke="#130F26" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="
+			M21.25,12c0,5.108-4.141,9.25-9.25,9.25c-5.108,0-9.25-4.142-9.25-9.25c0-5.109,4.142-9.25,9.25-9.25
+			C17.109,2.75,21.25,6.891,21.25,12z"/>
+		<path id="Stroke_3" fill="none" stroke="#130F26" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="
+			M16.191,12.767l-4.53-0.074V7.846"/>
+	</g>
 </g>
 </svg>

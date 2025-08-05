@@ -1,8 +1,14 @@
-<svg width="24px" height="24px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-<g id="Iconly/Curved/Home">
-<g id="Home">
-<path id="Stroke 1" d="M9.07861 16.1355H14.8936" stroke="#130F26" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-<path id="Stroke 2" fill-rule="evenodd" clip-rule="evenodd" d="M2.3999 13.713C2.3999 8.082 3.0139 8.475 6.3189 5.41C7.7649 4.246 10.0149 2 11.9579 2C13.8999 2 16.1949 4.235 17.6539 5.41C20.9589 8.475 21.5719 8.082 21.5719 13.713C21.5719 22 19.6129 22 11.9859 22C4.3589 22 2.3999 22 2.3999 13.713Z" stroke="#130F26" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-</g>
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generator: Adobe Illustrator 27.9.6, SVG Export Plug-In . SVG Version: 9.03 Build 54986)  -->
+<svg version="1.2" baseProfile="tiny" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+	 x="0px" y="0px" viewBox="0 0 24 24" overflow="visible" xml:space="preserve">
+<g id="Iconly_x2F_Curved_x2F_Home">
+	<g id="Home">
+		<path id="Stroke_1" fill="none" stroke="#130F26" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="
+			M9.079,16.135h5.815"/>
+		<path id="Stroke_2" fill="none" stroke="#130F26" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="
+			M2.4,13.713c0-5.631,0.614-5.238,3.919-8.303C7.765,4.246,10.015,2,11.958,2c1.942,0,4.237,2.235,5.696,3.41
+			c3.305,3.065,3.918,2.672,3.918,8.303C21.572,22,19.613,22,11.986,22S2.4,22,2.4,13.713z"/>
+	</g>
 </g>
 </svg>

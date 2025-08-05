@@ -1,8 +1,14 @@
-<svg width="24px" height="24px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-<g id="Iconly/Curved/Send">
-<g id="Send">
-<path id="Stroke 1" fill-rule="evenodd" clip-rule="evenodd" d="M11.4933 12.4382C11.4933 12.4382 -0.483351 9.96062 3.6786 7.55807C7.19075 5.53077 19.2947 2.04522 20.9857 2.94582C21.8863 4.63682 18.4007 16.7408 16.3734 20.2529C13.9709 24.4149 11.4933 12.4382 11.4933 12.4382Z" stroke="#130F26" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-<path id="Stroke 3" d="M11.4933 12.4382L20.9857 2.9458" stroke="#130F26" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-</g>
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generator: Adobe Illustrator 27.9.6, SVG Export Plug-In . SVG Version: 9.03 Build 54986)  -->
+<svg version="1.2" baseProfile="tiny" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+	 x="0px" y="0px" viewBox="0 0 24 24" overflow="visible" xml:space="preserve">
+<g id="Iconly_x2F_Curved_x2F_Send">
+	<g id="Send">
+		<path id="Stroke_1" fill="none" stroke="#130F26" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="
+			M11.493,12.438c0,0-11.977-2.478-7.815-4.88c3.512-2.027,15.616-5.513,17.307-4.612c0.901,1.691-2.585,13.795-4.612,17.307
+			C13.971,24.415,11.493,12.438,11.493,12.438z"/>
+		<path id="Stroke_3" fill="none" stroke="#130F26" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="
+			M11.493,12.438l9.492-9.492"/>
+	</g>
 </g>
 </svg>
