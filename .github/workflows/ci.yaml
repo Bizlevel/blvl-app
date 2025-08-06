@@ -9,10 +9,10 @@ env:
   FLUTTER_VERSION: "3.22.0"
   JAVA_VERSION: "17"
   SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-  SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
-  SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
-  SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-  SUPABASE_PROJECT_ID: acevqbdpzgbtqznbpgzr
+  SENTRY_ORG:           ${{ secrets.SENTRY_ORG }}
+  SENTRY_PROJECT:       ${{ secrets.SENTRY_PROJECT }}
+  SLACK_WEBHOOK_URL:    ${{ secrets.SLACK_WEBHOOK_URL }}
+  SUPABASE_PROJECT_ID:  acevqbdpzgbtqznbpgzr
 
 jobs:
   unit:
@@ -29,6 +29,21 @@ jobs:
 
       - name: Install dependencies
         run: flutter pub get
+
+      - name: Create real .env from GitHub Secrets
+        run: |
+          cat <<EOF > .env
+          SUPABASE_URL=${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+          OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+          SUPABASE_PERSONAL_ACCESS_TOKEN=${{ secrets.SUPABASE_PERSONAL_ACCESS_TOKEN }}
+          SENTRY_DSN=${{ secrets.SENTRY_DSN }}
+          SENTRY_AUTH_TOKEN=${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG=${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT=${{ secrets.SENTRY_PROJECT }}
+          VERCEL_ACCESS_TOKEN=${{ secrets.VERCEL_ACCESS_TOKEN }}
+          VERCEL_PROJECT_ID=${{ secrets.VERCEL_PROJECT_ID }}
+          EOF
 
       - name: Run unit tests
         run: flutter test --coverage
@@ -54,6 +69,9 @@ jobs:
 
       - name: Install dependencies
         run: flutter pub get
+
+      - name: Create real .env from GitHub Secrets
+        run: touch .env
 
       - name: Set up xvfb for headless Chrome
         run: |
@@ -86,6 +104,9 @@ jobs:
 
       - name: Install dependencies
         run: flutter pub get
+
+      - name: Create real .env from GitHub Secrets
+        run: touch .env
 
       - name: Cache Gradle
         uses: actions/cache@v3
@@ -128,6 +149,9 @@ jobs:
 
       - name: Install dependencies
         run: flutter pub get
+
+      - name: Create real .env from GitHub Secrets
+        run: touch .env
 
       - name: Cache CocoaPods
         uses: actions/cache@v3
@@ -185,8 +209,8 @@ jobs:
       - name: Run Sentry unresolved issues check
         env:
           SENTRY_AUTH_TOKEN: ${{ env.SENTRY_AUTH_TOKEN }}
-          SENTRY_ORG: ${{ env.SENTRY_ORG }}
-          SENTRY_PROJECT: ${{ env.SENTRY_PROJECT }}
+          SENTRY_ORG:       ${{ env.SENTRY_ORG }}
+          SENTRY_PROJECT:   ${{ env.SENTRY_PROJECT }}
         run: bash scripts/sentry_check.sh
 
   email_notify:
@@ -199,21 +223,21 @@ jobs:
         uses: dawidd6/action-send-mail@v3
         with:
           server_address: ${{ secrets.SMTP_SERVER }}
-          server_port: ${{ secrets.SMTP_PORT }}
-          username: ${{ secrets.SMTP_USERNAME }}
-          password: ${{ secrets.SMTP_PASSWORD }}
-          subject: "BizLevel CI - Run #${{ github.run_number }} (Sentry: ${{ needs.sentry_check.result }})"
-          to: "deus2111@gmail.com"
-          from: "BizLevel CI <${{ secrets.SMTP_USERNAME }}>"
-          content_type: text/html
+          server_port:    ${{ secrets.SMTP_PORT }}
+          username:       ${{ secrets.SMTP_USERNAME }}
+          password:       ${{ secrets.SMTP_PASSWORD }}
+          subject:        "BizLevel CI - Run #${{ github.run_number }} (Sentry: ${{ needs.sentry_check.result }})"
+          to:             "deus2111@gmail.com"
+          from:           "BizLevel CI <${{ secrets.SMTP_USERNAME }}>"
+          content_type:   text/html
           body: |
             <h3>BizLevel CI – workflow run #${{ github.run_number }}</h3>
             <ul>
               <li>Unit: ${{ needs.unit.result }}</li>
-              <li>Web: ${{ needs.integration_web.result }}</li>
+              <li>Web:  ${{ needs.integration_web.result }}</li>
               <li>Android: ${{ needs.integration_android.result }}</li>
               <li>iOS: ${{ needs.integration_ios.result }}</li>
               <li>Supabase Advisors: ${{ needs.supabase_advisors.result }}</li>
               <li>Sentry: ${{ needs.sentry_check.result }}</li>
             </ul>
-            <p>Details: <a href="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}">see workflow</a></p> 
+            <p>Details: <a href="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}">see workflow</a></p>
