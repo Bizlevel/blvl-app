@@ -10,6 +10,8 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../providers/auth_provider.dart';
 import '../../widgets/custom_textfield.dart';
+import '../../widgets/custom_image.dart';
+
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -24,6 +26,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _confirmController = TextEditingController();
 
   bool _isLoading = false;
+  bool _registrationSuccess = false;
 
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
@@ -59,9 +62,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           );
       log('Sign up successful for email: $email');
       if (!mounted) return;
-      _showSnackBar(
-          'Регистрация прошла успешно! Пожалуйста, подтвердите свой e-mail, перейдя по ссылке в письме.');
-      // Не переходим на другой экран, даём пользователю прочитать сообщение
+      // Устанавливаем состояние успешной регистрации для показа экрана подтверждения
+      setState(() => _registrationSuccess = true);
     } on AuthFailure catch (e) {
       log('AuthFailure during sign up for $email', error: e);
       _showSnackBar(e.message);
@@ -110,102 +112,207 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   ),
                 ],
               ),
-              child: Column(
-                children: [
-                  Container(
-                    width: 96,
-                    height: 96,
-                    decoration: BoxDecoration(
-                      color: Color(0xFFf0f0f0),
-                      shape: BoxShape.circle,
-                    ),
-                    padding: const EdgeInsets.all(8),
-                    child: SvgPicture.asset(
-                      'assets/images/logo_light.svg',
-                      width: 80,
-                      height: 80,
-                      fit: BoxFit.contain,
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                  CustomTextBox(
-                    hint: 'Email',
-                    prefix: const Icon(Icons.email_outlined),
-                    controller: _emailController,
-                  ),
-                  const SizedBox(height: 16),
-                  CustomTextBox(
-                    hint: 'Пароль',
-                    prefix: const Icon(Icons.lock_outline),
-                    controller: _passwordController,
-                    obscureText: _obscurePassword,
-                    suffix: IconButton(
-                      icon: Icon(_obscurePassword
-                          ? Icons.visibility_off
-                          : Icons.visibility),
-                      onPressed: () =>
-                          setState(() => _obscurePassword = !_obscurePassword),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  CustomTextBox(
-                    hint: 'Подтвердите пароль',
-                    prefix: const Icon(Icons.lock_person_outlined),
-                    controller: _confirmController,
-                    obscureText: _obscureConfirm,
-                    suffix: IconButton(
-                      icon: Icon(_obscureConfirm
-                          ? Icons.visibility_off
-                          : Icons.visibility),
-                      onPressed: () =>
-                          setState(() => _obscureConfirm = !_obscureConfirm),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  GestureDetector(
-                    onTap: _isLoading ? null : _submit,
-                    child: Container(
-                      height: 48,
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [AppColor.primary, Color(0xFF1273C4)],
-                          begin: Alignment.centerLeft,
-                          end: Alignment.centerRight,
-                        ),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      alignment: Alignment.center,
-                      child: _isLoading
-                          ? const SizedBox(
-                              width: 22,
-                              height: 22,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 3,
-                              ),
-                            )
-                          : const Text(
-                              'Создать аккаунт',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextButton(
-                    onPressed: () => context.go('/login'),
-                    child: const Text('Уже есть аккаунт? Войти'),
-                  ),
-                ],
-              ),
+              child: _registrationSuccess
+                  ? _buildSuccessView()
+                  : _buildRegistrationForm(),
             ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildRegistrationForm() {
+    return Column(
+      children: [
+        Container(
+          width: 96,
+          height: 96,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+          ),
+          padding: const EdgeInsets.all(8),
+          child: const CustomImage(
+            'assets/images/logo_light.png',
+            width: 80,
+            height: 80,
+            isNetwork: false,
+            fit: BoxFit.contain,
+          ),
+        ),
+        const SizedBox(height: 32),
+        CustomTextBox(
+          key: const Key('email_field'),
+          hint: 'Email',
+          prefix: const Icon(Icons.email_outlined),
+          controller: _emailController,
+        ),
+        const SizedBox(height: 16),
+        CustomTextBox(
+          key: const Key('password_field'),
+          hint: 'Пароль',
+          prefix: const Icon(Icons.lock_outline),
+          controller: _passwordController,
+          obscureText: _obscurePassword,
+          suffix: IconButton(
+            icon: Icon(
+                _obscurePassword ? Icons.visibility_off : Icons.visibility),
+            onPressed: () =>
+                setState(() => _obscurePassword = !_obscurePassword),
+          ),
+        ),
+        const SizedBox(height: 16),
+        CustomTextBox(
+          key: const Key('confirm_password_field'),
+          hint: 'Подтвердите пароль',
+          prefix: const Icon(Icons.lock_person_outlined),
+          controller: _confirmController,
+          obscureText: _obscureConfirm,
+          suffix: IconButton(
+            icon:
+                Icon(_obscureConfirm ? Icons.visibility_off : Icons.visibility),
+            onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
+          ),
+        ),
+        const SizedBox(height: 24),
+        GestureDetector(
+          onTap: _isLoading ? null : _submit,
+          child: Container(
+            height: 48,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [AppColor.primary, Color(0xFF1273C4)],
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+              ),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            alignment: Alignment.center,
+            child: _isLoading
+                ? const SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 3,
+                    ),
+                  )
+                : const Text(
+                    'Создать аккаунт',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        TextButton(
+          onPressed: () => context.go('/login'),
+          child: const Text('Уже есть аккаунт? Войти'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSuccessView() {
+    return Column(
+      children: [
+        Container(
+          width: 96,
+          height: 96,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+          ),
+          padding: const EdgeInsets.all(8),
+          child: const CustomImage(
+            'assets/images/logo_light.png',
+            width: 80,
+            height: 80,
+            isNetwork: false,
+            fit: BoxFit.contain,
+          ),
+        ),
+        const SizedBox(height: 32),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.green.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.green.withOpacity(0.3)),
+          ),
+          child: const Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.green, size: 24),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Регистрация успешна!',
+                  style: TextStyle(
+                    color: Colors.green,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
+        const Text(
+          'Проверьте почту для подтверждения аккаунта',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+            color: Colors.black87,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 16),
+        const Text(
+          'Мы отправили вам письмо со ссылкой для подтверждения. Перейдите по ссылке, а затем войдите в приложение.',
+          style: TextStyle(
+            fontSize: 14,
+            color: Colors.black54,
+            height: 1.4,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 32),
+        GestureDetector(
+          onTap: () => context.go('/login?registered=true'),
+          child: Container(
+            height: 48,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [AppColor.primary, Color(0xFF1273C4)],
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+              ),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            alignment: Alignment.center,
+            child: const Text(
+              'Уже подтвердили? Войти',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        TextButton(
+          onPressed: () => setState(() => _registrationSuccess = false),
+          child: const Text('← Назад к регистрации'),
+        ),
+      ],
     );
   }
 }

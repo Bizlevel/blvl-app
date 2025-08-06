@@ -21,8 +21,12 @@ class UserRepository {
             'UserRepository.fetchProfile: querying users table for $userId');
       }
 
-      final response =
-          await _client.from('users').select().eq('id', userId).maybeSingle();
+      final response = await _client
+          .from('users')
+          .select(
+              'id, name, email, about, goal, onboarding_completed, current_level, leo_messages_today, leo_messages_total, is_premium, avatar_id')
+          .eq('id', userId)
+          .maybeSingle();
 
       if (response == null) {
         if (kDebugMode) {

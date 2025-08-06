@@ -89,7 +89,7 @@ void main() {
       builder = MockSupabaseQueryBuilder();
       when(() => client.from('users')).thenReturn(builder as dynamic);
       when(() => (builder as dynamic).upsert(any<dynamic>()))
-          .thenAnswer((_) async {});
+          .thenAnswer((_) async => {});
     });
 
     test('формирует payload без onboarding_completed по умолчанию', () async {

@@ -79,11 +79,17 @@ class AuthService {
   /// Returns the currently authenticated [User] or `null` if not signed in.
   User? getCurrentUser() => _client.auth.currentUser;
 
+  /// Stream of authentication state changes.
+  Stream<User?> get authStateChanges =>
+      _client.auth.onAuthStateChange.map((event) => event.session?.user);
+
   /// Updates profile fields in `users` table for the current user.
+  /// All parameters are optional for partial updates.
   Future<void> updateProfile({
-    required String name,
-    required String about,
-    required String goal,
+    String? name,
+    String? about,
+    String? goal,
+    int? avatarId,
     bool? onboardingCompleted,
   }) async {
     final user = _client.auth.currentUser;
@@ -98,12 +104,9 @@ class AuthService {
     }
 
     await _handleAuthCall(() async {
-      // Формируем payload динамически и добавляем email только при наличии.
+      // Формируем payload динамически, добавляя только переданные поля
       final Map<String, dynamic> payload = {
         'id': user.id,
-        'name': name,
-        'about': about,
-        'goal': goal,
         'updated_at': DateTime.now().toIso8601String(),
       };
 
@@ -112,7 +115,11 @@ class AuthService {
         payload['email'] = user.email;
       }
 
-      // Only update onboarding flag when explicitly specified.
+      // Добавляем только переданные поля
+      if (name != null) payload['name'] = name;
+      if (about != null) payload['about'] = about;
+      if (goal != null) payload['goal'] = goal;
+      if (avatarId != null) payload['avatar_id'] = avatarId;
       if (onboardingCompleted != null) {
         payload['onboarding_completed'] = onboardingCompleted;
       }
@@ -122,18 +129,9 @@ class AuthService {
   }
 
   /// Updates the avatar id (1..7) for current user.
+  /// Deprecated: Use updateProfile(avatarId: id) instead.
   Future<void> updateAvatar(int avatarId) async {
-    final user = _client.auth.currentUser;
-    if (user == null) {
-      throw AuthFailure('Пользователь не авторизован');
-    }
-
-    await _handleAuthCall(() async {
-      await _client.from('users').update({
-        'avatar_id': avatarId,
-        'updated_at': DateTime.now().toIso8601String(),
-      }).eq('id', user.id);
-    }, unknownErrorMessage: 'Не удалось обновить аватар');
+    await updateProfile(avatarId: avatarId);
   }
 }
 

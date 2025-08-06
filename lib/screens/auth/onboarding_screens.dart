@@ -5,7 +5,6 @@ import '../../services/auth_service.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/color.dart';
 import '../../widgets/custom_textfield.dart';
-import '../../widgets/custom_image.dart';
 import 'package:go_router/go_router.dart';
 
 class OnboardingProfileScreen extends ConsumerStatefulWidget {
@@ -23,6 +22,7 @@ class _OnboardingProfileScreenState
   final _goalController = TextEditingController();
 
   bool _saving = false;
+  int _selectedAvatarId = 1; // По умолчанию первый аватар
 
   @override
   void dispose() {
@@ -55,6 +55,7 @@ class _OnboardingProfileScreenState
             name: name,
             about: about,
             goal: goal,
+            avatarId: _selectedAvatarId,
           );
       if (!mounted) return;
       context.go('/onboarding/video');
@@ -72,6 +73,55 @@ class _OnboardingProfileScreenState
         .showSnackBar(SnackBar(content: Text(message)));
   }
 
+  Future<void> _showAvatarPicker() async {
+    final selectedId = await showModalBottomSheet<int>(
+      context: context,
+      backgroundColor: Colors.white,
+      builder: (ctx) {
+        return GridView.builder(
+          padding: const EdgeInsets.all(AppSpacing.medium),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            mainAxisSpacing: AppSpacing.medium,
+            crossAxisSpacing: AppSpacing.medium,
+          ),
+          itemCount: 7,
+          itemBuilder: (_, index) {
+            final id = index + 1;
+            final asset = 'assets/images/avatars/avatar_${id}.png';
+            final isSelected = id == _selectedAvatarId;
+            return GestureDetector(
+              onTap: () => Navigator.of(ctx).pop(id),
+              child: Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(40),
+                    child: Image.asset(asset, fit: BoxFit.cover),
+                  ),
+                  if (isSelected)
+                    Positioned.fill(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          border: Border.all(color: AppColor.primary, width: 3),
+                          borderRadius: BorderRadius.circular(40),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    if (selectedId != null) {
+      setState(() {
+        _selectedAvatarId = selectedId;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -81,12 +131,45 @@ class _OnboardingProfileScreenState
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Center(
-              child: CustomImage(
-                'https://placehold.co/90x90',
-                width: 90,
-                height: 90,
-                radius: 15,
+            Center(
+              child: GestureDetector(
+                onTap: _showAvatarPicker,
+                child: Stack(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(15),
+                      child: Image.asset(
+                        'assets/images/avatars/avatar_$_selectedAvatarId.png',
+                        width: 90,
+                        height: 90,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: Container(
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 2,
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.camera_alt,
+                          size: 16,
+                          color: AppColor.primary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 32),
@@ -94,6 +177,7 @@ class _OnboardingProfileScreenState
                 style: TextStyle(fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
             CustomTextBox(
+              key: const Key('name_field'),
               hint: 'Имя',
               controller: _nameController,
               prefix: const Icon(Icons.person_outline),
@@ -102,6 +186,7 @@ class _OnboardingProfileScreenState
             const Text('Кратко о себе'),
             const SizedBox(height: 8),
             CustomTextBox(
+              key: const Key('about_field'),
               hint: 'О себе',
               controller: _aboutController,
               prefix: const Icon(Icons.info_outline),
@@ -110,6 +195,7 @@ class _OnboardingProfileScreenState
             const Text('Ваша цель обучения'),
             const SizedBox(height: 8),
             CustomTextBox(
+              key: const Key('goal_field'),
               hint: 'Цель',
               controller: _goalController,
               prefix: const Icon(Icons.flag_outlined),
