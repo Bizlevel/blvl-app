@@ -6,7 +6,7 @@ on:
   pull_request:
 
 env:
-  FLUTTER_VERSION: "3.32.1"
+  FLUTTER_VERSION: "3.22.0"
   JAVA_VERSION: "17"
   SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
   SENTRY_ORG:           ${{ secrets.SENTRY_ORG }}
