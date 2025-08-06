@@ -34,6 +34,8 @@ class CustomImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bool isAsset = image.startsWith('assets/');
+
     return Container(
       width: width,
       height: height,
@@ -50,26 +52,28 @@ class CustomImage extends StatelessWidget {
             ),
         ],
       ),
-      child: isNetwork
-          ? _buildNetworkImage()
-          : Image(
-              image: AssetImage(image),
-              fit: fit,
-            ),
+      child: ClipRRect(
+        borderRadius: borderRadius ?? BorderRadius.circular(radius),
+        child: isAsset
+            ? Image.asset(
+                image,
+                width: width,
+                height: height,
+                fit: fit,
+              )
+            : _buildNetworkImage(),
+      ),
     );
   }
 
   Widget _buildNetworkImage() {
     return CachedNetworkImage(
       imageUrl: image,
+      width: width,
+      height: height,
+      fit: fit,
       placeholder: (context, url) => const BlankImageWidget(),
       errorWidget: (context, url, error) => const BlankImageWidget(),
-      imageBuilder: (context, imageProvider) => Container(
-        decoration: BoxDecoration(
-          borderRadius: borderRadius ?? BorderRadius.circular(radius),
-          image: DecorationImage(image: imageProvider, fit: fit),
-        ),
-      ),
     );
   }
 }
