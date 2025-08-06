@@ -48,9 +48,9 @@ jobs:
       - name: Run unit tests
         run: flutter test --coverage
 
-      - name: Install Supabase CLI
+      - name: Setup Supabase CLI
         if: failure()
-        run: npm install -g supabase
+        uses: supabase/setup-cli@v1
 
       - name: Fetch Supabase logs on failure
         if: failure()
@@ -87,9 +87,9 @@ jobs:
       - name: Run integration tests (Chrome)
         run: flutter test integration_test -d chrome
 
-      - name: Install Supabase CLI
+      - name: Setup Supabase CLI
         if: failure()
-        run: npm install -g supabase
+        uses: supabase/setup-cli@v1
 
       - name: Fetch Supabase logs on failure
         if: failure()
@@ -136,7 +136,7 @@ jobs:
 
       - name: Install Supabase CLI
         if: failure()
-        run: npm install -g supabase
+        run: uses: supabase/setup-cli@v1
 
       - name: Fetch Supabase logs on failure
         if: failure()
@@ -182,9 +182,9 @@ jobs:
           sleep 20
           flutter test integration_test -d "iPhone 15"
 
-      - name: Install Supabase CLI
+      - name: Setup Supabase CLI
         if: failure()
-        run: npm install -g supabase
+        uses: supabase/setup-cli@v1
 
       - name: Fetch Supabase logs on failure
         if: failure()
@@ -204,8 +204,8 @@ jobs:
       - name: Install jq (for JSON processing)
         run: sudo apt-get update && sudo apt-get install -y jq
 
-      - name: Install Supabase CLI
-        run: npm install -g supabase
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
 
       - name: Run Supabase security advisors check
         env:
