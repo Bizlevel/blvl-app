@@ -99,11 +99,11 @@ class _OnboardingVideoScreenState extends ConsumerState<OnboardingVideoScreen> {
       // Помечаем, что онбординг пройден через сервис
       await ref.read(authServiceProvider).updateProfile(
             name: currentUser.name,
-            about: currentUser.about,
-            goal: currentUser.goal,
-            avatarId: currentUser.avatarId,
+            about: currentUser.about ?? '',
+            goal: currentUser.goal ?? '',
             onboardingCompleted: true,
           );
+      await ref.read(authServiceProvider).updateAvatar(currentUser.avatarId ?? 1);
       // Принудительно обновляем провайдер, чтобы GoRouter получил актуальные данные
       ref.invalidate(currentUserProvider);
     } on AuthFailure catch (e) {
