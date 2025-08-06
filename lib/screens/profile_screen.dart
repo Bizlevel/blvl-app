@@ -390,6 +390,7 @@ class _BodyState extends ConsumerState<_Body> {
                 width: 80,
                 height: 80,
                 radius: 40,
+                isNetwork: localAsset.isEmpty,
               ),
             ),
             Positioned(
