@@ -6,9 +6,10 @@ import 'package:go_router/go_router.dart';
 
 import '../../theme/color.dart';
 import '../../services/auth_service.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+
 import '../../providers/auth_provider.dart';
 import '../../widgets/custom_textfield.dart';
-import '../../widgets/custom_image.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -115,15 +116,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     width: 96,
                     height: 96,
                     decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(24),
+                      color: Color(0xFFf0f0f0),
+                      shape: BoxShape.circle,
                     ),
                     padding: const EdgeInsets.all(8),
-                    child: const CustomImage(
-                      'assets/images/logo_light.png',
+                    child: SvgPicture.asset(
+                      'assets/images/logo_light.svg',
                       width: 80,
                       height: 80,
-                      isNetwork: false,
                       fit: BoxFit.contain,
                     ),
                   ),

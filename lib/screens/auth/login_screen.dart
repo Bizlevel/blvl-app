@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../providers/login_controller.dart';
 import '../../theme/color.dart';
-import '../../widgets/custom_image.dart';
 import '../../widgets/custom_textfield.dart';
 
 class LoginScreen extends HookConsumerWidget {
@@ -81,15 +81,14 @@ class LoginScreen extends HookConsumerWidget {
                         width: 96,
                         height: 96,
                         decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(24),
+                          color: Color(0xFFf0f0f0),
+                          shape: BoxShape.circle,
                         ),
                         padding: const EdgeInsets.all(8),
-                        child: const CustomImage(
-                          'assets/images/logo_light.png',
+                        child: SvgPicture.asset(
+                          'assets/images/logo_light.svg',
                           width: 80,
                           height: 80,
-                          isNetwork: false,
                           fit: BoxFit.contain,
                         ),
                       ),
