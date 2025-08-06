@@ -1,24 +1,27 @@
 import 'dart:async';
 
+import 'package:bizlevel/providers/auth_provider.dart';
+import 'package:bizlevel/services/auth_service.dart';
 import 'package:flutter/material.dart';
 import 'package:chewie/chewie.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:video_player/video_player.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bizlevel/services/supabase_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../theme/color.dart';
 
-class OnboardingVideoScreen extends StatefulWidget {
+class OnboardingVideoScreen extends ConsumerStatefulWidget {
   const OnboardingVideoScreen({super.key});
 
   @override
-  State<OnboardingVideoScreen> createState() => _OnboardingVideoScreenState();
+  ConsumerState<OnboardingVideoScreen> createState() =>
+      _OnboardingVideoScreenState();
 }
 
-class _OnboardingVideoScreenState extends State<OnboardingVideoScreen> {
+class _OnboardingVideoScreenState extends ConsumerState<OnboardingVideoScreen> {
   static const _relativeVideoPath = 'onboarding.mp4';
 
   ChewieController? _chewieController;
@@ -81,15 +84,37 @@ class _OnboardingVideoScreenState extends State<OnboardingVideoScreen> {
   }
 
   void _goToApp() async {
-    // Помечаем, что онбординг пройден
-    final user = Supabase.instance.client.auth.currentUser;
-    if (user != null) {
-      try {
-        await Supabase.instance.client
-            .from('users')
-            .update({'onboarding_completed': true}).eq('id', user.id);
-      } catch (_) {}
+    final currentUser = ref.read(currentUserProvider).value;
+    // Если по какой-то причине данных пользователя нет, прерываем операцию
+    if (currentUser == null || currentUser.name.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Ошибка: данные профиля не найдены.')),
+        );
+      }
+      return;
     }
+
+    try {
+      // Помечаем, что онбординг пройден через сервис
+      await ref.read(authServiceProvider).updateProfile(
+            name: currentUser.name,
+            about: currentUser.about,
+            goal: currentUser.goal,
+            avatarId: currentUser.avatarId,
+            onboardingCompleted: true,
+          );
+      // Принудительно обновляем провайдер, чтобы GoRouter получил актуальные данные
+      ref.invalidate(currentUserProvider);
+    } on AuthFailure catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message)),
+        );
+      }
+      return; // Не продолжаем, если была ошибка
+    }
+
     // Локальный флаг, чтобы при offline доступе пропускать онбординг
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('onboarding_done', true);
