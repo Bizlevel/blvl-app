@@ -86,7 +86,7 @@ class _OnboardingVideoScreenState extends ConsumerState<OnboardingVideoScreen> {
   void _goToApp() async {
     final currentUser = ref.read(currentUserProvider).value;
     // Если по какой-то причине данных пользователя нет, прерываем операцию
-    if (currentUser == null || currentUser.name.isEmpty) {
+          if (currentUser == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Ошибка: данные профиля не найдены.')),
@@ -95,10 +95,12 @@ class _OnboardingVideoScreenState extends ConsumerState<OnboardingVideoScreen> {
       return;
     }
 
+    final String safeName = currentUser.name.isEmpty ? 'Без имени' : currentUser.name;
+
     try {
       // Помечаем, что онбординг пройден через сервис
       await ref.read(authServiceProvider).updateProfile(
-            name: currentUser.name,
+            name: safeName,
             about: currentUser.about ?? '',
             goal: currentUser.goal ?? '',
             onboardingCompleted: true,
