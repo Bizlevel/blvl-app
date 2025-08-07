@@ -13,7 +13,15 @@ import 'package:bizlevel/services/leo_service.dart';
 /// message limit enforcement and auto-scroll to bottom.
 class LeoDialogScreen extends ConsumerStatefulWidget {
   final String? chatId;
-  const LeoDialogScreen({super.key, this.chatId});
+  final String? userContext;
+  final String? levelContext;
+  
+  const LeoDialogScreen({
+    super.key, 
+    this.chatId,
+    this.userContext,
+    this.levelContext,
+  });
 
   @override
   ConsumerState<LeoDialogScreen> createState() => _LeoDialogScreenState();
@@ -102,6 +110,11 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
       });
 
   Future<void> _sendMessage() async {
+    print('🔧 DEBUG: _sendMessage вызван');
+    print('🔧 DEBUG: text = "${_inputController.text.trim()}"');
+    print('🔧 DEBUG: _isSending = $_isSending');
+    print('🔧 DEBUG: _remaining = $_remaining');
+    
     // Check limit
     if (_remaining == 0) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -132,9 +145,30 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
       final rem = await _leo.decrementMessageCount();
       if (mounted) setState(() => _remaining = rem);
 
-      // Get assistant response
-      final response = await _leo.sendMessage(messages: _buildChatContext());
-      final assistantMsg = response['message']['content'] as String? ?? '';
+      // Get assistant response with RAG if context is available
+      String assistantMsg;
+      
+      print('🔧 DEBUG: userContext = "${widget.userContext}"');
+      print('🔧 DEBUG: levelContext = "${widget.levelContext}"');
+      print('🔧 DEBUG: userContext.isNotEmpty = ${widget.userContext?.isNotEmpty}');
+      print('🔧 DEBUG: levelContext.isNotEmpty = ${widget.levelContext?.isNotEmpty}');
+      
+      if (widget.userContext != null && widget.levelContext != null && 
+          (widget.userContext!.isNotEmpty || widget.levelContext!.isNotEmpty)) {
+        print('🔧 DEBUG: Используем RAG систему');
+        // Use RAG system with context
+        final response = await _leo.sendMessageWithRAG(
+          messages: _buildChatContext(),
+          userContext: widget.userContext!,
+          levelContext: widget.levelContext!,
+        );
+        assistantMsg = response['message']['content'] as String? ?? '';
+      } else {
+        print('🔧 DEBUG: Используем обычный sendMessage');
+        // Fallback to regular sendMessage
+        final response = await _leo.sendMessage(messages: _buildChatContext());
+        assistantMsg = response['message']['content'] as String? ?? '';
+      }
 
       await _leo.saveConversation(
           chatId: _chatId, role: 'assistant', content: assistantMsg);

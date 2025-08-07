@@ -29,6 +29,10 @@ mixin _$UserModel {
   int? get avatarId => throw _privateConstructorUsedError;
   String? get about => throw _privateConstructorUsedError;
   String? get goal => throw _privateConstructorUsedError;
+  @JsonKey(name: 'business_area')
+  String? get businessArea => throw _privateConstructorUsedError;
+  @JsonKey(name: 'experience_level')
+  String? get experienceLevel => throw _privateConstructorUsedError;
   @JsonKey(name: 'is_premium')
   bool get isPremium => throw _privateConstructorUsedError;
   @JsonKey(name: 'current_level')
@@ -69,6 +73,8 @@ abstract class $UserModelCopyWith<$Res> {
       @JsonKey(name: 'avatar_id') int? avatarId,
       String? about,
       String? goal,
+      @JsonKey(name: 'business_area') String? businessArea,
+      @JsonKey(name: 'experience_level') String? experienceLevel,
       @JsonKey(name: 'is_premium') bool isPremium,
       @JsonKey(name: 'current_level') int currentLevel,
       @JsonKey(name: 'leo_messages_total') int leoMessagesTotal,
@@ -101,6 +107,8 @@ class _$UserModelCopyWithImpl<$Res, $Val extends UserModel>
     Object? avatarId = freezed,
     Object? about = freezed,
     Object? goal = freezed,
+    Object? businessArea = freezed,
+    Object? experienceLevel = freezed,
     Object? isPremium = null,
     Object? currentLevel = null,
     Object? leoMessagesTotal = null,
@@ -138,6 +146,14 @@ class _$UserModelCopyWithImpl<$Res, $Val extends UserModel>
       goal: freezed == goal
           ? _value.goal
           : goal // ignore: cast_nullable_to_non_nullable
+              as String?,
+      businessArea: freezed == businessArea
+          ? _value.businessArea
+          : businessArea // ignore: cast_nullable_to_non_nullable
+              as String?,
+      experienceLevel: freezed == experienceLevel
+          ? _value.experienceLevel
+          : experienceLevel // ignore: cast_nullable_to_non_nullable
               as String?,
       isPremium: null == isPremium
           ? _value.isPremium
@@ -191,6 +207,8 @@ abstract class _$$UserModelImplCopyWith<$Res>
       @JsonKey(name: 'avatar_id') int? avatarId,
       String? about,
       String? goal,
+      @JsonKey(name: 'business_area') String? businessArea,
+      @JsonKey(name: 'experience_level') String? experienceLevel,
       @JsonKey(name: 'is_premium') bool isPremium,
       @JsonKey(name: 'current_level') int currentLevel,
       @JsonKey(name: 'leo_messages_total') int leoMessagesTotal,
@@ -221,6 +239,8 @@ class __$$UserModelImplCopyWithImpl<$Res>
     Object? avatarId = freezed,
     Object? about = freezed,
     Object? goal = freezed,
+    Object? businessArea = freezed,
+    Object? experienceLevel = freezed,
     Object? isPremium = null,
     Object? currentLevel = null,
     Object? leoMessagesTotal = null,
@@ -258,6 +278,14 @@ class __$$UserModelImplCopyWithImpl<$Res>
       goal: freezed == goal
           ? _value.goal
           : goal // ignore: cast_nullable_to_non_nullable
+              as String?,
+      businessArea: freezed == businessArea
+          ? _value.businessArea
+          : businessArea // ignore: cast_nullable_to_non_nullable
+              as String?,
+      experienceLevel: freezed == experienceLevel
+          ? _value.experienceLevel
+          : experienceLevel // ignore: cast_nullable_to_non_nullable
               as String?,
       isPremium: null == isPremium
           ? _value.isPremium
@@ -306,6 +334,8 @@ class _$UserModelImpl implements _UserModel {
       @JsonKey(name: 'avatar_id') this.avatarId,
       this.about,
       this.goal,
+      @JsonKey(name: 'business_area') this.businessArea,
+      @JsonKey(name: 'experience_level') this.experienceLevel,
       @JsonKey(name: 'is_premium') this.isPremium = false,
       @JsonKey(name: 'current_level') this.currentLevel = 1,
       @JsonKey(name: 'leo_messages_total') this.leoMessagesTotal = 30,
@@ -335,6 +365,12 @@ class _$UserModelImpl implements _UserModel {
   @override
   final String? goal;
   @override
+  @JsonKey(name: 'business_area')
+  final String? businessArea;
+  @override
+  @JsonKey(name: 'experience_level')
+  final String? experienceLevel;
+  @override
   @JsonKey(name: 'is_premium')
   final bool isPremium;
   @override
@@ -361,7 +397,7 @@ class _$UserModelImpl implements _UserModel {
 
   @override
   String toString() {
-    return 'UserModel(id: $id, email: $email, name: $name, avatarUrl: $avatarUrl, avatarId: $avatarId, about: $about, goal: $goal, isPremium: $isPremium, currentLevel: $currentLevel, leoMessagesTotal: $leoMessagesTotal, leoMessagesToday: $leoMessagesToday, leoResetAt: $leoResetAt, onboardingCompleted: $onboardingCompleted, createdAt: $createdAt, updatedAt: $updatedAt)';
+    return 'UserModel(id: $id, email: $email, name: $name, avatarUrl: $avatarUrl, avatarId: $avatarId, about: $about, goal: $goal, businessArea: $businessArea, experienceLevel: $experienceLevel, isPremium: $isPremium, currentLevel: $currentLevel, leoMessagesTotal: $leoMessagesTotal, leoMessagesToday: $leoMessagesToday, leoResetAt: $leoResetAt, onboardingCompleted: $onboardingCompleted, createdAt: $createdAt, updatedAt: $updatedAt)';
   }
 
   @override
@@ -378,6 +414,10 @@ class _$UserModelImpl implements _UserModel {
                 other.avatarId == avatarId) &&
             (identical(other.about, about) || other.about == about) &&
             (identical(other.goal, goal) || other.goal == goal) &&
+            (identical(other.businessArea, businessArea) ||
+                other.businessArea == businessArea) &&
+            (identical(other.experienceLevel, experienceLevel) ||
+                other.experienceLevel == experienceLevel) &&
             (identical(other.isPremium, isPremium) ||
                 other.isPremium == isPremium) &&
             (identical(other.currentLevel, currentLevel) ||
@@ -407,6 +447,8 @@ class _$UserModelImpl implements _UserModel {
       avatarId,
       about,
       goal,
+      businessArea,
+      experienceLevel,
       isPremium,
       currentLevel,
       leoMessagesTotal,
@@ -441,6 +483,8 @@ abstract class _UserModel implements UserModel {
           @JsonKey(name: 'avatar_id') final int? avatarId,
           final String? about,
           final String? goal,
+          @JsonKey(name: 'business_area') final String? businessArea,
+          @JsonKey(name: 'experience_level') final String? experienceLevel,
           @JsonKey(name: 'is_premium') final bool isPremium,
           @JsonKey(name: 'current_level') final int currentLevel,
           @JsonKey(name: 'leo_messages_total') final int leoMessagesTotal,
@@ -470,6 +514,12 @@ abstract class _UserModel implements UserModel {
   String? get about;
   @override
   String? get goal;
+  @override
+  @JsonKey(name: 'business_area')
+  String? get businessArea;
+  @override
+  @JsonKey(name: 'experience_level')
+  String? get experienceLevel;
   @override
   @JsonKey(name: 'is_premium')
   bool get isPremium;

@@ -14,6 +14,8 @@ class UserModel with _$UserModel {
     @JsonKey(name: 'avatar_id') int? avatarId,
     String? about,
     String? goal,
+    @JsonKey(name: 'business_area') String? businessArea,
+    @JsonKey(name: 'experience_level') String? experienceLevel,
     @JsonKey(name: 'is_premium') @Default(false) bool isPremium,
     @JsonKey(name: 'current_level') @Default(1) int currentLevel,
     @JsonKey(name: 'leo_messages_total') @Default(30) int leoMessagesTotal,
