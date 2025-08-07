@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/user_model.dart';
+import '../models/user_skill_model.dart';
 
 /// Репозиторий, отвечающий за загрузку и сохранение данных пользователя.
 ///
@@ -52,6 +53,46 @@ class UserRepository {
         debugPrint('UserRepository.fetchProfile: unexpected error = $e');
       }
       return null;
+    }
+  }
+
+  /// Загружает полный список навыков (5) с очками пользователя.
+  /// Если пользователь ещё не заработал очки по навыку, points = 0.
+  Future<List<UserSkillModel>> fetchUserSkills(String userId) async {
+    try {
+      // 1. Загружаем все навыки каталога.
+      final catalog = await _client.from('skills').select('id, name');
+      final Map<int, String> skillCatalog = {
+        for (final row in (catalog as List))
+          row['id'] as int: row['name'] as String,
+      };
+
+      // 2. Загружаем очки пользователя.
+      final raw = await _client
+          .from('user_skills')
+          .select('skill_id, points')
+          .eq('user_id', userId);
+
+      final Map<int, int> pointsBySkill = {
+        for (final row in (raw as List))
+          row['skill_id'] as int: row['points'] as int,
+      };
+
+      // 3. Составляем результирующий список из каталога, заполняя 0, если нет очков.
+      final result = skillCatalog.entries.map((e) {
+        return UserSkillModel(
+          userId: userId,
+          skillId: e.key,
+          skillName: e.value,
+          points: pointsBySkill[e.key] ?? 0,
+        );
+      }).toList()
+        ..sort((a, b) => a.skillId.compareTo(b.skillId));
+
+      return result;
+    } catch (e) {
+      debugPrint('Error fetching user skills: $e');
+      return [];
     }
   }
 }
