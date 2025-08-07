@@ -27,7 +27,7 @@ class LeoService {
   // и проще настраивать таймауты/перехватчики.
   static final Dio _edgeDio = Dio(BaseOptions(
     baseUrl:
-        'https://mpaamzkuawumtgitmkcr.supabase.co/functions/v1',
+        '${const String.fromEnvironment('SUPABASE_URL', defaultValue: 'https://acevqbdpzgbtqznbpgzr.supabase.co')}/functions/v1',
     connectTimeout: const Duration(seconds: 10),
     sendTimeout: const Duration(seconds: 20),
     receiveTimeout: const Duration(seconds: 20),
