@@ -49,3 +49,4 @@ app.*.map.json
 .gradle/8.12/fileHashes/fileHashes.lock
 
 credentials.json
+venv/

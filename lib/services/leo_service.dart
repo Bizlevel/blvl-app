@@ -185,8 +185,7 @@ class LeoService {
         print('📚 DEBUG: Получен контекст из БЗ: ${context.isNotEmpty ? "ЕСТЬ" : "НЕТ"}');
         if (context.isNotEmpty) {
           print('📝 DEBUG: Первые 200 символов контекста:');
-          print(context.substring(0, 200));
-        }
+          print(context.length > 200 ? context.substring(0, 200) : context);        }
         return context;
       } else {
         print('❌ DEBUG: RAG вернул ошибку: ${response.statusCode}');
