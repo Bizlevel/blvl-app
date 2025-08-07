@@ -41,6 +41,11 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+with open('../credentials.json', 'r') as f:
+    creds = json.load(f)
+    print(f"Подключен к аккаунту: {creds.get('client_email', 'Не указан')}")
+    print(f"Проект: {creds.get('project_id', 'Не указан')}")
+
 @dataclass
 class Config:
     """Конфигурация приложения"""
