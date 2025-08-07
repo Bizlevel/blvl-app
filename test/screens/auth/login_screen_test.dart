@@ -1,3 +1,4 @@
+import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -19,9 +20,19 @@ void main() {
   });
 
   late MockAuthService mockService;
+  late GoRouter router;
 
   setUp(() {
     mockService = MockAuthService();
+    router = GoRouter(
+      routes: [
+        GoRoute(
+          path: '/login',
+          builder: (context, state) => const LoginScreen(),
+        ),
+      ],
+      initialLocation: '/login',
+    );
   });
 
   Future<void> _pumpLoginScreen(WidgetTester tester) async {
@@ -30,7 +41,9 @@ void main() {
         overrides: [
           authServiceProvider.overrideWithValue(mockService),
         ],
-        child: const MaterialApp(home: LoginScreen()),
+        child: MaterialApp.router(
+          routerConfig: router,
+        ),
       ),
     );
   }
@@ -45,12 +58,14 @@ void main() {
     await _pumpLoginScreen(tester);
 
     // Заполняем поля
-    await tester.enterText(find.byType(TextField).at(0), 'test@example.com');
-    await tester.enterText(find.byType(TextField).at(1), 'password');
+    await tester.enterText(
+        find.byKey(const ValueKey('email_field')), 'test@example.com');
+    await tester.enterText(
+        find.byKey(const ValueKey('password_field')), 'password');
 
     // Tap login button
     await tester.tap(find.text('Войти'));
-    await tester.pump(); // начало анимации SnackBar
+    await tester.pumpAndSettle(); // pumpAndSettle для SnackBar
 
     // assert
     expect(find.text('Ошибка'), findsOneWidget);
@@ -68,8 +83,10 @@ void main() {
 
     await _pumpLoginScreen(tester);
 
-    await tester.enterText(find.byType(TextField).at(0), 'a@b.com');
-    await tester.enterText(find.byType(TextField).at(1), 'pass');
+    await tester.enterText(
+        find.byKey(const ValueKey('email_field')), 'a@b.com');
+    await tester.enterText(
+        find.byKey(const ValueKey('password_field')), 'pass');
 
     await tester.tap(find.text('Войти'));
     await tester.pump(); // rebuild после смены состояния -> loading

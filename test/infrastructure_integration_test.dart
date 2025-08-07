@@ -53,6 +53,7 @@ void main() {
         'artifact_title': null,
         'artifact_description': null,
         'artifact_url': null,
+        'skill_id': null,
         'created_at': null,
       };
       final model = LevelModel.fromJson(json);

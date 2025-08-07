@@ -134,6 +134,7 @@ class LoginScreen extends HookConsumerWidget {
                       ),
                       const SizedBox(height: 32),
                       CustomTextBox(
+                        key: const ValueKey('email_field'),
                         hint: 'Email',
                         prefix: const Icon(Icons.email_outlined),
                         controller: emailController,
@@ -141,6 +142,7 @@ class LoginScreen extends HookConsumerWidget {
                       const SizedBox(height: 16),
                       // поле пароля с глазом
                       CustomTextBox(
+                        key: const ValueKey('password_field'),
                         hint: 'Пароль',
                         prefix: const Icon(Icons.lock_outline),
                         controller: passwordController,

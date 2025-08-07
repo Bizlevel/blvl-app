@@ -1,3 +1,5 @@
+import 'package:bizlevel/providers/user_skills_provider.dart';
+import 'package:bizlevel/widgets/skills_tree_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/foundation.dart';
@@ -348,6 +350,8 @@ class _BodyState extends ConsumerState<_Body> {
 
   @override
   Widget build(BuildContext context) {
+    final skillsAsync = ref.watch(userSkillsProvider);
+
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.medium),
       child: Column(
@@ -355,6 +359,14 @@ class _BodyState extends ConsumerState<_Body> {
           _buildProfile(),
           const SizedBox(height: AppSpacing.medium),
           _buildRecord(),
+          const SizedBox(height: AppSpacing.medium),
+          skillsAsync.when(
+            data: (skills) => SkillsTreeView(
+                skills: skills, currentLevel: widget.currentLevel),
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, st) =>
+                const Center(child: Text('Ошибка загрузки навыков')),
+          ),
           const SizedBox(height: AppSpacing.medium),
           if (!widget.isPremium) _buildPremiumButton(context),
           if (!widget.isPremium) const SizedBox(height: AppSpacing.medium),
@@ -419,42 +431,46 @@ class _BodyState extends ConsumerState<_Body> {
             ),
           ],
         ),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Text(
-                  widget.userName,
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w600,
+        const SizedBox(width: AppSpacing.medium),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    widget.userName,
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.small,
-                      vertical: AppSpacing.small / 2),
-                  decoration: BoxDecoration(
-                    color: widget.isPremium ? AppColor.primary : Colors.grey,
-                    borderRadius: BorderRadius.circular(4),
+                  const SizedBox(width: AppSpacing.small),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.small,
+                        vertical: AppSpacing.small / 2),
+                    decoration: BoxDecoration(
+                      color: widget.isPremium ? AppColor.primary : Colors.grey,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      widget.isPremium ? 'Premium' : 'Free',
+                      style: const TextStyle(fontSize: 12, color: Colors.white),
+                    ),
                   ),
-                  child: Text(
-                    widget.isPremium ? 'Premium' : 'Free',
-                    style: const TextStyle(fontSize: 12, color: Colors.white),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.small),
-            const Text(
-              "BizLevel",
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey,
+                ],
               ),
-            ),
-          ],
+              const SizedBox(height: AppSpacing.small),
+              const Text(
+                "BizLevel",
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey,
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );

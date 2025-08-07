@@ -15,6 +15,7 @@ void main() {
   late LevelsRepository repository;
 
   setUpAll(() async {
+    TestWidgetsFlutterBinding.ensureInitialized();
     tempDir = await Directory.systemTemp.createTemp();
     Hive.init(p.join(tempDir.path, 'hive'));
     box = await Hive.openBox('levels');

@@ -15,6 +15,7 @@ void main() {
   late LessonsRepository repository;
 
   setUpAll(() async {
+    TestWidgetsFlutterBinding.ensureInitialized();
     tempDir = await Directory.systemTemp.createTemp();
     Hive.init(p.join(tempDir.path, 'hive_lessons'));
     box = await Hive.openBox('lessons');

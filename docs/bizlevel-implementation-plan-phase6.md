@@ -153,3 +153,75 @@
   4. Обновить widget-тесты для LoginScreen и RegisterScreen
   5. Добавить тесты для GoRouter redirect с проверкой onboarding_completed
 - **Проверка:** все тесты проходят, покрытие нового flow не менее 80%
+
+# Этап 24: Добавление древа навыков
+
+## Часть 1: Бэкенд и миграции
+
+### Задача 24.1: Создание миграции для навыков
+- **Файлы:** `supabase/migrations/YYYYMMDD_add_skills_system.sql` (новый)
+- **Что делать:**
+  1. Создать таблицу `skills` (id, name) для хранения названий навыков.
+  2. Наполнить `skills` шестью базовыми навыками.
+  3. Добавить колонку `skill_id` (INT, FK -> skills.id) в таблицу `levels`.
+  4. Создать таблицу `user_skills` (user_id, skill_id, points) для хранения прогресса.
+  5. Включить RLS для новых таблиц, разрешив чтение всем авторизованным пользователям и запись только через security definer функции.
+- **Проверка:** миграция применяется успешно, таблицы созданы, RLS активен.
+
+### Задача 24.2: Обновление RPC-функции для начисления очков
+- **Файлы:** `supabase/migrations/YYYYMMDD_add_skills_system.sql` (дополнить)
+- **Что делать:**
+  1. Модифицировать существующую RPC-функцию `update_current_level(level_id, user_id)`.
+  2. Добавить в неё шаг для определения `skill_id` завершённого уровня.
+  3. Реализовать `UPSERT` в `user_skills`, который увеличивает `points` на 1 для соответствующего `user_id` и `skill_id`.
+- **Проверка:** вызов функции `update_current_level` корректно обновляет `user_progress`, `users.current_level` и `user_skills.points`.
+
+## Часть 2: Слой данных (Flutter)
+
+### Задача 24.3: Обновление моделей данных
+- **Файлы:** `lib/models/level_model.dart`, `lib/models/skill_model.dart` (новый), `lib/models/user_skill_model.dart` (новый)
+- **Что делать:**
+  1. Добавить `int? skillId` в `LevelModel`.
+  2. Создать модели `SkillModel` (id, name) и `UserSkillModel` (skillId, userId, points, skillName).
+  3. Запустить `build_runner` для генерации `.freezed.dart` и `.g.dart` файлов.
+- **Проверка:** код компилируется, модели корректно сериализуют/десериализуют JSON.
+
+### Задача 24.4: Расширение репозиториев
+- **Файлы:** `lib/repositories/user_repository.dart`, `lib/repositories/levels_repository.dart`
+- **Что делать:**
+  1. В `UserRepository` добавить метод `Future<List<UserSkillModel>> fetchUserSkills(String userId)`. Он должен делать JOIN таблиц `user_skills` и `skills`.
+  2. Убедиться, что `LevelsRepository.completeLevel()` вызывает обновленную RPC-функцию.
+- **Проверка:** `fetchUserSkills` возвращает корректный список навыков с очками, `completeLevel` работает как ожидается.
+
+### Задача 24.5: Создание провайдера для навыков
+- **Файлы:** `lib/providers/skills_provider.dart` (новый), `lib/screens/level_detail_screen.dart`
+- **Что делать:**
+  1. Создать `userSkillsProvider` (FutureProvider), который вызывает `UserRepository.fetchUserSkills()`.
+  2. В `LevelDetailScreen`, после успешного вызова `completeLevel`, добавить `ref.invalidate(userSkillsProvider)`.
+- **Проверка:** провайдер предоставляет данные в UI; после завершения уровня данные в профиле обновляются.
+
+## Часть 3: Пользовательский интерфейс (Flutter)
+
+### Задача 24.6: Создание виджета древа навыков
+- **Файл:** `lib/widgets/skills_tree_view.dart` (новый)
+- **Что делать:**
+  1. Создать `StatelessWidget`, который принимает `List<UserSkillModel>`.
+  2. Отобразить 6 шкал прогресса (`LinearProgressIndicator`) с названиями навыков.
+  3. Показать количество очков рядом с каждой шкалой (например, "5/10").
+- **Проверка:** виджет корректно отображает переданные ему данные о навыках.
+
+### Задача 24.7: Интеграция древа навыков в профиль
+- **Файл:** `lib/screens/profile_screen.dart`
+- **Что делать:**
+  1. Добавить в `ProfileScreen` блок "Древо навыков".
+  2. Использовать `ref.watch(userSkillsProvider)` для получения данных.
+  3. Отображать `CircularProgressIndicator` во время загрузки.
+  4. В случае успеха, отображать `SkillsTreeView` с полученными данными.
+- **Проверка:** на экране профиля отображается прогресс по навыкам, выше настроек, состояние загрузки/ошибки обрабатывается корректно.
+
+### Задача 24.8: Тестирование
+- **Файлы:** `test/repositories/user_repository_test.dart`, `test/screens/profile_screen_test.dart`
+- **Что делать:**
+  1. Добавить unit-тест для `UserRepository.fetchUserSkills` с использованием моков.
+  2. Добавить widget-тест для `ProfileScreen`, проверяющий отображение `SkillsTreeView` с мок-данными через `ProviderScope`.
+- **Проверка:** все новые и существующие тесты проходят успешно.
