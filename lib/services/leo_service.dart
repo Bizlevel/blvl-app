@@ -182,6 +182,11 @@ class LeoService {
 
       if (response.statusCode == 200 && response.data is Map<String, dynamic>) {
         final context = response.data['context'] as String? ?? '';
+        print('🔍 DEBUG: Полный ответ от RAG: ${response.data}');
+        print('🔍 DEBUG: Тип context: ${context.runtimeType}');
+        print('🔍 DEBUG: Длина context: ${context.length}');
+        print('🔍 DEBUG: Контекст (raw): "$context"');
+        print('🔍 DEBUG: Контекст (bytes): ${context.codeUnits}');
         print('📚 DEBUG: Получен контекст из БЗ: ${context.isNotEmpty ? "ЕСТЬ" : "НЕТ"}');
         if (context.isNotEmpty) {
           print('📝 DEBUG: Первые 200 символов контекста:');

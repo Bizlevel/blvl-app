@@ -40,22 +40,30 @@ serve(async (req: Request): Promise<Response> => {
     }
 
     // Генерируем эмбеддинг для запроса
+    console.log('🔍 Создаем эмбеддинг для запроса:', query);
     const embeddingResponse = await openai.embeddings.create({
       input: query,
       model: Deno.env.get("OPENAI_EMBEDDING_MODEL") || "text-embedding-3-small"
     });
+    console.log('🔍 Embedding создан, размер:', embeddingResponse.data[0].embedding.length);
 
     // Ищем похожие документы в базе знаний
+    console.log('🔍 Ищем в таблице documents с порогом 0.3...');
     const { data: results, error } = await supabaseAdmin.rpc('match_documents', {
       query_embedding: embeddingResponse.data[0].embedding,
-      match_threshold: 0.7,
+      match_threshold: 0.3,
       match_count: 5
     });
 
     console.log('📚 Результаты поиска:', { 
       found: results?.length || 0, 
       error: error?.message,
-      firstResult: results?.[0]?.content?.substring(0, 100)
+      firstResult: results?.[0]?.content?.substring(0, 100),
+      allResults: results?.map((r: any) => ({
+        id: r.id,
+        similarity: r.similarity,
+        contentLength: r.content?.length || 0
+      }))
     });
 
     if (error) {
