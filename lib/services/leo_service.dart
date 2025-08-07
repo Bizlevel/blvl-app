@@ -49,7 +49,6 @@ class LeoService {
 
     // Используем только Edge Function
     print('🔧 DEBUG: Используется Edge Function');
-    print('🔧 DEBUG: URL: https://mpaamzkuawumtgitmkcr.supabase.co/functions/v1/leo-chat');
     return _withRetry(() async {
       try {
         final response = await _edgeDio.post(
