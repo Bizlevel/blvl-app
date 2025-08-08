@@ -16,6 +16,7 @@ class LevelModel with _$LevelModel {
     @JsonKey(name: 'artifact_title') String? artifactTitle,
     @JsonKey(name: 'artifact_description') String? artifactDescription,
     @JsonKey(name: 'artifact_url') String? artifactUrl,
+    @JsonKey(name: 'skill_id') int? skillId,
     @JsonKey(name: 'created_at') DateTime? createdAt,
   }) = _LevelModel;
 

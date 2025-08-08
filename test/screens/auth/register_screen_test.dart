@@ -3,6 +3,7 @@ import 'package:bizlevel/screens/auth/register_screen.dart';
 import 'package:bizlevel/services/auth_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -12,15 +13,19 @@ class MockAuthService extends Mock implements AuthService {}
 
 class MockAuthResponse extends Fake implements AuthResponse {}
 
+class MockGoRouter extends Mock implements GoRouter {}
+
 void main() {
   setUpAll(() {
     registerFallbackValue(MockAuthResponse());
   });
 
   late MockAuthService mockService;
+  late MockGoRouter mockGoRouter;
 
   setUp(() {
     mockService = MockAuthService();
+    mockGoRouter = MockGoRouter();
   });
 
   Future<void> _pumpRegisterScreen(WidgetTester tester) async {
@@ -29,7 +34,12 @@ void main() {
         overrides: [
           authServiceProvider.overrideWithValue(mockService),
         ],
-        child: const MaterialApp(home: RegisterScreen()),
+        child: MaterialApp(
+          home: InheritedGoRouter(
+            goRouter: mockGoRouter,
+            child: const RegisterScreen(),
+          ),
+        ),
       ),
     );
   }
@@ -50,7 +60,7 @@ void main() {
 
     // Tap create account button
     await tester.tap(find.text('Создать аккаунт'));
-    await tester.pump(); // начало анимации SnackBar
+    await tester.pumpAndSettle(); // дожидаемся завершения всех анимаций
 
     // assert
     expect(find.text('Ошибка'), findsOneWidget);
@@ -78,8 +88,60 @@ void main() {
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
 
     // после завершения Future индикатор исчезает
-    await tester.pump(const Duration(milliseconds: 120));
+    await tester.pumpAndSettle();
     expect(find.byType(CircularProgressIndicator), findsNothing);
-    expect(find.text('Создать аккаунт'), findsOneWidget);
+  });
+
+  testWidgets('показывает сообщение о подтверждении после успешной регистрации',
+      (WidgetTester tester) async {
+    // arrange: signUp успешно завершается
+    when(() => mockService.signUp(
+            email: any(named: 'email'), password: any(named: 'password')))
+        .thenAnswer((_) async => MockAuthResponse());
+
+    await _pumpRegisterScreen(tester);
+
+    // Act
+    await tester.enterText(
+        find.byKey(const Key('email_field')), 'test@test.com');
+    await tester.enterText(find.byKey(const Key('password_field')), 'password');
+    await tester.enterText(
+        find.byKey(const Key('confirm_password_field')), 'password');
+
+    await tester.tap(find.text('Создать аккаунт'));
+    await tester.pumpAndSettle();
+
+    // Assert
+    expect(find.text('Регистрация успешна!'), findsOneWidget);
+    expect(find.textContaining('Проверьте почту'), findsOneWidget);
+    expect(find.text('Уже подтвердили? Войти'), findsOneWidget);
+    expect(find.text('Создать аккаунт'), findsNothing); // Форма скрыта
+  });
+
+  testWidgets(
+      'кнопка "Уже подтвердили? Войти" перенаправляет на /login?registered=true',
+      (WidgetTester tester) async {
+    // arrange: signUp успешно
+    when(() => mockService.signUp(
+            email: any(named: 'email'), password: any(named: 'password')))
+        .thenAnswer((_) async => MockAuthResponse());
+
+    await _pumpRegisterScreen(tester);
+
+    // Act: проходим регистрацию
+    await tester.enterText(
+        find.byKey(const Key('email_field')), 'test@test.com');
+    await tester.enterText(find.byKey(const Key('password_field')), 'password');
+    await tester.enterText(
+        find.byKey(const Key('confirm_password_field')), 'password');
+    await tester.tap(find.text('Создать аккаунт'));
+    await tester.pumpAndSettle();
+
+    // Act: нажимаем на кнопку входа
+    await tester.tap(find.text('Уже подтвердили? Войти'));
+    await tester.pumpAndSettle();
+
+    // Assert: проверяем вызов GoRouter
+    verify(() => mockGoRouter.go('/login?registered=true')).called(1);
   });
 }

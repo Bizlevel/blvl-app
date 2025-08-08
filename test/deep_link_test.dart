@@ -8,8 +8,18 @@ void main() {
       expect(mapBizLevelDeepLink(link), '/levels/42');
     });
 
+    test('maps bizlevel://auth/confirm to /login?registered=true', () {
+      const link = 'bizlevel://auth/confirm';
+      expect(mapBizLevelDeepLink(link), '/login?registered=true');
+    });
+
     test('returns null for unknown scheme', () {
       const link = 'https://example.com/levels/3';
+      expect(mapBizLevelDeepLink(link), isNull);
+    });
+
+    test('returns null for unknown auth path', () {
+      const link = 'bizlevel://auth/unknown';
       expect(mapBizLevelDeepLink(link), isNull);
     });
   });

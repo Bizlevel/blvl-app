@@ -22,6 +22,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
   // Слушаем изменения аутентификации, чтобы GoRouter автоматически
   // пересоздавался при логине/логауте.
   final authAsync = ref.watch(authStateProvider);
+  final currentUserAsync = ref.watch(currentUserProvider);
   final session = authAsync.asData?.value.session ??
       Supabase.instance.client.auth.currentSession;
 
@@ -83,13 +84,31 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       final loggedIn = session != null;
       final loggingIn = state.matchedLocation == '/login' ||
           state.matchedLocation == '/register';
+      final onboardingPath = state.matchedLocation.startsWith('/onboarding');
 
+      // Если не авторизован и не на страницах логина/регистрации - на логин
       if (!loggedIn && !loggingIn) {
         return '/login';
       }
 
+      // Если авторизован и на страницах входа/регистрации - проверяем онбординг
       if (loggedIn && loggingIn) {
+        // Проверяем, завершен ли онбординг
+        final currentUser = currentUserAsync.asData?.value;
+        if (currentUser != null) {
+          if (currentUser.onboardingCompleted == false) {
+            return '/onboarding/profile';
+          }
+        }
         return '/home';
+      }
+
+      // Если авторизован и не завершил онбординг, но не на страницах онбординга
+      if (loggedIn && !onboardingPath) {
+        final currentUser = currentUserAsync.asData?.value;
+        if (currentUser != null && currentUser.onboardingCompleted == false) {
+          return '/onboarding/profile';
+        }
       }
 
       // no redirect

@@ -12,6 +12,7 @@ import 'package:bizlevel/widgets/quiz_widget.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:bizlevel/providers/levels_provider.dart';
 import 'package:bizlevel/providers/levels_repository_provider.dart';
+import 'package:bizlevel/providers/auth_provider.dart';
 
 /// Shows a level as full-screen blocks (Intro → Lesson → Quiz → …).
 class LevelDetailScreen extends ConsumerStatefulWidget {
@@ -125,6 +126,7 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
                             await SupabaseService.completeLevel(widget.levelId);
                             // Обновляем карту уровней
                             ref.invalidate(levelsProvider);
+                            ref.invalidate(currentUserProvider);
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(

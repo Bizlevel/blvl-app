@@ -14,6 +14,7 @@ class LevelsMapScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
+      key: const Key('levels_map_screen'),
       backgroundColor: AppColor.appBgColor,
       body: CustomScrollView(
         slivers: [
@@ -119,17 +120,12 @@ class LevelsMapScreen extends ConsumerWidget {
   }
 
   double _calcChildAspectRatio(double width) {
-    // Подбираем коэффициент так, чтобы высота карточки заполняла ячейку без лишнего пространства
-    // На мобильных (1 колонка) карточка выше, поэтому aspectRatio ≈1.25;
-    // На планшете/десктопе, где несколько колонок, карточка шире, поэтому высота относительно меньшая – повышаем aspect.
     if (width < 600) {
-      return 1.25;
+      return 1.25; // Mobile: Taller card, works well in a single column.
     } else if (width < 1024) {
-      return 1.4;
-    } else if (width < 1400) {
-      return 1.6;
+      return 1.1; // Tablet: A bit wider than tall.
     } else {
-      return 1.8;
+      return 1.0; // Desktop: Square cards to ensure enough height for text.
     }
   }
 

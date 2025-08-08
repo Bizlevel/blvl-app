@@ -17,6 +17,7 @@ _$LevelModelImpl _$$LevelModelImplFromJson(Map<String, dynamic> json) =>
       artifactTitle: json['artifact_title'] as String?,
       artifactDescription: json['artifact_description'] as String?,
       artifactUrl: json['artifact_url'] as String?,
+      skillId: (json['skill_id'] as num?)?.toInt(),
       createdAt: json['created_at'] == null
           ? null
           : DateTime.parse(json['created_at'] as String),
@@ -33,5 +34,6 @@ Map<String, dynamic> _$$LevelModelImplToJson(_$LevelModelImpl instance) =>
       'artifact_title': instance.artifactTitle,
       'artifact_description': instance.artifactDescription,
       'artifact_url': instance.artifactUrl,
+      'skill_id': instance.skillId,
       'created_at': instance.createdAt?.toIso8601String(),
     };

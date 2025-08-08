@@ -9,22 +9,15 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final repo = ref.watch(levelsRepositoryProvider);
 
-  // Информация о пользователе и подписке
-  final currentUserAsync = ref.watch(currentUserProvider);
-  final subscriptionAsync = ref.watch(subscriptionProvider);
+  final userCurrentLevel =
+      ref.watch(currentUserProvider.select((user) => user.value?.currentLevel));
+  final hasPremium =
+      ref.watch(currentUserProvider.select((user) => user.value?.isPremium));
+  final subscriptionStatus =
+      ref.watch(subscriptionProvider.select((sub) => sub.value));
 
-  bool hasPremium = false;
-  int userCurrentLevel = 1;
-  if (currentUserAsync is AsyncData) {
-    final user = currentUserAsync.value;
-    hasPremium = user?.isPremium ?? false;
-    if (user != null) {
-      userCurrentLevel = user.currentLevel;
-    }
-  }
-  if (subscriptionAsync is AsyncData<String?>) {
-    hasPremium = hasPremium || (subscriptionAsync.value == 'active');
-  }
+  final bool isPremium =
+      (hasPremium ?? false) || (subscriptionStatus == 'active');
 
   final userId = Supabase.instance.client.auth.currentUser?.id;
   final rows = await repo.fetchLevels(userId: userId);
@@ -49,7 +42,7 @@ final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
       isAccessible = true;
     } else if (!level.isFree && level.number > 3) {
       // Премиум уровни открываются только при активной подписке/флаге
-      isAccessible = hasPremium && previousCompleted;
+      isAccessible = isPremium && previousCompleted;
     } else {
       isAccessible = previousCompleted;
     }

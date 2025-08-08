@@ -19,6 +19,10 @@ class LoginScreen extends HookConsumerWidget {
     final isLoading = ref.watch(loginControllerProvider);
     final obscurePassword = useState<bool>(true);
 
+    // Читаем query-параметр registered из GoRouter
+    final registered =
+        GoRouterState.of(context).uri.queryParameters['registered'] == 'true';
+
     Future<void> submit() async {
       final email = emailController.text.trim();
       final password = passwordController.text;
@@ -32,10 +36,17 @@ class LoginScreen extends HookConsumerWidget {
         await ref
             .read(loginControllerProvider.notifier)
             .signIn(email: email, password: password);
+
+        // Если вход выполнен после подтверждения регистрации - переходим на онбординг
+        if (registered && context.mounted) {
+          context.go('/onboarding/profile');
+        }
       } on String catch (msg) {
         // перехватываем сообщение ошибки, брошенное контроллером
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(msg)));
+        if (context.mounted) {
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text(msg)));
+        }
       }
     }
 
@@ -51,6 +62,35 @@ class LoginScreen extends HookConsumerWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
+                // Баннер успешной регистрации
+                if (registered) ...[
+                  Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.green.withOpacity(0.3)),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.check_circle, color: Colors.green, size: 24),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'Вы успешно зарегистрировались!',
+                            style: TextStyle(
+                              color: Colors.green,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 // белая карта формы
                 Container(
                   key: const Key('login_form'),
@@ -94,6 +134,7 @@ class LoginScreen extends HookConsumerWidget {
                       ),
                       const SizedBox(height: 32),
                       CustomTextBox(
+                        key: const ValueKey('email_field'),
                         hint: 'Email',
                         prefix: const Icon(Icons.email_outlined),
                         controller: emailController,
@@ -101,6 +142,7 @@ class LoginScreen extends HookConsumerWidget {
                       const SizedBox(height: 16),
                       // поле пароля с глазом
                       CustomTextBox(
+                        key: const ValueKey('password_field'),
                         hint: 'Пароль',
                         prefix: const Icon(Icons.lock_outline),
                         controller: passwordController,

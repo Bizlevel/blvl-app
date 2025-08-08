@@ -76,7 +76,7 @@ void main() {
 
   group('updateProfile', () {
     late MockUser user;
-    late dynamic builder;
+    late MockSupabaseQueryBuilder builder;
 
     setUp(() {
       // Мокаем текущего пользователя
@@ -87,15 +87,14 @@ void main() {
 
       // Мокаем builder для upsert
       builder = MockSupabaseQueryBuilder();
-      when(() => client.from('users')).thenReturn(builder as dynamic);
-      when(() => (builder as dynamic).upsert(any<dynamic>()))
-          .thenAnswer((_) async {});
+      when(() => client.from('users')).thenReturn(builder);
+      when(() => builder.upsert(any<dynamic>())).thenAnswer((_) async => []);
     });
 
     test('формирует payload без onboarding_completed по умолчанию', () async {
       await service.updateProfile(name: 'N', about: 'A', goal: 'G');
 
-      final captured = verify(() => (builder as dynamic).upsert(captureAny()))
+      final captured = verify(() => builder.upsert(captureAny()))
           .captured
           .single as Map<String, dynamic>;
 
@@ -107,7 +106,7 @@ void main() {
       await service.updateProfile(
           name: 'N', about: 'A', goal: 'G', onboardingCompleted: true);
 
-      final captured = verify(() => (builder as dynamic).upsert(captureAny()))
+      final captured = verify(() => builder.upsert(captureAny()))
           .captured
           .single as Map<String, dynamic>;
 
@@ -133,7 +132,7 @@ void main() {
       );
 
       // Проверяем, что upsert НЕ вызывается
-      verifyNever(() => (builder as dynamic).upsert(any<dynamic>()));
+      verifyNever(() => builder.upsert(any<dynamic>()));
     });
   });
 }

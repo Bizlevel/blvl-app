@@ -195,7 +195,7 @@ class _LevelCardState extends State<LevelCard> {
             widget.data["name"],
             softWrap: true,
             style: TextStyle(
-              fontSize: (MediaQuery.of(context).size.width < 600) ? 15 : 17,
+              fontSize: (MediaQuery.of(context).size.width < 600) ? 15 : 10,
               color: AppColor.textColor,
               fontWeight: FontWeight.w600,
             ),

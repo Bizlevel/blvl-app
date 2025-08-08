@@ -34,6 +34,8 @@ mixin _$LevelModel {
   String? get artifactDescription => throw _privateConstructorUsedError;
   @JsonKey(name: 'artifact_url')
   String? get artifactUrl => throw _privateConstructorUsedError;
+  @JsonKey(name: 'skill_id')
+  int? get skillId => throw _privateConstructorUsedError;
   @JsonKey(name: 'created_at')
   DateTime? get createdAt => throw _privateConstructorUsedError;
 
@@ -63,6 +65,7 @@ abstract class $LevelModelCopyWith<$Res> {
       @JsonKey(name: 'artifact_title') String? artifactTitle,
       @JsonKey(name: 'artifact_description') String? artifactDescription,
       @JsonKey(name: 'artifact_url') String? artifactUrl,
+      @JsonKey(name: 'skill_id') int? skillId,
       @JsonKey(name: 'created_at') DateTime? createdAt});
 }
 
@@ -90,6 +93,7 @@ class _$LevelModelCopyWithImpl<$Res, $Val extends LevelModel>
     Object? artifactTitle = freezed,
     Object? artifactDescription = freezed,
     Object? artifactUrl = freezed,
+    Object? skillId = freezed,
     Object? createdAt = freezed,
   }) {
     return _then(_value.copyWith(
@@ -129,6 +133,10 @@ class _$LevelModelCopyWithImpl<$Res, $Val extends LevelModel>
           ? _value.artifactUrl
           : artifactUrl // ignore: cast_nullable_to_non_nullable
               as String?,
+      skillId: freezed == skillId
+          ? _value.skillId
+          : skillId // ignore: cast_nullable_to_non_nullable
+              as int?,
       createdAt: freezed == createdAt
           ? _value.createdAt
           : createdAt // ignore: cast_nullable_to_non_nullable
@@ -155,6 +163,7 @@ abstract class _$$LevelModelImplCopyWith<$Res>
       @JsonKey(name: 'artifact_title') String? artifactTitle,
       @JsonKey(name: 'artifact_description') String? artifactDescription,
       @JsonKey(name: 'artifact_url') String? artifactUrl,
+      @JsonKey(name: 'skill_id') int? skillId,
       @JsonKey(name: 'created_at') DateTime? createdAt});
 }
 
@@ -180,6 +189,7 @@ class __$$LevelModelImplCopyWithImpl<$Res>
     Object? artifactTitle = freezed,
     Object? artifactDescription = freezed,
     Object? artifactUrl = freezed,
+    Object? skillId = freezed,
     Object? createdAt = freezed,
   }) {
     return _then(_$LevelModelImpl(
@@ -219,6 +229,10 @@ class __$$LevelModelImplCopyWithImpl<$Res>
           ? _value.artifactUrl
           : artifactUrl // ignore: cast_nullable_to_non_nullable
               as String?,
+      skillId: freezed == skillId
+          ? _value.skillId
+          : skillId // ignore: cast_nullable_to_non_nullable
+              as int?,
       createdAt: freezed == createdAt
           ? _value.createdAt
           : createdAt // ignore: cast_nullable_to_non_nullable
@@ -240,6 +254,7 @@ class _$LevelModelImpl implements _LevelModel {
       @JsonKey(name: 'artifact_title') this.artifactTitle,
       @JsonKey(name: 'artifact_description') this.artifactDescription,
       @JsonKey(name: 'artifact_url') this.artifactUrl,
+      @JsonKey(name: 'skill_id') this.skillId,
       @JsonKey(name: 'created_at') this.createdAt});
 
   factory _$LevelModelImpl.fromJson(Map<String, dynamic> json) =>
@@ -269,12 +284,15 @@ class _$LevelModelImpl implements _LevelModel {
   @JsonKey(name: 'artifact_url')
   final String? artifactUrl;
   @override
+  @JsonKey(name: 'skill_id')
+  final int? skillId;
+  @override
   @JsonKey(name: 'created_at')
   final DateTime? createdAt;
 
   @override
   String toString() {
-    return 'LevelModel(id: $id, number: $number, title: $title, description: $description, imageUrl: $imageUrl, isFree: $isFree, artifactTitle: $artifactTitle, artifactDescription: $artifactDescription, artifactUrl: $artifactUrl, createdAt: $createdAt)';
+    return 'LevelModel(id: $id, number: $number, title: $title, description: $description, imageUrl: $imageUrl, isFree: $isFree, artifactTitle: $artifactTitle, artifactDescription: $artifactDescription, artifactUrl: $artifactUrl, skillId: $skillId, createdAt: $createdAt)';
   }
 
   @override
@@ -296,6 +314,7 @@ class _$LevelModelImpl implements _LevelModel {
                 other.artifactDescription == artifactDescription) &&
             (identical(other.artifactUrl, artifactUrl) ||
                 other.artifactUrl == artifactUrl) &&
+            (identical(other.skillId, skillId) || other.skillId == skillId) &&
             (identical(other.createdAt, createdAt) ||
                 other.createdAt == createdAt));
   }
@@ -313,6 +332,7 @@ class _$LevelModelImpl implements _LevelModel {
       artifactTitle,
       artifactDescription,
       artifactUrl,
+      skillId,
       createdAt);
 
   /// Create a copy of LevelModel
@@ -342,6 +362,7 @@ abstract class _LevelModel implements LevelModel {
       @JsonKey(name: 'artifact_title') final String? artifactTitle,
       @JsonKey(name: 'artifact_description') final String? artifactDescription,
       @JsonKey(name: 'artifact_url') final String? artifactUrl,
+      @JsonKey(name: 'skill_id') final int? skillId,
       @JsonKey(name: 'created_at')
       final DateTime? createdAt}) = _$LevelModelImpl;
 
@@ -371,6 +392,9 @@ abstract class _LevelModel implements LevelModel {
   @override
   @JsonKey(name: 'artifact_url')
   String? get artifactUrl;
+  @override
+  @JsonKey(name: 'skill_id')
+  int? get skillId;
   @override
   @JsonKey(name: 'created_at')
   DateTime? get createdAt;

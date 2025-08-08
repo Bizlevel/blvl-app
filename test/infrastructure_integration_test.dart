@@ -26,6 +26,7 @@ void main() {
         'email': 'user@example.com',
         'name': 'Tester',
         'avatar_url': null,
+        'avatar_id': null,
         'about': 'About',
         'goal': 'Goal',
         'is_premium': false,
@@ -52,6 +53,7 @@ void main() {
         'artifact_title': null,
         'artifact_description': null,
         'artifact_url': null,
+        'skill_id': null,
         'created_at': null,
       };
       final model = LevelModel.fromJson(json);
@@ -66,6 +68,7 @@ void main() {
         'title': 'Lesson 1',
         'description': 'Desc',
         'video_url': 'http://video',
+        'vimeo_id': null,
         'duration_minutes': 5,
         'quiz_questions': [],
         'correct_answers': [],
