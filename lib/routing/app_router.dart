@@ -7,8 +7,6 @@ import '../screens/auth/login_screen.dart';
 import '../screens/auth/register_screen.dart';
 import '../screens/app_shell.dart';
 import '../providers/auth_provider.dart';
-import '../screens/auth/onboarding_screens.dart';
-import '../screens/auth/onboarding_video_screen.dart';
 import '../screens/profile_screen.dart';
 import '../screens/level_detail_screen.dart';
 import '../screens/premium_screen.dart';
@@ -66,14 +64,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: '/register',
         builder: (context, state) => const RegisterScreen(),
       ),
-      GoRoute(
-        path: '/onboarding/profile',
-        builder: (context, state) => const OnboardingProfileScreen(),
-      ),
-      GoRoute(
-        path: '/onboarding/video',
-        builder: (context, state) => const OnboardingVideoScreen(),
-      ),
+      // Deprecated onboarding routes removed
       GoRoute(
         path: '/premium',
         builder: (context, state) => const PremiumScreen(),
@@ -83,7 +74,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) {
       final loggingIn = state.matchedLocation == '/login' ||
           state.matchedLocation == '/register';
-      final onboardingPath = state.matchedLocation.startsWith('/onboarding');
+      // Onboarding routes deprecated; no special handling
 
       // Используем currentUserProvider для определения статуса логина.
       // Это надёжнее, чем просто проверять сессию.
@@ -99,7 +90,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       }
 
       // Если не авторизован и не на страницах логина/регистрации - на логин
-      if (!loggedIn && !loggingIn && !onboardingPath) {
+      if (!loggedIn && !loggingIn) {
         return '/login';
       }
 

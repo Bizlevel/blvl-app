@@ -13,6 +13,9 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:bizlevel/providers/levels_provider.dart';
 import 'package:bizlevel/providers/levels_repository_provider.dart';
 import 'package:bizlevel/providers/auth_provider.dart';
+import 'package:bizlevel/widgets/custom_textfield.dart';
+import 'package:bizlevel/services/auth_service.dart';
+import 'package:bizlevel/providers/user_skills_provider.dart';
 
 /// Shows a level as full-screen blocks (Intro → Lesson → Quiz → …).
 class LevelDetailScreen extends ConsumerStatefulWidget {
@@ -30,6 +33,9 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
   late List<_PageBlock> _blocks;
   LessonProgressState get _progress =>
       ref.watch(lessonProgressProvider(widget.levelId));
+
+  // Флаг сохранения профиля (для уровня 0)
+  bool _profileSaved = false;
 
   // Leo chat (создаётся при первом сообщении пользователя)
   String? _chatId;
@@ -89,65 +95,75 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
         data: (lessons) {
           _buildBlocks(lessons);
 
+          final bool isLevelZero = (widget.levelNumber ?? -1) == 0;
+          final bool isProfilePage =
+              isLevelZero && _blocks[_currentIndex] is _ProfileFormBlock;
+
           final mainContent = SafeArea(
             child: Column(
               children: [
                 Expanded(child: _buildPageView()),
-                _NavBar(
-                  canBack: (_pageController.hasClients
-                      ? (_pageController.page ??
-                              _pageController.initialPage.toDouble()) >
-                          0
-                      : false),
-                  // Кнопка «Далее» активна, если текущая страница разблокирована
-                  // или следующая страница уже открыта.
-                  canNext: _currentIndex < _progress.unlockedPage ||
-                      _currentIndex + 1 == _progress.unlockedPage,
-                  onBack: _goBack,
-                  onNext: _goNext,
-                  onDiscuss: () {
-                    showModalBottomSheet(
-                      context: context,
-                      isScrollControlled: true,
-                      backgroundColor: Colors.white,
-                      barrierColor: Colors.black54,
-                      builder: (_) => FractionallySizedBox(
-                        heightFactor: 0.9,
-                        child: LeoDialogScreen(chatId: _chatId),
-                      ),
-                    );
-                  },
-                ),
+                if (!isProfilePage)
+                  _NavBar(
+                    showDiscuss: !isLevelZero,
+                    canBack: (_pageController.hasClients
+                        ? (_pageController.page ??
+                                _pageController.initialPage.toDouble()) >
+                            0
+                        : false),
+                    // Кнопка «Далее» активна, если текущая страница разблокирована
+                    // или следующая страница уже открыта.
+                    canNext: _currentIndex < _progress.unlockedPage ||
+                        _currentIndex + 1 == _progress.unlockedPage,
+                    onBack: _goBack,
+                    onNext: _goNext,
+                    onDiscuss: () {
+                      showModalBottomSheet(
+                        context: context,
+                        isScrollControlled: true,
+                        backgroundColor: Colors.white,
+                        barrierColor: Colors.black54,
+                        builder: (_) => FractionallySizedBox(
+                          heightFactor: 0.9,
+                          child: LeoDialogScreen(chatId: _chatId),
+                        ),
+                      );
+                    },
+                  ),
                 const SizedBox(height: 10),
-                ElevatedButton.icon(
-                  onPressed: _isLevelCompleted(lessons)
-                      ? () async {
-                          try {
-                            await SupabaseService.completeLevel(widget.levelId);
-                            // Обновляем карту уровней
-                            ref.invalidate(levelsProvider);
-                            ref.invalidate(currentUserProvider);
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                    content: Text('Уровень завершён!')),
-                              );
-                              Navigator.of(context).pop();
-                            }
-                          } catch (e) {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Ошибка: $e')),
-                              );
+                if ((widget.levelNumber ?? -1) != 0)
+                  ElevatedButton.icon(
+                    onPressed: _isLevelCompleted(lessons)
+                        ? () async {
+                            try {
+                              await SupabaseService.completeLevel(
+                                  widget.levelId);
+                              // Обновляем карту уровней
+                              ref.invalidate(levelsProvider);
+                              ref.invalidate(currentUserProvider);
+                              // Инвалидация навыков для обновления древа навыков в профиле
+                              ref.invalidate(userSkillsProvider);
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                      content: Text('Уровень завершён!')),
+                                );
+                                Navigator.of(context).pop();
+                              }
+                            } catch (e) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Ошибка: $e')),
+                                );
+                              }
                             }
                           }
-                        }
-                      : null,
-                  icon: const Icon(Icons.check),
-                  label: const Text('Завершить уровень'),
-                  style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColor.primary),
-                ),
+                        : null,
+                    icon: const Icon(Icons.check),
+                    label: const Text('Завершить уровень'),
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColor.primary),
+                  ),
               ],
             ),
           );
@@ -244,17 +260,26 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
   }
 
   bool _isLevelCompleted(List<LessonModel> lessons) {
-    // Intro = 0, далее пары Video/Quiz, затем (опционально) Artifact.
+    // Для уровня 0: достаточно просмотра всех видео уроков этого уровня
+    // и сохранения профиля в блоке ProfileForm.
+    if ((widget.levelNumber ?? -1) == 0) {
+      for (var i = 0; i < lessons.length; i++) {
+        final videoPage = 1 + i * 2;
+        if (!_progress.watchedVideos.contains(videoPage)) {
+          return false;
+        }
+      }
+      return _profileSaved;
+    }
+
+    // Для остальных уровней: видео + квизы (если есть) по текущей логике
     for (var i = 0; i < lessons.length; i++) {
       final videoPage = 1 + i * 2; // первый блок каждого урока
       final quizPage = videoPage + 1;
 
-      // Видео обязательно должно быть просмотрено
       if (!_progress.watchedVideos.contains(videoPage)) {
         return false;
       }
-
-      // Если урок содержит хотя бы один правильный ответ, считаем, что есть квиз
       final hasQuiz = lessons[i].quizQuestions.isNotEmpty;
       if (hasQuiz && !_progress.passedQuizzes.contains(quizPage)) {
         return false;
@@ -264,13 +289,28 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
   }
 
   void _buildBlocks(List<LessonModel> lessons) {
+    // Уровень 0: Intro → Видео(ы) → Профиль → Финальный блок
+    if ((widget.levelNumber ?? -1) == 0) {
+      _blocks = [
+        _IntroBlock(
+            levelId: widget.levelId,
+            levelNumber: widget.levelNumber ?? widget.levelId),
+        for (final lesson in lessons)
+          _LessonBlock(lesson: lesson, onWatched: _videoWatched),
+        _ProfileFormBlock(levelId: widget.levelId),
+      ];
+      return;
+    }
+
+    // Остальные уровни: Intro → (Видео → Квиз?)* → Артефакт
     _blocks = [
       _IntroBlock(
           levelId: widget.levelId,
           levelNumber: widget.levelNumber ?? widget.levelId),
       for (final lesson in lessons) ...[
         _LessonBlock(lesson: lesson, onWatched: _videoWatched),
-        _QuizBlock(lesson: lesson, onCorrect: _quizPassed),
+        if (lesson.quizQuestions.isNotEmpty)
+          _QuizBlock(lesson: lesson, onCorrect: _quizPassed),
       ],
       _ArtifactBlock(levelId: widget.levelId),
     ];
@@ -353,6 +393,235 @@ abstract class _PageBlock {
   Widget build(BuildContext context, int index);
 }
 
+// Profile form (First Step level only) ----------------------------------------
+class _ProfileFormBlock extends _PageBlock {
+  final int levelId;
+  _ProfileFormBlock({required this.levelId});
+
+  final _nameController = TextEditingController();
+  final _aboutController = TextEditingController();
+  final _goalController = TextEditingController();
+  int _selectedAvatarId = 1;
+
+  Future<void> _showAvatarPicker(BuildContext context) async {
+    final selectedId = await showModalBottomSheet<int>(
+      context: context,
+      backgroundColor: Colors.white,
+      builder: (ctx) {
+        return GridView.builder(
+          padding: const EdgeInsets.all(AppSpacing.medium),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            mainAxisSpacing: AppSpacing.medium,
+            crossAxisSpacing: AppSpacing.medium,
+          ),
+          itemCount: 7,
+          itemBuilder: (_, index) {
+            final id = index + 1;
+            final asset = 'assets/images/avatars/avatar_${id}.png';
+            final isSelected = id == _selectedAvatarId;
+            return GestureDetector(
+              onTap: () => Navigator.of(ctx).pop(id),
+              child: Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(40),
+                    child: Image.asset(asset, fit: BoxFit.cover),
+                  ),
+                  if (isSelected)
+                    Positioned.fill(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          border: Border.all(color: AppColor.primary, width: 3),
+                          borderRadius: BorderRadius.circular(40),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    if (selectedId != null) {
+      _selectedAvatarId = selectedId;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, int index) {
+    return Consumer(builder: (context, ref, _) {
+      Future<void> save() async {
+        final svc = ref.read(authServiceProvider);
+        final sessionUser = svc.getCurrentUser();
+        if (sessionUser?.email == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text('Подтвердите e-mail, прежде чем продолжить')),
+          );
+          return;
+        }
+
+        final name = _nameController.text.trim();
+        final about = _aboutController.text.trim();
+        final goal = _goalController.text.trim();
+        if (name.isEmpty || about.isEmpty || goal.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Пожалуйста, заполните все поля')),
+          );
+          return;
+        }
+
+        try {
+          await ref.read(authServiceProvider).updateProfile(
+                name: name,
+                about: about,
+                goal: goal,
+                avatarId: _selectedAvatarId,
+              );
+          // onSaved будет вызван кнопкой ниже, с передачей целевого индекса
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Профиль сохранён')),
+            );
+          }
+        } on AuthFailure catch (e) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(e.message)),
+            );
+          }
+        } catch (_) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Ошибка сохранения профиля')),
+            );
+          }
+        }
+      }
+
+      return LayoutBuilder(builder: (context, constraints) {
+        return SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              GestureDetector(
+                onTap: () => _showAvatarPicker(context),
+                child: Stack(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(15),
+                      child: Image.asset(
+                        'assets/images/avatars/avatar_$_selectedAvatarId.png',
+                        width: 90,
+                        height: 90,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: Container(
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 2,
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.camera_alt,
+                          size: 16,
+                          color: AppColor.primary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Как к вам обращаться?',
+                    style: TextStyle(fontWeight: FontWeight.w600)),
+              ),
+              const SizedBox(height: 8),
+              CustomTextBox(
+                hint: 'Имя',
+                controller: _nameController,
+                prefix: const Icon(Icons.person_outline),
+              ),
+              const SizedBox(height: 16),
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Кратко о себе'),
+              ),
+              const SizedBox(height: 8),
+              CustomTextBox(
+                hint: 'О себе',
+                controller: _aboutController,
+                prefix: const Icon(Icons.info_outline),
+              ),
+              const SizedBox(height: 16),
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Ваша цель обучения'),
+              ),
+              const SizedBox(height: 8),
+              CustomTextBox(
+                hint: 'Цель',
+                controller: _goalController,
+                prefix: const Icon(Icons.flag_outlined),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColor.primary),
+                  onPressed: () async {
+                    await save();
+                    try {
+                      await SupabaseService.completeLevel(levelId);
+                      ref.invalidate(levelsProvider);
+                      ref.invalidate(currentUserProvider);
+                      ref.invalidate(userSkillsProvider);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Первый шаг завершён!')),
+                        );
+                        Navigator.of(context).pop();
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Ошибка: $e')),
+                        );
+                      }
+                    }
+                  },
+                  child: const Text('Перейти на Уровень 1'),
+                ),
+              ),
+            ],
+          ),
+        );
+      });
+    });
+  }
+}
+
+// Дополнительные блоки уровня 0 больше не используются
+
 // Intro -------------------------------------------------------------
 class _IntroBlock extends _PageBlock {
   final int levelId;
@@ -360,19 +629,24 @@ class _IntroBlock extends _PageBlock {
   _IntroBlock({required this.levelId, required this.levelNumber});
   @override
   Widget build(BuildContext context, int index) {
+    final bool isFirstStep = levelNumber == 0;
+    final String title = isFirstStep ? 'Первый шаг' : 'Уровень $levelNumber';
+    final String description = isFirstStep
+        ? 'Привет! 👋\nЯ Leo, ваш персональный AI-ментор по бизнесу.\nЗа следующие пару минут Вы:\n- Узнаете, как получить максимум от BizLevel\n- Настроите свой профиль, чтобы я мог давать Вам персонализированные советы и рекомендации.\nГотовы начать свой путь в бизнесе?'
+        : 'Проходите уроки по порядку и выполняйте тесты, чтобы продвигаться дальше.';
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text('Уровень $levelNumber',
+            Text(title,
+                textAlign: TextAlign.center,
                 style:
                     const TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
-            const Text(
-                'Проходите уроки по порядку и выполняйте тесты, чтобы продвигаться дальше.',
-                textAlign: TextAlign.center),
+            Text(description, textAlign: TextAlign.center),
           ],
         ),
       ),
@@ -404,6 +678,9 @@ class _QuizBlock extends _PageBlock {
     return Consumer(builder: (context, ref, _) {
       final progress = ref.watch(lessonProgressProvider(lesson.levelId));
       final alreadyPassed = progress.passedQuizzes.contains(index);
+      if (lesson.quizQuestions.isEmpty) {
+        return const Center(child: Text('Тест отсутствует для этого урока'));
+      }
       return SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
         child: Center(
@@ -464,12 +741,14 @@ class _NavBar extends StatelessWidget {
   final VoidCallback onBack;
   final VoidCallback onNext;
   final VoidCallback onDiscuss;
+  final bool showDiscuss;
   const _NavBar({
     required this.canBack,
     required this.canNext,
     required this.onBack,
     required this.onNext,
     required this.onDiscuss,
+    this.showDiscuss = true,
   });
   @override
   Widget build(BuildContext context) {
@@ -483,12 +762,14 @@ class _NavBar extends StatelessWidget {
             style: ElevatedButton.styleFrom(backgroundColor: AppColor.primary),
             child: const Text('Назад'),
           ),
-          ElevatedButton(
-            onPressed: onDiscuss,
-            style: ElevatedButton.styleFrom(backgroundColor: AppColor.primary),
-            child: const Text('Обсудить с Лео',
-                style: TextStyle(fontWeight: FontWeight.w600)),
-          ),
+          if (showDiscuss)
+            ElevatedButton(
+              onPressed: onDiscuss,
+              style:
+                  ElevatedButton.styleFrom(backgroundColor: AppColor.primary),
+              child: const Text('Обсудить с Лео',
+                  style: TextStyle(fontWeight: FontWeight.w600)),
+            ),
           ElevatedButton(
             onPressed: canNext ? onNext : null,
             style: ElevatedButton.styleFrom(backgroundColor: AppColor.primary),

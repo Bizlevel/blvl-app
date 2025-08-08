@@ -5,8 +5,8 @@ import '../../services/auth_service.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/color.dart';
 import '../../widgets/custom_textfield.dart';
-import 'package:go_router/go_router.dart';
 
+// DEPRECATED: OnboardingProfileScreen оставлен для совместимости. Маршруты удалены.
 class OnboardingProfileScreen extends ConsumerStatefulWidget {
   const OnboardingProfileScreen({super.key});
 
@@ -58,7 +58,7 @@ class _OnboardingProfileScreenState
             avatarId: _selectedAvatarId,
           );
       if (!mounted) return;
-      context.go('/onboarding/video');
+      // DEPRECATED: переходы на онбординг-видео отключены. Навигация осуществляется через уровень 0.
     } on AuthFailure catch (e) {
       _showSnackBar(e.message);
     } catch (e) {
