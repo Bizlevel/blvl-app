@@ -5,6 +5,7 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../providers/login_controller.dart';
+import '../../services/auth_service.dart';
 import '../../theme/color.dart';
 import '../../widgets/custom_textfield.dart';
 
@@ -16,12 +17,26 @@ class LoginScreen extends HookConsumerWidget {
     final emailController = useTextEditingController();
     final passwordController = useTextEditingController();
 
-    final isLoading = ref.watch(loginControllerProvider);
+    final loginState = ref.watch(loginControllerProvider);
+    final isLoading = loginState.isLoading;
     final obscurePassword = useState<bool>(true);
 
     // Читаем query-параметр registered из GoRouter
     final registered =
         GoRouterState.of(context).uri.queryParameters['registered'] == 'true';
+
+    ref.listen(loginControllerProvider, (previous, next) {
+      if (next is AsyncError) {
+        final error = next.error;
+        if (error is AuthFailure) {
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text(error.message)));
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Произошла неизвестная ошибка: $error')));
+        }
+      }
+    });
 
     Future<void> submit() async {
       final email = emailController.text.trim();
@@ -32,22 +47,11 @@ class LoginScreen extends HookConsumerWidget {
         return;
       }
 
-      try {
-        await ref
-            .read(loginControllerProvider.notifier)
-            .signIn(email: email, password: password);
-
-        // Если вход выполнен после подтверждения регистрации - переходим на онбординг
-        if (registered && context.mounted) {
-          context.go('/onboarding/profile');
-        }
-      } on String catch (msg) {
-        // перехватываем сообщение ошибки, брошенное контроллером
-        if (context.mounted) {
-          ScaffoldMessenger.of(context)
-              .showSnackBar(SnackBar(content: Text(msg)));
-        }
-      }
+      // Вызываем signIn, обработка ошибок и навигация происходят в listener'ах
+      // и роутере.
+      await ref
+          .read(loginControllerProvider.notifier)
+          .signIn(email: email, password: password);
     }
 
     return Scaffold(

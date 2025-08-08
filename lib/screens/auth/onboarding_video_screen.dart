@@ -86,7 +86,7 @@ class _OnboardingVideoScreenState extends ConsumerState<OnboardingVideoScreen> {
   void _goToApp() async {
     final currentUser = ref.read(currentUserProvider).value;
     // Если по какой-то причине данных пользователя нет, прерываем операцию
-    if (currentUser == null || currentUser.name.isEmpty) {
+    if (currentUser == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Ошибка: данные профиля не найдены.')),
@@ -95,15 +95,18 @@ class _OnboardingVideoScreenState extends ConsumerState<OnboardingVideoScreen> {
       return;
     }
 
+    final String safeName =
+        currentUser.name.isEmpty ? 'Без имени' : currentUser.name;
+
     try {
       // Помечаем, что онбординг пройден через сервис
       await ref.read(authServiceProvider).updateProfile(
-            name: currentUser.name,
+            name: safeName,
             about: currentUser.about ?? '',
             goal: currentUser.goal ?? '',
+            avatarId: currentUser.avatarId ?? 1,
             onboardingCompleted: true,
           );
-      await ref.read(authServiceProvider).updateAvatar(currentUser.avatarId ?? 1);
       // Принудительно обновляем провайдер, чтобы GoRouter получил актуальные данные
       ref.invalidate(currentUserProvider);
     } on AuthFailure catch (e) {
