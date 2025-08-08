@@ -110,10 +110,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
       });
 
   Future<void> _sendMessage() async {
-    print('🔧 DEBUG: _sendMessage вызван');
-    print('🔧 DEBUG: text = "${_inputController.text.trim()}"');
-    print('🔧 DEBUG: _isSending = $_isSending');
-    print('🔧 DEBUG: _remaining = $_remaining');
+    // debug: sending message
     
     // Check limit
     if (_remaining == 0) {
@@ -148,14 +145,11 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
       // Get assistant response with RAG if context is available
       String assistantMsg;
       
-      print('🔧 DEBUG: userContext = "${widget.userContext}"');
-      print('🔧 DEBUG: levelContext = "${widget.levelContext}"');
-      print('🔧 DEBUG: userContext.isNotEmpty = ${widget.userContext?.isNotEmpty}');
-      print('🔧 DEBUG: levelContext.isNotEmpty = ${widget.levelContext?.isNotEmpty}');
+      // debug: contexts
       
       if (widget.userContext != null && widget.levelContext != null && 
           (widget.userContext!.isNotEmpty || widget.levelContext!.isNotEmpty)) {
-        print('🔧 DEBUG: Используем RAG систему');
+        // debug: use RAG
         // Use RAG system with context
         final response = await _leo.sendMessageWithRAG(
           messages: _buildChatContext(),
@@ -164,7 +158,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
         );
         assistantMsg = response['message']['content'] as String? ?? '';
       } else {
-        print('🔧 DEBUG: Используем обычный sendMessage');
+        // debug: use basic send
         // Fallback to regular sendMessage
         final response = await _leo.sendMessage(messages: _buildChatContext());
         assistantMsg = response['message']['content'] as String? ?? '';

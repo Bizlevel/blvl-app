@@ -124,6 +124,7 @@ serve(async (req: Request): Promise<Response> => {
 
   try {
     const { messages, userContext, levelContext, knowledgeContext } = await req.json();
+    let computedLevelContext = levelContext;
 
     if (!Array.isArray(messages)) {
       return new Response(
@@ -151,27 +152,34 @@ serve(async (req: Request): Promise<Response> => {
       if (!error && user) {
         const { data: profile } = await supabaseAdmin
           .from("users")
-          .select("name, about, goal, business_area, experience_level")
+          .select("name, about, goal, business_area, experience_level, current_level")
           .eq("id", user.id)
           .single();
 
         if (profile) {
-          const { name, about, goal, business_area, experience_level } = profile;
+          const { name, about, goal, business_area, experience_level, current_level } = profile;
           // Используем контекст от клиента, если он передан, иначе строим из профиля
           if (userContext) {
             userContextText = userContext;
           } else {
             userContextText = `Имя пользователя: ${name ?? "не указано"}. Цель: ${goal ?? "не указана"}. О себе: ${about ?? "нет информации"}. Сфера деятельности: ${business_area ?? "не указана"}. Уровень опыта: ${experience_level ?? "не указан"}.`;
           }
+
+          // Если контекст уровня не передан клиентом, используем текущий уровень профиля
+          if (!computedLevelContext && typeof current_level === 'number') {
+            computedLevelContext = `Текущий уровень: ${current_level}`;
+          }
         }
       }
     }
 
     console.log('🔧 DEBUG: leo-chat вызван');
-    console.log('🔧 DEBUG: messages:', messages);
-    console.log('🔧 DEBUG: userContext from client:', userContext ? 'ЕСТЬ' : 'НЕТ');
-    console.log('🔧 DEBUG: levelContext from client:', levelContext ? 'ЕСТЬ' : 'НЕТ');
-    console.log('🔧 DEBUG: knowledgeContext from client:', knowledgeContext ? 'ЕСТЬ' : 'НЕТ');
+    console.log('🔧 DEBUG: client contexts:', {
+      userContext: !!userContext,
+      levelContext: !!levelContext,
+      computedLevelContext: !!computedLevelContext,
+      knowledgeContext: !!knowledgeContext,
+    });
     
     // Enhanced system prompt for Leo AI mentor
     const systemPrompt = `## Твоя Роль и Личность:
@@ -259,7 +267,7 @@ serve(async (req: Request): Promise<Response> => {
 Ты лицо школы BizLevel. Помогай эффективно и профессионально!
 
 ${userContextText ? `\n## ПЕРСОНАЛИЗАЦИЯ ДЛЯ ПОЛЬЗОВАТЕЛЯ:\n${userContextText}` : ''}
-${levelContext ? `\n## КОНТЕКСТ УРОКА:\n${levelContext}` : ''}
+${computedLevelContext ? `\n## КОНТЕКСТ УРОКА:\n${computedLevelContext}` : ''}
 ${knowledgeContext ? `\n## БАЗА ЗНАНИЙ:\n${knowledgeContext}` : ''}`;
 
     // Compose chat with enhanced system prompt
@@ -278,7 +286,7 @@ ${knowledgeContext ? `\n## БАЗА ЗНАНИЙ:\n${knowledgeContext}` : ''}`;
     const assistantMessage = completion.choices[0].message;
     const usage = completion.usage; // prompt/completion/total tokens
 
-    console.log('🔧 DEBUG: Ответ от OpenAI:', assistantMessage.content?.substring(0, 100));
+    // console.log('🔧 DEBUG: Ответ от OpenAI:', assistantMessage.content?.substring(0, 100));
 
     return new Response(
       JSON.stringify({ message: assistantMessage, usage }),

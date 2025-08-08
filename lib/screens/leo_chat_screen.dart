@@ -50,12 +50,6 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
   String? _getUserContext() {
     final user = ref.read(currentUserProvider).value;
     if (user != null) {
-      print('🔧 DEBUG: _getUserContext - user data:');
-      print('  goal: "${user.goal}"');
-      print('  about: "${user.about}"');
-      print('  goal isNotEmpty: ${user.goal?.isNotEmpty}');
-      print('  about isNotEmpty: ${user.about?.isNotEmpty}');
-      
       final contextParts = <String>[];
       
       if (user.goal?.isNotEmpty == true) {
@@ -68,10 +62,7 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
         contextParts.add('Текущий уровень: ${user.currentLevel}');
       }
       
-      final result = contextParts.isNotEmpty ? contextParts.join('. ') : null;
-      print('🔧 DEBUG: _getUserContext - result: "$result"');
-      
-      return result;
+      return contextParts.isNotEmpty ? contextParts.join('. ') : null;
     }
     return null;
   }
