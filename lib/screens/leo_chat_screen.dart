@@ -7,7 +7,7 @@ import 'package:bizlevel/widgets/chat_item.dart';
 import 'package:bizlevel/screens/leo_dialog_screen.dart';
 
 import 'package:bizlevel/theme/color.dart';
-
+import 'package:bizlevel/providers/auth_provider.dart';
 class LeoChatScreen extends ConsumerStatefulWidget {
   const LeoChatScreen({super.key});
 
@@ -45,6 +45,23 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
       // silently ignore, UI отобразит пустые данные
     }
     if (mounted) setState(() {});
+  }
+
+  String? _getUserContext() {
+    final user = ref.read(currentUserProvider).value;
+    if (user != null) {
+      return '${user.name ?? ''} ${user.about ?? ''} ${user.goal ?? ''}'.trim();
+    }
+    return null;
+  }
+
+  String? _getLevelContext() {
+    // Получить текущий уровень пользователя
+    final user = ref.read(currentUserProvider).value;
+    if (user != null && user.currentLevel != null) {
+      return 'Уровень ${user.currentLevel}';
+    }
+    return null;
   }
 
   @override
@@ -162,8 +179,12 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
           onTap: () {
             Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (_) => LeoDialogScreen(chatId: chat['id']),
+              builder: (_) => LeoDialogScreen(
+                chatId: chat['id'],
+                userContext: _getUserContext(),
+                levelContext: _getLevelContext(),
               ),
+            ),
             );
           },
         );
@@ -173,7 +194,12 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
 
   void _onNewChat() {
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const LeoDialogScreen()),
+      MaterialPageRoute(
+        builder: (_) => LeoDialogScreen(
+          userContext: _getUserContext(),
+          levelContext: _getLevelContext(),
+        ),
+      ),
     );
   }
 }
