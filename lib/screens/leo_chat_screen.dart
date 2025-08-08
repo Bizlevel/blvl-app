@@ -50,7 +50,16 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
   String? _getUserContext() {
     final user = ref.read(currentUserProvider).value;
     if (user != null) {
-      return '${user.name ?? ''} ${user.about ?? ''} ${user.goal ?? ''}'.trim();
+      final contextParts = <String>[];
+      
+      if (user.goal?.isNotEmpty == true) {
+        contextParts.add('Цель: ${user.goal}');
+      }
+      if (user.about?.isNotEmpty == true) {
+        contextParts.add('О себе: ${user.about}');
+      }
+      
+      return contextParts.isNotEmpty ? contextParts.join('. ') : null;
     }
     return null;
   }
