@@ -81,34 +81,38 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       appShell,
     ],
     redirect: (context, state) {
-      final loggedIn = session != null;
       final loggingIn = state.matchedLocation == '/login' ||
           state.matchedLocation == '/register';
       final onboardingPath = state.matchedLocation.startsWith('/onboarding');
 
-      // Если не авторизован и не на страницах логина/регистрации - на логин
-      if (!loggedIn && !loggingIn) {
+      // Используем currentUserProvider для определения статуса логина.
+      // Это надёжнее, чем просто проверять сессию.
+      final currentUser = currentUserAsync.asData?.value;
+      final loggedIn = currentUser != null;
+
+      // Обработка случая с "зависшей" сессией, когда сессия есть,
+      // а пользователя в базе нет.
+      if (session != null && !currentUserAsync.isLoading && !loggedIn) {
+        // Запускаем signOut в фоне и сразу редиректим на логин
+        ref.read(authServiceProvider).signOut();
         return '/login';
       }
 
-      // Если авторизован и на страницах входа/регистрации - проверяем онбординг
+      // Если не авторизован и не на страницах логина/регистрации - на логин
+      if (!loggedIn && !loggingIn && !onboardingPath) {
+        return '/login';
+      }
+
+      // Если авторизован и на страницах входа/регистрации - на домашнюю
       if (loggedIn && loggingIn) {
-        // Проверяем, завершен ли онбординг
-        final currentUser = currentUserAsync.asData?.value;
-        if (currentUser != null) {
-          if (currentUser.onboardingCompleted == false) {
-            return '/onboarding/profile';
-          }
-        }
         return '/home';
       }
 
-      // Если авторизован и не завершил онбординг, но не на страницах онбординга
-      if (loggedIn && !onboardingPath) {
-        final currentUser = currentUserAsync.asData?.value;
-        if (currentUser != null && currentUser.onboardingCompleted == false) {
-          return '/onboarding/profile';
-        }
+      // Логика редиректа на онбординг, если он не завершён
+      if (loggedIn &&
+          currentUser.onboardingCompleted == false &&
+          !onboardingPath) {
+        return '/onboarding/profile';
       }
 
       // no redirect

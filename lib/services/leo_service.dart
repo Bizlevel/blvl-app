@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
-import 'package:sentry_flutter/sentry_flutter.dart';
+// import 'package:sentry_flutter/sentry_flutter.dart';
 import '../utils/env_helper.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -37,94 +37,98 @@ class LeoService {
   /// Отправляет список сообщений в Edge Function `leo-chat` и возвращает
   /// ответ ассистента + статистику токенов.
   /// Expects [messages] in chat completion API format.
-  /// Проверка контента через OpenAI Moderation API. Бросает [LeoFailure] если flagged.
-  Future<void> _moderationCheck(String content) async {
-    final openaiKey = envOrDefine('OPENAI_API_KEY');
-    if (openaiKey.isEmpty) {
-      return; // moderation доступна только при прямом OpenAI ключе
-    }
-
-    try {
-      final response = await Dio().post(
-        'https://api.openai.com/v1/moderations',
-        options: Options(headers: {
-          'Authorization': 'Bearer $openaiKey',
-          'Content-Type': 'application/json',
-        }),
-        data: {
-          'input': content,
-        },
-      );
-      if (response.statusCode == 200 && response.data is Map<String, dynamic>) {
-        final results = response.data['results'] as List?;
-        if (results != null && results.isNotEmpty) {
-          final flagged = results.first['flagged'] as bool? ?? false;
-          if (flagged) {
-            throw LeoFailure('Сообщение содержит запрещённый контент');
-          }
-        }
-      }
-    } catch (e) {
-      // если moderation не доступен – не блокировать, но залогировать
-      await Sentry.captureException(e);
-    }
-  }
-
   Future<Map<String, dynamic>> sendMessage(
       {required List<Map<String, dynamic>> messages}) async {
+    print('🔧 DEBUG: sendMessage вызван');
     final session = _client.auth.currentSession;
     if (session == null) {
       throw LeoFailure('Пользователь не авторизован');
     }
+    
+    print('🔧 DEBUG: JWT Token: ${session.accessToken.substring(0, 50)}...');
 
-    final openaiKey = envOrDefine('OPENAI_API_KEY');
-    if (openaiKey.isNotEmpty) {
-      // Run moderation on the latest user message (last in list)
-      final last = messages.isNotEmpty ? messages.last : null;
-      if (last != null && last['role'] == 'user') {
-        await _moderationCheck(last['content'] as String? ?? '');
-      }
-      // Call OpenAI API directly
-      return _withRetry(() async {
-        try {
-          final response = await Dio().post(
-            'https://api.openai.com/v1/chat/completions',
-            options: Options(headers: {
-              'Authorization': 'Bearer $openaiKey',
-              'Content-Type': 'application/json',
-            }),
-            data: {
-              'model': 'gpt-3.5-turbo',
-              'messages': messages,
-              'temperature': 0.7,
-            },
-          );
-          if (response.statusCode == 200 &&
-              response.data is Map<String, dynamic>) {
-            final choices = response.data['choices'] as List?;
-            final first =
-                choices != null && choices.isNotEmpty ? choices.first : null;
-            final content = first?['message']?['content'] ?? '';
-            return {
-              'message': {'content': content},
-              'tokens': response.data['usage'] ?? {},
-            };
-          } else {
-            throw LeoFailure('OpenAI error: ${response.statusMessage}');
-          }
-        } on DioException catch (e, st) {
-          await Sentry.captureException(e, stackTrace: st);
-          throw LeoFailure(e.message ?? 'Ошибка сети при обращении к OpenAI');
-        }
-      });
-    }
-
-    // Fallback to Supabase Edge Function
+    // Используем только Edge Function
+    print('🔧 DEBUG: Используется Edge Function');
     return _withRetry(() async {
       try {
         final response = await _edgeDio.post(
           '/leo-chat',
           data: jsonEncode({'messages': messages}),
+          options: Options(headers: {
+            'Authorization': 'Bearer ${session.accessToken}',
+            'Content-Type': 'application/json',
+          }),
+        );
+        
+        print('🔧 DEBUG: Response status: ${response.statusCode}');
+        print('🔧 DEBUG: Response data: ${response.data}');
+
+        if (response.statusCode == 200 &&
+            response.data is Map<String, dynamic>) {
+          return Map<String, dynamic>.from(response.data);
+        } else {
+          final message =
+              (response.data is Map && response.data['error'] != null)
+                  ? response.data['error'] as String
+                  : 'Неизвестная ошибка Leo';
+          throw LeoFailure(message);
+        }
+      } on DioException catch (e, st) {
+        // await Sentry.captureException(e, stackTrace: st);
+        if (e.error is SocketException) {
+          throw LeoFailure('Нет соединения с интернетом');
+        }
+        throw LeoFailure(e.message ?? 'Сетевая ошибка при обращении к Leo');
+      } catch (e, st) {
+        // await Sentry.captureException(e, stackTrace: st);
+        throw LeoFailure('Не удалось получить ответ Leo');
+      }
+    });
+  }
+
+  /// Отправляет сообщение с использованием RAG системы
+  Future<Map<String, dynamic>> sendMessageWithRAG({
+    required List<Map<String, dynamic>> messages,
+    required String userContext,
+    required String levelContext,
+  }) async {
+    final session = _client.auth.currentSession;
+    if (session == null) {
+      throw LeoFailure('Пользователь не авторизован');
+    }
+
+    print('🔧 DEBUG: sendMessageWithRAG вызван');
+    print('🔧 DEBUG: userContext = "$userContext"');
+    print('🔧 DEBUG: levelContext = "$levelContext"');
+    
+    // Получаем контекст из базы знаний (если доступен)
+    String knowledgeContext = '';
+    try {
+      knowledgeContext = await _getKnowledgeContext(
+        messages.last['content'] as String,
+        userContext,
+        levelContext,
+      );
+    } catch (e) {
+      // Если RAG недоступен, продолжаем без базы знаний
+      // await Sentry.captureException(e);
+    }
+
+    print('🔧 DEBUG: Контекст из БЗ: ${knowledgeContext.isNotEmpty ? "ЕСТЬ" : "НЕТ"}');
+    print('🔧 DEBUG: Сообщения пользователя: ${messages.length}');
+
+    // Отправляем сообщения в Edge Function с контекстом
+    // Edge Function сам построит системный промпт на основе JWT токена
+    return _withRetry(() async {
+      try {
+        final response = await _edgeDio.post(
+          '/leo-chat',
+          data: jsonEncode({
+            'messages': messages,
+            'userContext': userContext,
+            'levelContext': levelContext,
+            'knowledgeContext': knowledgeContext,
+          }),
           options: Options(headers: {
             'Authorization': 'Bearer ${session.accessToken}',
             'Content-Type': 'application/json',
@@ -142,16 +146,63 @@ class LeoService {
           throw LeoFailure(message);
         }
       } on DioException catch (e, st) {
-        await Sentry.captureException(e, stackTrace: st);
+        // await Sentry.captureException(e, stackTrace: st);
         if (e.error is SocketException) {
           throw LeoFailure('Нет соединения с интернетом');
         }
         throw LeoFailure(e.message ?? 'Сетевая ошибка при обращении к Leo');
       } catch (e, st) {
-        await Sentry.captureException(e, stackTrace: st);
+        // await Sentry.captureException(e, stackTrace: st);
         throw LeoFailure('Не удалось получить ответ Leo');
       }
     });
+  }
+
+  /// Получает контекст из базы знаний
+  Future<String> _getKnowledgeContext(
+    String query,
+    String userContext,
+    String levelContext,
+  ) async {
+    try {
+      print('🔍 DEBUG: Запрос к RAG: $query');
+      
+      final response = await _edgeDio.post(
+        '/leo-rag',
+        data: jsonEncode({
+          'query': query,
+          'userContext': userContext,
+          'levelContext': levelContext,
+        }),
+        options: Options(headers: {
+          'Authorization': 'Bearer ${_client.auth.currentSession?.accessToken}',
+          'Content-Type': 'application/json',
+        }),
+      );
+
+      if (response.statusCode == 200 && response.data is Map<String, dynamic>) {
+        final context = response.data['context'] as String? ?? '';
+        print('🔍 DEBUG: Полный ответ от RAG: ${response.data}');
+        print('🔍 DEBUG: Тип context: ${context.runtimeType}');
+        print('🔍 DEBUG: Длина context: ${context.length}');
+        print('🔍 DEBUG: Контекст (raw): "$context"');
+        print('🔍 DEBUG: Контекст (bytes): ${context.codeUnits}');
+        print('📚 DEBUG: Получен контекст из БЗ: ${context.isNotEmpty ? "ЕСТЬ" : "НЕТ"}');
+        if (context.isNotEmpty) {
+          print('📝 DEBUG: Первые 200 символов контекста:');
+          print(context.length > 200 ? context.substring(0, 200) : context);        }
+        return context;
+      } else {
+        print('❌ DEBUG: RAG вернул ошибку: ${response.statusCode}');
+        // Если RAG недоступен, возвращаем пустой контекст
+        return '';
+      }
+    } catch (e) {
+      print('❌ DEBUG: Ошибка RAG: $e');
+      // Логируем ошибку, но не прерываем работу
+      // await Sentry.captureException(e);
+      return '';
+    }
   }
 
   /// Generic retry with exponential backoff (300ms, 600ms)
