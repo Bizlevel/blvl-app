@@ -108,12 +108,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         return '/home';
       }
 
-      // Логика редиректа на онбординг, если он не завершён
-      if (loggedIn &&
-          currentUser.onboardingCompleted == false &&
-          !onboardingPath) {
-        return '/onboarding/profile';
-      }
+      // Удалена логика редиректа на онбординг — после входа пользователь попадает на карту уровней
 
       // no redirect
       return null;
