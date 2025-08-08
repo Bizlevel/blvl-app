@@ -36,9 +36,15 @@ class UserRepository {
         return null;
       }
 
+      if (kDebugMode) {
+        debugPrint('UserRepository.fetchProfile: raw response: $response');
+      }
+
       final user = UserModel.fromJson(response);
       if (kDebugMode) {
         debugPrint('UserRepository.fetchProfile: loaded user ${user.id}');
+        debugPrint('UserRepository.fetchProfile: goal = "${user.goal}"');
+        debugPrint('UserRepository.fetchProfile: about = "${user.about}"');
       }
       return user;
     } on PostgrestException catch (e) {
