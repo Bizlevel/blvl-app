@@ -9,7 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:video_player/video_player.dart';
 import 'package:bizlevel/services/supabase_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:go_router/go_router.dart';
+// DEPRECATED: go_router import удалён; экран онбординга не используется в навигации
 
 import '../../theme/color.dart';
 
@@ -124,7 +124,7 @@ class _OnboardingVideoScreenState extends ConsumerState<OnboardingVideoScreen> {
 
     if (!mounted) return;
 
-    context.go('/home');
+    // DEPRECATED: навигация выполняется через основной flow уровней
   }
 
   @override
