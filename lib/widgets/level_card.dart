@@ -208,7 +208,8 @@ class _LevelCardState extends State<LevelCard> {
   }
 
   Widget _buildLevelNumber() {
-    final level = widget.data["level"].toString();
+    final levelNum = widget.data["level"] as int? ?? 0;
+    final String label = levelNum == 0 ? 'Первый шаг' : 'Уровень $levelNum';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
@@ -224,7 +225,7 @@ class _LevelCardState extends State<LevelCard> {
         ],
       ),
       child: Text(
-        'Уровень $level',
+        label,
         style: const TextStyle(
           color: Colors.white,
           fontWeight: FontWeight.w600,
