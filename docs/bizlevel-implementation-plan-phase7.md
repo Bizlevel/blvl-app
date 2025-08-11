@@ -138,3 +138,62 @@
   5) Убедиться, что триггер `trg_call_leo_memory` существует на `public.leo_messages` и вызывает `public.call_leo_memory()` при `role='assistant'`.
   6) В клиенте обеспечить структурный `levelContext` при вызове `/leo-chat` (например `{"level_id":6}`), либо передавать строку `level_id: 6`.
   7) Прогнать проверку: отправить сообщение → ответ ассистента → через ~сек проверить `user_memories` (новые записи), `leo_chats.summary/last_topics` (заполнены). Новый чат должен получить блок «Итоги прошлых обсуждений» в системном промпте и корректно отвечать на вопрос про прошлый диалог.
+
+# Этап 27: Исправления и оптимизации
+
+### Задача 27.1: База данных — корректировка прогресса и навыков
+- Файлы: `supabase/migrations/YYYYMMDD_update_current_level_with_skills.sql`
+- Что сделать:
+  1) Обновить RPC `public.update_current_level(p_level_id int)`:
+     - Определять `lvl_num` и `skill_id` завершённого уровня: `select number, skill_id into ... from levels where id = p_level_id`.
+     - Обновлять `users.current_level = lvl_num + 1` для `auth.uid()` (сохранить текущее поведение и `SECURITY DEFINER`, `SET search_path TO public`).
+     - Если `skill_id` не NULL — выполнить UPSERT в `user_skills` (+1 к `points`) для пары `(auth.uid(), skill_id)`.
+  2) Добавить индексы производительности:
+     - `create index if not exists idx_levels_skill_id on public.levels(skill_id);`
+     - `create index if not exists idx_user_skills_skill on public.user_skills(skill_id);`
+     - (проверка) наличие индекса `idx_user_progress_level_id` на `user_progress(level_id)`.
+- Проверка:
+  - Применить миграцию через `supabase-mcp`.
+  - Выполнить `select pg_get_functiondef('public.update_current_level(int)')` и визуально подтвердить логику UPSERT.
+  - Прогнать advisors (см. 27.3) — не должно появиться новых ошибок.
+
+### Задача 27.2: Клиент — консистентность и безрегрессный сценарий
+- Файлы: без изменений (поведение уже корректное: `SupabaseService.completeLevel()` → upsert в `user_progress` + RPC, инвалидация провайдеров `levelsProvider`/`currentUserProvider`/`userSkillsProvider`).
+- Опционально (техдолг): унифицировать дефолт `UserModel.currentLevel` на `0`, чтобы соответствовал БД. Делать только после прохождения основного сценария.
+
+### Задача 27.3: Advisors и индексы
+- Инструменты: `supabase-mcp` (`get_advisors`, `list_tables`).
+- Что сделать:
+  1) Запустить security/performance advisors и зафиксировать результаты.
+  2) Убедиться, что предупреждения про неиндексированные FK `levels.skill_id` и `user_skills.skill_id` ушли.
+  3) (Техдолг) Отметить WARN по RLS init-plan (вызовы `auth.*()` в политиках) — оставить к последующей оптимизации.
+
+### Задача 27.4: Тесты — проверка начисления навыков
+- Файлы: `test/level_flow_test.dart` (расширить), либо новый `test/level_skill_increment_test.dart`.
+- Что проверить:
+  1) После вызова `SupabaseService.completeLevel(levelId)` очки навыка, связанного с этим уровнем (`levels.skill_id`), увеличиваются на 1 в данных `userSkillsProvider`.
+  2) Инвалидация `levelsProvider`/`currentUserProvider`/`userSkillsProvider` приводит к обновлению UI (можно проверить через мок/фейк-репозитории или интеграционный сценарий).
+- Примечание: интеграционный тест с реальной БД допустим в отдельном окружении; в юнит‑тестах — контрактный тест на уровне репозитория/провайдера.
+
+### Задача 27.5: Проверка и настройка Sentry
+- Файлы: `lib/main.dart`, `lib/routing/app_router.dart`, `scripts/sentry_check.sh`.
+- Что сделать:
+  1) Проверить, что DSN передаётся через `envOrDefine('SENTRY_DSN')`, Sentry инициализируется в той же async‑зоне, `SentryNavigatorObserver` подключён к GoRouter.
+  2) Убедиться, что `beforeSend` удаляет заголовок `Authorization` из событий (есть в `main.dart`).
+  3) Прогнать `scripts/sentry_check.sh` локально и в CI, убедиться в отсутствии критических нерешённых ошибок за 24 часа. Игнор «шумных» категорий должен сохраняться.
+  4) Смоук-проверка: искусственно выбросить исключение в dev-сборке и убедиться, что оно попадает в Sentry с корректным `environment` и `release`.
+
+### Задача 27.6: Ручная проверка сценария
+- Сценарий:
+  1) Войти под тестовым пользователем → открыть уровень с привязкой `skill_id` → пройти уроки → нажать «Завершить уровень».
+  2) Открыть Профиль → блок «Шкала навыков» должен показать `+1` к соответствующему навыку.
+  3) Обновить карту уровней — следующий уровень становится доступным (учитывая подписку и `current_level`).
+
+### Задача 27.7: Бэкфилл очков навыков (при наличии завершённых уровней до фикса)
+- Файл: `supabase/migrations/YYYYMMDD_backfill_user_skills_from_progress.sql` (опционально, одноразовая миграция).
+- Что сделать:
+  - Для всех пар `(user_id, level_id)` из `user_progress` с `is_completed=true` найти `levels.skill_id` и выполнить UPSERT в `user_skills` с суммированием очков.
+- Проверка: выборочно сравнить пользователей до/после, удостоверившись, что очки соответствуют числу завершённых уровней по каждому навыку.
+
+### Задача 27.8: Документация
+- Файлы: `docs/status.md` — добавить краткую запись о выполненных изменениях (фикс RPC, индексы, тесты, проверки Sentry/advisors), влияние на UX: «очки навыков теперь автоматически растут при завершении уровня».
