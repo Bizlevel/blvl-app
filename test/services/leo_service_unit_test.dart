@@ -39,6 +39,7 @@ void main() {
   });
 
   // Только decrementMessageCount тестируем – не требует сложного builder.
+  // Контракт ответа /leo-chat не менялся.
 
   group('decrementMessageCount', () {
     test('возвращает новое значение счётчика', () async {
