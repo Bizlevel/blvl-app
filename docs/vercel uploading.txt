@@ -1,0 +1,42 @@
+Для добавления версии проекта в vercel используется скрипт для powershell. При необходимости - переделайте его в bash.
+Запуск: .\scripts\local_build.ps1
+
+
+
+-----------------------------------------------------------------------------------------
+# deploy_web.ps1
+$ErrorActionPreference = 'Stop'
+
+# --- Build ---
+Write-Host "Building Flutter web with hardcoded variables..."
+flutter build web --release `
+  --dart-define="SUPABASE_URL=https://********.supabase.co" `
+  --dart-define="SUPABASE_ANON_KEY=*************************" `
+  --dart-define="SENTRY_DSN=https://**************ingest.de.sentry.io/**************"
+
+if ($LASTEXITCODE -ne 0) { throw "Flutter build failed." }
+
+# --- Cleanup: Remove .env file if it exists ---
+$envFile = "build/web/assets/.env"
+if (Test-Path $envFile) { 
+    Write-Host "Removing .env file from build output..."
+    Remove-Item $envFile -Force 
+}
+
+# --- Deploy only build/web ---
+Push-Location build/web
+
+# Link project on first run
+if (-not (Test-Path ".vercel\project.json")) {
+  Write-Host "Linking Vercel project..."
+  vercel link --yes
+}
+
+# Deploy to production
+Write-Host "Deploying to Vercel..."
+vercel --prod --yes
+
+Pop-Location
+
+Write-Host "Done. Deployed build/web."
+-----------------------------------------------------------------------------------------
