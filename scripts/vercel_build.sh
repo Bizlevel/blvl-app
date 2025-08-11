@@ -18,5 +18,7 @@ flutter pub get
 flutter build web --release \
   --dart-define="SUPABASE_URL=${SUPABASE_URL:-}" \
   --dart-define="SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY:-}" \
-  --dart-define="SENTRY_DSN=${SENTRY_DSN:-}" \
-  --dart-define="OPENAI_API_KEY=${OPENAI_API_KEY:-}" 
+  --dart-define="SENTRY_DSN=${SENTRY_DSN:-}"
+
+# Remove the .env file from the build output to avoid exposing secrets
+rm -f build/web/assets/.env

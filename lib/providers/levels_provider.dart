@@ -9,7 +9,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final repo = ref.watch(levelsRepositoryProvider);
 
-  final userCurrentLevel =
+  final int? userCurrentLevel =
       ref.watch(currentUserProvider.select((user) => user.value?.currentLevel));
   final hasPremium =
       ref.watch(currentUserProvider.select((user) => user.value?.isPremium));
@@ -36,19 +36,23 @@ final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
         ? (progressArr.first['is_completed'] as bool? ?? false)
         : false;
 
-    // Логика доступности
+    // Доступность уровня
     bool isAccessible;
-    if (level.number == 1) {
+    if (level.number == 0) {
+      // «Первый шаг» всегда доступен для просмотра
       isAccessible = true;
     } else if (!level.isFree && level.number > 3) {
-      // Премиум уровни открываются только при активной подписке/флаге
+      // Премиум уровни открываются при активной подписке и после завершения предыдущего
       isAccessible = isPremium && previousCompleted;
     } else {
+      // Обычные уровни доступны только после завершения предыдущего уровня
       isAccessible = previousCompleted;
     }
 
-    // Обновляем previousCompleted для следующего уровня
-    previousCompleted = isCompleted;
+    // Обновляем previousCompleted для следующего уровня:
+    // - уровень считается «пройденным» если user_progress.is_completed = true
+    // - или если текущий уровень пользователя больше номера этого уровня
+    previousCompleted = isCompleted || ((userCurrentLevel ?? 0) > level.number);
 
     final bool isLocked = !isAccessible;
 
