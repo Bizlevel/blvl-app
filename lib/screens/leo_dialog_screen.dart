@@ -43,6 +43,10 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
   int _remaining = -1; // −1 unknown
 
   late final LeoService _leo;
+  
+  // Добавляем debounce для предотвращения дублей
+  Timer? _debounceTimer;
+  static const Duration _debounceDelay = Duration(milliseconds: 500);
 
   @override
   void initState() {
@@ -53,6 +57,12 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
     if (_chatId != null) {
       _loadMessages();
     }
+  }
+
+  @override
+  void dispose() {
+    _debounceTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _fetchRemaining() async {
@@ -124,6 +134,19 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
 
     final text = _inputController.text.trim();
     if (text.isEmpty || _isSending) return;
+
+    // Отменяем предыдущий таймер debounce
+    _debounceTimer?.cancel();
+    
+    // Устанавливаем новый таймер debounce
+    _debounceTimer = Timer(_debounceDelay, () async {
+      await _sendMessageInternal(text);
+    });
+  }
+
+  Future<void> _sendMessageInternal(String text) async {
+    // Дополнительная проверка на случай, если состояние изменилось
+    if (_isSending || !mounted) return;
 
     setState(() {
       _isSending = true;
@@ -250,6 +273,12 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
                   hintText: 'Введите сообщение...',
                   border: OutlineInputBorder(),
                 ),
+                // Добавляем onSubmitted для отправки по Enter
+                onSubmitted: (text) {
+                  if (text.trim().isNotEmpty && !_isSending) {
+                    _sendMessage();
+                  }
+                },
               ),
             ),
             const SizedBox(width: 8),
