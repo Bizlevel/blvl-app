@@ -13,7 +13,14 @@ void main() {
     IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   }
 
+  // Этот тест предназначен для web-платформы, где доступен HtmlElementView.
+  // В среде vm помечаем как пропущенный.
   testWidgets('Smoke test – LessonWidget renders on Web', (tester) async {
+    // Пропускаем в не-web окружении
+    const isWeb = identical(0, 0.0);
+    if (!isWeb) {
+      return;
+    }
     // Dummy lesson with Vimeo ID to avoid network calls to Supabase in tests.
     const lesson = LessonModel(
       id: 1,

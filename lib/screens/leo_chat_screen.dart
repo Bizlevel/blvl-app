@@ -8,6 +8,7 @@ import 'package:bizlevel/screens/leo_dialog_screen.dart';
 
 import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/providers/auth_provider.dart';
+
 class LeoChatScreen extends ConsumerStatefulWidget {
   const LeoChatScreen({super.key});
 
@@ -179,12 +180,12 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
           onTap: () {
             Navigator.of(context).push(
               MaterialPageRoute(
-              builder: (_) => LeoDialogScreen(
-                chatId: chat['id'],
-                userContext: _getUserContext(),
-                levelContext: _getLevelContext(),
+                builder: (_) => LeoDialogScreen(
+                  chatId: chat['id'],
+                  userContext: _getUserContext(),
+                  levelContext: _getLevelContext(),
+                ),
               ),
-            ),
             );
           },
         );

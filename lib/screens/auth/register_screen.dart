@@ -12,7 +12,6 @@ import '../../providers/auth_provider.dart';
 import '../../widgets/custom_textfield.dart';
 import '../../widgets/custom_image.dart';
 
-
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
 

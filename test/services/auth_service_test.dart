@@ -13,6 +13,9 @@ class MockAuthResponse extends Mock implements AuthResponse {}
 
 class MockSupabaseQueryBuilder extends Mock implements SupabaseQueryBuilder {}
 
+class MockPostgrestFilterBuilder<T> extends Mock
+    implements PostgrestFilterBuilder<T> {}
+
 class MockUser extends Mock implements User {}
 
 void main() {
@@ -77,6 +80,7 @@ void main() {
   group('updateProfile', () {
     late MockUser user;
     late MockSupabaseQueryBuilder builder;
+    late MockPostgrestFilterBuilder<dynamic> filterBuilder;
 
     setUp(() {
       // Мокаем текущего пользователя
@@ -87,8 +91,10 @@ void main() {
 
       // Мокаем builder для upsert
       builder = MockSupabaseQueryBuilder();
+      filterBuilder = MockPostgrestFilterBuilder<dynamic>();
       when(() => client.from('users')).thenReturn(builder);
-      when(() => builder.upsert(any<dynamic>())).thenAnswer((_) async => []);
+      when(() => builder.upsert(any<dynamic>()))
+          .thenAnswer((_) => filterBuilder);
     });
 
     test('формирует payload без onboarding_completed по умолчанию', () async {
@@ -114,6 +120,7 @@ void main() {
     });
 
     test('бросает AuthFailure, если пользователь не авторизован', () async {
+      // Подготовим состояние заранее, до expect
       when(() => auth.currentUser).thenReturn(null);
 
       expect(
