@@ -15,12 +15,14 @@ class LeoDialogScreen extends ConsumerStatefulWidget {
   final String? chatId;
   final String? userContext;
   final String? levelContext;
+  final String bot; // 'leo' | 'alex'
 
   const LeoDialogScreen({
     super.key,
     this.chatId,
     this.userContext,
     this.levelContext,
+    this.bot = 'leo',
   });
 
   @override
@@ -38,7 +40,8 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
 
   bool _isSending = false;
   bool _isLoadingMore = false;
-  bool _hasMore = true;
+  bool _hasMore =
+      false; // включаем пагинацию только после реальной загрузки из БД
   int _page = 0; // 0-based page counter
   int _remaining = -1; // −1 unknown
 
@@ -54,6 +57,14 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
     _leo = ref.read(leoServiceProvider);
     _fetchRemaining();
     _chatId = widget.chatId;
+    // Автоприветствие для Алекса при открытии нового диалога (не сохраняем в БД)
+    if (widget.bot == 'alex' && _chatId == null && _messages.isEmpty) {
+      _messages.add({
+        'role': 'assistant',
+        'content':
+            'Я — Алекс, трекер цели BizLevel. Помогаю кристаллизовать цель и держать темп 28 дней. Напишите, чего хотите добиться — предложу ближайший шаг.',
+      });
+    }
     if (_chatId != null) {
       _loadMessages();
     }
@@ -94,8 +105,23 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
     setState(() {
       _hasMore = fetched.length == _pageSize;
       _page += 1;
-      // Reverse to chronological order and prepend
-      _messages.insertAll(0, fetched.reversed);
+      // Reverse to chronological order и добавить только новые (по роли+контенту), чтобы не дублировать
+      final chronological = fetched.reversed
+          .map((e) => {'role': e['role'], 'content': e['content']})
+          .toList();
+      final existingKeys =
+          _messages.map((m) => '${m['role']}::${m['content']}').toSet();
+      final toAdd = <Map<String, dynamic>>[];
+      for (final m in chronological) {
+        final key = '${m['role']}::${m['content']}';
+        if (!existingKeys.contains(key)) {
+          toAdd.add(m);
+          existingKeys.add(key);
+        }
+      }
+      if (toAdd.isNotEmpty) {
+        _messages.insertAll(0, toAdd);
+      }
     });
 
     // Auto-scroll only after first page load
@@ -159,7 +185,8 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
       // Save user message & decrement limit atomically
       if (_chatId == null) {
         // создаём диалог при первом сообщении
-        _chatId = await _leo.saveConversation(role: 'user', content: text);
+        _chatId = await _leo.saveConversation(
+            role: 'user', content: text, bot: widget.bot);
         // сразу загрузим (чтобы появился счётчик и т.д.)
       } else {
         await _leo.saveConversation(
@@ -183,6 +210,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
         messages: _buildChatContext(),
         userContext: widget.userContext ?? '',
         levelContext: widget.levelContext ?? '',
+        bot: widget.bot,
       );
       assistantMsg = response['message']['content'] as String? ?? '';
 
@@ -214,7 +242,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: AppColor.primary,
-        title: const Text('Диалог с Leo'),
+        title: Text(widget.bot == 'alex' ? 'Диалог с Алекс' : 'Диалог с Leo'),
       ),
       body: Column(
         children: [

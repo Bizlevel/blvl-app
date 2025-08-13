@@ -436,7 +436,9 @@ class _BodyState extends ConsumerState<_Body> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
+              Wrap(
+                alignment: WrapAlignment.center,
+                runSpacing: 8,
                 children: [
                   Text(
                     widget.userName,
@@ -523,11 +525,12 @@ class _BodyState extends ConsumerState<_Body> {
             ),
           ],
         ),
-        child: const Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+        child: const Wrap(
+          alignment: WrapAlignment.center,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: AppSpacing.small,
           children: [
             Icon(Icons.star, color: Colors.white, size: 20),
-            SizedBox(width: AppSpacing.small),
             Text(
               "Активировать премиум",
               style: TextStyle(

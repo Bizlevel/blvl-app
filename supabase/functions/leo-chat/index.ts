@@ -178,7 +178,14 @@ serve(async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { messages, userContext, levelContext, knowledgeContext } = await req.json();
+    // Read request body once to support additional parameters
+    const body = await req.json();
+    const messages = body?.messages;
+    const userContext = body?.userContext;
+    const levelContext = body?.levelContext;
+    const knowledgeContext = body?.knowledgeContext;
+    const bot: string = typeof body?.bot === 'string' ? String(body.bot) : 'leo';
+    const isAlex = bot === 'alex';
 
     if (!Array.isArray(messages)) {
       return new Response(
@@ -193,6 +200,7 @@ serve(async (req: Request): Promise<Response> => {
     // Try to extract user context from bearer token (optional)
     const authHeader = req.headers.get("Authorization") || req.headers.get("authorization");
     let userContextText = "";
+    let profileText = ""; // формируем отдельно, чтобы при отсутствии JWT всё равно использовать client userContext
     let personaSummary = "";
     let userId: string | null = null;
 
@@ -222,12 +230,8 @@ serve(async (req: Request): Promise<Response> => {
 
         if (profile) {
           const { name, about, goal, business_area, experience_level, persona_summary } = profile as any;
-          // Используем контекст от клиента, если он передан, иначе строим из профиля
-          if (userContext) {
-            userContextText = userContext;
-          } else {
-            userContextText = `Имя пользователя: ${name ?? "не указано"}. Цель: ${goal ?? "не указана"}. О себе: ${about ?? "нет информации"}. Сфера деятельности: ${business_area ?? "не указана"}. Уровень опыта: ${experience_level ?? "не указан"}.`;
-          }
+          // Собираем профиль пользователя
+          profileText = `Имя пользователя: ${name ?? "не указано"}. Цель: ${goal ?? "не указана"}. О себе: ${about ?? "нет информации"}. Сфера деятельности: ${business_area ?? "не указана"}. Уровень опыта: ${experience_level ?? "не указан"}.`;
 
           // Персона: берём сохранённую, иначе кратко формируем из профиля
           if (!personaSummary) {
@@ -244,6 +248,13 @@ serve(async (req: Request): Promise<Response> => {
           }
         }
       }
+    }
+
+    // Объединяем профиль и клиентский контекст независимо от авторизации
+    if (typeof userContext === 'string' && userContext.trim().length > 0) {
+      userContextText = `${profileText ? profileText + "\n" : ''}${userContext.trim()}`;
+    } else {
+      userContextText = profileText;
     }
 
     // Извлекаем последний запрос пользователя
@@ -332,6 +343,7 @@ serve(async (req: Request): Promise<Response> => {
           .from('leo_chats')
           .select('summary')
           .eq('user_id', userId)
+          .eq('bot', isAlex ? 'alex' : 'leo')
           .not('summary', 'is', null)
           .order('updated_at', { ascending: false })
           .limit(3);
@@ -353,9 +365,82 @@ serve(async (req: Request): Promise<Response> => {
     console.log('🔧 DEBUG: userContext from client:', userContext ? 'ЕСТЬ' : 'НЕТ');
     console.log('🔧 DEBUG: levelContext from client:', levelContext ? 'ЕСТЬ' : 'НЕТ');
     console.log('🔧 DEBUG: knowledgeContext from client:', knowledgeContext ? 'ЕСТЬ' : 'НЕТ');
+    console.log('🔧 DEBUG: bot:', isAlex ? 'alex' : 'leo');
+    
+    // Extra goal/sprint/reminders/quote context for Alex (tracker)
+    let goalBlock = '';
+    let sprintBlock = '';
+    let remindersBlock = '';
+    let quoteBlock = '';
+    if (isAlex && userId) {
+      try {
+        // Latest goal version
+        const { data: goals } = await supabaseAdmin
+          .from('core_goals')
+          .select('version, goal_text, version_data, updated_at')
+          .eq('user_id', userId)
+          .order('version', { ascending: false })
+          .limit(1);
+        if (Array.isArray(goals) && goals.length > 0) {
+          const g = goals[0] as any;
+          const version = g?.version;
+          const goalText = g?.goal_text || '';
+          const versionData = typeof g?.version_data === 'object' ? JSON.stringify(g?.version_data) : String(g?.version_data || '');
+          goalBlock = `Версия цели: v${version}. Кратко: ${goalText}. Данные версии: ${versionData}`;
+        }
+      } catch (e) {
+        console.error('alex goal fetch error:', e);
+      }
+      try {
+        // Latest weekly progress
+        const { data: progress } = await supabaseAdmin
+          .from('weekly_progress')
+          .select('sprint_number, achievement, metric_actual, created_at')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false })
+          .limit(1);
+        if (Array.isArray(progress) && progress.length > 0) {
+          const p = progress[0] as any;
+          sprintBlock = `Спринт: ${p?.sprint_number ?? ''}. Итоги: ${p?.achievement ?? ''}. Метрика (факт): ${p?.metric_actual ?? ''}`;
+        }
+      } catch (e) {
+        console.error('alex progress fetch error:', e);
+      }
+      try {
+        // Recent unchecked reminders (up to 5)
+        const { data: reminders } = await supabaseAdmin
+          .from('reminder_checks')
+          .select('day_number, reminder_text, is_completed')
+          .eq('user_id', userId)
+          .eq('is_completed', false)
+          .order('day_number', { ascending: true })
+          .limit(5);
+        if (Array.isArray(reminders) && reminders.length > 0) {
+          const lines = reminders.map((r: any) => `• День ${r?.day_number}: ${r?.reminder_text}`);
+          remindersBlock = lines.join('\n');
+        }
+      } catch (e) {
+        console.error('alex reminders fetch error:', e);
+      }
+      try {
+        // Daily quote (any active)
+        const { data: quotes } = await supabaseAdmin
+          .from('motivational_quotes')
+          .select('quote_text, author')
+          .eq('is_active', true)
+          .limit(1);
+        if (Array.isArray(quotes) && quotes.length > 0) {
+          const q = quotes[0] as any;
+          const author = q?.author ? ` — ${q.author}` : '';
+          quoteBlock = `${q?.quote_text || ''}${author}`;
+        }
+      } catch (e) {
+        console.error('alex quotes fetch error:', e);
+      }
+    }
     
     // Enhanced system prompt for Leo AI mentor
-    const systemPrompt = `## Твоя Роль и Личность:
+    const systemPromptLeo = `## Твоя Роль и Личность:
 Ты — Лео, харизматичный ИИ-консультант программы «БизЛевел» в Казахстане. 
 Отвечай от своего имени - Леонард или Лео, старайся не представляться, а сразу отвечать на вопросы.
 Используй простой текст без разметки, звездочек или других символов форматирования.
@@ -379,6 +464,7 @@ serve(async (req: Request): Promise<Response> => {
    • НИКОГДА НЕ начинай ответы с: 'Отличный вопрос!', 'Понимаю...', 'Конечно!', 'Хороший вопрос!'
    • НИКОГДА НЕ используй: 'Давайте разберемся!', 'Это интересная тема!', 'Поясню подробнее...'
    • СРАЗУ переходи к сути ответа без предисловий
+   • НЕ начинай сообщения с приветствий типа "Привет", "Здравствуйте"
    • Пример: вместо 'Отличный вопрос! УТП - это...' пиши просто 'УТП - это...'
 
 ## ИНФОРМАЦИЯ О ПОЛЬЗОВАТЕЛЕ:
@@ -446,31 +532,78 @@ ${userContextText ? `\n## ПЕРСОНАЛИЗАЦИЯ ДЛЯ ПОЛЬЗОВАТ
 ${levelContext ? `\n## КОНТЕКСТ УРОКА:\n${levelContext}` : ''}
 ${knowledgeContext ? `\n## БАЗА ЗНАНИЙ (клиент):\n${knowledgeContext}` : ''}`;
 
-    // Compose chat with enhanced system prompt
-    const completion = await openai.chat.completions.create({
-      model: Deno.env.get("OPENAI_MODEL") || "gpt-4.1-mini",
-      temperature: parseFloat(Deno.env.get("OPENAI_TEMPERATURE") || "0.4"),
-      messages: [
+    // Alex (goal tracker) prompt — коротко, конкретно, приоритет цели/спринтов
+    const systemPromptAlex = `## Твоя роль и тон:
+Ты — Алекс, трекер цели BizLevel. Отвечай коротко, конкретно и по делу.
+Фокус: помочь пользователю сформулировать и кристаллизовать цель, поддерживать её достижение в 28‑дневных спринтах.
+Представляйся только в первом ответе новой сессии или если пользователь явно спрашивает «кто ты?».
+Не используй таблицы и не предлагай «дополнительную помощь». Сразу давай следующий шаг.
+
+## Приоритет ответа:
+1) Цель и метрики пользователя → 2) Следующие микро‑шаги на сегодня/неделю → 3) Дополнение из базы знаний курса (если нужно) → 4) Краткое завершение.
+Если цель присутствует в блоках «Персонализация» или «Цель», НЕ проси пользователя повторять её. Кратко перескажи и предложи шаг. Если данных совсем нет, тогда запроси одно ключевое уточнение.
+
+## Данные пользователя и контекст:
+${personaSummary ? `Персона: ${personaSummary}\n` : ''}
+${goalBlock ? `Цель: ${goalBlock}\n` : ''}
+${sprintBlock ? `Спринт: ${sprintBlock}\n` : ''}
+${remindersBlock ? `Незафиксированные напоминания:\n${remindersBlock}\n` : ''}
+${recentSummaries ? `Итоги прошлых обсуждений:\n${recentSummaries}\n` : ''}
+${memoriesText ? `Личные заметки:\n${memoriesText}\n` : ''}
+${ragContext ? `Материалы курса (RAG):\n${ragContext}\n` : ''}
+${userContextText ? `Персонализация: ${userContextText}\n` : ''}
+${levelContext ? `Контекст экрана/урока: ${levelContext}\n` : ''}
+${quoteBlock ? `Цитата дня: ${quoteBlock}\n` : ''}
+
+## Правила формата:
+- Без таблиц, эмодзи и вводных фраз. 2–5 коротких абзацев или маркированный список.
+- Всегда укажи один следующий шаг (микро‑действие) c реалистичным сроком в ближайшие 1–3 дня.
+- Если данных недостаточно — попроси уточнение по одному самому важному пункту.
+- Не говори, что у тебя нет доступа к профилю. Используй данные из разделов выше (Персонализация, Персона, Память, Итоги) и отвечай по ним.`;
+
+    const systemPrompt = isAlex ? systemPromptAlex : systemPromptLeo;
+
+    // --- Безопасный вызов OpenAI с валидацией конфигурации ---
+    const apiKey = Deno.env.get("OPENAI_API_KEY");
+    if (!apiKey || apiKey.trim().length < 20) {
+      console.error("OpenAI API key is not configured or too short");
+      return new Response(
+        JSON.stringify({ error: "openai_config_error", details: "OpenAI API key is missing or invalid" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    try {
+      // Compose chat with enhanced system prompt
+      const completion = await openai.chat.completions.create({
+        model: Deno.env.get("OPENAI_MODEL") || "gpt-4.1-mini",
+        temperature: parseFloat(Deno.env.get("OPENAI_TEMPERATURE") || "0.4"),
+        messages: [
+          { role: "system", content: systemPrompt },
+          ...messages,
+        ],
+      });
+
+      const assistantMessage = completion.choices[0].message;
+      const usage = completion.usage; // prompt/completion/total tokens
+
+      console.log('🔧 DEBUG: Ответ от OpenAI:', assistantMessage.content?.substring(0, 100));
+
+      return new Response(
+        JSON.stringify({ message: assistantMessage, usage }),
         {
-          role: "system",
-          content: systemPrompt,
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
         },
-        ...messages,
-      ],
-    });
-
-    const assistantMessage = completion.choices[0].message;
-    const usage = completion.usage; // prompt/completion/total tokens
-
-    console.log('🔧 DEBUG: Ответ от OpenAI:', assistantMessage.content?.substring(0, 100));
-
-    return new Response(
-      JSON.stringify({ message: assistantMessage, usage }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      },
-    );
+      );
+    } catch (openaiErr: any) {
+      const short = (openaiErr?.message || String(openaiErr)).slice(0, 240);
+      console.error("OpenAI chat error:", short);
+      return new Response(
+        JSON.stringify({ error: "openai_error", details: short }),
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
   } catch (err) {
     console.error("Leo chat function error:", err);
     return new Response(

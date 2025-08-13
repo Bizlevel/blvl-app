@@ -47,6 +47,7 @@ void main() {
 
   // Только decrementMessageCount тестируем – не требует сложного builder.
   // Контракт ответа /leo-chat не менялся.
+  // Добавлен режим bot, но дефолт 'leo' сохраняет обратную совместимость.
 
   group('decrementMessageCount', () {
     test('возвращает новое значение счётчика', () async {
@@ -65,34 +66,12 @@ void main() {
     });
   });
 
-  group('sendMessage', () {
-    test('использует Edge Function даже при наличии OPENAI_API_KEY', () async {
-      // Проверяем, что сервис всегда использует Edge Function
-      // независимо от наличия OPENAI_API_KEY в окружении
-      
-      final messages = [
-        {'role': 'user', 'content': 'Тестовое сообщение'}
-      ];
-
-      // Мокаем Dio для проверки вызова Edge Function
-      // Это тест архитектуры - проверяем, что используется правильный путь
-      
-      expect(() => service.sendMessage(messages: messages), 
-             throwsA(isA<LeoFailure>())); // Ожидаем ошибку из-за мокнутого Dio
-      
-      // Основная проверка: что код не падает на проверке OPENAI_API_KEY
-      // и пытается использовать Edge Function
-    });
-
-    test('бросает LeoFailure, если не авторизован', () async {
-      when(() => auth.currentSession).thenReturn(null);
-      
-      final messages = [
-        {'role': 'user', 'content': 'Тестовое сообщение'}
-      ];
-      
-      expect(() => service.sendMessage(messages: messages), 
-             throwsA(isA<LeoFailure>()));
-    });
-  });
+<<<<<<< HEAD
+  // Тест на sendMessage оставлен в prelaunch как интеграционный/архитектурный
+  // и покрыт отдельными интеграционными тестами. Небольшой unit-проверки
+  // sendMessage здесь не требуется.
+=======
+  // Тест на saveConversation с bot флагом намеренно не добавляем —
+  // требует сложных моке PostgREST. Поведение косвенно покрыто UI‑тестами.
+>>>>>>> origin/prelaunch
 }

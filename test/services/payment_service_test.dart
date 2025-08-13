@@ -9,6 +9,7 @@ class _MockSupabaseClient extends Mock implements SupabaseClient {}
 class _MockFunctionsClient extends Mock implements FunctionsClient {}
 
 class _FakeFunctionResponse extends Fake implements FunctionResponse {
+  @override
   final dynamic data;
   _FakeFunctionResponse(this.data);
 }

@@ -2,24 +2,24 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Сервис для персонализации ответов Leo AI
 class PersonalizationService {
-  
   /// Строит контекст пользователя на основе его профиля
   static String buildUserContext(Map<String, dynamic>? userProfile) {
     if (userProfile == null) return '';
-    
+
     final name = userProfile['name'] as String? ?? 'Пользователь';
     final about = userProfile['about'] as String?;
     final goal = userProfile['goal'] as String?;
     final businessArea = userProfile['business_area'] as String?;
     final experienceLevel = userProfile['experience_level'] as String?;
-    
+
     // Базовый контекст всегда есть
     final basicContext = '''
 Имя: $name
 ${about != null ? 'О себе: $about' : ''}
 ${goal != null ? 'Цель: $goal' : ''}
-'''.trim();
-    
+'''
+        .trim();
+
     // Добавляем специализированный контекст только если есть данные
     if (businessArea != null && businessArea.isNotEmpty) {
       final businessContext = _buildBusinessContext(businessArea);
@@ -28,13 +28,14 @@ ${goal != null ? 'Цель: $goal' : ''}
 $basicContext
 $businessContext
 $experienceContext
-'''.trim();
+'''
+          .trim();
     }
-    
+
     // Если нет специализированной информации, возвращаем базовый контекст
     return basicContext;
   }
-  
+
   /// Строит контекст бизнес-сферы
   static String _buildBusinessContext(String? businessArea) {
     switch (businessArea?.toLowerCase()) {
@@ -57,7 +58,7 @@ $experienceContext
         return 'Бизнес-консультант с опытом в различных сферах предпринимательства.';
     }
   }
-  
+
   /// Строит контекст уровня опыта
   static String _buildExperienceContext(String? experienceLevel) {
     switch (experienceLevel?.toLowerCase()) {
@@ -74,11 +75,12 @@ $experienceContext
         return 'Уровень: Развивающийся предприниматель.';
     }
   }
-  
+
   /// Строит контекст уровня и урока
-  static String buildLevelContext(int levelId, String lessonTitle, String lessonType) {
+  static String buildLevelContext(
+      int levelId, String lessonTitle, String lessonType) {
     final levelContext = _getLevelDescription(levelId);
-    
+
     switch (lessonType.toLowerCase()) {
       case 'intro':
         return 'Пользователь изучает вводный блок уровня $levelId: "$lessonTitle". $levelContext';
@@ -94,7 +96,7 @@ $experienceContext
         return 'Пользователь работает с уровнем $levelId: "$lessonTitle". $levelContext';
     }
   }
-  
+
   /// Получает описание уровня
   static String _getLevelDescription(int levelId) {
     switch (levelId) {
@@ -122,7 +124,7 @@ $experienceContext
         return 'Общий фокус на развитии предпринимательских навыков.';
     }
   }
-  
+
   /// Строит расширенный системный промпт для Leo
   static String buildEnhancedSystemPrompt({
     required String userContext,
@@ -219,6 +221,7 @@ ${additionalContext != null ? '## ДОПОЛНИТЕЛЬНЫЙ КОНТЕКСТ:
 • **ВСЕГДА используй только актуальные или будущие даты (2026 год и далее) в примерах целей, планов, дедлайнов и т.д.** Никогда не используй даты из прошлого (2024 и ранее) в новых примерах.
 
 Ты лицо школы BizLevel. Помогай эффективно и профессионально!
-'''.trim();
+'''
+        .trim();
   }
-} 
+}

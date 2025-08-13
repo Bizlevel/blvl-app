@@ -148,7 +148,17 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
                                   const SnackBar(
                                       content: Text('Уровень завершён!')),
                                 );
-                                Navigator.of(context).pop();
+                                if ((widget.levelNumber ?? -1) == 1) {
+                                  // После уровня 1: открыть страницу «Цель» (v1)
+                                  if (context.mounted) {
+                                    Navigator.of(context).pop();
+                                    // Переход на /goal через Navigator (GoRouter не импортируем здесь)
+                                    // ignore: use_build_context_synchronously
+                                    Navigator.of(context).pushNamed('/goal');
+                                  }
+                                } else {
+                                  Navigator.of(context).pop();
+                                }
                               }
                             } catch (e) {
                               if (context.mounted) {

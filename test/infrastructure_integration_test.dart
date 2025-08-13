@@ -29,6 +29,8 @@ void main() {
         'avatar_id': null,
         'about': 'About',
         'goal': 'Goal',
+        'business_area': null,
+        'experience_level': null,
         'is_premium': false,
         'current_level': 1,
         'leo_messages_total': 30,

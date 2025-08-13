@@ -22,8 +22,8 @@ void main() {
       (_) async => [
         {
           'id': 1,
-          'level': 1,
-          'name': 'Intro',
+          'number': 1,
+          'title': 'Intro',
           'description': '',
           'image_url': '',
           'is_free': true,
@@ -32,8 +32,8 @@ void main() {
         },
         {
           'id': 2,
-          'level': 2,
-          'name': 'Next',
+          'number': 2,
+          'title': 'Next',
           'description': '',
           'image_url': '',
           'is_free': true,

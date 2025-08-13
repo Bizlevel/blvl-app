@@ -26,11 +26,23 @@ class FloatingChatBubble extends ConsumerStatefulWidget {
   /// Кол-во непрочитанных сообщений (если chatId == null, бейдж не показывается).
   final int unreadCount;
 
+  /// Дополнительный пользовательский контекст (для режима трекера и т.п.)
+  final String? userContext;
+
+  /// Дополнительный контекст уровня/экрана (опционально)
+  final String? levelContext;
+
+  /// Какого бота открыть: 'leo' (по умолчанию) или 'alex'
+  final String bot;
+
   const FloatingChatBubble(
       {super.key,
       required this.chatId,
       required this.systemPrompt,
-      this.unreadCount = 0});
+      this.unreadCount = 0,
+      this.userContext,
+      this.levelContext,
+      this.bot = 'leo'});
 
   @override
   ConsumerState<FloatingChatBubble> createState() => _FloatingChatBubbleState();
@@ -75,7 +87,12 @@ class _FloatingChatBubbleState extends ConsumerState<FloatingChatBubble>
       barrierColor: Colors.black54,
       builder: (_) => FractionallySizedBox(
         heightFactor: 0.9,
-        child: LeoDialogScreen(chatId: widget.chatId),
+        child: LeoDialogScreen(
+          chatId: widget.chatId,
+          userContext: widget.userContext,
+          levelContext: widget.levelContext,
+          bot: widget.bot,
+        ),
       ),
     );
   }
@@ -100,9 +117,11 @@ class _FloatingChatBubbleState extends ConsumerState<FloatingChatBubble>
             backgroundColor: AppColor.primary,
             onPressed: _openDialog,
             icon: const Icon(Icons.chat_bubble_outline),
-            label: const Text('Обсудить с Лео',
-                style: TextStyle(
-                    color: Colors.white, fontWeight: FontWeight.w600)),
+            label: Text(
+              widget.bot == 'alex' ? 'Обсудить с Алекс' : 'Обсудить с Лео',
+              style: const TextStyle(
+                  color: Colors.white, fontWeight: FontWeight.w600),
+            ),
           ),
           if (unread > 0)
             Positioned(
