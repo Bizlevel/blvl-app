@@ -263,8 +263,9 @@ serve(async (req: Request): Promise<Response> => {
       : '';
 
     // Встроенный RAG: эмбеддинг + match_documents (с кешем)
+    // Для Alex (бот-трекер) RAG отключаем полностью
     let ragContext = '';
-    if (typeof lastUserMessage === 'string' && lastUserMessage.trim().length > 0) {
+    if (!isAlex && typeof lastUserMessage === 'string' && lastUserMessage.trim().length > 0) {
       try {
         const embeddingModel = Deno.env.get("OPENAI_EMBEDDING_MODEL") || "text-embedding-3-small";
         const matchThreshold = parseFloat(Deno.env.get("RAG_MATCH_THRESHOLD") || "0.35");
@@ -550,7 +551,6 @@ ${sprintBlock ? `Спринт: ${sprintBlock}\n` : ''}
 ${remindersBlock ? `Незафиксированные напоминания:\n${remindersBlock}\n` : ''}
 ${recentSummaries ? `Итоги прошлых обсуждений:\n${recentSummaries}\n` : ''}
 ${memoriesText ? `Личные заметки:\n${memoriesText}\n` : ''}
-${ragContext ? `Материалы курса (RAG):\n${ragContext}\n` : ''}
 ${userContextText ? `Персонализация: ${userContextText}\n` : ''}
 ${levelContext ? `Контекст экрана/урока: ${levelContext}\n` : ''}
 ${quoteBlock ? `Цитата дня: ${quoteBlock}\n` : ''}
