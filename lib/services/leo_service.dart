@@ -36,8 +36,10 @@ class LeoService {
   /// Отправляет список сообщений в Edge Function `leo-chat` и возвращает
   /// ответ ассистента + статистику токенов.
   /// Expects [messages] in chat completion API format.
-  Future<Map<String, dynamic>> sendMessage(
-      {required List<Map<String, dynamic>> messages}) async {
+  Future<Map<String, dynamic>> sendMessage({
+    required List<Map<String, dynamic>> messages,
+    String bot = 'leo',
+  }) async {
     print('🔧 DEBUG: sendMessage вызван');
     final session = _client.auth.currentSession;
     if (session == null) {
@@ -52,7 +54,7 @@ class LeoService {
       try {
         final response = await _edgeDio.post(
           '/leo-chat',
-          data: jsonEncode({'messages': messages}),
+          data: jsonEncode({'messages': messages, 'bot': bot}),
           options: Options(headers: {
             'Authorization': 'Bearer ${session.accessToken}',
             'Content-Type': 'application/json',
@@ -77,7 +79,21 @@ class LeoService {
         if (e.error is SocketException) {
           throw LeoFailure('Нет соединения с интернетом');
         }
-        throw LeoFailure(e.message ?? 'Сетевая ошибка при обращении к Leo');
+        final data = e.response?.data;
+        if (data is Map) {
+          final err = (data['error'] ?? data['message'])?.toString();
+          final details = data['details']?.toString();
+          if (err != null && err.isNotEmpty) {
+            final composed =
+                details != null && details.isNotEmpty ? '$err: $details' : err;
+            throw LeoFailure(_humanizeServerError(composed));
+          }
+        }
+        if ((e.response?.statusCode ?? 0) >= 500) {
+          throw LeoFailure(
+              'Сервер чата временно недоступен. Попробуйте позже.');
+        }
+        throw LeoFailure('Сетевая ошибка при обращении к Leo');
       } catch (e) {
         // await Sentry.captureException(e, stackTrace: st);
         throw LeoFailure('Не удалось получить ответ Leo');
@@ -90,6 +106,7 @@ class LeoService {
     required List<Map<String, dynamic>> messages,
     required String userContext,
     required String levelContext,
+    String bot = 'leo',
   }) async {
     final session = _client.auth.currentSession;
     if (session == null) {
@@ -111,6 +128,7 @@ class LeoService {
             'userContext': userContext,
             'levelContext': levelContext,
             'enableRag': true,
+            'bot': bot,
           }),
           options: Options(headers: {
             'Authorization': 'Bearer ${session.accessToken}',
@@ -133,7 +151,21 @@ class LeoService {
         if (e.error is SocketException) {
           throw LeoFailure('Нет соединения с интернетом');
         }
-        throw LeoFailure(e.message ?? 'Сетевая ошибка при обращении к Leo');
+        final data = e.response?.data;
+        if (data is Map) {
+          final err = (data['error'] ?? data['message'])?.toString();
+          final details = data['details']?.toString();
+          if (err != null && err.isNotEmpty) {
+            final composed =
+                details != null && details.isNotEmpty ? '$err: $details' : err;
+            throw LeoFailure(_humanizeServerError(composed));
+          }
+        }
+        if ((e.response?.statusCode ?? 0) >= 500) {
+          throw LeoFailure(
+              'Сервер чата временно недоступен. Попробуйте позже.');
+        }
+        throw LeoFailure('Сетевая ошибка при обращении к Leo');
       } catch (e) {
         // await Sentry.captureException(e, stackTrace: st);
         throw LeoFailure('Не удалось получить ответ Leo');
@@ -157,6 +189,17 @@ class LeoService {
         attempt++;
       }
     }
+  }
+
+  String _humanizeServerError(String raw) {
+    // Сокращаем технические сообщения до понятных пользователю
+    if (raw.contains('openai_config_error')) {
+      return 'Сервис ИИ не настроен. Обратитесь к поддержке.';
+    }
+    if (raw.contains('openai_error')) {
+      return 'Проблема на стороне ИИ‑провайдера. Попробуйте ещё раз позже.';
+    }
+    return raw;
   }
 
   /// Проверяет, сколько сообщений осталось у пользователя.
@@ -218,6 +261,7 @@ class LeoService {
     required String role,
     required String content,
     String? chatId,
+    String bot = 'leo',
   }) async {
     final user = _client.auth.currentUser;
     if (user == null) throw LeoFailure('Не авторизован');
@@ -232,6 +276,7 @@ class LeoService {
             .insert({
               'user_id': user.id,
               'title': content.length > 40 ? content.substring(0, 40) : content,
+              'bot': bot,
             })
             .select('id')
             .single();

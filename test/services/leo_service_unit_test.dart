@@ -40,6 +40,7 @@ void main() {
 
   // Только decrementMessageCount тестируем – не требует сложного builder.
   // Контракт ответа /leo-chat не менялся.
+  // Добавлен режим bot, но дефолт 'leo' сохраняет обратную совместимость.
 
   group('decrementMessageCount', () {
     test('возвращает новое значение счётчика', () async {
@@ -57,4 +58,7 @@ void main() {
       expect(service.decrementMessageCount(), throwsA(isA<LeoFailure>()));
     });
   });
+
+  // Тест на saveConversation с bot флагом намеренно не добавляем —
+  // требует сложных моке PostgREST. Поведение косвенно покрыто UI‑тестами.
 }

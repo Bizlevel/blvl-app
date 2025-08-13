@@ -15,12 +15,14 @@ class LeoDialogScreen extends ConsumerStatefulWidget {
   final String? chatId;
   final String? userContext;
   final String? levelContext;
+  final String bot; // 'leo' | 'alex'
 
   const LeoDialogScreen({
     super.key,
     this.chatId,
     this.userContext,
     this.levelContext,
+    this.bot = 'leo',
   });
 
   @override
@@ -136,7 +138,8 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
       // Save user message & decrement limit atomically
       if (_chatId == null) {
         // создаём диалог при первом сообщении
-        _chatId = await _leo.saveConversation(role: 'user', content: text);
+        _chatId = await _leo.saveConversation(
+            role: 'user', content: text, bot: widget.bot);
         // сразу загрузим (чтобы появился счётчик и т.д.)
       } else {
         await _leo.saveConversation(
@@ -160,6 +163,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
         messages: _buildChatContext(),
         userContext: widget.userContext ?? '',
         levelContext: widget.levelContext ?? '',
+        bot: widget.bot,
       );
       assistantMsg = response['message']['content'] as String? ?? '';
 
@@ -191,7 +195,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: AppColor.primary,
-        title: const Text('Диалог с Leo'),
+        title: Text(widget.bot == 'alex' ? 'Диалог с Алекс' : 'Диалог с Leo'),
       ),
       body: Column(
         children: [
