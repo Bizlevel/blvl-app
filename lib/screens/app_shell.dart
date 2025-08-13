@@ -9,7 +9,7 @@ class AppShell extends ConsumerWidget {
   final Widget child;
   const AppShell({required this.child, super.key});
 
-  static const _routes = ['/home', '/chat', '/profile'];
+  static const _routes = ['/home', '/chat', '/goal', '/profile'];
 
   int _locationToTab(String location) {
     for (int i = 0; i < _routes.length; i++) {
@@ -21,7 +21,7 @@ class AppShell extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final String location =
-        GoRouter.of(context).routeInformationProvider.value.location ?? '/home';
+        GoRouter.of(context).routeInformationProvider.value.location;
     final int activeTab = _locationToTab(location);
 
     final width = MediaQuery.of(context).size.width;
@@ -57,19 +57,21 @@ class AppShell extends ConsumerWidget {
                 padding: const EdgeInsets.only(left: 25, right: 25, bottom: 15),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: List.generate(
-                    _routes.length,
-                    (index) => BottomBarItem(
-                      index == 0
-                          ? Icons.school
-                          : index == 1
-                              ? Icons.chat_bubble
-                              : Icons.person,
+                  children: List.generate(_routes.length, (index) {
+                    final icon = index == 0
+                        ? Icons.map
+                        : index == 1
+                            ? Icons.chat_bubble
+                            : index == 2
+                                ? Icons.flag
+                                : Icons.person;
+                    return BottomBarItem(
+                      icon,
                       isActive: activeTab == index,
                       activeColor: AppColor.primary,
                       onTap: () => _goTab(index),
-                    ),
-                  ),
+                    );
+                  }),
                 ),
               ),
             ),
@@ -77,9 +79,10 @@ class AppShell extends ConsumerWidget {
           ? Row(
               children: [
                 DesktopNavBar(
-                  tabs: [
+                  tabs: const [
                     {'icon': Icons.map, 'label': 'Карта уровней'},
                     {'icon': Icons.chat_bubble, 'label': 'Чат'},
+                    {'icon': Icons.flag, 'label': 'Цель'},
                     {'icon': Icons.person, 'label': 'Профиль'},
                   ],
                   activeIndex: activeTab,

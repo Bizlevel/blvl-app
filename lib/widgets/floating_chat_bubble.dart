@@ -26,11 +26,19 @@ class FloatingChatBubble extends ConsumerStatefulWidget {
   /// Кол-во непрочитанных сообщений (если chatId == null, бейдж не показывается).
   final int unreadCount;
 
+  /// Дополнительный пользовательский контекст (для режима трекера и т.п.)
+  final String? userContext;
+
+  /// Дополнительный контекст уровня/экрана (опционально)
+  final String? levelContext;
+
   const FloatingChatBubble(
       {super.key,
       required this.chatId,
       required this.systemPrompt,
-      this.unreadCount = 0});
+      this.unreadCount = 0,
+      this.userContext,
+      this.levelContext});
 
   @override
   ConsumerState<FloatingChatBubble> createState() => _FloatingChatBubbleState();
@@ -75,7 +83,11 @@ class _FloatingChatBubbleState extends ConsumerState<FloatingChatBubble>
       barrierColor: Colors.black54,
       builder: (_) => FractionallySizedBox(
         heightFactor: 0.9,
-        child: LeoDialogScreen(chatId: widget.chatId),
+        child: LeoDialogScreen(
+          chatId: widget.chatId,
+          userContext: widget.userContext,
+          levelContext: widget.levelContext,
+        ),
       ),
     );
   }
