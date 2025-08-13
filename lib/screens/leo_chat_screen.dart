@@ -61,8 +61,9 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
       if (user.about?.isNotEmpty == true) {
         contextParts.add('О себе: ${user.about}');
       }
-      if (user.currentLevel != null) {
-        contextParts.add('Текущий уровень: ${user.currentLevel}');
+      final currentLevel = user.currentLevel;
+      if (currentLevel != null) {
+        contextParts.add('Текущий уровень: $currentLevel');
       }
 
       return contextParts.isNotEmpty ? contextParts.join('. ') : null;

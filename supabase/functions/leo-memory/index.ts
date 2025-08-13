@@ -104,7 +104,7 @@ serve(async (req: Request): Promise<Response> => {
 
     // Cron/trigger mode: authorized by secret header
     const cronSecret = req.headers.get('x-cron-secret');
-    if (cronSecret && cronSecret === Deno.env.get('LEO_MEMORY_CRON_SECRET')) {
+    if (cronSecret && cronSecret === Deno.env.get('CRON_SECRET')) {
       const windowMin = parseInt(Deno.env.get('LEO_MEMORY_WINDOW_MINUTES') || '3');
       const maxPerUser = parseInt(Deno.env.get('LEO_MEMORY_MAX_PER_USER') || '40');
       const sinceIso = new Date(Date.now() - windowMin * 60 * 1000).toISOString();
