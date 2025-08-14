@@ -49,3 +49,5 @@ app.*.map.json
 
 credentials.json
 venv/
+scripts/local_build.ps1
+scripts/local_build.sh
