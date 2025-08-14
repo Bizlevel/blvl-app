@@ -15,12 +15,14 @@ class LeoDialogScreen extends ConsumerStatefulWidget {
   final String? chatId;
   final String? userContext;
   final String? levelContext;
-  
+  final String bot; // 'leo' | 'alex'
+
   const LeoDialogScreen({
-    super.key, 
+    super.key,
     this.chatId,
     this.userContext,
     this.levelContext,
+    this.bot = 'leo',
   });
 
   @override
@@ -38,11 +40,16 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
 
   bool _isSending = false;
   bool _isLoadingMore = false;
-  bool _hasMore = true;
+  bool _hasMore =
+      false; // включаем пагинацию только после реальной загрузки из БД
   int _page = 0; // 0-based page counter
   int _remaining = -1; // −1 unknown
 
   late final LeoService _leo;
+  
+  // Добавляем debounce для предотвращения дублей
+  Timer? _debounceTimer;
+  static const Duration _debounceDelay = Duration(milliseconds: 500);
 
   @override
   void initState() {
@@ -50,9 +57,23 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
     _leo = ref.read(leoServiceProvider);
     _fetchRemaining();
     _chatId = widget.chatId;
+    // Автоприветствие для Алекса при открытии нового диалога (не сохраняем в БД)
+    if (widget.bot == 'alex' && _chatId == null && _messages.isEmpty) {
+      _messages.add({
+        'role': 'assistant',
+        'content':
+            'Я — Алекс, трекер цели BizLevel. Помогаю кристаллизовать цель и держать темп 28 дней. Напишите, чего хотите добиться — предложу ближайший шаг.',
+      });
+    }
     if (_chatId != null) {
       _loadMessages();
     }
+  }
+
+  @override
+  void dispose() {
+    _debounceTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _fetchRemaining() async {
@@ -84,8 +105,23 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
     setState(() {
       _hasMore = fetched.length == _pageSize;
       _page += 1;
-      // Reverse to chronological order and prepend
-      _messages.insertAll(0, fetched.reversed);
+      // Reverse to chronological order и добавить только новые (по роли+контенту), чтобы не дублировать
+      final chronological = fetched.reversed
+          .map((e) => {'role': e['role'], 'content': e['content']})
+          .toList();
+      final existingKeys =
+          _messages.map((m) => '${m['role']}::${m['content']}').toSet();
+      final toAdd = <Map<String, dynamic>>[];
+      for (final m in chronological) {
+        final key = '${m['role']}::${m['content']}';
+        if (!existingKeys.contains(key)) {
+          toAdd.add(m);
+          existingKeys.add(key);
+        }
+      }
+      if (toAdd.isNotEmpty) {
+        _messages.insertAll(0, toAdd);
+      }
     });
 
     // Auto-scroll only after first page load
@@ -114,7 +150,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
     print('🔧 DEBUG: text = "${_inputController.text.trim()}"');
     print('🔧 DEBUG: _isSending = $_isSending');
     print('🔧 DEBUG: _remaining = $_remaining');
-    
+
     // Check limit
     if (_remaining == 0) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -124,6 +160,19 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
 
     final text = _inputController.text.trim();
     if (text.isEmpty || _isSending) return;
+
+    // Отменяем предыдущий таймер debounce
+    _debounceTimer?.cancel();
+    
+    // Устанавливаем новый таймер debounce
+    _debounceTimer = Timer(_debounceDelay, () async {
+      await _sendMessageInternal(text);
+    });
+  }
+
+  Future<void> _sendMessageInternal(String text) async {
+    // Дополнительная проверка на случай, если состояние изменилось
+    if (_isSending || !mounted) return;
 
     setState(() {
       _isSending = true;
@@ -136,7 +185,8 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
       // Save user message & decrement limit atomically
       if (_chatId == null) {
         // создаём диалог при первом сообщении
-        _chatId = await _leo.saveConversation(role: 'user', content: text);
+        _chatId = await _leo.saveConversation(
+            role: 'user', content: text, bot: widget.bot);
         // сразу загрузим (чтобы появился счётчик и т.д.)
       } else {
         await _leo.saveConversation(
@@ -147,28 +197,22 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
 
       // Get assistant response with RAG if context is available
       String assistantMsg;
-      
+
       print('🔧 DEBUG: userContext = "${widget.userContext}"');
       print('🔧 DEBUG: levelContext = "${widget.levelContext}"');
-      print('🔧 DEBUG: userContext.isNotEmpty = ${widget.userContext?.isNotEmpty}');
-      print('🔧 DEBUG: levelContext.isNotEmpty = ${widget.levelContext?.isNotEmpty}');
-      
-      if (widget.userContext != null && widget.levelContext != null && 
-          (widget.userContext!.isNotEmpty || widget.levelContext!.isNotEmpty)) {
-        print('🔧 DEBUG: Используем RAG систему');
-        // Use RAG system with context
-        final response = await _leo.sendMessageWithRAG(
-          messages: _buildChatContext(),
-          userContext: widget.userContext!,
-          levelContext: widget.levelContext!,
-        );
-        assistantMsg = response['message']['content'] as String? ?? '';
-      } else {
-        print('🔧 DEBUG: Используем обычный sendMessage');
-        // Fallback to regular sendMessage
-        final response = await _leo.sendMessage(messages: _buildChatContext());
-        assistantMsg = response['message']['content'] as String? ?? '';
-      }
+      print(
+          '🔧 DEBUG: userContext.isNotEmpty = ${widget.userContext?.isNotEmpty}');
+      print(
+          '🔧 DEBUG: levelContext.isNotEmpty = ${widget.levelContext?.isNotEmpty}');
+
+      // Единый вызов: сервер выполнит RAG + персонализацию при необходимости
+      final response = await _leo.sendMessageWithRAG(
+        messages: _buildChatContext(),
+        userContext: widget.userContext ?? '',
+        levelContext: widget.levelContext ?? '',
+        bot: widget.bot,
+      );
+      assistantMsg = response['message']['content'] as String? ?? '';
 
       await _leo.saveConversation(
           chatId: _chatId, role: 'assistant', content: assistantMsg);
@@ -198,7 +242,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: AppColor.primary,
-        title: const Text('Диалог с Leo'),
+        title: Text(widget.bot == 'alex' ? 'Диалог с Алекс' : 'Диалог с Leo'),
       ),
       body: Column(
         children: [
@@ -257,6 +301,12 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
                   hintText: 'Введите сообщение...',
                   border: OutlineInputBorder(),
                 ),
+                // Добавляем onSubmitted для отправки по Enter
+                onSubmitted: (text) {
+                  if (text.trim().isNotEmpty && !_isSending) {
+                    _sendMessage();
+                  }
+                },
               ),
             ),
             const SizedBox(width: 8),

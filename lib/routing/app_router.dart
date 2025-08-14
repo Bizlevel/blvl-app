@@ -12,6 +12,7 @@ import '../screens/level_detail_screen.dart';
 import '../screens/premium_screen.dart';
 import '../screens/levels_map_screen.dart';
 import '../screens/leo_chat_screen.dart';
+import '../screens/goal_screen.dart';
 
 /// Riverpod provider that exposes the [GoRouter] instance used across the app.
 ///
@@ -38,6 +39,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const LeoChatScreen(),
       ),
       GoRoute(
+        path: '/goal',
+        builder: (context, state) => const GoalScreen(),
+      ),
+      GoRoute(
         path: '/profile',
         builder: (context, state) => const ProfileScreen(),
       ),
@@ -60,6 +65,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: '/login',
         builder: (context, state) => const LoginScreen(),
       ),
+      // /goal объявлен внутри ShellRoute
       GoRoute(
         path: '/register',
         builder: (context, state) => const RegisterScreen(),
@@ -99,7 +105,13 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         return '/home';
       }
 
-      // Удалена логика редиректа на онбординг — после входа пользователь попадает на карту уровней
+      // Гейтинг для /goal: доступно после завершения Уровня 1 (current_level >= 2)
+      if (state.matchedLocation.startsWith('/goal')) {
+        final currentLevel = currentUser?.currentLevel ?? 0;
+        if (currentLevel < 2) {
+          return '/home';
+        }
+      }
 
       // no redirect
       return null;

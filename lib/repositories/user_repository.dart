@@ -25,7 +25,7 @@ class UserRepository {
       final response = await _client
           .from('users')
           .select(
-              'id, name, email, about, goal, onboarding_completed, current_level, leo_messages_today, leo_messages_total, is_premium, avatar_id')
+              'id, name, email, about, goal, business_area, experience_level, onboarding_completed, current_level, leo_messages_today, leo_messages_total, is_premium, avatar_id')
           .eq('id', userId)
           .maybeSingle();
 
@@ -36,9 +36,15 @@ class UserRepository {
         return null;
       }
 
+      if (kDebugMode) {
+        debugPrint('UserRepository.fetchProfile: raw response: $response');
+      }
+
       final user = UserModel.fromJson(response);
       if (kDebugMode) {
         debugPrint('UserRepository.fetchProfile: loaded user ${user.id}');
+        debugPrint('UserRepository.fetchProfile: goal = "${user.goal}"');
+        debugPrint('UserRepository.fetchProfile: about = "${user.about}"');
       }
       return user;
     } on PostgrestException catch (e) {

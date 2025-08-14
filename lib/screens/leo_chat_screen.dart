@@ -8,6 +8,7 @@ import 'package:bizlevel/screens/leo_dialog_screen.dart';
 
 import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/providers/auth_provider.dart';
+
 class LeoChatScreen extends ConsumerStatefulWidget {
   const LeoChatScreen({super.key});
 
@@ -16,6 +17,7 @@ class LeoChatScreen extends ConsumerStatefulWidget {
 }
 
 class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
+  String _activeBot = 'leo'; // 'leo' | 'alex'
   late Future<void> _loadFuture;
   int _messagesLeft = 0;
   List<Map<String, dynamic>> _chats = [];
@@ -33,7 +35,8 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
       final limitFuture = leo.checkMessageLimit();
       final chatsFuture = Supabase.instance.client
           .from('leo_chats')
-          .select('id, title, updated_at, message_count')
+          .select('id, title, updated_at, message_count, bot')
+          .eq('bot', _activeBot)
           .gt('message_count', 0)
           .order('updated_at', ascending: false);
 
@@ -50,7 +53,20 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
   String? _getUserContext() {
     final user = ref.read(currentUserProvider).value;
     if (user != null) {
-      return '${user.name ?? ''} ${user.about ?? ''} ${user.goal ?? ''}'.trim();
+      final contextParts = <String>[];
+
+      if (user.goal?.isNotEmpty == true) {
+        contextParts.add('Цель: ${user.goal}');
+      }
+      if (user.about?.isNotEmpty == true) {
+        contextParts.add('О себе: ${user.about}');
+      }
+      final currentLevel = user.currentLevel;
+      if (currentLevel != null) {
+        contextParts.add('Текущий уровень: $currentLevel');
+      }
+
+      return contextParts.isNotEmpty ? contextParts.join('. ') : null;
     }
     return null;
   }
@@ -58,9 +74,7 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
   String? _getLevelContext() {
     // Получить текущий уровень пользователя
     final user = ref.read(currentUserProvider).value;
-    if (user != null && user.currentLevel != null) {
-      return 'Уровень ${user.currentLevel}';
-    }
+    if (user != null) return 'Уровень ${user.currentLevel}';
     return null;
   }
 
@@ -71,8 +85,11 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
         backgroundColor: AppColor.primary,
         onPressed: _onNewChat,
         icon: const Icon(Icons.add_comment),
-        label: const Text('Обсудить с Лео',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+        label: Text(
+          _activeBot == 'alex' ? 'Новый диалог с Алекс' : 'Новый диалог с Лео',
+          style:
+              const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+        ),
       ),
       body: FutureBuilder<void>(
         future: _loadFuture,
@@ -82,6 +99,8 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
             child: Column(
               children: [
                 _buildHeader(context),
+                const SizedBox(height: 8),
+                _buildBotSwitcher(),
                 const SizedBox(height: 10),
                 _buildChats(),
               ],
@@ -132,7 +151,9 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
                 ],
               ),
               Text(
-                '$_messagesLeft сообщений Leo',
+                _activeBot == 'alex'
+                    ? '$_messagesLeft сообщений Алекс'
+                    : '$_messagesLeft сообщений Leo',
                 style: const TextStyle(
                   fontSize: 14,
                   color: Colors.black54,
@@ -179,12 +200,13 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
           onTap: () {
             Navigator.of(context).push(
               MaterialPageRoute(
-              builder: (_) => LeoDialogScreen(
-                chatId: chat['id'],
-                userContext: _getUserContext(),
-                levelContext: _getLevelContext(),
+                builder: (_) => LeoDialogScreen(
+                  chatId: chat['id'],
+                  userContext: _getUserContext(),
+                  levelContext: _getLevelContext(),
+                  bot: _activeBot,
+                ),
               ),
-            ),
             );
           },
         );
@@ -198,8 +220,36 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
         builder: (_) => LeoDialogScreen(
           userContext: _getUserContext(),
           levelContext: _getLevelContext(),
+          bot: _activeBot,
         ),
       ),
+    );
+  }
+
+  Widget _buildBotSwitcher() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        ChoiceChip(
+          label: const Text('Лео'),
+          selected: _activeBot == 'leo',
+          onSelected: (sel) {
+            if (!sel) return;
+            setState(() => _activeBot = 'leo');
+            _loadData();
+          },
+        ),
+        const SizedBox(width: 8),
+        ChoiceChip(
+          label: const Text('Алекс'),
+          selected: _activeBot == 'alex',
+          onSelected: (sel) {
+            if (!sel) return;
+            setState(() => _activeBot = 'alex');
+            _loadData();
+          },
+        ),
+      ],
     );
   }
 }

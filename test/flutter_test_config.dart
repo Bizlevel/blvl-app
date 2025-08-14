@@ -16,7 +16,7 @@ Future<void> testExecutable(FutureOr<void> Function() testMain) async {
   await Supabase.initialize(
     url: 'http://localhost:54321', // Dummy URL
     anonKey: 'dummy_key', // Dummy key
-    httpClient: MockHttpClient(),
+    httpClient: TestHttpClient(),
   );
 
   // Запускаем основной тестовый файл

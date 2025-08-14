@@ -34,6 +34,13 @@ import openai
 # Supabase
 from supabase import create_client, Client
 
+# Optional tokenizer (tiktoken). Falls back to naive tokenizer if not available
+try:
+    import tiktoken  # type: ignore
+    _ENC = tiktoken.get_encoding("cl100k_base")
+except Exception:
+    _ENC = None
+
 # Настройка логирования
 logging.basicConfig(
     level=logging.INFO,
@@ -59,7 +66,11 @@ class Config:
     max_file_size_mb: int = 100  # 100MB
     delay_between_files: float = 3.0  # 3 секунды
     delay_between_chunks: float = 1.0  # 1 секунда
-    chunk_size: int = 1000  # размер чанка для эмбеддингов
+    # Целевой размер чанка в токенах и перекрытие
+    token_chunk_size: int = 400
+    token_chunk_overlap: int = 50
+    # Путь к JSON-карте метаданных: { file_id | file_name: { level_id, skill_id, title, section, tags[] } }
+    documents_map_json: Optional[str] = None
 
 class DriveUploader:
     """Класс для загрузки документов из Google Drive в Supabase"""
@@ -200,27 +211,64 @@ class DriveUploader:
             return None
     
     def _chunk_text(self, text: str) -> List[str]:
-        """Разбиение текста на чанки"""
+        """Разбиение текста на чанки по токенам (tiktoken с фолбэком)."""
         if not text:
             return []
-        
-        # Простое разбиение по предложениям
-        sentences = text.split('. ')
-        chunks = []
-        current_chunk = ""
-        
-        for sentence in sentences:
-            if len(current_chunk) + len(sentence) < self.config.chunk_size:
-                current_chunk += sentence + ". "
-            else:
-                if current_chunk:
-                    chunks.append(current_chunk.strip())
-                current_chunk = sentence + ". "
-        
-        if current_chunk:
-            chunks.append(current_chunk.strip())
-        
+
+        # Токенайзер: tiktoken → фолбэк (слова)
+        def encode(s: str) -> List[int]:
+            if _ENC:
+                return _ENC.encode(s)
+            # наивный фолбэк: разбиваем по пробелам, 1 слово = 1 "токен"
+            return s.split()  # type: ignore
+
+        def decode(tokens: List[int]) -> str:
+            if _ENC:
+                return _ENC.decode(tokens)  # type: ignore
+            return " ".join(tokens)  # type: ignore
+
+        tokens = encode(text)
+        size = max(100, int(self.config.token_chunk_size))
+        overlap = max(0, int(self.config.token_chunk_overlap))
+
+        chunks: List[str] = []
+        start = 0
+        n = len(tokens)
+        while start < n:
+            end = min(n, start + size)
+            chunk_tokens = tokens[start:end]
+            chunk_text = decode(chunk_tokens).strip()
+            if chunk_text:
+                chunks.append(chunk_text)
+            if end == n:
+                break
+            start = max(start + size - overlap, end) if overlap < size else end
+
         return chunks
+
+    def _extract_headings_and_tags(self, text: str) -> Dict[str, Any]:
+        """Грубая эвристика для заголовков/секций/тегов."""
+        if not text:
+            return {}
+        lines = [l.strip() for l in text.splitlines() if l.strip()]
+        title = lines[0][:120] if lines else None
+        # Ищем строку, похожую на секцию (начинается с цифры/маркера)
+        section = None
+        for l in lines[1:6]:
+            if l[:2].isdigit() or l.lower().startswith(("глава", "раздел", "section", "chapter")):
+                section = l[:120]
+                break
+        # Простые теги: топ-5 часто встречающихся слов > 4 символов
+        from collections import Counter
+        words = [w.lower().strip('.,:;!()?"\'') for w in text.split()]
+        words = [w for w in words if len(w) > 4 and w.isalpha()]
+        common = [w for w, _ in Counter(words).most_common(5)]
+        tags = list(dict.fromkeys(common))[:5]
+        out: Dict[str, Any] = {}
+        if title: out['title'] = title
+        if section: out['section'] = section
+        if tags: out['tags'] = tags
+        return out
     
     def _create_embedding(self, text: str) -> Optional[List[float]]:
         """Создание эмбеддинга для текста"""
@@ -259,7 +307,7 @@ class DriveUploader:
             logger.error(f"Ошибка загрузки в Supabase: {e}")
             return False
     
-    def _process_file(self, file_id: str, file_name: str) -> bool:
+    def _process_file(self, file_id: str, file_name: str, mapping: Optional[Dict[str, Any]] = None) -> bool:
         """Обработка одного файла"""
         logger.info(f"Обрабатываю файл: {file_name}")
         
@@ -277,19 +325,35 @@ class DriveUploader:
             
             logger.info(f"Извлечено {len(text)} символов из {file_name}")
             
-            # Разбиваем на чанки
+            # Разбиваем на чанки по токенам и собираем базовые метаданные
             chunks = self._chunk_text(text)
             logger.info(f"Создано {len(chunks)} чанков для {file_name}")
             
             # Загружаем каждый чанк
             success_count = 0
             for i, chunk in enumerate(chunks):
-                metadata = {
+                metadata: Dict[str, Any] = {
                     'file_name': file_name,
                     'file_id': file_id,
                     'chunk_index': i,
                     'total_chunks': len(chunks)
                 }
+                # Эвристики заголовков/секций/тегов из исходного текста (для первого чанка)
+                if i == 0:
+                    base_meta = self._extract_headings_and_tags(text)
+                    metadata.update(base_meta)
+                # Маппинг уровня/скилла и переопределение заголовков, если задан
+                if mapping:
+                    override = None
+                    # по file_id или по file_name
+                    if file_id in mapping:
+                        override = mapping[file_id]
+                    elif file_name in mapping:
+                        override = mapping[file_name]
+                    if isinstance(override, dict):
+                        for k in ('level_id', 'skill_id', 'title', 'section', 'tags'):
+                            if k in override and override[k] is not None:
+                                metadata[k] = override[k]
                 
                 if self._upload_chunk_to_supabase(chunk, metadata):
                     success_count += 1
@@ -340,6 +404,16 @@ class DriveUploader:
             logger.error("Не найдено файлов для загрузки")
             return
         
+        # Загружаем карту метаданных, если задана
+        mapping: Optional[Dict[str, Any]] = None
+        if self.config.documents_map_json:
+            try:
+                with open(self.config.documents_map_json, 'r', encoding='utf-8') as mf:
+                    mapping = json.load(mf)
+                logger.info(f"📌 Загрузил карту метаданных: {self.config.documents_map_json}")
+            except Exception as e:
+                logger.warning(f"Не удалось загрузить карту метаданных: {e}")
+
         # Обрабатываем каждый файл
         success_count = 0
         total_count = len(files)
@@ -350,7 +424,7 @@ class DriveUploader:
             
             logger.info(f"📄 [{i+1}/{total_count}] Обрабатываю: {file_name}")
             
-            if self._process_file(file_id, file_name):
+            if self._process_file(file_id, file_name, mapping):
                 success_count += 1
             
             # Задержка между файлами

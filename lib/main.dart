@@ -40,6 +40,9 @@ Future<void> main() async {
   await Hive.initFlutter();
   await Hive.openBox('levels');
   await Hive.openBox('lessons');
+  await Hive.openBox('goals');
+  await Hive.openBox('weekly_progress');
+  await Hive.openBox('quotes');
 
   final dsn = envOrDefine('SENTRY_DSN');
 

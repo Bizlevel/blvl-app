@@ -27,7 +27,7 @@ serve(async (req: Request): Promise<Response> => {
   try {
     const { query, userContext, levelContext } = await req.json();
     
-    console.log('🔍 RAG запрос:', { query, userContext: userContext?.substring(0, 50), levelContext: levelContext?.substring(0, 50) });
+    // console.log('🔍 RAG запрос:', { query, userContext: userContext?.substring(0, 50), levelContext: levelContext?.substring(0, 50) });
 
     if (!query || typeof query !== 'string') {
       return new Response(
@@ -40,31 +40,22 @@ serve(async (req: Request): Promise<Response> => {
     }
 
     // Генерируем эмбеддинг для запроса
-    console.log('🔍 Создаем эмбеддинг для запроса:', query);
+    // console.log('🔍 Создаем эмбеддинг для запроса:', query);
     const embeddingResponse = await openai.embeddings.create({
       input: query,
       model: Deno.env.get("OPENAI_EMBEDDING_MODEL") || "text-embedding-3-small"
     });
-    console.log('🔍 Embedding создан, размер:', embeddingResponse.data[0].embedding.length);
+    // console.log('🔍 Embedding создан, размер:', embeddingResponse.data[0].embedding.length);
 
     // Ищем похожие документы в базе знаний
-    console.log('🔍 Ищем в таблице documents с порогом 0.3...');
+    // console.log('🔍 Ищем в таблице documents с порогом 0.3...');
     const { data: results, error } = await supabaseAdmin.rpc('match_documents', {
       query_embedding: embeddingResponse.data[0].embedding,
       match_threshold: 0.3,
       match_count: 5
     });
 
-    console.log('📚 Результаты поиска:', { 
-      found: results?.length || 0, 
-      error: error?.message,
-      firstResult: results?.[0]?.content?.substring(0, 100),
-      allResults: results?.map((r: any) => ({
-        id: r.id,
-        similarity: r.similarity,
-        contentLength: r.content?.length || 0
-      }))
-    });
+    // console.log('📚 Результаты поиска:', { found: results?.length || 0, error: error?.message });
 
     if (error) {
       console.error("Database search error:", error);
@@ -77,7 +68,7 @@ serve(async (req: Request): Promise<Response> => {
     // Формируем контекст из найденных документов
     const context = results?.map((r: any) => r.content).join('\n\n') || '';
     
-    console.log('📝 Сформированный контекст:', context.substring(0, 200));
+    // console.log('📝 Сформированный контекст:', context.substring(0, 200));
     
     // Добавляем контекст пользователя и уровня
     const enhancedContext = `
