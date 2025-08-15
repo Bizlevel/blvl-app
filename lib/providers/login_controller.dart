@@ -1,6 +1,4 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
-import '../services/auth_service.dart';
 import 'auth_provider.dart';
 
 /// [LoginController] управляет процессом авторизации.

@@ -9,7 +9,6 @@ import 'package:bizlevel/services/auth_service.dart';
 import 'package:bizlevel/services/supabase_service.dart';
 import 'package:bizlevel/providers/auth_provider.dart';
 
-@Skip('integration test – requires network')
 void main() {
   AuthService authService = AuthService(Supabase.instance.client);
 

@@ -46,15 +46,8 @@ class FeatureItem extends StatelessWidget {
               height: 190,
               radius: 15,
             ),
-            Positioned(
-              top: 170,
-              right: 15,
-              child: _buildPrice(),
-            ),
-            Positioned(
-              top: 210,
-              child: _buildInfo(),
-            )
+            Positioned(top: 170, right: 15, child: _buildPrice()),
+            Positioned(top: 210, child: _buildInfo()),
           ],
         ),
       ),
@@ -78,9 +71,7 @@ class FeatureItem extends StatelessWidget {
               fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(
-            height: 10,
-          ),
+          const SizedBox(height: 10),
           _buildAttributes(),
         ],
       ),
@@ -121,22 +112,14 @@ class FeatureItem extends StatelessWidget {
           AppColor.labelColor,
           data["session"],
         ),
-        const SizedBox(
-          width: 12,
-        ),
+        const SizedBox(width: 12),
         _getAttribute(
           Icons.schedule_rounded,
           AppColor.labelColor,
           data["duration"],
         ),
-        const SizedBox(
-          width: 12,
-        ),
-        _getAttribute(
-          Icons.star,
-          AppColor.yellow,
-          data["review"],
-        ),
+        const SizedBox(width: 12),
+        _getAttribute(Icons.star, AppColor.yellow, data["review"]),
       ],
     );
   }
@@ -144,14 +127,8 @@ class FeatureItem extends StatelessWidget {
   _getAttribute(IconData icon, Color color, String info) {
     return Row(
       children: [
-        Icon(
-          icon,
-          size: 18,
-          color: color,
-        ),
-        const SizedBox(
-          width: 3,
-        ),
+        Icon(icon, size: 18, color: color),
+        const SizedBox(width: 3),
         Text(
           info,
           maxLines: 1,

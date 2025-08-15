@@ -183,3 +183,76 @@
   3) Открытие чата с Алекс с страницы «Цель» (через `FloatingChatBubble`), наличие контекста цели/спринта в промпте.
   4) Backward‑compatibility: диалоги Лео продолжают работать как прежде.
 - Подсказка в UI (tooltip/баннер) при первом открытии «Цели»: «Диалог с Алекс помогает кристаллизовать цель и поддерживает вас 28 дней».
+
+### Задача 29.8: Аудит схемы и индексов для Leo/Alex и RAG
+- Инструменты: supabase-mcp (`list_tables`, `execute_sql`).
+- Что сделать:
+  1) Проверить структуру таблиц: `users`, `leo_chats` (включая `bot`, `summary`, `last_topics`), `leo_messages`, `user_memories`, `documents` (наличие `embedding vector` и `metadata jsonb`), `core_goals`, `weekly_progress`, `reminder_checks`, `motivational_quotes`.
+  2) Проверить индексы производительности: 
+     - `idx_leo_chats_user_bot_updated` на `(user_id, bot, updated_at desc)`;
+     - ANN/IVFFLAT/HNSW индекс на `documents(embedding)`;
+     - GIN индекс на `documents(metadata)`;
+     - индексы на навыках: `idx_levels_skill_id`, `idx_user_skills_skill`.
+  3) Проверить триггеры на `leo_messages` (AFTER INSERT ассистента → вызов памяти) и отсутствие дубликатов `public.call_leo_memory(...)`.
+  4) Подтвердить наличие перегрузки RPC `match_documents(vector, double precision, integer, jsonb)`.
+- Критерии приёмки: все объекты существуют; индексы присутствуют; перегрузка RPC с `jsonb` доступна; нет дублирующих сигнатур `call_leo_memory`.
+
+### Задача 29.9: Конфигурация секретов и GUC для edge‑функций
+- Инструменты: Supabase Studio (Edge Functions Settings), supabase-mcp (`execute_sql`).
+- Что сделать:
+  1) Установить БД‑GUC: `app.supabase_url`, `app.service_role_key` (без коммитов ключей в репозиторий).
+  2) Для edge‑функции `leo-memory` задать секрет `CRON_SECRET` и выполнить redeploy.
+  3) Для `leo-chat` убедиться, что внешние ключи (если используются) берутся из ENV/секретов, а не из кода.
+- Критерии приёмки: `current_setting('app.supabase_url', true)` и `current_setting('app.service_role_key', true)` возвращают непустые значения; `leo-memory` читает `CRON_SECRET`; функции успешно деплоятся.
+
+### Задача 29.10: Smoke‑проверка пайплайна памяти
+- Инструменты: supabase-mcp (`execute_sql`).
+- Что сделать:
+  1) Выполнить ручной вызов `public.call_leo_memory(...)` на последнем ассистентском сообщении (как в `docs/1.md`).
+  2) Проверить, что появилась запись в `leo_messages_processed` для этого `message_id`.
+  3) Проверить обновление `leo_chats.summary` и `leo_chats.last_topics` по соответствующему `chat_id`.
+- Критерии приёмки: сообщение помечено как обработанное, свёртки обновились без ошибок.
+
+### Задача 29.11: Smoke‑проверка RAG с metadata_filter
+- Инструменты: supabase-mcp (`execute_sql`), логи edge‑функции `leo-chat`.
+- Что сделать:
+  1) Выполнить SQL‑запрос к `match_documents` с `metadata_filter` по уровню (например, `{"level_id":1}`) и убедиться, что есть релевантные совпадения.
+  2) Отправить тестовый запрос в `leo-chat` с `levelContext` и проверить по логам, что фильтр применяется и ошибок RAG нет.
+- Критерии приёмки: SQL возвращает результаты, логи функции фиксируют применение `metadata_filter` и отсутствие ошибок.
+
+### Задача 29.12: Бэкфилл и индексация `documents`
+- Инструменты: скрипт `scripts/upload_from_drive.py`, supabase-mcp (`execute_sql`).
+- Что сделать:
+  1) Проверить заполненность `documents.metadata` (`level_id`, `lesson_id`, `tags` вида "Level N"/"Lesson N"). При нехватке — выполнить бэкфилл через `documents_backfill_map` и загрузчик.
+  2) Создать (если отсутствуют) индексы: ANN на `embedding` и GIN на `metadata`.
+  3) Пройти advisors (performance) — убедиться в отсутствии предупреждений по этим таблицам.
+- Критерии приёмки: покрытие метаданных ≥ 95%; индексы на месте; latency `match_documents` в норме; advisors без новых WARN/ERROR.
+
+### Задача 29.13: Выравнивание RAG‑фильтра для `bot='alex'` в `leo-chat`
+- Файл: `supabase/functions/leo-chat/index.ts`.
+- Что сделать:
+  1) Убедиться, что при наличии `levelContext` ветка `bot='alex'` передаёт `metadata_filter` в `rpc('match_documents', ...)` аналогично Лео.
+  2) Добавить структурированное логирование факта применения `metadata_filter` (без утечки данных пользователя).
+- Критерии приёмки: ответы Алекса включают RAG по уровню/уроку, логи подтверждают применение фильтра; поведение Лео не меняется.
+
+### Задача 29.14: Безопасность service role и секретов
+- Инструменты: ревью репозитория, CI.
+- Что сделать:
+  1) Исключить `service_role_key` и любые секреты из `.env` и коммитов (проверить `.gitignore`, скрипты, README).
+  2) Хранить секреты только в БД‑GUC/Edge Secrets/CI Secrets. В клиенте — использовать `envOrDefine` без сервисных ключей.
+  3) (Опционально) В CI добавить grep‑проверку на строки вида `service_role`/`app.service_role_key` в изменениях пул‑реквестов.
+- Критерии приёмки: в репозитории отсутствуют секреты; CI/ревью проходят; Sentry/логи не содержат секретов.
+
+### Задача 29.15: Мини‑сид данных для `bot='alex'`
+- Инструменты: supabase-mcp (`execute_sql`).
+- Что сделать:
+  1) Вставить под тестового пользователя минимальные записи: `core_goals(v1)`, один `weekly_progress`, `reminder_checks` (текущий день), одну активную запись в `motivational_quotes`.
+  2) Отправить вопрос в `leo-chat` с `bot='alex'` и убедиться, что ответ содержит секции «Цель/Спринт/Напоминания/Цитата».
+- Критерии приёмки: Алекс отвечает предметно, без RAG‑регрессий.
+
+### Задача 29.16: Наблюдаемость (Sentry и логи edge)
+- Инструменты: sentry-mcp, логи Supabase Edge.
+- Что сделать:
+  1) Проверить отсутствие критичных нерешённых ошибок за 24 часа (скрипт `scripts/sentry_check.sh`).
+  2) Убедиться, что edge‑функции логируют ключевые этапы (применение фильтра, обращение к памяти) без PII.
+- Критерии приёмки: критичных ошибок нет; логи информативны и безопасны.
