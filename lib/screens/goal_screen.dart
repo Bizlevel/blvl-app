@@ -48,6 +48,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
   int _selectedVersion = 1;
   Map<int, Map<String, dynamic>> _versions = {};
   int _selectedSprint = 1;
+  bool _isEditing = false; // режим редактирования текущей версии
 
   // Sprint check-in form
   final TextEditingController _achievementCtrl = TextEditingController();
@@ -66,20 +67,17 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
       _versions = {
         for (final m in all) m['version'] as int: Map<String, dynamic>.from(m)
       };
-      _selectedVersion = _versions.keys.isEmpty
-          ? 1
-          : (_versions.keys.reduce((a, b) => a > b ? a : b));
+      final hasAny = _versions.isNotEmpty;
+      // Показываем последнюю версию, если есть, иначе v1
+      _selectedVersion =
+          hasAny ? (_versions.keys.reduce((a, b) => a > b ? a : b)) : 1;
+      // Если записей ещё нет — сразу редактируем v1; если есть — стартуем в просмотре
+      _isEditing = !hasAny;
       _fillControllersFor(_selectedVersion);
       if (mounted) setState(() {});
     });
 
-    void onChanged() {
-      _scheduleAutosave();
-    }
-
-    _goalInitialCtrl.addListener(onChanged);
-    _goalWhyCtrl.addListener(onChanged);
-    _mainObstacleCtrl.addListener(onChanged);
+    // Автосохранение отключено по требованию: слушателей не добавляем
   }
 
   @override
@@ -107,12 +105,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
     super.dispose();
   }
 
-  void _scheduleAutosave() {
-    _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 200), () async {
-      await _saveGoal(silent: true);
-    });
-  }
+  // Автосохранение отключено
 
   bool _isValidV1() {
     String s(String v) => v.trim();
@@ -237,7 +230,10 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
       // Инвалидируем провайдеры
       ref.invalidate(goalLatestProvider);
       ref.invalidate(goalVersionsProvider);
-      setState(() => _saving = false);
+      setState(() {
+        _saving = false;
+        _isEditing = false; // после сохранения показываем режим просмотра
+      });
     } catch (e) {
       setState(() => _saving = false);
       if (!silent && mounted) {
@@ -385,6 +381,20 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                             setState(() {
                               _selectedVersion = v;
                               _fillControllersFor(v);
+                              // Логика редактирования при переключении версий:
+                              final hasAny = _versions.isNotEmpty;
+                              final latest = hasAny
+                                  ? _versions.keys
+                                      .reduce((a, b) => a > b ? a : b)
+                                  : 0;
+                              final exists = _versions.containsKey(v);
+                              // Если выбираем новую (latest+1) → сразу редактируем без карандаша
+                              if (!exists && v == latest + 1) {
+                                _isEditing = true;
+                              } else {
+                                // Для существующих версий по умолчанию просмотр
+                                _isEditing = false;
+                              }
                             });
                           }
                         : null,
@@ -393,12 +403,32 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
               ),
               const SizedBox(height: 12),
 
-              // Кристаллизация цели (динамично по версии)
-              Text('Кристаллизация цели v$_selectedVersion',
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleLarge
-                      ?.copyWith(fontWeight: FontWeight.bold)),
+              // Кристаллизация цели (динамично по версии) + иконка «Редактировать»
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Кристаллизация цели v$_selectedVersion',
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleLarge
+                          ?.copyWith(fontWeight: FontWeight.bold)),
+                  Builder(builder: (context) {
+                    final hasAny = _versions.isNotEmpty;
+                    final latest = hasAny
+                        ? _versions.keys.reduce((a, b) => a > b ? a : b)
+                        : 0;
+                    final exists = _versions.containsKey(_selectedVersion);
+                    final canEdit = exists && _selectedVersion == latest;
+                    return IconButton(
+                      icon: const Icon(Icons.edit, color: Colors.grey),
+                      tooltip: 'Редактировать',
+                      onPressed: (canEdit && !_isEditing)
+                          ? () => setState(() => _isEditing = true)
+                          : null,
+                    );
+                  }),
+                ],
+              ),
               const SizedBox(height: 12),
 
               if (_selectedVersion == 1) ...[
@@ -406,93 +436,126 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                     label: 'Чего хочу достичь за 28 дней*',
                     child: CustomTextBox(
                         controller: _goalInitialCtrl,
+                        readOnly: !_isEditing,
                         hint: 'Опишите цель (мин. 10 символов)')),
                 const SizedBox(height: 12),
                 _LabeledField(
                     label: 'Почему это важно именно сейчас*',
                     child: CustomTextBox(
                         controller: _goalWhyCtrl,
+                        readOnly: !_isEditing,
                         hint: 'Обоснование (мин. 10 символов)')),
                 const SizedBox(height: 12),
                 _LabeledField(
                     label: 'Главное препятствие*',
                     child: CustomTextBox(
                         controller: _mainObstacleCtrl,
+                        readOnly: !_isEditing,
                         hint: 'Что мешает? (мин. 10 символов)')),
               ] else if (_selectedVersion == 2) ...[
                 _LabeledField(
                     label: 'Конкретная цель*',
                     child: CustomTextBox(
                         controller: _goalRefinedCtrl,
+                        readOnly: !_isEditing,
                         hint: 'Уточнённая формулировка (мин. 10)')),
                 const SizedBox(height: 12),
                 _LabeledField(
                     label: 'Ключевая метрика*',
                     child: CustomTextBox(
-                        controller: _metricNameCtrl, hint: 'Напр. «клиенты»')),
+                        controller: _metricNameCtrl,
+                        readOnly: !_isEditing,
+                        hint: 'Напр. «клиенты»')),
                 const SizedBox(height: 12),
                 Row(children: [
                   Expanded(
                     child: _LabeledField(
                         label: 'Текущее значение*',
                         child: CustomTextBox(
-                            controller: _metricFromCtrl, hint: 'число')),
+                            controller: _metricFromCtrl,
+                            readOnly: !_isEditing,
+                            hint: 'число')),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: _LabeledField(
                         label: 'Целевое значение*',
                         child: CustomTextBox(
-                            controller: _metricToCtrl, hint: 'число')),
+                            controller: _metricToCtrl,
+                            readOnly: !_isEditing,
+                            hint: 'число')),
                   ),
                 ]),
                 const SizedBox(height: 12),
                 _LabeledField(
                     label: 'Финансовый результат в ₸*',
                     child: CustomTextBox(
-                        controller: _financialGoalCtrl, hint: 'число')),
+                        controller: _financialGoalCtrl,
+                        readOnly: !_isEditing,
+                        hint: 'число')),
               ] else if (_selectedVersion == 3) ...[
                 _LabeledField(
                     label: 'SMART-формулировка цели*',
                     child: CustomTextBox(
-                        controller: _goalSmartCtrl, hint: 'SMART')),
+                        controller: _goalSmartCtrl,
+                        readOnly: !_isEditing,
+                        hint: 'SMART')),
                 const SizedBox(height: 12),
                 _LabeledField(
                     label: 'Спринт 1 (1–7)*',
-                    child: CustomTextBox(controller: _s1Ctrl, hint: 'кратко')),
+                    child: CustomTextBox(
+                        controller: _s1Ctrl,
+                        hint: 'кратко',
+                        readOnly: !_isEditing)),
                 const SizedBox(height: 12),
                 _LabeledField(
                     label: 'Спринт 2 (8–14)*',
-                    child: CustomTextBox(controller: _s2Ctrl, hint: 'кратко')),
+                    child: CustomTextBox(
+                        controller: _s2Ctrl,
+                        hint: 'кратко',
+                        readOnly: !_isEditing)),
                 const SizedBox(height: 12),
                 _LabeledField(
                     label: 'Спринт 3 (15–21)*',
-                    child: CustomTextBox(controller: _s3Ctrl, hint: 'кратко')),
+                    child: CustomTextBox(
+                        controller: _s3Ctrl,
+                        hint: 'кратко',
+                        readOnly: !_isEditing)),
                 const SizedBox(height: 12),
                 _LabeledField(
                     label: 'Спринт 4 (22–28)*',
-                    child: CustomTextBox(controller: _s4Ctrl, hint: 'кратко')),
+                    child: CustomTextBox(
+                        controller: _s4Ctrl,
+                        hint: 'кратко',
+                        readOnly: !_isEditing)),
               ] else ...[
                 _LabeledField(
                     label: 'Что именно достигну*',
                     child: CustomTextBox(
-                        controller: _finalWhatCtrl, hint: 'конкретно')),
+                        controller: _finalWhatCtrl,
+                        readOnly: !_isEditing,
+                        hint: 'конкретно')),
                 const SizedBox(height: 12),
                 _LabeledField(
                     label: 'К какой дате (28 дней)*',
                     child: CustomTextBox(
-                        controller: _finalWhenCtrl, hint: 'дата')),
+                        controller: _finalWhenCtrl,
+                        readOnly: !_isEditing,
+                        hint: 'дата')),
                 const SizedBox(height: 12),
                 _LabeledField(
                     label: 'Через какие ключевые действия*',
                     child: CustomTextBox(
-                        controller: _finalHowCtrl, hint: '3 шага')),
+                        controller: _finalHowCtrl,
+                        readOnly: !_isEditing,
+                        hint: '3 шага')),
                 const SizedBox(height: 8),
                 Row(children: [
                   Checkbox(
                       value: _commitment,
-                      onChanged: (v) =>
-                          setState(() => _commitment = v ?? false)),
+                      onChanged: _isEditing
+                          ? (v) => setState(() => _commitment = v ?? false)
+                          : null),
                   const Text('✓ Я готов к реализации'),
                 ]),
               ],
@@ -500,7 +563,8 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
               const SizedBox(height: 12),
               Row(children: [
                 ElevatedButton(
-                  onPressed: !_saving ? () => _saveGoal() : null,
+                  onPressed:
+                      (!_saving && _isEditing) ? () => _saveGoal() : null,
                   child: _saving
                       ? const SizedBox(
                           width: 18,
@@ -511,8 +575,12 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                       : const Text('Сохранить'),
                 ),
                 const SizedBox(width: 12),
-                const Text('Автосохранение каждые 200 мс',
-                    style: TextStyle(color: Colors.grey)),
+                Text(
+                  _isEditing
+                      ? 'Автосохранение каждые 200 мс'
+                      : 'Режим просмотра',
+                  style: const TextStyle(color: Colors.grey),
+                ),
               ]),
 
               const SizedBox(height: 24),

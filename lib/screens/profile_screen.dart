@@ -8,13 +8,14 @@ import 'package:bizlevel/providers/auth_provider.dart';
 import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/widgets/custom_image.dart';
 import 'package:bizlevel/widgets/stat_card.dart';
-import 'package:bizlevel/widgets/setting_item.dart';
+// import 'package:bizlevel/widgets/setting_item.dart';
 import 'package:bizlevel/widgets/artifact_card.dart';
 import 'package:bizlevel/providers/levels_provider.dart';
 import 'package:bizlevel/providers/subscription_provider.dart';
 import 'package:bizlevel/models/user_model.dart';
 import 'package:go_router/go_router.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:io';
 
@@ -179,12 +180,12 @@ class ProfileScreen extends ConsumerWidget {
 
         return CustomScrollView(
           slivers: [
-            const SliverAppBar(
+            SliverAppBar(
               backgroundColor: AppColor.appBgColor,
               pinned: true,
               snap: true,
               floating: true,
-              title: Text(
+              title: const Text(
                 'Профиль',
                 style: TextStyle(
                   color: AppColor.textColor,
@@ -192,6 +193,97 @@ class ProfileScreen extends ConsumerWidget {
                   fontWeight: FontWeight.w600,
                 ),
               ),
+              actions: [
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.settings, color: Colors.grey),
+                  onSelected: (value) async {
+                    switch (value) {
+                      case 'settings':
+                        // Пока отдельного экрана нет — подскажем пользователю
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                              content:
+                                  Text('Раздел настроек скоро будет доступен')),
+                        );
+                        break;
+                      case 'payments':
+                        context.go('/premium');
+                        break;
+                      case 'logout':
+                        await ref.read(authServiceProvider).signOut();
+                        break;
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    PopupMenuItem(
+                      value: 'settings',
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: const BoxDecoration(
+                              color: AppColor.blue,
+                              shape: BoxShape.circle,
+                            ),
+                            child: SvgPicture.asset(
+                              'assets/icons/setting.svg',
+                              color: Colors.white,
+                              width: 18,
+                              height: 18,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          const Text('Настройки'),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'payments',
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: const BoxDecoration(
+                              color: AppColor.orange,
+                              shape: BoxShape.circle,
+                            ),
+                            child: SvgPicture.asset(
+                              'assets/icons/wallet.svg',
+                              color: Colors.white,
+                              width: 18,
+                              height: 18,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          const Text('Платежи'),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'logout',
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: const BoxDecoration(
+                              color: AppColor.red,
+                              shape: BoxShape.circle,
+                            ),
+                            child: SvgPicture.asset(
+                              'assets/icons/logout.svg',
+                              color: Colors.white,
+                              width: 18,
+                              height: 18,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          const Text('Выход'),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
             SliverToBoxAdapter(
               child: _Body(
@@ -370,12 +462,7 @@ class _BodyState extends ConsumerState<_Body> {
           const SizedBox(height: AppSpacing.medium),
           if (!widget.isPremium) _buildPremiumButton(context),
           if (!widget.isPremium) const SizedBox(height: AppSpacing.medium),
-          _buildSection1(context),
-          const SizedBox(height: AppSpacing.medium),
-          _buildSection2(),
-          const SizedBox(height: AppSpacing.medium),
-          _buildSection3(),
-          const SizedBox(height: AppSpacing.medium),
+          // Кнопки перенесены в меню шестерёнки в AppBar
           _buildArtifactsSection(),
           const SizedBox(height: AppSpacing.medium),
         ],
@@ -544,34 +631,7 @@ class _BodyState extends ConsumerState<_Body> {
     );
   }
 
-  Widget _buildSection1(BuildContext context) {
-    return SettingItem(
-      title: "Настройки",
-      leadingIcon: "assets/icons/setting.svg",
-      bgIconColor: AppColor.blue,
-      onTap: () {},
-    );
-  }
-
-  Widget _buildSection2() {
-    return SettingItem(
-      title: "Платежи",
-      leadingIcon: "assets/icons/wallet.svg",
-      bgIconColor: AppColor.orange,
-      onTap: () {},
-    );
-  }
-
-  Widget _buildSection3() {
-    return SettingItem(
-      title: "Выход",
-      leadingIcon: "assets/icons/logout.svg",
-      bgIconColor: AppColor.red,
-      onTap: () async {
-        await ref.read(authServiceProvider).signOut();
-      },
-    );
-  }
+  // Секции настроек/платежей/выхода перенесены в меню шестерёнки AppBar
 
   Widget _buildArtifactsSection() {
     return Column(

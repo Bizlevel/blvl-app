@@ -37,6 +37,15 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
   // Флаг сохранения профиля (для уровня 0)
   bool _profileSaved = false;
 
+  // --- Состояние формы профиля уровня 0 (поднято из блока для сохранения ввода) ---
+  final TextEditingController _profileNameCtrl = TextEditingController();
+  final TextEditingController _profileAboutCtrl = TextEditingController();
+  final TextEditingController _profileGoalCtrl = TextEditingController();
+  int _profileAvatarId = 1;
+  bool _isProfileEditing = true; // после сохранения переключим в read-only
+  bool _profileInitialized =
+      false; // чтобы не переписывать контроллеры на каждом билде
+
   // Leo chat (создаётся при первом сообщении пользователя)
   String? _chatId;
 
@@ -56,6 +65,9 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
   @override
   void dispose() {
     _pageController.dispose();
+    _profileNameCtrl.dispose();
+    _profileAboutCtrl.dispose();
+    _profileGoalCtrl.dispose();
     super.dispose();
   }
 
@@ -98,6 +110,24 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
           final bool isLevelZero = (widget.levelNumber ?? -1) == 0;
           final bool isProfilePage =
               isLevelZero && _blocks[_currentIndex] is _ProfileFormBlock;
+
+          // Одноразовый префилл формы профиля из текущего пользователя
+          if (isLevelZero && !_profileInitialized) {
+            final user = ref.watch(currentUserProvider).value;
+            if (user != null) {
+              _profileNameCtrl.text = user.name;
+              _profileAboutCtrl.text = (user.about ?? '');
+              _profileGoalCtrl.text = (user.goal ?? '');
+              _profileAvatarId = (user.avatarId ?? 1);
+              // Если профиль уже заполнен – открываем в режиме просмотра
+              _isProfileEditing = user.name.isEmpty ||
+                      (user.about ?? '').isEmpty ||
+                      (user.goal ?? '').isEmpty
+                  ? true
+                  : false;
+              _profileInitialized = true;
+            }
+          }
 
           final mainContent = SafeArea(
             child: Column(
@@ -307,7 +337,20 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
             levelNumber: widget.levelNumber ?? widget.levelId),
         for (final lesson in lessons)
           _LessonBlock(lesson: lesson, onWatched: _videoWatched),
-        _ProfileFormBlock(levelId: widget.levelId),
+        _ProfileFormBlock(
+          levelId: widget.levelId,
+          nameController: _profileNameCtrl,
+          aboutController: _profileAboutCtrl,
+          goalController: _profileGoalCtrl,
+          selectedAvatarId: _profileAvatarId,
+          isEditing: _isProfileEditing,
+          onAvatarChanged: (id) => setState(() => _profileAvatarId = id),
+          onEdit: () => setState(() => _isProfileEditing = true),
+          onSaved: () => setState(() {
+            _isProfileEditing = false;
+            _profileSaved = true;
+          }),
+        ),
       ];
       return;
     }
@@ -406,12 +449,26 @@ abstract class _PageBlock {
 // Profile form (First Step level only) ----------------------------------------
 class _ProfileFormBlock extends _PageBlock {
   final int levelId;
-  _ProfileFormBlock({required this.levelId});
+  final TextEditingController nameController;
+  final TextEditingController aboutController;
+  final TextEditingController goalController;
+  final int selectedAvatarId;
+  final bool isEditing;
+  final VoidCallback onEdit;
+  final VoidCallback onSaved;
+  final void Function(int) onAvatarChanged;
 
-  final _nameController = TextEditingController();
-  final _aboutController = TextEditingController();
-  final _goalController = TextEditingController();
-  int _selectedAvatarId = 1;
+  _ProfileFormBlock({
+    required this.levelId,
+    required this.nameController,
+    required this.aboutController,
+    required this.goalController,
+    required this.selectedAvatarId,
+    required this.isEditing,
+    required this.onEdit,
+    required this.onSaved,
+    required this.onAvatarChanged,
+  });
 
   Future<void> _showAvatarPicker(BuildContext context) async {
     final selectedId = await showModalBottomSheet<int>(
@@ -429,7 +486,7 @@ class _ProfileFormBlock extends _PageBlock {
           itemBuilder: (_, index) {
             final id = index + 1;
             final asset = 'assets/images/avatars/avatar_${id}.png';
-            final isSelected = id == _selectedAvatarId;
+            final isSelected = id == selectedAvatarId;
             return GestureDetector(
               onTap: () => Navigator.of(ctx).pop(id),
               child: Stack(
@@ -456,7 +513,7 @@ class _ProfileFormBlock extends _PageBlock {
     );
 
     if (selectedId != null) {
-      _selectedAvatarId = selectedId;
+      onAvatarChanged(selectedId);
     }
   }
 
@@ -474,9 +531,9 @@ class _ProfileFormBlock extends _PageBlock {
           return;
         }
 
-        final name = _nameController.text.trim();
-        final about = _aboutController.text.trim();
-        final goal = _goalController.text.trim();
+        final name = nameController.text.trim();
+        final about = aboutController.text.trim();
+        final goal = goalController.text.trim();
         if (name.isEmpty || about.isEmpty || goal.isEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Пожалуйста, заполните все поля')),
@@ -489,7 +546,7 @@ class _ProfileFormBlock extends _PageBlock {
                 name: name,
                 about: about,
                 goal: goal,
-                avatarId: _selectedAvatarId,
+                avatarId: selectedAvatarId,
               );
           // onSaved будет вызван кнопкой ниже, с передачей целевого индекса
           if (context.mounted) {
@@ -497,6 +554,7 @@ class _ProfileFormBlock extends _PageBlock {
               const SnackBar(content: Text('Профиль сохранён')),
             );
           }
+          onSaved();
         } on AuthFailure catch (e) {
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -518,6 +576,15 @@ class _ProfileFormBlock extends _PageBlock {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
+              // Верхняя панель с иконкой «Редактировать» (показываем, если не в режиме редактирования)
+              Align(
+                alignment: Alignment.topRight,
+                child: IconButton(
+                  icon: const Icon(Icons.edit, color: Colors.grey),
+                  onPressed: isEditing ? null : onEdit,
+                  tooltip: 'Редактировать',
+                ),
+              ),
               GestureDetector(
                 onTap: () => _showAvatarPicker(context),
                 child: Stack(
@@ -525,7 +592,7 @@ class _ProfileFormBlock extends _PageBlock {
                     ClipRRect(
                       borderRadius: BorderRadius.circular(15),
                       child: Image.asset(
-                        'assets/images/avatars/avatar_$_selectedAvatarId.png',
+                        'assets/images/avatars/avatar_${selectedAvatarId}.png',
                         width: 90,
                         height: 90,
                         fit: BoxFit.cover,
@@ -566,7 +633,8 @@ class _ProfileFormBlock extends _PageBlock {
               const SizedBox(height: 8),
               CustomTextBox(
                 hint: 'Имя',
-                controller: _nameController,
+                controller: nameController,
+                readOnly: !isEditing,
                 prefix: const Icon(Icons.person_outline),
               ),
               const SizedBox(height: 16),
@@ -577,7 +645,8 @@ class _ProfileFormBlock extends _PageBlock {
               const SizedBox(height: 8),
               CustomTextBox(
                 hint: 'О себе',
-                controller: _aboutController,
+                controller: aboutController,
+                readOnly: !isEditing,
                 prefix: const Icon(Icons.info_outline),
               ),
               const SizedBox(height: 16),
@@ -588,7 +657,8 @@ class _ProfileFormBlock extends _PageBlock {
               const SizedBox(height: 8),
               CustomTextBox(
                 hint: 'Цель',
-                controller: _goalController,
+                controller: goalController,
+                readOnly: !isEditing,
                 prefix: const Icon(Icons.flag_outlined),
               ),
               const SizedBox(height: 24),
