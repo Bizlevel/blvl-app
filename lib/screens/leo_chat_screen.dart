@@ -231,7 +231,11 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
   }
 
   Widget _buildBotSelectorCards() {
-    Widget buildCard({required String bot, required String name, required String subtitle, required String avatar}) {
+    Widget buildCard(
+        {required String bot,
+        required String name,
+        required String subtitle,
+        required String avatar}) {
       final bool active = _activeBot == bot;
       return Expanded(
         child: GestureDetector(
@@ -246,7 +250,9 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
             decoration: BoxDecoration(
               color: active ? Colors.white : Colors.white,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: active ? AppColor.primary : Colors.grey.shade300, width: active ? 2 : 1),
+              border: Border.all(
+                  color: active ? AppColor.primary : Colors.grey.shade300,
+                  width: active ? 2 : 1),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withOpacity(0.04),
@@ -267,9 +273,13 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+                    Text(name,
+                        style: const TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.w600)),
                     const SizedBox(height: 2),
-                    Text(subtitle, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                    Text(subtitle,
+                        style:
+                            const TextStyle(fontSize: 12, color: Colors.grey)),
                   ],
                 )
               ],

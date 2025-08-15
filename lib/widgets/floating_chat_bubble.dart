@@ -118,10 +118,9 @@ class _FloatingChatBubbleState extends ConsumerState<FloatingChatBubble>
             onPressed: _openDialog,
             icon: CircleAvatar(
               radius: 10,
-              backgroundImage: AssetImage(
-                  widget.bot == 'max'
-                      ? 'assets/images/avatars/avatar_max.png'
-                      : 'assets/images/avatars/avatar_leo.png'),
+              backgroundImage: AssetImage(widget.bot == 'max'
+                  ? 'assets/images/avatars/avatar_max.png'
+                  : 'assets/images/avatars/avatar_leo.png'),
               backgroundColor: Colors.transparent,
             ),
             label: Text(

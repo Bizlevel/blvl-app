@@ -46,7 +46,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
   int _remaining = -1; // −1 unknown
 
   late final LeoService _leo;
-  
+
   // Добавляем debounce для предотвращения дублей
   Timer? _debounceTimer;
   static const Duration _debounceDelay = Duration(milliseconds: 500);
@@ -163,7 +163,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
 
     // Отменяем предыдущий таймер debounce
     _debounceTimer?.cancel();
-    
+
     // Устанавливаем новый таймер debounce
     _debounceTimer = Timer(_debounceDelay, () async {
       await _sendMessageInternal(text);
