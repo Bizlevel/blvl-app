@@ -17,7 +17,7 @@ class LeoChatScreen extends ConsumerStatefulWidget {
 }
 
 class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
-  String _activeBot = 'leo'; // 'leo' | 'alex'
+  String _activeBot = 'leo'; // 'leo' | 'max'
   late Future<void> _loadFuture;
   int _messagesLeft = 0;
   List<Map<String, dynamic>> _chats = [];
@@ -62,9 +62,7 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
         contextParts.add('О себе: ${user.about}');
       }
       final currentLevel = user.currentLevel;
-      if (currentLevel != null) {
-        contextParts.add('Текущий уровень: $currentLevel');
-      }
+      contextParts.add('Текущий уровень: $currentLevel');
 
       return contextParts.isNotEmpty ? contextParts.join('. ') : null;
     }
@@ -84,9 +82,15 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: AppColor.primary,
         onPressed: _onNewChat,
-        icon: const Icon(Icons.add_comment),
+        icon: CircleAvatar(
+          radius: 12,
+          backgroundImage: AssetImage(_activeBot == 'max'
+              ? 'assets/images/avatars/avatar_max.png'
+              : 'assets/images/avatars/avatar_leo.png'),
+          backgroundColor: Colors.transparent,
+        ),
         label: Text(
-          _activeBot == 'alex' ? 'Новый диалог с Алекс' : 'Новый диалог с Лео',
+          _activeBot == 'max' ? 'Новый чат с Максом' : 'Новый чат с Лео',
           style:
               const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
         ),
@@ -100,7 +104,7 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
               children: [
                 _buildHeader(context),
                 const SizedBox(height: 8),
-                _buildBotSwitcher(),
+                _buildBotSelectorCards(),
                 const SizedBox(height: 10),
                 _buildChats(),
               ],
@@ -226,28 +230,69 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
     );
   }
 
-  Widget _buildBotSwitcher() {
+  Widget _buildBotSelectorCards() {
+    Widget buildCard({required String bot, required String name, required String subtitle, required String avatar}) {
+      final bool active = _activeBot == bot;
+      return Expanded(
+        child: GestureDetector(
+          onTap: () {
+            if (_activeBot == bot) return;
+            setState(() => _activeBot = bot);
+            _loadData();
+          },
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            margin: const EdgeInsets.symmetric(horizontal: 6),
+            decoration: BoxDecoration(
+              color: active ? Colors.white : Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: active ? AppColor.primary : Colors.grey.shade300, width: active ? 2 : 1),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 6,
+                  offset: const Offset(0, 3),
+                )
+              ],
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircleAvatar(
+                  radius: 22,
+                  backgroundImage: AssetImage(avatar),
+                  backgroundColor: Colors.transparent,
+                ),
+                const SizedBox(width: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 2),
+                    Text(subtitle, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                  ],
+                )
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        ChoiceChip(
-          label: const Text('Лео'),
-          selected: _activeBot == 'leo',
-          onSelected: (sel) {
-            if (!sel) return;
-            setState(() => _activeBot = 'leo');
-            _loadData();
-          },
+        buildCard(
+          bot: 'leo',
+          name: 'Leo AI',
+          subtitle: 'Твой бизнес‑ментор',
+          avatar: 'assets/images/avatars/avatar_leo.png',
         ),
-        const SizedBox(width: 8),
-        ChoiceChip(
-          label: const Text('Алекс'),
-          selected: _activeBot == 'alex',
-          onSelected: (sel) {
-            if (!sel) return;
-            setState(() => _activeBot = 'alex');
-            _loadData();
-          },
+        buildCard(
+          bot: 'max',
+          name: 'Max AI',
+          subtitle: 'Твой помощник в достижении цели',
+          avatar: 'assets/images/avatars/avatar_max.png',
         ),
       ],
     );

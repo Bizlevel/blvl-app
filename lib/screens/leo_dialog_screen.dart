@@ -242,7 +242,19 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: AppColor.primary,
-        title: Text(widget.bot == 'alex' ? 'Диалог с Алекс' : 'Диалог с Leo'),
+        title: Row(
+          children: [
+            CircleAvatar(
+              radius: 14,
+              backgroundImage: AssetImage(widget.bot == 'max'
+                  ? 'assets/images/avatars/avatar_max.png'
+                  : 'assets/images/avatars/avatar_leo.png'),
+              backgroundColor: Colors.transparent,
+            ),
+            const SizedBox(width: 8),
+            Text(widget.bot == 'max' ? 'Макс' : 'Лео'),
+          ],
+        ),
       ),
       body: Column(
         children: [

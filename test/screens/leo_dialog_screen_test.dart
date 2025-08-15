@@ -9,7 +9,7 @@ import 'package:mocktail/mocktail.dart';
 class _MockLeoService extends Mock implements LeoService {}
 
 void main() {
-  testWidgets('LeoDialogScreen shows Leo title by default', (tester) async {
+  testWidgets('LeoDialogScreen shows Leo in title by default', (tester) async {
     final mockService = _MockLeoService();
     when(() => mockService.checkMessageLimit()).thenAnswer((_) async => 0);
     await tester.pumpWidget(ProviderScope(
@@ -17,17 +17,17 @@ void main() {
       child: const MaterialApp(home: LeoDialogScreen()),
     ));
 
-    expect(find.text('Диалог с Leo'), findsOneWidget);
+    expect(find.text('Лео'), findsOneWidget);
   });
 
-  testWidgets('LeoDialogScreen shows Alex title when bot=alex', (tester) async {
+  testWidgets('LeoDialogScreen shows Max title when bot=max', (tester) async {
     final mockService = _MockLeoService();
     when(() => mockService.checkMessageLimit()).thenAnswer((_) async => 0);
     await tester.pumpWidget(ProviderScope(
       overrides: [leoServiceProvider.overrideWithValue(mockService)],
-      child: const MaterialApp(home: LeoDialogScreen(bot: 'alex')),
+      child: const MaterialApp(home: LeoDialogScreen(bot: 'max')),
     ));
 
-    expect(find.text('Диалог с Алекс'), findsOneWidget);
+    expect(find.text('Макс'), findsOneWidget);
   });
 }

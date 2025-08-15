@@ -116,9 +116,16 @@ class _FloatingChatBubbleState extends ConsumerState<FloatingChatBubble>
           FloatingActionButton.extended(
             backgroundColor: AppColor.primary,
             onPressed: _openDialog,
-            icon: const Icon(Icons.chat_bubble_outline),
+            icon: CircleAvatar(
+              radius: 10,
+              backgroundImage: AssetImage(
+                  widget.bot == 'max'
+                      ? 'assets/images/avatars/avatar_max.png'
+                      : 'assets/images/avatars/avatar_leo.png'),
+              backgroundColor: Colors.transparent,
+            ),
             label: Text(
-              widget.bot == 'alex' ? 'Обсудить с Алекс' : 'Обсудить с Лео',
+              widget.bot == 'max' ? 'Новый чат с Максом' : 'Новый чат с Лео',
               style: const TextStyle(
                   color: Colors.white, fontWeight: FontWeight.w600),
             ),

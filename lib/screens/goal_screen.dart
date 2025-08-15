@@ -598,7 +598,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                 'Режим трекера цели: обсуждаем версию v$_selectedVersion и прогресс спринтов. Будь краток, поддерживай фокус, предлагай следующий шаг.',
             userContext: _buildTrackerUserContext(),
             levelContext: 'current_level: $currentLevel',
-            bot: 'alex',
+            bot: 'max',
           ),
         )
       ]),

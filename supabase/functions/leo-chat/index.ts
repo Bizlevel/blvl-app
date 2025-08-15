@@ -88,8 +88,10 @@ serve(async (req: Request): Promise<Response> => {
     const userContext = body?.userContext;
     const levelContext = body?.levelContext;
     const knowledgeContext = body?.knowledgeContext;
-    const bot: string = typeof body?.bot === 'string' ? String(body.bot) : 'leo';
-    const isAlex = bot === 'alex';
+    let bot: string = typeof body?.bot === 'string' ? String(body.bot) : 'leo';
+    // Backward compatibility: treat 'alex' as 'max'
+    if (bot === 'alex') bot = 'max';
+    const isMax = bot === 'max';
 
     if (!Array.isArray(messages)) {
       return new Response(
@@ -169,7 +171,7 @@ serve(async (req: Request): Promise<Response> => {
     // Встроенный RAG: эмбеддинг + match_documents (с кешем)
     // Для Alex (бот-трекер) RAG отключаем полностью
     let ragContext = '';
-    if (!isAlex && typeof lastUserMessage === 'string' && lastUserMessage.trim().length > 0) {
+    if (!isMax && typeof lastUserMessage === 'string' && lastUserMessage.trim().length > 0) {
       try {
         const embeddingModel = Deno.env.get("OPENAI_EMBEDDING_MODEL") || "text-embedding-3-small";
         const matchThreshold = parseFloat(Deno.env.get("RAG_MATCH_THRESHOLD") || "0.35");
@@ -248,7 +250,7 @@ serve(async (req: Request): Promise<Response> => {
           .from('leo_chats')
           .select('summary')
           .eq('user_id', userId)
-          .eq('bot', isAlex ? 'alex' : 'leo')
+          .eq('bot', isMax ? 'max' : 'leo')
           .not('summary', 'is', null)
           .order('updated_at', { ascending: false })
           .limit(3);
@@ -270,14 +272,14 @@ serve(async (req: Request): Promise<Response> => {
     console.log('🔧 DEBUG: userContext from client:', userContext ? 'ЕСТЬ' : 'НЕТ');
     console.log('🔧 DEBUG: levelContext from client:', levelContext ? 'ЕСТЬ' : 'НЕТ');
     console.log('🔧 DEBUG: knowledgeContext from client:', knowledgeContext ? 'ЕСТЬ' : 'НЕТ');
-    console.log('🔧 DEBUG: bot:', isAlex ? 'alex' : 'leo');
+    console.log('🔧 DEBUG: bot:', isMax ? 'max' : 'leo');
     
     // Extra goal/sprint/reminders/quote context for Alex (tracker)
     let goalBlock = '';
     let sprintBlock = '';
     let remindersBlock = '';
     let quoteBlock = '';
-    if (isAlex && userId) {
+    if (isMax && userId) {
       try {
         // Latest goal version
         const { data: goals } = await supabaseAdmin
@@ -439,7 +441,7 @@ ${knowledgeContext ? `\n## БАЗА ЗНАНИЙ (клиент):\n${knowledgeCon
 
     // Alex (goal tracker) prompt — коротко, конкретно, приоритет цели/спринтов
     const systemPromptAlex = `## Твоя роль и тон:
-Ты — Алекс, трекер цели BizLevel. Отвечай коротко, конкретно и по делу.
+Ты — Макс, трекер цели BizLevel. Отвечай коротко, конкретно и по делу.
 Фокус: помочь пользователю сформулировать и кристаллизовать цель, поддерживать её достижение в 28‑дневных спринтах.
 Представляйся только в первом ответе новой сессии или если пользователь явно спрашивает «кто ты?».
 Не используй таблицы и не предлагай «дополнительную помощь». Сразу давай следующий шаг.
@@ -465,7 +467,7 @@ ${quoteBlock ? `Цитата дня: ${quoteBlock}\n` : ''}
 - Если данных недостаточно — попроси уточнение по одному самому важному пункту.
 - Не говори, что у тебя нет доступа к профилю. Используй данные из разделов выше (Персонализация, Персона, Память, Итоги) и отвечай по ним.`;
 
-    const systemPrompt = isAlex ? systemPromptAlex : systemPromptLeo;
+    const systemPrompt = isMax ? systemPromptAlex : systemPromptLeo;
 
     // --- Безопасный вызов OpenAI с валидацией конфигурации ---
     const apiKey = Deno.env.get("OPENAI_API_KEY");
