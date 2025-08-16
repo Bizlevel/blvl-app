@@ -136,21 +136,18 @@ class _LeoQuizWidgetState extends ConsumerState<LeoQuizWidget> {
           questionIndex: widget.questionIndex,
         ),
         const SizedBox(height: 12),
-        // Лента сообщений в стиле чата
+        // Лента сообщений в стиле чата: приветствие → вопрос
         LeoMessageBubble(text: _initialMessage, isUser: false),
         LeoMessageBubble(text: question, isUser: false),
-        if (_assistantMessage != null)
-          LeoMessageBubble(text: _assistantMessage!, isUser: false),
         const SizedBox(height: 12),
         // Варианты ответа — карточки (не кнопки), нейтральная палитра
         ...List.generate(options.length, (i) {
-          final bool isSelected = _selectedIndex == i && !_checked;
+          final bool isSelected = _selectedIndex == i;
           final Color borderColor = isSelected
-              ? AppColor.primary
+              ? Colors.transparent
               : Colors.grey.shade300;
-          final Color bgColor = isSelected
-              ? Colors.blue.shade50
-              : Colors.white;
+          final Color bgColor = isSelected ? AppColor.primary : Colors.white;
+          final Color textColor = isSelected ? Colors.white : Colors.black87;
           return Padding(
             padding: const EdgeInsets.symmetric(vertical: 6),
             child: InkWell(
@@ -175,10 +172,14 @@ class _LeoQuizWidgetState extends ConsumerState<LeoQuizWidget> {
                 ),
                 child: Row(
                   children: [
-                    Expanded(child: Text(options[i])),
+                    Expanded(
+                        child: Text(
+                      options[i],
+                      style: TextStyle(color: textColor),
+                    )),
                     if (isSelected)
-                      Icon(Icons.check_circle,
-                          size: 20, color: AppColor.primary),
+                      const Icon(Icons.check_circle,
+                          size: 20, color: Colors.white),
                   ],
                 ),
               ),
@@ -195,6 +196,45 @@ class _LeoQuizWidgetState extends ConsumerState<LeoQuizWidget> {
               isUser: true,
             ),
           ),
+        if (_assistantMessage != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: LeoMessageBubble(text: _assistantMessage!, isUser: false),
+          ),
+        if (_assistantMessage != null && _isCorrect)
+          const LeoMessageBubble(
+            text:
+                'Если хочешь обсудить более подробно, нажми на кнопку ниже «Обсудить с Лео».',
+            isUser: false,
+          ),
+        if (_assistantMessage != null && !_isCorrect)
+          Align(
+            alignment: Alignment.centerRight,
+            child: InkWell(
+              onTap: () {
+                setState(() {
+                  _checked = false;
+                  _selectedIndex = null;
+                  _assistantMessage = null;
+                  _userAnswer = null;
+                  _isSending = false;
+                });
+              },
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppColor.primary,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text(
+                  'Попробовать снова',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+            ),
+          ),
         if (_checked) ...[
           if (_isCorrect)
             const Text(
@@ -203,23 +243,7 @@ class _LeoQuizWidgetState extends ConsumerState<LeoQuizWidget> {
                   TextStyle(color: Colors.green, fontWeight: FontWeight.w600),
             )
           else
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 8),
-                ElevatedButton(
-                  onPressed: () {
-                    setState(() {
-                      _checked = false;
-                      _selectedIndex = null;
-                      _assistantMessage = null;
-                      _userAnswer = null;
-                    });
-                  },
-                  child: const Text('Попробовать снова'),
-                ),
-              ],
-            ),
+            const SizedBox.shrink(),
         ],
       ],
     );
@@ -238,36 +262,43 @@ class _Header extends StatelessWidget {
         ? 'Вопрос ${levelNumber!.toString()}.${questionIndex!.toString()}'
         : 'Вопрос';
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        const CircleAvatar(
-          radius: 16,
-          backgroundImage: AssetImage('assets/images/avatars/avatar_leo.png'),
-          backgroundColor: Colors.transparent,
-        ),
-        const SizedBox(width: 8),
-        const Text(
-          'Лео',
-          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
-        ),
-        const Spacer(),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: AppColor.primary.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(16),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.blue.shade50,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          const CircleAvatar(
+            radius: 16,
+            backgroundImage: AssetImage('assets/images/avatars/avatar_leo.png'),
+            backgroundColor: Colors.transparent,
           ),
-          child: Text(
-            chipText,
-            style: TextStyle(
+          const SizedBox(width: 8),
+          const Text(
+            'Лео',
+            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+          ),
+          const Spacer(),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
               color: AppColor.primary,
-              fontWeight: FontWeight.w600,
-              fontSize: 12,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Text(
+              chipText,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
