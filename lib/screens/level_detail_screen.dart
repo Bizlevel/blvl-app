@@ -8,7 +8,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bizlevel/providers/lesson_progress_provider.dart';
 import 'package:bizlevel/widgets/lesson_widget.dart';
 import 'package:bizlevel/screens/leo_dialog_screen.dart';
+// import 'package:bizlevel/widgets/quiz_widget.dart';
+import 'package:bizlevel/widgets/leo_quiz_widget.dart';
 import 'package:bizlevel/widgets/quiz_widget.dart';
+import 'package:bizlevel/utils/constant.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:bizlevel/providers/levels_provider.dart';
 import 'package:bizlevel/providers/levels_repository_provider.dart';
@@ -363,7 +366,11 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
       for (final lesson in lessons) ...[
         _LessonBlock(lesson: lesson, onWatched: _videoWatched),
         if (lesson.quizQuestions.isNotEmpty)
-          _QuizBlock(lesson: lesson, onCorrect: _quizPassed),
+          _QuizBlock(
+            lesson: lesson,
+            onCorrect: _quizPassed,
+            levelNumber: widget.levelNumber ?? widget.levelId,
+          ),
       ],
       _ArtifactBlock(levelId: widget.levelId),
     ];
@@ -752,7 +759,8 @@ class _LessonBlock extends _PageBlock {
 class _QuizBlock extends _PageBlock {
   final LessonModel lesson;
   final void Function(int) onCorrect;
-  _QuizBlock({required this.lesson, required this.onCorrect});
+  final int? levelNumber;
+  _QuizBlock({required this.lesson, required this.onCorrect, this.levelNumber});
   @override
   Widget build(BuildContext context, int index) {
     return Consumer(builder: (context, ref, _) {
@@ -764,16 +772,45 @@ class _QuizBlock extends _PageBlock {
       return SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
         child: Center(
-          child: QuizWidget(
-            questionData: {
-              'question': lesson.quizQuestions.first['question'],
-              'options':
-                  List<String>.from(lesson.quizQuestions.first['options']),
-              'correct': lesson.correctAnswers.first,
-            },
-            initiallyPassed: alreadyPassed,
-            onCorrect: () => onCorrect(index),
-          ),
+          child: Builder(builder: (context) {
+            final user = ref.watch(currentUserProvider).value;
+            final parts = <String>[];
+            if (user != null) {
+              if (user.name.isNotEmpty) parts.add('Имя: ${user.name}');
+              if ((user.goal ?? '').isNotEmpty) parts.add('Цель: ${user.goal}');
+              if ((user.about ?? '').isNotEmpty)
+                parts.add('О себе: ${user.about}');
+            }
+            final userCtx = parts.isEmpty ? null : parts.join('. ');
+            if (kUseLeoQuiz) {
+              return LeoQuizWidget(
+                questionData: {
+                  'question': lesson.quizQuestions.first['question'],
+                  'options':
+                      List<String>.from(lesson.quizQuestions.first['options']),
+                  'correct': lesson.correctAnswers.first,
+                  'script': lesson.quizQuestions.first['script'],
+                  'explanation': lesson.quizQuestions.first['explanation'],
+                },
+                initiallyPassed: alreadyPassed,
+                onCorrect: () => onCorrect(index),
+                userContext: userCtx,
+                levelNumber: levelNumber ?? lesson.levelId,
+                questionIndex: lesson.order,
+              );
+            } else {
+              return QuizWidget(
+                questionData: {
+                  'question': lesson.quizQuestions.first['question'],
+                  'options':
+                      List<String>.from(lesson.quizQuestions.first['options']),
+                  'correct': lesson.correctAnswers.first,
+                },
+                initiallyPassed: alreadyPassed,
+                onCorrect: () => onCorrect(index),
+              );
+            }
+          }),
         ),
       );
     });
