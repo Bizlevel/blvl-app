@@ -191,6 +191,7 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
           child: Container(
             padding: const EdgeInsets.all(12),
             margin: const EdgeInsets.symmetric(horizontal: 6),
+            constraints: const BoxConstraints(minHeight: 100),
             decoration: BoxDecoration(
               color: active ? Colors.white : Colors.white,
               borderRadius: BorderRadius.circular(12),
