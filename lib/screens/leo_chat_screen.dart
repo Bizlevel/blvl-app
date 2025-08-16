@@ -99,9 +99,25 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
         future: _loadFuture,
         builder: (context, snapshot) {
           return SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 15),
+            padding: EdgeInsets.only(
+              left: 15,
+              right: 15,
+              top: MediaQuery.of(context).padding.top +
+                  8, // отступ от статус-бара
+            ),
             child: Column(
               children: [
+                const SizedBox(height: 4),
+                Center(
+                  child: Text(
+                    'База тренеров',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleLarge
+                        ?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                ),
+                const SizedBox(height: 8),
                 _buildBotSelectorCards(),
                 const SizedBox(height: 10),
                 _buildChats(),

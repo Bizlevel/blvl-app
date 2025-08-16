@@ -81,7 +81,7 @@ class AppShell extends ConsumerWidget {
                 DesktopNavBar(
                   tabs: const [
                     {'icon': Icons.map, 'label': 'Карта уровней'},
-                    {'icon': Icons.chat_bubble, 'label': 'Чат'},
+                    {'icon': Icons.chat_bubble, 'label': 'База тренеров'},
                     {'icon': Icons.flag, 'label': 'Цель'},
                     {'icon': Icons.person, 'label': 'Профиль'},
                   ],

@@ -334,7 +334,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('Мотивация от Leo',
+                              Text('Мотивация от Макса',
                                   style: Theme.of(context)
                                       .textTheme
                                       .titleMedium

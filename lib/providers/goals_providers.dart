@@ -44,7 +44,27 @@ final remindersStreamProvider =
 });
 
 // Цитата дня
+// Чтобы цитата реально менялась раз в сутки без перезапуска приложения,
+// добавляем зависимость от «индекса текущего дня», который эмитится раз в час.
+final _todayIndexProvider = StreamProvider<int>((ref) async* {
+  int last = _dayIndex();
+  yield last;
+  // Пуллим раз в час: при смене календарного дня значение изменится
+  while (true) {
+    await Future.delayed(const Duration(hours: 1));
+    final nowIdx = _dayIndex();
+    if (nowIdx != last) {
+      last = nowIdx;
+      yield nowIdx;
+    }
+  }
+});
+
+int _dayIndex() => DateTime.now().toUtc().difference(DateTime.utc(1970)).inDays;
+
 final dailyQuoteProvider = FutureProvider<Map<String, dynamic>?>((ref) async {
+  // Подписка нужна только для инвалидации провайдера при смене дня
+  ref.watch(_todayIndexProvider);
   final repo = ref.read(goalsRepositoryProvider);
   return repo.getDailyQuote();
 });

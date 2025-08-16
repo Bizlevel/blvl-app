@@ -33,7 +33,7 @@ class _LeoQuizWidgetState extends ConsumerState<LeoQuizWidget> {
   bool _isCorrect = false;
   String? _assistantMessage; // Сообщение Лео после проверки ответа
   late String _initialMessage; // Стартовое приветствие Лео
-  String? _userAnswer; // Текст выбранного пользователем варианта
+  // Убрано: ответ пользователя не дублируется отдельным баблом
   bool _isSending = false; // Блокировка повторных тапов до ответа Лео
 
   @override
@@ -140,62 +140,64 @@ class _LeoQuizWidgetState extends ConsumerState<LeoQuizWidget> {
         LeoMessageBubble(text: _initialMessage, isUser: false),
         LeoMessageBubble(text: question, isUser: false),
         const SizedBox(height: 12),
-        // Варианты ответа — карточки (не кнопки), нейтральная палитра
+        // Варианты ответа — карточки (не кнопки), прижаты вправо
         ...List.generate(options.length, (i) {
           final bool isSelected = _selectedIndex == i;
-          final Color borderColor = isSelected
-              ? Colors.transparent
-              : Colors.grey.shade300;
+          final Color borderColor =
+              isSelected ? Colors.transparent : Colors.grey.shade300;
           final Color bgColor = isSelected ? AppColor.primary : Colors.white;
           final Color textColor = isSelected ? Colors.white : Colors.black87;
           return Padding(
             padding: const EdgeInsets.symmetric(vertical: 6),
-            child: InkWell(
-              key: Key('leo_quiz_option_$i'),
-              onTap: (_checked || _isSending)
-                  ? null
-                  : () {
-                      setState(() {
-                        _selectedIndex = i;
-                        _userAnswer = options[i];
-                      });
-                      _checkAnswer();
-                    },
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                decoration: BoxDecoration(
-                  color: bgColor,
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                    maxWidth: MediaQuery.of(context).size.width * 0.8),
+                child: InkWell(
+                  key: Key('leo_quiz_option_$i'),
+                  onTap: (_checked || _isSending)
+                      ? null
+                      : () {
+                          setState(() {
+                            _selectedIndex = i;
+                          });
+                          _checkAnswer();
+                        },
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: borderColor),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                        child: Text(
-                      options[i],
-                      style: TextStyle(color: textColor),
-                    )),
-                    if (isSelected)
-                      const Icon(Icons.check_circle,
-                          size: 20, color: Colors.white),
-                  ],
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: bgColor,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: borderColor),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            options[i],
+                            style: TextStyle(color: textColor),
+                          ),
+                        ),
+                        if (isSelected)
+                          const Padding(
+                            padding: EdgeInsets.only(left: 8.0),
+                            child: Icon(Icons.check_circle,
+                                size: 20, color: Colors.white),
+                          ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
           );
         }),
         const SizedBox(height: 8),
-        if (_userAnswer != null)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: LeoMessageBubble(
-              key: const Key('leo_quiz_user_bubble'),
-              text: _userAnswer!,
-              isUser: true,
-            ),
-          ),
+        // Не дублируем выбранный ответ отдельным сообщением — он остаётся подсвеченной карточкой справа
         if (_assistantMessage != null)
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
@@ -216,7 +218,6 @@ class _LeoQuizWidgetState extends ConsumerState<LeoQuizWidget> {
                   _checked = false;
                   _selectedIndex = null;
                   _assistantMessage = null;
-                  _userAnswer = null;
                   _isSending = false;
                 });
               },
@@ -265,7 +266,7 @@ class _Header extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.blue.shade50,
+        color: AppColor.primary, // тот же цвет, что и AppBar чата
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -274,24 +275,25 @@ class _Header extends StatelessWidget {
           const CircleAvatar(
             radius: 16,
             backgroundImage: AssetImage('assets/images/avatars/avatar_leo.png'),
-            backgroundColor: Colors.transparent,
+            backgroundColor: Colors.white,
           ),
           const SizedBox(width: 8),
           const Text(
             'Лео',
-            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+            style: TextStyle(
+                fontWeight: FontWeight.w600, fontSize: 16, color: Colors.white),
           ),
           const Spacer(),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
-              color: AppColor.primary,
+              color: Colors.white,
               borderRadius: BorderRadius.circular(16),
             ),
             child: Text(
               chipText,
               style: const TextStyle(
-                color: Colors.white,
+                color: Colors.black87,
                 fontWeight: FontWeight.w600,
                 fontSize: 12,
               ),
