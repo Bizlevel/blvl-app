@@ -33,6 +33,8 @@ class _LeoQuizWidgetState extends ConsumerState<LeoQuizWidget> {
   bool _isCorrect = false;
   String? _assistantMessage; // Сообщение Лео после проверки ответа
   late String _initialMessage; // Стартовое приветствие Лео
+  String? _userAnswer; // Текст выбранного пользователем варианта
+  bool _isSending = false; // Блокировка повторных тапов до ответа Лео
 
   @override
   void initState() {
@@ -62,6 +64,7 @@ class _LeoQuizWidgetState extends ConsumerState<LeoQuizWidget> {
   Future<void> _sendAssistantReply(bool isRight, int correctIndex) async {
     // Пытаемся получить короткий ответ ассистента (без лимитов/создания чата).
     try {
+      setState(() => _isSending = true);
       final service = ref.read(leoServiceProvider);
       final question = widget.questionData['question'] as String;
       final options = List<String>.from(widget.questionData['options'] as List);
@@ -78,6 +81,7 @@ class _LeoQuizWidgetState extends ConsumerState<LeoQuizWidget> {
         _isCorrect = isRight;
         _assistantMessage =
             content.isNotEmpty ? content : _composeAssistantReply(isRight);
+        _isSending = false;
       });
     } catch (_) {
       // Фолбэк: локальная формулировка без сети
@@ -85,6 +89,7 @@ class _LeoQuizWidgetState extends ConsumerState<LeoQuizWidget> {
         _checked = true;
         _isCorrect = isRight;
         _assistantMessage = _composeAssistantReply(isRight);
+        _isSending = false;
       });
     }
 
@@ -137,22 +142,60 @@ class _LeoQuizWidgetState extends ConsumerState<LeoQuizWidget> {
         if (_assistantMessage != null)
           LeoMessageBubble(text: _assistantMessage!, isUser: false),
         const SizedBox(height: 12),
+        // Варианты ответа — карточки (не кнопки), нейтральная палитра
         ...List.generate(options.length, (i) {
-          return RadioListTile<int>(
-            value: i,
-            groupValue: _selectedIndex,
-            onChanged:
-                _checked ? null : (v) => setState(() => _selectedIndex = v),
-            title: Text(options[i]),
+          final bool isSelected = _selectedIndex == i && !_checked;
+          final Color borderColor = isSelected
+              ? AppColor.primary
+              : Colors.grey.shade300;
+          final Color bgColor = isSelected
+              ? Colors.blue.shade50
+              : Colors.white;
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: InkWell(
+              key: Key('leo_quiz_option_$i'),
+              onTap: (_checked || _isSending)
+                  ? null
+                  : () {
+                      setState(() {
+                        _selectedIndex = i;
+                        _userAnswer = options[i];
+                      });
+                      _checkAnswer();
+                    },
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                decoration: BoxDecoration(
+                  color: bgColor,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: borderColor),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(child: Text(options[i])),
+                    if (isSelected)
+                      Icon(Icons.check_circle,
+                          size: 20, color: AppColor.primary),
+                  ],
+                ),
+              ),
+            ),
           );
         }),
         const SizedBox(height: 8),
-        if (!_checked)
-          ElevatedButton(
-            onPressed: _selectedIndex == null ? null : _checkAnswer,
-            child: const Text('Проверить'),
-          )
-        else ...[
+        if (_userAnswer != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: LeoMessageBubble(
+              key: const Key('leo_quiz_user_bubble'),
+              text: _userAnswer!,
+              isUser: true,
+            ),
+          ),
+        if (_checked) ...[
           if (_isCorrect)
             const Text(
               'Тест пройден ✅',
@@ -170,6 +213,7 @@ class _LeoQuizWidgetState extends ConsumerState<LeoQuizWidget> {
                       _checked = false;
                       _selectedIndex = null;
                       _assistantMessage = null;
+                      _userAnswer = null;
                     });
                   },
                   child: const Text('Попробовать снова'),
@@ -199,8 +243,7 @@ class _Header extends StatelessWidget {
       children: [
         const CircleAvatar(
           radius: 16,
-          backgroundImage:
-              AssetImage('assets/images/avatars/avatar_leo.png'),
+          backgroundImage: AssetImage('assets/images/avatars/avatar_leo.png'),
           backgroundColor: Colors.transparent,
         ),
         const SizedBox(width: 8),
