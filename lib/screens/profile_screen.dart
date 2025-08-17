@@ -9,8 +9,8 @@ import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/widgets/custom_image.dart';
 import 'package:bizlevel/widgets/stat_card.dart';
 // import 'package:bizlevel/widgets/setting_item.dart';
-import 'package:bizlevel/widgets/artifact_card.dart';
 import 'package:bizlevel/providers/levels_provider.dart';
+import 'package:bizlevel/providers/levels_repository_provider.dart';
 import 'package:bizlevel/providers/subscription_provider.dart';
 import 'package:bizlevel/models/user_model.dart';
 import 'package:go_router/go_router.dart';
@@ -18,6 +18,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:io';
+import 'package:url_launcher/url_launcher.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -172,6 +173,7 @@ class ProfileScreen extends ConsumerWidget {
                   'description': lvl['artifact_description'] ?? '',
                   'url': lvl['artifact_url'] ?? '',
                   'image': lvl['image'] ?? '',
+                  'level': lvl['level'],
                 })
             .where((a) => (a['url'] as String).isNotEmpty)
             .toList();
@@ -330,6 +332,171 @@ class _BodyState extends ConsumerState<_Body> {
   // ignore: unused_field
   bool _isUploading = false;
 
+  String _pluralizeArtifacts(int n) {
+    final int nMod100 = n % 100;
+    if (nMod100 >= 11 && nMod100 <= 14) {
+      return 'Артефактов';
+    }
+    switch (n % 10) {
+      case 1:
+        return 'Артефакт';
+      case 2:
+      case 3:
+      case 4:
+        return 'Артефакта';
+      default:
+        return 'Артефактов';
+    }
+  }
+
+  Future<void> _openArtifactUrl(String link) async {
+    try {
+      String url = link;
+      if (!url.startsWith('http')) {
+        final repo = ref.read(levelsRepositoryProvider);
+        final signed = await repo.getArtifactSignedUrl(url);
+        if (signed == null) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Не удалось получить ссылку на файл')),
+          );
+          return;
+        }
+        url = signed;
+      }
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Не удалось открыть ссылку')),
+        );
+      }
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ошибка открытия файла')),
+      );
+    }
+  }
+
+  Future<void> _openArtifactsModal() async {
+    if (widget.artifacts.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('У вас пока нет артефактов')),
+      );
+      return;
+    }
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      builder: (ctx) {
+        return DraggableScrollableSheet(
+          expand: false,
+          minChildSize: 0.3,
+          maxChildSize: 0.9,
+          initialChildSize: 0.6,
+          builder: (context, scrollController) {
+            return Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.medium,
+                    vertical: AppSpacing.small,
+                  ),
+                  child: Row(
+                    children: [
+                      const Text(
+                        'Артефакты',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const Spacer(),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppColor.primary.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '${widget.artifacts.length} ${_pluralizeArtifacts(widget.artifacts.length)}',
+                          style: const TextStyle(color: AppColor.primary),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                Expanded(
+                  child: ListView.separated(
+                    controller: scrollController,
+                    itemCount: widget.artifacts.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (context, index) {
+                      final a = widget.artifacts[index];
+                      final String title =
+                          (a['title'] as String?) ?? 'Артефакт';
+                      final String desc = (a['description'] as String?) ?? '';
+                      final String url = (a['url'] as String?) ?? '';
+                      final int? levelNumber = a['level'] as int?;
+                      final String subtitleLine = levelNumber == null
+                          ? desc
+                          : [
+                              if (desc.isNotEmpty) desc,
+                              'Уровень ${levelNumber.toString()}'
+                            ].where((e) => e.isNotEmpty).join(' • ');
+                      return ListTile(
+                        leading: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: SizedBox(
+                            width: 40,
+                            height: 40,
+                            child: CustomImage(
+                              (a['image'] as String?) ?? '',
+                              radius: 8,
+                              width: 40,
+                              height: 40,
+                            ),
+                          ),
+                        ),
+                        title: Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        subtitle: subtitleLine.isEmpty
+                            ? null
+                            : Text(
+                                subtitleLine,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(color: Colors.grey),
+                              ),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.download),
+                          color: AppColor.primary,
+                          onPressed: () => _openArtifactUrl(url),
+                        ),
+                        onTap: () => _openArtifactUrl(url),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   Future<void> _showAvatarPicker() async {
     final selectedId = await showModalBottomSheet<int>(
       context: context,
@@ -462,9 +629,7 @@ class _BodyState extends ConsumerState<_Body> {
           const SizedBox(height: AppSpacing.medium),
           if (!widget.isPremium) _buildPremiumButton(context),
           if (!widget.isPremium) const SizedBox(height: AppSpacing.medium),
-          // Кнопки перенесены в меню шестерёнки в AppBar
-          _buildArtifactsSection(),
-          const SizedBox(height: AppSpacing.medium),
+          // Секция артефактов скрыта — используйте карточку статистики выше
         ],
       ),
     );
@@ -584,9 +749,28 @@ class _BodyState extends ConsumerState<_Body> {
         ),
         const SizedBox(width: AppSpacing.small),
         Expanded(
-          child: StatCard(
-            title: "${widget.artifactsCount} Артефакта",
-            icon: Icons.shield_outlined,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: _openArtifactsModal,
+            child: Stack(
+              children: [
+                // Stack будет принимать размер по ненапозиционированному ребёнку
+                StatCard(
+                  title:
+                      "${widget.artifactsCount} ${_pluralizeArtifacts(widget.artifactsCount)}",
+                  icon: Icons.inventory_2_outlined,
+                ),
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: Icon(
+                    Icons.expand_more,
+                    size: 16,
+                    color: Colors.grey.withOpacity(0.9),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ],
@@ -633,45 +817,7 @@ class _BodyState extends ConsumerState<_Body> {
 
   // Секции настроек/платежей/выхода перенесены в меню шестерёнки AppBar
 
-  Widget _buildArtifactsSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          "Артефакты",
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: AppSpacing.small),
-        if (widget.artifacts.isEmpty)
-          const Center(child: Text("У вас пока нет артефактов."))
-        else
-          Wrap(
-            spacing: AppSpacing.small,
-            runSpacing: AppSpacing.small,
-            children: widget.artifacts
-                .map((artifact) => SizedBox(
-                      width: (MediaQuery.of(context).size.width < 600)
-                          ? double.infinity
-                          : (MediaQuery.of(context).size.width < 1024
-                              ? (MediaQuery.of(context).size.width / 2 -
-                                  AppSpacing.medium * 2)
-                              : (MediaQuery.of(context).size.width / 3 -
-                                  AppSpacing.medium * 2)),
-                      child: ArtifactCard(
-                        title: artifact['title'],
-                        description: artifact['description'],
-                        url: artifact['url'],
-                        image: artifact['image'],
-                      ),
-                    ))
-                .toList(),
-          ),
-      ],
-    );
-  }
+  // Секция артефактов удалена согласно задаче 31.16 — используется модалка
 }
 
 class DividerWrapper extends StatelessWidget {
