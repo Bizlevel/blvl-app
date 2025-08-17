@@ -76,8 +76,8 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
       // Показываем последнюю версию, если есть, иначе v1
       _selectedVersion =
           hasAny ? (_versions.keys.reduce((a, b) => a > b ? a : b)) : 1;
-      // Если записей ещё нет — сразу редактируем v1; если есть — стартуем в просмотре
-      _isEditing = !hasAny;
+      // По умолчанию стартуем в режиме просмотра (в т.ч. когда v1 ещё нет — раздел заблокирован)
+      _isEditing = false;
       _fillControllersFor(_selectedVersion);
       if (mounted) setState(() {});
     });
@@ -671,31 +671,86 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                         const SizedBox(height: 12),
 
                         if (_selectedVersion == 1) ...[
-                          // Основная цель
-                          _GroupHeader('Основная цель'),
-                          CustomTextBox(
-                              controller: _goalInitialCtrl,
-                              readOnly: !_isEditing,
-                              readOnlySoftBackground: true,
-                              hint: 'Чего хочу достичь за 28 дней'),
-                          const SizedBox(height: 16),
+                          if (!_versions.containsKey(1))
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color:
+                                        AppColor.shadowColor.withOpacity(0.1),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.lock_outline,
+                                      color: Colors.grey.shade400, size: 28),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          '🔒 Версия v1 «Набросок» заполняется на Уровне 1',
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .titleSmall
+                                              ?.copyWith(
+                                                color: Colors.grey.shade700,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          'Пройдите Уровень 1 и заполните Набросок цели. После этого вы сможете редактировать здесь.',
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodySmall
+                                              ?.copyWith(
+                                                color: Colors.grey.shade600,
+                                                height: 1.3,
+                                              ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          else ...[
+                            // Основная цель
+                            _GroupHeader('Основная цель'),
+                            CustomTextBox(
+                                controller: _goalInitialCtrl,
+                                readOnly: !_isEditing,
+                                readOnlySoftBackground: true,
+                                hint: 'Чего хочу достичь за 28 дней'),
+                            const SizedBox(height: 16),
 
-                          // Мотивация
-                          _GroupHeader('Почему сейчас'),
-                          CustomTextBox(
-                              controller: _goalWhyCtrl,
-                              readOnly: !_isEditing,
-                              readOnlySoftBackground: true,
-                              hint: 'Почему это важно именно сейчас*'),
-                          const SizedBox(height: 16),
+                            // Мотивация
+                            _GroupHeader('Почему сейчас'),
+                            CustomTextBox(
+                                controller: _goalWhyCtrl,
+                                readOnly: !_isEditing,
+                                readOnlySoftBackground: true,
+                                hint: 'Почему это важно именно сейчас*'),
+                            const SizedBox(height: 16),
 
-                          // Препятствие
-                          _GroupHeader('Препятствие'),
-                          CustomTextBox(
-                              controller: _mainObstacleCtrl,
-                              readOnly: !_isEditing,
-                              readOnlySoftBackground: true,
-                              hint: 'Главное препятствие*'),
+                            // Препятствие
+                            _GroupHeader('Препятствие'),
+                            CustomTextBox(
+                                controller: _mainObstacleCtrl,
+                                readOnly: !_isEditing,
+                                readOnlySoftBackground: true,
+                                hint: 'Главное препятствие*'),
+                          ]
                         ] else if (_selectedVersion == 2) ...[
                           // Уточненная цель
                           _GroupHeader('Уточненная цель'),
@@ -818,9 +873,12 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                           SizedBox(
                             height: 44,
                             child: ElevatedButton(
-                              onPressed: (!_saving && _isEditing)
-                                  ? () => _saveGoal()
-                                  : null,
+                              onPressed: (_selectedVersion == 1 &&
+                                      !_versions.containsKey(1))
+                                  ? null
+                                  : ((!_saving && _isEditing)
+                                      ? () => _saveGoal()
+                                      : null),
                               child: _saving
                                   ? const SizedBox(
                                       width: 18,
@@ -902,7 +960,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
   String _getVersionLabel(int version) {
     switch (version) {
       case 1:
-        return '1. Семя';
+        return '1. Набросок';
       case 2:
         return '2. Метрики';
       case 3:

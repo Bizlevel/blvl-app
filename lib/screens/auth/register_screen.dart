@@ -6,7 +6,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../theme/color.dart';
 import '../../services/auth_service.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../providers/auth_provider.dart';
 import '../../widgets/custom_textfield.dart';

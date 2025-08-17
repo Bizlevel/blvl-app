@@ -19,6 +19,8 @@ import 'package:bizlevel/providers/auth_provider.dart';
 import 'package:bizlevel/widgets/custom_textfield.dart';
 import 'package:bizlevel/services/auth_service.dart';
 import 'package:bizlevel/providers/user_skills_provider.dart';
+import 'package:bizlevel/providers/goals_repository_provider.dart';
+import 'package:bizlevel/providers/goals_providers.dart';
 
 /// Shows a level as full-screen blocks (Intro → Lesson → Quiz → …).
 class LevelDetailScreen extends ConsumerStatefulWidget {
@@ -39,6 +41,9 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
 
   // Флаг сохранения профиля (для уровня 0)
   bool _profileSaved = false;
+
+  // Флаг сохранения v1 «Семя» (для уровня 1)
+  bool _goalV1Saved = false;
 
   // --- Состояние формы профиля уровня 0 (поднято из блока для сохранения ввода) ---
   final TextEditingController _profileNameCtrl = TextEditingController();
@@ -328,6 +333,10 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
         return false;
       }
     }
+    // Для уровня 1 требуется также заполнение v1 «Семя»
+    if ((widget.levelNumber ?? -1) == 1) {
+      return _goalV1Saved;
+    }
     return true;
   }
 
@@ -353,6 +362,35 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
             _isProfileEditing = false;
             _profileSaved = true;
           }),
+        ),
+      ];
+      return;
+    }
+
+    // Уровень 1: Intro → (Видео → Квиз?)* → Семя (v1)
+    if ((widget.levelNumber ?? -1) == 1) {
+      _blocks = [
+        _IntroBlock(
+            levelId: widget.levelId,
+            levelNumber: widget.levelNumber ?? widget.levelId),
+        for (final lesson in lessons) ...[
+          _LessonBlock(lesson: lesson, onWatched: _videoWatched),
+          if (lesson.quizQuestions.isNotEmpty)
+            _QuizBlock(
+              lesson: lesson,
+              onCorrect: _quizPassed,
+              levelNumber: widget.levelNumber ?? widget.levelId,
+            ),
+        ],
+        _GoalV1Block(
+          onSaved: () {
+            if (mounted) {
+              setState(() => _goalV1Saved = true);
+              // Инвалидация провайдеров целей для синхронизации страницы «Цель»
+              ref.invalidate(goalLatestProvider);
+              ref.invalidate(goalVersionsProvider);
+            }
+          },
         ),
       ];
       return;
@@ -451,6 +489,143 @@ class _ArtifactBlock extends _PageBlock {
 // Abstract block ----------------------------------------------------
 abstract class _PageBlock {
   Widget build(BuildContext context, int index);
+}
+
+// Goal v1 (Draft) block for Level 1 ------------------------------------------
+class _GoalV1Block extends _PageBlock {
+  final VoidCallback onSaved;
+  _GoalV1Block({required this.onSaved});
+
+  bool _isValid(String v) => v.trim().length >= 10;
+
+  @override
+  Widget build(BuildContext context, int index) {
+    final TextEditingController goalInitialCtrl = TextEditingController();
+    final TextEditingController goalWhyCtrl = TextEditingController();
+    final TextEditingController mainObstacleCtrl = TextEditingController();
+
+    return Consumer(builder: (context, ref, _) {
+      final versionsAsync = ref.watch(goalVersionsProvider);
+      return versionsAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, __) => Center(child: Text('Ошибка загрузки цели: $e')),
+        data: (all) {
+          final byVersion = {
+            for (final m in all)
+              m['version'] as int: Map<String, dynamic>.from(m)
+          };
+          final v1 = byVersion[1]?['version_data'];
+          if (v1 is Map) {
+            final data = Map<String, dynamic>.from(v1);
+            goalInitialCtrl.text = (data['goal_initial'] ?? '') as String;
+            goalWhyCtrl.text = (data['goal_why'] ?? '') as String;
+            mainObstacleCtrl.text = (data['main_obstacle'] ?? '') as String;
+          }
+
+          Future<void> save() async {
+            final repo = ref.read(goalsRepositoryProvider);
+            final bool exists = byVersion.containsKey(1);
+            final String goalText = goalInitialCtrl.text.trim();
+            final Map<String, dynamic> versionData = {
+              'goal_initial': goalInitialCtrl.text.trim(),
+              'goal_why': goalWhyCtrl.text.trim(),
+              'main_obstacle': mainObstacleCtrl.text.trim(),
+            };
+            if (!_isValid(versionData['goal_initial'] as String) ||
+                !_isValid(versionData['goal_why'] as String) ||
+                !_isValid(versionData['main_obstacle'] as String)) {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                  content: Text('Заполните все поля (минимум 10 символов)')));
+              return;
+            }
+            try {
+              if (exists) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                      content: Text(
+                          'Вы уже сохраняли Набросок цели ранее. Редактировать возможно на странице «Цель».')));
+                }
+                onSaved();
+                return;
+              } else {
+                await repo.upsertGoalVersion(
+                  version: 1,
+                  goalText: goalText,
+                  versionData: versionData,
+                );
+              }
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Набросок цели сохранён')));
+              }
+              onSaved();
+            } catch (e) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Ошибка сохранения: $e')));
+              }
+            }
+          }
+
+          return SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Text(
+                    'Набросок цели',
+                    style: const TextStyle(
+                        fontSize: 22, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text('Основная цель'),
+                const SizedBox(height: 6),
+                CustomTextBox(
+                  controller: goalInitialCtrl,
+                  hint: 'Чего хочу достичь за 28 дней',
+                ),
+                const SizedBox(height: 16),
+                const Text('Почему сейчас'),
+                const SizedBox(height: 6),
+                CustomTextBox(
+                  controller: goalWhyCtrl,
+                  hint: 'Почему это важно именно сейчас*',
+                ),
+                const SizedBox(height: 16),
+                const Text('Препятствие'),
+                const SizedBox(height: 6),
+                CustomTextBox(
+                  controller: mainObstacleCtrl,
+                  hint: 'Главное препятствие*',
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColor.primary),
+                    onPressed: save,
+                    child: const Text(
+                      'Сохранить Набросок цели',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'После сохранения вы сможете завершить уровень и редактировать Набросок на странице «Цель».',
+                  style: TextStyle(color: Colors.grey),
+                ),
+              ],
+            ),
+          );
+        },
+      );
+    });
+  }
 }
 
 // Profile form (First Step level only) ----------------------------------------
@@ -769,8 +944,8 @@ class _QuizBlock extends _PageBlock {
       if (lesson.quizQuestions.isEmpty) {
         return const Center(child: Text('Тест отсутствует для этого урока'));
       }
-      return SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         child: Center(
           child: Builder(builder: (context) {
             final user = ref.watch(currentUserProvider).value;
@@ -799,15 +974,18 @@ class _QuizBlock extends _PageBlock {
                 questionIndex: lesson.order,
               );
             } else {
-              return QuizWidget(
-                questionData: {
-                  'question': lesson.quizQuestions.first['question'],
-                  'options':
-                      List<String>.from(lesson.quizQuestions.first['options']),
-                  'correct': lesson.correctAnswers.first,
-                },
-                initiallyPassed: alreadyPassed,
-                onCorrect: () => onCorrect(index),
+              return SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 8),
+                child: QuizWidget(
+                  questionData: {
+                    'question': lesson.quizQuestions.first['question'],
+                    'options': List<String>.from(
+                        lesson.quizQuestions.first['options']),
+                    'correct': lesson.correctAnswers.first,
+                  },
+                  initiallyPassed: alreadyPassed,
+                  onCorrect: () => onCorrect(index),
+                ),
               );
             }
           }),
