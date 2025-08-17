@@ -58,6 +58,10 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
   bool _consultedLeo = false;
   bool _appliedTechniques = false;
   final TextEditingController _keyInsightCtrl = TextEditingController();
+  // details for weekly progress
+  final TextEditingController _artifactsDetailsCtrl = TextEditingController();
+  final TextEditingController _consultedBenefitCtrl = TextEditingController();
+  final TextEditingController _techniquesDetailsCtrl = TextEditingController();
 
   @override
   void initState() {
@@ -103,6 +107,9 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
     _achievementCtrl.dispose();
     _metricActualCtrl.dispose();
     _keyInsightCtrl.dispose();
+    _artifactsDetailsCtrl.dispose();
+    _consultedBenefitCtrl.dispose();
+    _techniquesDetailsCtrl.dispose();
     super.dispose();
   }
 
@@ -187,8 +194,9 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
         };
         goalText = _goalSmartCtrl.text.trim();
       } else {
-        if (!_isValidV4())
+        if (!_isValidV4()) {
           throw 'Заполните все поля v4 и подтвердите готовность';
+        }
         versionData = {
           'final_what': _finalWhatCtrl.text.trim(),
           'final_when': _finalWhenCtrl.text.trim(),
@@ -302,66 +310,8 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final isDesktop = constraints.maxWidth > 600;
-                return Text(
-                  'Цель',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontSize: isDesktop
-                            ? (Theme.of(context)
-                                        .textTheme
-                                        .titleLarge
-                                        ?.fontSize ??
-                                    22) +
-                                1
-                            : null,
-                      ),
-                );
-              },
-            ),
-            Text(
-              'Сформулируйте цель и пройдите 4 версии',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Colors.grey,
-                  ),
-            ),
-          ],
-        ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                SizedBox(
-                  height: 44,
-                  child: Chip(
-                    label: Text(
-                      'Версия $_selectedVersion из 4',
-                      style: const TextStyle(fontSize: 12),
-                    ),
-                    backgroundColor: AppColor.primary.withOpacity(0.1),
-                    labelStyle: TextStyle(color: AppColor.primary),
-                  ),
-                ),
-                if (allowedMax < 4)
-                  Text(
-                    'Открыто до версии $allowedMax',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.grey,
-                          fontSize: 10,
-                        ),
-                  ),
-              ],
-            ),
-          ),
-        ],
+        centerTitle: true,
+        title: const Text('Цель'),
       ),
       body: Stack(children: [
         Center(
@@ -393,9 +343,35 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                     ),
                     child: quoteAsync.when(
                       data: (q) {
-                        final text = q?['quote_text'] as String? ??
-                            'Каждый день — новый шаг к цели';
-                        final author = q?['author'] as String? ?? 'Макс';
+                        if (q == null) {
+                          // Данных нет (пусто/офлайн без кеша) — показываем компактный плейсхолдер с аватаром
+                          return Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const CircleAvatar(
+                                radius: 28,
+                                backgroundImage: AssetImage(
+                                    'assets/images/avatars/avatar_max.png'),
+                                backgroundColor: Colors.transparent,
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Text(
+                                  'Цитата недоступна',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodyMedium
+                                      ?.copyWith(
+                                        color: Colors.grey.shade600,
+                                        height: 1.4,
+                                      ),
+                                ),
+                              )
+                            ],
+                          );
+                        }
+                        final text = (q['quote_text'] as String?) ?? '';
+                        final String? author = q['author'] as String?;
                         return Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -449,16 +425,17 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                   const SizedBox(height: 4),
-                                  Text(
-                                    '— $author',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodySmall
-                                        ?.copyWith(
-                                          color: AppColor.primary,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                  ),
+                                  if (author != null && author.isNotEmpty)
+                                    Text(
+                                      '— $author',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(
+                                            color: AppColor.primary,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                    ),
                                 ],
                               ),
                             ),
@@ -526,56 +503,25 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                       error: (_, __) => Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Аватар Макса даже при ошибке
-                          CircleAvatar(
+                          const CircleAvatar(
                             radius: 28,
-                            backgroundImage: const AssetImage(
+                            backgroundImage: AssetImage(
                                 'assets/images/avatars/avatar_max.png'),
                             backgroundColor: Colors.transparent,
                           ),
                           const SizedBox(width: 16),
-                          // Дружелюбное сообщение об ошибке
                           Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                LayoutBuilder(
-                                  builder: (context, constraints) {
-                                    final isDesktop =
-                                        constraints.maxWidth > 600;
-                                    return Text(
-                                      'Мотивация от Макса',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .titleMedium
-                                          ?.copyWith(
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: isDesktop
-                                                ? (Theme.of(context)
-                                                            .textTheme
-                                                            .titleMedium
-                                                            ?.fontSize ??
-                                                        16) +
-                                                    1
-                                                : null,
-                                          ),
-                                    );
-                                  },
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Сегодня работаем по плану — без цитаты',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .bodyMedium
-                                      ?.copyWith(
-                                        color: Colors.grey.shade600,
-                                        height: 1.4,
-                                      ),
-                                ),
-                              ],
+                            child: Text(
+                              'Цитата недоступна',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyMedium
+                                  ?.copyWith(
+                                    color: Colors.grey.shade600,
+                                    height: 1.4,
+                                  ),
                             ),
-                          ),
+                          )
                         ],
                       ),
                     ),
@@ -600,85 +546,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Переключатель версий v1..v4
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: List.generate(4, (i) {
-                            final v = i + 1;
-                            final isSelected = _selectedVersion == v;
-                            final bool hasAny = _versions.isNotEmpty;
-                            final int latest = hasAny
-                                ? _versions.keys.reduce((a, b) => a > b ? a : b)
-                                : 0;
-                            final available = v <= allowedMax &&
-                                ((!hasAny && v == 1) ||
-                                    _versions.containsKey(v) ||
-                                    (hasAny && v == latest + 1));
-
-                            final status = _getVersionStatus(
-                                v, allowedMax, hasAny, latest);
-                            final tooltip = _getVersionTooltip(v, allowedMax);
-
-                            Widget chip = SizedBox(
-                              height: 44,
-                              child: ChoiceChip(
-                                label: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    if (status == 'completed')
-                                      const Icon(Icons.check,
-                                          size: 16, color: Colors.green)
-                                    else if (status == 'locked')
-                                      const Icon(Icons.lock,
-                                          size: 16, color: Colors.grey),
-                                    if (status == 'completed' ||
-                                        status == 'locked')
-                                      const SizedBox(width: 4),
-                                    Text(_getVersionLabel(v)),
-                                  ],
-                                ),
-                                selected: isSelected,
-                                onSelected: available
-                                    ? (sel) {
-                                        if (!sel) return;
-                                        setState(() {
-                                          _selectedVersion = v;
-                                          _fillControllersFor(v);
-                                          // Логика редактирования при переключении версий:
-                                          final hasAny = _versions.isNotEmpty;
-                                          final latest = hasAny
-                                              ? _versions.keys.reduce(
-                                                  (a, b) => a > b ? a : b)
-                                              : 0;
-                                          final exists =
-                                              _versions.containsKey(v);
-                                          // Если выбираем новую (latest+1) → сразу редактируем без карандаша
-                                          if (!exists && v == latest + 1) {
-                                            _isEditing = true;
-                                          } else {
-                                            // Для существующих версий по умолчанию просмотр
-                                            _isEditing = false;
-                                          }
-                                        });
-                                      }
-                                    : null,
-                              ),
-                            );
-
-                            // Добавляем tooltip для заблокированных версий
-                            if (status == 'locked' && tooltip.isNotEmpty) {
-                              chip = Tooltip(
-                                message: tooltip,
-                                child: chip,
-                              );
-                            }
-
-                            return chip;
-                          }),
-                        ),
-                        const SizedBox(height: 12),
-
-                        // Кристаллизация цели (динамично по версии) + иконка «Редактировать»
+                        // Заголовок секции «Кристаллизация цели»
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
@@ -686,7 +554,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                               builder: (context, constraints) {
                                 final isDesktop = constraints.maxWidth > 600;
                                 return Text(
-                                  'Кристаллизация цели v$_selectedVersion',
+                                  'Кристаллизация цели',
                                   style: Theme.of(context)
                                       .textTheme
                                       .titleLarge
@@ -730,160 +598,206 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                           ],
                         ),
                         const SizedBox(height: 12),
+                        // Переключатель версий 1..4: один ряд, компактные кнопки, без галочек
+                        Row(
+                          children: List.generate(4, (i) {
+                            final v = i + 1;
+                            final isSelected = _selectedVersion == v;
+                            final bool hasAny = _versions.isNotEmpty;
+                            final int latest = hasAny
+                                ? _versions.keys.reduce((a, b) => a > b ? a : b)
+                                : 0;
+                            final available = v <= allowedMax &&
+                                ((!hasAny && v == 1) ||
+                                    _versions.containsKey(v) ||
+                                    (hasAny && v == latest + 1));
+
+                            final String labelText = _getVersionLabel(v);
+
+                            final chip = ChoiceChip(
+                              showCheckmark: false,
+                              labelPadding:
+                                  const EdgeInsets.symmetric(horizontal: 6),
+                              visualDensity: const VisualDensity(
+                                  horizontal: -3, vertical: -3),
+                              materialTapTargetSize:
+                                  MaterialTapTargetSize.shrinkWrap,
+                              label: Text(
+                                labelText,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              selected: isSelected,
+                              selectedColor: AppColor.premium.withOpacity(0.18),
+                              backgroundColor: Colors.white,
+                              shape: StadiumBorder(
+                                side: BorderSide(
+                                  color: isSelected
+                                      ? AppColor.premium
+                                      : AppColor.borderColor,
+                                ),
+                              ),
+                              onSelected: available
+                                  ? (sel) {
+                                      if (!sel) return;
+                                      setState(() {
+                                        _selectedVersion = v;
+                                        _fillControllersFor(v);
+                                        // Логика редактирования при переключении версий:
+                                        final hasAny = _versions.isNotEmpty;
+                                        final latest = hasAny
+                                            ? _versions.keys
+                                                .reduce((a, b) => a > b ? a : b)
+                                            : 0;
+                                        final exists = _versions.containsKey(v);
+                                        // Если выбираем новую (latest+1) → сразу редактируем
+                                        if (!exists && v == latest + 1) {
+                                          _isEditing = true;
+                                        } else {
+                                          _isEditing = false;
+                                        }
+                                      });
+                                    }
+                                  : null,
+                            );
+
+                            return Expanded(
+                              child: Padding(
+                                padding: EdgeInsets.only(right: i < 3 ? 8 : 0),
+                                child: SizedBox(height: 36, child: chip),
+                              ),
+                            );
+                          }),
+                        ),
+                        const SizedBox(height: 12),
 
                         if (_selectedVersion == 1) ...[
                           // Основная цель
                           _GroupHeader('Основная цель'),
-                          _LabeledField(
-                              label: 'Чего хочу достичь за 28 дней*',
-                              child: CustomTextBox(
-                                  controller: _goalInitialCtrl,
-                                  readOnly: !_isEditing,
-                                  hint:
-                                      'Например: запустить интернет-магазин')),
+                          CustomTextBox(
+                              controller: _goalInitialCtrl,
+                              readOnly: !_isEditing,
+                              readOnlySoftBackground: true,
+                              hint: 'Чего хочу достичь за 28 дней'),
                           const SizedBox(height: 16),
 
                           // Мотивация
                           _GroupHeader('Почему сейчас'),
-                          _LabeledField(
-                              label: 'Почему это важно именно сейчас*',
-                              child: CustomTextBox(
-                                  controller: _goalWhyCtrl,
-                                  readOnly: !_isEditing,
-                                  hint:
-                                      'Например: хочу дополнительный доход к НГ')),
+                          CustomTextBox(
+                              controller: _goalWhyCtrl,
+                              readOnly: !_isEditing,
+                              readOnlySoftBackground: true,
+                              hint: 'Почему это важно именно сейчас*'),
                           const SizedBox(height: 16),
 
                           // Препятствие
                           _GroupHeader('Препятствие'),
-                          _LabeledField(
-                              label: 'Главное препятствие*',
-                              child: CustomTextBox(
-                                  controller: _mainObstacleCtrl,
-                                  readOnly: !_isEditing,
-                                  hint: 'Например: не знаю с чего начать')),
+                          CustomTextBox(
+                              controller: _mainObstacleCtrl,
+                              readOnly: !_isEditing,
+                              readOnlySoftBackground: true,
+                              hint: 'Главное препятствие*'),
                         ] else if (_selectedVersion == 2) ...[
                           // Уточненная цель
                           _GroupHeader('Уточненная цель'),
-                          _LabeledField(
-                              label: 'Конкретная цель*',
-                              child: CustomTextBox(
-                                  controller: _goalRefinedCtrl,
-                                  readOnly: !_isEditing,
-                                  hint:
-                                      'Например: привлечь 50 клиентов в магазин')),
+                          CustomTextBox(
+                              controller: _goalRefinedCtrl,
+                              readOnly: !_isEditing,
+                              readOnlySoftBackground: true,
+                              hint: 'Конкретная цель*'),
                           const SizedBox(height: 16),
 
                           // Метрика
                           _GroupHeader('Метрика'),
-                          _LabeledField(
-                              label: 'Ключевая метрика*',
-                              child: CustomTextBox(
-                                  controller: _metricNameCtrl,
-                                  readOnly: !_isEditing,
-                                  hint: 'Например: количество клиентов')),
+                          CustomTextBox(
+                              controller: _metricNameCtrl,
+                              readOnly: !_isEditing,
+                              readOnlySoftBackground: true,
+                              hint: 'Ключевая метрика*'),
                           const SizedBox(height: 12),
                           Row(children: [
                             Expanded(
-                              child: _LabeledField(
-                                  label: 'Текущее значение*',
-                                  child: CustomTextBox(
-                                      controller: _metricFromCtrl,
-                                      readOnly: !_isEditing,
-                                      keyboardType: TextInputType.number,
-                                      hint: '0')),
+                              child: CustomTextBox(
+                                  controller: _metricFromCtrl,
+                                  readOnly: !_isEditing,
+                                  readOnlySoftBackground: true,
+                                  keyboardType: TextInputType.number,
+                                  hint: 'Текущее значение*'),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
-                              child: _LabeledField(
-                                  label: 'Целевое значение*',
-                                  child: CustomTextBox(
-                                      controller: _metricToCtrl,
-                                      readOnly: !_isEditing,
-                                      keyboardType: TextInputType.number,
-                                      hint: '50')),
+                              child: CustomTextBox(
+                                  controller: _metricToCtrl,
+                                  readOnly: !_isEditing,
+                                  readOnlySoftBackground: true,
+                                  keyboardType: TextInputType.number,
+                                  hint: 'Целевое значение*'),
                             ),
                           ]),
                           const SizedBox(height: 16),
 
                           // Финансы
                           _GroupHeader('Финансовая цель'),
-                          _LabeledField(
-                              label: 'Финансовый результат в ₸*',
-                              child: CustomTextBox(
-                                  controller: _financialGoalCtrl,
-                                  readOnly: !_isEditing,
-                                  keyboardType: TextInputType.number,
-                                  hint: '100000')),
+                          CustomTextBox(
+                              controller: _financialGoalCtrl,
+                              readOnly: !_isEditing,
+                              readOnlySoftBackground: true,
+                              keyboardType: TextInputType.number,
+                              hint: 'Финансовый результат в ₸*'),
                         ] else if (_selectedVersion == 3) ...[
                           // SMART-план
                           _GroupHeader('SMART-план'),
-                          _LabeledField(
-                              label: 'SMART-формулировка цели*',
-                              child: CustomTextBox(
-                                  controller: _goalSmartCtrl,
-                                  readOnly: !_isEditing,
-                                  hint:
-                                      'Конкретно, измеримо, достижимо, релевантно, ограничено по времени')),
+                          CustomTextBox(
+                              controller: _goalSmartCtrl,
+                              readOnly: !_isEditing,
+                              readOnlySoftBackground: true,
+                              hint: 'SMART-формулировка цели*'),
                           const SizedBox(height: 16),
 
                           // Спринты
                           _GroupHeader('План спринтов'),
-                          _LabeledField(
-                              label: 'Спринт 1 (1–7 дни)*',
-                              child: CustomTextBox(
-                                  controller: _s1Ctrl,
-                                  hint: 'Например: изучить рынок и конкурентов',
-                                  readOnly: !_isEditing)),
+                          CustomTextBox(
+                              controller: _s1Ctrl,
+                              hint: 'Спринт 1 (1–7 дни)*',
+                              readOnly: !_isEditing,
+                              readOnlySoftBackground: true),
                           const SizedBox(height: 12),
-                          _LabeledField(
-                              label: 'Спринт 2 (8–14 дни)*',
-                              child: CustomTextBox(
-                                  controller: _s2Ctrl,
-                                  hint:
-                                      'Например: создать продукт и настроить сайт',
-                                  readOnly: !_isEditing)),
+                          CustomTextBox(
+                              controller: _s2Ctrl,
+                              hint: 'Спринт 2 (8–14 дни)*',
+                              readOnly: !_isEditing,
+                              readOnlySoftBackground: true),
                           const SizedBox(height: 12),
-                          _LabeledField(
-                              label: 'Спринт 3 (15–21 дни)*',
-                              child: CustomTextBox(
-                                  controller: _s3Ctrl,
-                                  hint:
-                                      'Например: запустить рекламу и найти клиентов',
-                                  readOnly: !_isEditing)),
+                          CustomTextBox(
+                              controller: _s3Ctrl,
+                              hint: 'Спринт 3 (15–21 дни)*',
+                              readOnly: !_isEditing,
+                              readOnlySoftBackground: true),
                           const SizedBox(height: 12),
-                          _LabeledField(
-                              label: 'Спринт 4 (22–28 дни)*',
-                              child: CustomTextBox(
-                                  controller: _s4Ctrl,
-                                  hint:
-                                      'Например: отработать продажи и подвести итоги',
-                                  readOnly: !_isEditing)),
+                          CustomTextBox(
+                              controller: _s4Ctrl,
+                              hint: 'Спринт 4 (22–28 дни)*',
+                              readOnly: !_isEditing,
+                              readOnlySoftBackground: true),
                         ] else ...[
                           // Финальный план
                           _GroupHeader('Финальный план'),
-                          _LabeledField(
-                              label: 'Что именно достигну*',
-                              child: CustomTextBox(
-                                  controller: _finalWhatCtrl,
-                                  readOnly: !_isEditing,
-                                  hint:
-                                      'Например: запущенный магазин с 50 клиентами')),
+                          CustomTextBox(
+                              controller: _finalWhatCtrl,
+                              readOnly: !_isEditing,
+                              readOnlySoftBackground: true,
+                              hint: 'Что именно достигну*'),
                           const SizedBox(height: 12),
-                          _LabeledField(
-                              label: 'К какой дате (28 дней)*',
-                              child: CustomTextBox(
-                                  controller: _finalWhenCtrl,
-                                  readOnly: !_isEditing,
-                                  hint: 'Например: 31 декабря 2024')),
+                          CustomTextBox(
+                              controller: _finalWhenCtrl,
+                              readOnly: !_isEditing,
+                              readOnlySoftBackground: true,
+                              hint: 'К какой дате (28 дней)*'),
                           const SizedBox(height: 12),
-                          _LabeledField(
-                              label: 'Через какие ключевые действия*',
-                              child: CustomTextBox(
-                                  controller: _finalHowCtrl,
-                                  readOnly: !_isEditing,
-                                  hint:
-                                      'Например: настрою сайт, запущу рекламу, проведу акции')),
+                          CustomTextBox(
+                              controller: _finalHowCtrl,
+                              readOnly: !_isEditing,
+                              readOnlySoftBackground: true,
+                              hint: 'Через какие ключевые действия*'),
                           const SizedBox(height: 16),
 
                           // Готовность
@@ -917,25 +831,6 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                                   : const Text('Сохранить'),
                             ),
                           ),
-                          const SizedBox(width: 12),
-                          SizedBox(
-                            height: 44,
-                            child: Chip(
-                              label: Text(
-                                _isEditing
-                                    ? 'Режим: Редактирование'
-                                    : 'Режим: Просмотр',
-                                style: const TextStyle(fontSize: 12),
-                              ),
-                              backgroundColor: _isEditing
-                                  ? AppColor.primary.withOpacity(0.1)
-                                  : Colors.grey.withOpacity(0.1),
-                              labelStyle: TextStyle(
-                                color:
-                                    _isEditing ? AppColor.primary : Colors.grey,
-                              ),
-                            ),
-                          ),
                         ]),
                       ],
                     ),
@@ -950,8 +845,8 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
           ),
         ),
         Positioned(
-          right: 20,
-          bottom: 20 + kBottomNavigationBarHeight,
+          right: 16,
+          bottom: 16,
           child: FloatingChatBubble(
             chatId: null,
             systemPrompt:
@@ -1007,53 +902,19 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
   String _getVersionLabel(int version) {
     switch (version) {
       case 1:
-        return 'v1 Семя';
+        return '1. Семя';
       case 2:
-        return 'v2 Метрики';
+        return '2. Метрики';
       case 3:
-        return 'v3 SMART';
+        return '3. SMART';
       case 4:
-        return 'v4 Финал';
+        return '4. Финал';
       default:
-        return 'v$version';
+        return '$version';
     }
   }
 
-  String _getVersionStatus(
-      int version, int allowedMax, bool hasAny, int latest) {
-    // Определяем статус версии:
-    // completed - версия завершена (существует в _versions)
-    // current - текущая выбранная версия
-    // available - доступна для создания (latest + 1)
-    // locked - недоступна (превышает allowedMax или логику)
-
-    if (_versions.containsKey(version)) {
-      return version == _selectedVersion ? 'current' : 'completed';
-    }
-
-    final available = version <= allowedMax &&
-        ((!hasAny && version == 1) || (hasAny && version == latest + 1));
-
-    if (available) {
-      return version == _selectedVersion ? 'current' : 'available';
-    }
-
-    return 'locked';
-  }
-
-  String _getVersionTooltip(int version, int allowedMax) {
-    if (version > allowedMax) {
-      final requiredLevel = version <= 1
-          ? 1
-          : version <= 2
-              ? 4
-              : version <= 3
-                  ? 7
-                  : 10;
-      return '🔒 Завершите Уровень $requiredLevel для разблокировки этой версии';
-    }
-    return '';
-  }
+  // Удалены: _getVersionStatus/_getVersionTooltip не используются после упрощения UI переключателя
 
   Widget _build7DayTimeline() {
     return LayoutBuilder(
@@ -1178,38 +1039,24 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
 
             const SizedBox(height: 16),
 
-            // Проверки недели
+            // Проверки недели (текстовые поля)
             _GroupHeader('Проверки недели'),
-            Wrap(
-              spacing: 12,
-              runSpacing: 8,
-              children: [
-                SizedBox(
-                  height: 44,
-                  child: FilterChip(
-                    label: const Text('Использовал артефакты'),
-                    selected: _usedArtifacts,
-                    onSelected: (v) => setState(() => _usedArtifacts = v),
-                  ),
-                ),
-                SizedBox(
-                  height: 44,
-                  child: FilterChip(
-                    label: const Text('Консультировался с Лео'),
-                    selected: _consultedLeo,
-                    onSelected: (v) => setState(() => _consultedLeo = v),
-                  ),
-                ),
-                SizedBox(
-                  height: 44,
-                  child: FilterChip(
-                    label: const Text('Применял техники из уроков'),
-                    selected: _appliedTechniques,
-                    onSelected: (v) => setState(() => _appliedTechniques = v),
-                  ),
-                ),
-              ],
-            ),
+            _LabeledField(
+                label: 'Использовал артефакты',
+                child: CustomTextBox(
+                    controller: _artifactsDetailsCtrl, hint: 'Какие именно')),
+            const SizedBox(height: 12),
+            _LabeledField(
+                label: 'Консультировался с тренерами',
+                child: CustomTextBox(
+                    controller: _consultedBenefitCtrl,
+                    hint: 'Какую пользу извлекли')),
+            const SizedBox(height: 12),
+            _LabeledField(
+                label: 'Применял техники из уроков',
+                child: CustomTextBox(
+                    controller: _techniquesDetailsCtrl,
+                    hint: 'Какие техники были полезными')),
             const SizedBox(height: 16),
 
             // Кнопки
@@ -1308,52 +1155,31 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final isDesktop = constraints.maxWidth > 600;
-                  return Text(
-                    'Путь к цели • Спринт $_selectedSprint',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          fontSize: isDesktop
-                              ? (Theme.of(context)
-                                          .textTheme
-                                          .titleMedium
-                                          ?.fontSize ??
-                                      16) +
-                                  1
-                              : null,
-                        ),
-                  );
-                },
-              ),
-              const SizedBox(width: 12),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColor.primary.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  '7 дней',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColor.primary,
-                        fontWeight: FontWeight.w500,
-                      ),
-                ),
-              ),
-            ],
+          // Заголовок секции
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isDesktop = constraints.maxWidth > 600;
+              return Text(
+                'Путь к цели',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      fontSize: isDesktop
+                          ? (Theme.of(context)
+                                      .textTheme
+                                      .titleMedium
+                                      ?.fontSize ??
+                                  16) +
+                              1
+                          : null,
+                    ),
+              );
+            },
           ),
-          const SizedBox(height: 16),
-
-          // Mini-timeline из 7 дней
-          _build7DayTimeline(),
           const SizedBox(height: 16),
 
           // Переключатель спринтов 1..4
           Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: List.generate(4, (i) {
               final s = i + 1;
               return Padding(
@@ -1380,6 +1206,10 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
           ),
           const SizedBox(height: 12),
 
+          // Mini-timeline из 7 дней (центрированная)
+          Center(child: _build7DayTimeline()),
+          const SizedBox(height: 16),
+
           // Форма чек-ина спринта
           _buildCheckInForm(),
         ],
@@ -1396,6 +1226,9 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
       _usedArtifacts = false;
       _consultedLeo = false;
       _appliedTechniques = false;
+      _artifactsDetailsCtrl.text = '';
+      _consultedBenefitCtrl.text = '';
+      _techniquesDetailsCtrl.text = '';
       if (mounted) setState(() {});
       return;
     }
@@ -1405,6 +1238,12 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
     _usedArtifacts = (existing['used_artifacts'] ?? false) as bool;
     _consultedLeo = (existing['consulted_leo'] ?? false) as bool;
     _appliedTechniques = (existing['applied_techniques'] ?? false) as bool;
+    _artifactsDetailsCtrl.text =
+        (existing['artifacts_details'] ?? '') as String;
+    _consultedBenefitCtrl.text =
+        (existing['consulted_benefit'] ?? '') as String;
+    _techniquesDetailsCtrl.text =
+        (existing['techniques_details'] ?? '') as String;
     if (mounted) setState(() {});
   }
 
@@ -1419,12 +1258,26 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
         metricActual: _metricActualCtrl.text.trim().isEmpty
             ? null
             : _metricActualCtrl.text.trim(),
-        usedArtifacts: _usedArtifacts,
-        consultedLeo: _consultedLeo,
-        appliedTechniques: _appliedTechniques,
+        usedArtifacts: _artifactsDetailsCtrl.text.trim().isNotEmpty
+            ? true
+            : _usedArtifacts,
+        consultedLeo:
+            _consultedBenefitCtrl.text.trim().isNotEmpty ? true : _consultedLeo,
+        appliedTechniques: _techniquesDetailsCtrl.text.trim().isNotEmpty
+            ? true
+            : _appliedTechniques,
         keyInsight: _keyInsightCtrl.text.trim().isEmpty
             ? null
             : _keyInsightCtrl.text.trim(),
+        artifactsDetails: _artifactsDetailsCtrl.text.trim().isEmpty
+            ? null
+            : _artifactsDetailsCtrl.text.trim(),
+        consultedBenefit: _consultedBenefitCtrl.text.trim().isEmpty
+            ? null
+            : _consultedBenefitCtrl.text.trim(),
+        techniquesDetails: _techniquesDetailsCtrl.text.trim().isEmpty
+            ? null
+            : _techniquesDetailsCtrl.text.trim(),
       );
       if (!mounted) return;
       setState(() => _sprintSaved = true);

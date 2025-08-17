@@ -84,6 +84,7 @@ serve(async (req: Request): Promise<Response> => {
   try {
     // Read request body once to support additional parameters
     const body = await req.json();
+    const mode = typeof body?.mode === 'string' ? String(body.mode) : '';
     const messages = body?.messages;
     const userContext = body?.userContext;
     const levelContext = body?.levelContext;
@@ -93,9 +94,68 @@ serve(async (req: Request): Promise<Response> => {
     if (bot === 'alex') bot = 'max';
     const isMax = bot === 'max';
 
+    // ==============================
+    // QUIZ MODE (short reply, no RAG)
+    // ==============================
+    if (mode === 'quiz') {
+      try {
+        const isCorrect: boolean = Boolean(body?.isCorrect);
+        const quiz = body?.quiz || {};
+        const question: string = String(quiz?.question || '');
+        const options: string[] = Array.isArray(quiz?.options) ? quiz.options.map((x: any) => String(x)) : [];
+        const selectedIndex: number = Number.isFinite(quiz?.selectedIndex) ? Number(quiz.selectedIndex) : -1;
+        const correctIndex: number = Number.isFinite(quiz?.correctIndex) ? Number(quiz.correctIndex) : -1;
+        const maxTokens = Number.isFinite(body?.maxTokens) ? Number(body.maxTokens) : 180;
+
+        const systemPromptQuiz = `Ты отвечаешь как Лео в режиме проверки знаний. Пиши коротко, по‑русски, без вступительных фраз и без предложений помощи.
+Если ответ неверный: поддержи и дай мягкую подсказку в 1–2 предложения, не раскрывай правильный вариант.
+Если ответ верный: поздравь (1 фраза) и добавь 2–3 строки, как применить знание с учётом персонализации пользователя (если передана).`;
+
+        const userMsgParts = [
+          question ? `Вопрос: ${question}` : '',
+          options.length ? `Варианты: ${options.join(' | ')}` : '',
+          `Выбранный индекс: ${selectedIndex}`,
+          `Правильный индекс: ${correctIndex}`,
+          typeof userContext === 'string' && userContext.trim() ? `Персонализация: ${userContext.trim()}` : '',
+          `Результат: ${isCorrect ? 'верно' : 'неверно'}`,
+        ].filter(Boolean).join('\n');
+
+        const apiKey = Deno.env.get("OPENAI_API_KEY");
+        if (!apiKey || apiKey.trim().length < 20) {
+          return new Response(
+            JSON.stringify({ error: "openai_config_error" }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+
+        const completion = await openai.chat.completions.create({
+          model: Deno.env.get("OPENAI_MODEL") || "gpt-4.1-mini",
+          temperature: 0.2,
+          max_tokens: Math.max(60, Math.min(300, maxTokens)),
+          messages: [
+            { role: "system", content: systemPromptQuiz },
+            { role: "user", content: userMsgParts },
+          ],
+        });
+
+        const assistantMessage = completion.choices[0].message;
+        const usage = completion.usage;
+        return new Response(
+          JSON.stringify({ message: assistantMessage, usage }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      } catch (e: any) {
+        const short = (e?.message || String(e)).slice(0, 240);
+        return new Response(
+          JSON.stringify({ error: "quiz_mode_error", details: short }),
+          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+    }
+
     if (!Array.isArray(messages)) {
       return new Response(
-        JSON.stringify({ error: "messages must be an array" }),
+        JSON.stringify({ error: "invalid_messages" }),
         {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -110,14 +170,15 @@ serve(async (req: Request): Promise<Response> => {
     let personaSummary = "";
     let userId: string | null = null;
 
-    console.log('🔧 DEBUG: Auth header:', authHeader ? 'ЕСТЬ' : 'НЕТ');
+    // No PII: do not log tokens, only presence
+    console.log('INFO auth_header_present', { present: Boolean(authHeader) });
     
     if (authHeader?.startsWith("Bearer ")) {
       const jwt = authHeader.replace("Bearer ", "");
-      console.log('🔧 DEBUG: JWT token length:', jwt.length);
+      // Do not log JWT content or length
 
       const { data: { user }, error } = await supabaseAdmin.auth.getUser(jwt);
-      console.log('🔧 DEBUG: Auth result:', error ? `ERROR: ${error.message}` : `SUCCESS: user ${user?.id}`);
+      console.log('INFO auth_get_user', { ok: !error, user: user?.id ? 'present' : 'absent' });
 
       if (!error && user) {
         userId = user.id;
@@ -206,7 +267,7 @@ serve(async (req: Request): Promise<Response> => {
             metadata_filter: Object.keys(metadataFilter).length ? metadataFilter : undefined,
           });
           if (matchError) {
-            console.error('RAG match_documents error:', matchError.message);
+            console.error('ERR rag_match_documents', { message: matchError.message });
           }
 
           const docs = Array.isArray(results) ? results : [];
@@ -222,7 +283,7 @@ serve(async (req: Request): Promise<Response> => {
           }
         }
       } catch (e) {
-        console.error('RAG pipeline error:', e);
+        console.error('ERR rag_pipeline', { message: String(e).slice(0, 240) });
       }
     }
 
@@ -241,7 +302,7 @@ serve(async (req: Request): Promise<Response> => {
           memoriesText = memories.map((m: any) => `• ${m.content}`).join('\n');
         }
       } catch (e) {
-        console.error('user_memories fetch error:', e);
+        console.error('ERR user_memories', { message: String(e).slice(0, 200) });
       }
 
       // При старте новой сессии: подтянуть свёртки прошлых чатов (2–3 последних)
@@ -263,16 +324,18 @@ serve(async (req: Request): Promise<Response> => {
           }
         }
       } catch (e) {
-        console.error('chat summaries fetch error:', e);
+        console.error('ERR chat_summaries', { message: String(e).slice(0, 200) });
       }
     }
 
-    console.log('🔧 DEBUG: leo-chat вызван');
-    console.log('🔧 DEBUG: messages:', messages);
-    console.log('🔧 DEBUG: userContext from client:', userContext ? 'ЕСТЬ' : 'НЕТ');
-    console.log('🔧 DEBUG: levelContext from client:', levelContext ? 'ЕСТЬ' : 'НЕТ');
-    console.log('🔧 DEBUG: knowledgeContext from client:', knowledgeContext ? 'ЕСТЬ' : 'НЕТ');
-    console.log('🔧 DEBUG: bot:', isMax ? 'max' : 'leo');
+    console.log('INFO request_meta', {
+      messages_count: Array.isArray(messages) ? messages.length : 0,
+      userContext_present: Boolean(userContext),
+      levelContext_present: Boolean(levelContext),
+      knowledgeContext_present: Boolean(knowledgeContext),
+      bot: isMax ? 'max' : 'leo',
+      mode,
+    });
     
     // Extra goal/sprint/reminders/quote context for Alex (tracker)
     let goalBlock = '';
@@ -296,7 +359,7 @@ serve(async (req: Request): Promise<Response> => {
           goalBlock = `Версия цели: v${version}. Кратко: ${goalText}. Данные версии: ${versionData}`;
         }
       } catch (e) {
-        console.error('alex goal fetch error:', e);
+        console.error('ERR alex_goal', { message: String(e).slice(0, 200) });
       }
       try {
         // Latest weekly progress
@@ -311,7 +374,7 @@ serve(async (req: Request): Promise<Response> => {
           sprintBlock = `Спринт: ${p?.sprint_number ?? ''}. Итоги: ${p?.achievement ?? ''}. Метрика (факт): ${p?.metric_actual ?? ''}`;
         }
       } catch (e) {
-        console.error('alex progress fetch error:', e);
+        console.error('ERR alex_progress', { message: String(e).slice(0, 200) });
       }
       try {
         // Recent unchecked reminders (up to 5)
@@ -327,7 +390,7 @@ serve(async (req: Request): Promise<Response> => {
           remindersBlock = lines.join('\n');
         }
       } catch (e) {
-        console.error('alex reminders fetch error:', e);
+        console.error('ERR alex_reminders', { message: String(e).slice(0, 200) });
       }
       try {
         // Daily quote (any active)
@@ -342,7 +405,7 @@ serve(async (req: Request): Promise<Response> => {
           quoteBlock = `${q?.quote_text || ''}${author}`;
         }
       } catch (e) {
-        console.error('alex quotes fetch error:', e);
+        console.error('ERR alex_quotes', { message: String(e).slice(0, 200) });
       }
     }
     
@@ -504,14 +567,14 @@ ${quoteBlock ? `Цитата дня: ${quoteBlock}\n` : ''}
       );
     } catch (openaiErr: any) {
       const short = (openaiErr?.message || String(openaiErr)).slice(0, 240);
-      console.error("OpenAI chat error:", short);
+      console.error("ERR openai_chat", { message: short });
       return new Response(
         JSON.stringify({ error: "openai_error", details: short }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
   } catch (err) {
-    console.error("Leo chat function error:", err);
+    console.error("ERR function", { message: String(err?.message || err).slice(0, 240) });
     return new Response(
       JSON.stringify({ error: "Internal error", details: err.message }),
       {

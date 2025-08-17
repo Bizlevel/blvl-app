@@ -10,6 +10,8 @@ class CustomTextBox extends StatelessWidget {
     this.controller,
     this.readOnly = false,
     this.obscureText = false,
+    this.keyboardType,
+    this.readOnlySoftBackground = false,
   });
 
   final String hint;
@@ -18,6 +20,8 @@ class CustomTextBox extends StatelessWidget {
   final bool readOnly;
   final bool obscureText;
   final TextEditingController? controller;
+  final TextInputType? keyboardType;
+  final bool readOnlySoftBackground;
 
   @override
   Widget build(BuildContext context) {
@@ -26,8 +30,13 @@ class CustomTextBox extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 3),
       height: 40,
       decoration: BoxDecoration(
-        color: AppColor.textBoxColor,
-        border: Border.all(color: AppColor.textBoxColor),
+        color: (readOnly && readOnlySoftBackground)
+            ? Colors.grey.shade100
+            : AppColor.textBoxColor,
+        border: Border.all(
+            color: (readOnly && readOnlySoftBackground)
+                ? Colors.grey.shade100
+                : AppColor.textBoxColor),
         borderRadius: BorderRadius.circular(10),
         boxShadow: [
           BoxShadow(
@@ -42,6 +51,7 @@ class CustomTextBox extends StatelessWidget {
         readOnly: readOnly,
         controller: controller,
         obscureText: obscureText,
+        keyboardType: keyboardType,
         decoration: InputDecoration(
           prefixIcon: prefix,
           suffixIcon: suffix,

@@ -118,7 +118,7 @@ class GoalsRepository {
       final data = await _client
           .from('weekly_progress')
           .select(
-              'id, user_id, sprint_number, achievement, metric_actual, used_artifacts, consulted_leo, applied_techniques, key_insight, created_at')
+              'id, user_id, sprint_number, achievement, metric_actual, used_artifacts, consulted_leo, applied_techniques, key_insight, artifacts_details, consulted_benefit, techniques_details, created_at')
           .eq('sprint_number', sprintNumber)
           .order('created_at', ascending: false)
           .limit(1)
@@ -148,6 +148,9 @@ class GoalsRepository {
     bool? consultedLeo,
     bool? appliedTechniques,
     String? keyInsight,
+    String? artifactsDetails,
+    String? consultedBenefit,
+    String? techniquesDetails,
   }) async {
     final payload = <String, dynamic>{
       'sprint_number': sprintNumber,
@@ -157,6 +160,9 @@ class GoalsRepository {
       if (consultedLeo != null) 'consulted_leo': consultedLeo,
       if (appliedTechniques != null) 'applied_techniques': appliedTechniques,
       if (keyInsight != null) 'key_insight': keyInsight,
+      if (artifactsDetails != null) 'artifacts_details': artifactsDetails,
+      if (consultedBenefit != null) 'consulted_benefit': consultedBenefit,
+      if (techniquesDetails != null) 'techniques_details': techniquesDetails,
     };
 
     final inserted =
@@ -203,34 +209,47 @@ class GoalsRepository {
   // Quotes (motivational_quotes)
   // ============================
 
-  /// Возвращает «цитату дня» детерминированно (по UTC-дню). Кэширует активные цитаты.
+  /// Возвращает случайную цитату из активных. Кэширует список активных.
   Future<Map<String, dynamic>?> getDailyQuote() async {
     final Box cache = Hive.box('quotes');
     const String cacheKey = 'active';
 
-    List active;
+    List<Map<String, dynamic>> active;
     try {
-      active = await _client
+      // Запрос и явное приведение к типу List<Map<String, dynamic>>
+      final resp = await _client
           .from('motivational_quotes')
           .select('id, quote_text, author, category')
-          .eq('is_active', true)
-          .order('created_at', ascending: true);
-      await cache.put(cacheKey, active);
+          .eq('is_active', true);
+      final list = (resp as List)
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+      active = list;
+      await cache.put(cacheKey, list);
     } on SocketException {
       final cached = cache.get(cacheKey);
       if (cached == null) return null;
-      active = List.from(cached);
+      active = List<Map<String, dynamic>>.from(
+          (cached as List).map((e) => Map<String, dynamic>.from(e as Map)));
+    } on PostgrestException {
+      final cached = cache.get(cacheKey);
+      if (cached == null) return null;
+      active = List<Map<String, dynamic>>.from(
+          (cached as List).map((e) => Map<String, dynamic>.from(e as Map)));
     } catch (_) {
       final cached = cache.get(cacheKey);
-      if (cached == null) rethrow;
-      active = List.from(cached);
+      // Не кидаем исключение: если кеш есть — используем, иначе вернём null ниже
+      active = cached == null
+          ? <Map<String, dynamic>>[]
+          : List<Map<String, dynamic>>.from(
+              (cached as List).map((e) => Map<String, dynamic>.from(e as Map)));
     }
 
     if (active.isEmpty) return null;
+    // Детерминированный выбор по UTC-дню: стабильная «цитата дня» без перезапуска
     final int dayIndex =
         DateTime.now().toUtc().difference(DateTime.utc(1970)).inDays;
-    final idx = dayIndex % active.length;
-    final row = Map<String, dynamic>.from(active[idx]);
-    return row;
+    final int pick = dayIndex % active.length;
+    return active[pick];
   }
 }

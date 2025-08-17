@@ -88,7 +88,7 @@ class _OnboardingProfileScreenState
           itemCount: 7,
           itemBuilder: (_, index) {
             final id = index + 1;
-            final asset = 'assets/images/avatars/avatar_${id}.png';
+            final asset = 'assets/images/avatars/avatar_$id.png';
             final isSelected = id == _selectedAvatarId;
             return GestureDetector(
               onTap: () => Navigator.of(ctx).pop(id),
@@ -156,7 +156,7 @@ class _OnboardingProfileScreenState
                           borderRadius: BorderRadius.circular(14),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
+                              color: Colors.black.withValues(alpha: 0.1),
                               blurRadius: 2,
                             ),
                           ],
