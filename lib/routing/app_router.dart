@@ -11,6 +11,8 @@ import '../screens/profile_screen.dart';
 import '../screens/level_detail_screen.dart';
 import '../screens/premium_screen.dart';
 import '../screens/levels_map_screen.dart';
+import '../screens/main_street_screen.dart';
+import '../screens/biz_tower_screen.dart';
 import '../screens/leo_chat_screen.dart';
 import '../screens/goal_screen.dart';
 
@@ -32,7 +34,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(
         path: '/home',
-        builder: (context, state) => const LevelsMapScreen(),
+        builder: (context, state) => const MainStreetScreen(),
       ),
       GoRoute(
         path: '/chat',
@@ -45,6 +47,16 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/profile',
         builder: (context, state) => const ProfileScreen(),
+      ),
+      // Floor 1 screen (reuses current levels map for MVP)
+      GoRoute(
+        path: '/floor/1',
+        builder: (context, state) => const LevelsMapScreen(),
+      ),
+      // BizLevel Tower overview (MVP)
+      GoRoute(
+        path: '/tower',
+        builder: (context, state) => const BizTowerScreen(),
       ),
       GoRoute(
         path: '/levels/:id',
