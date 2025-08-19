@@ -15,7 +15,7 @@ class LeoMessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bubbleColor =
-        isUser ? AppColor.primary.withOpacity(0.9) : Colors.grey.shade200;
+        isUser ? AppColor.primary.withValues(alpha: 0.9) : Colors.grey.shade200;
     final textColor = isUser ? Colors.white : Colors.black87;
     final alignment =
         isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start;

@@ -421,7 +421,7 @@ class _BodyState extends ConsumerState<_Body> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: AppColor.primary.withOpacity(0.1),
+                          color: AppColor.primary.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
@@ -666,7 +666,7 @@ class _BodyState extends ConsumerState<_Body> {
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
+                      color: Colors.black.withValues(alpha: 0.1),
                       blurRadius: 2,
                     ),
                   ],
@@ -766,7 +766,7 @@ class _BodyState extends ConsumerState<_Body> {
                   child: Icon(
                     Icons.expand_more,
                     size: 16,
-                    color: Colors.grey.withOpacity(0.9),
+                    color: Colors.grey.withValues(alpha: 0.9),
                   ),
                 ),
               ],
@@ -789,7 +789,7 @@ class _BodyState extends ConsumerState<_Body> {
           color: AppColor.primary,
           boxShadow: [
             BoxShadow(
-              color: AppColor.primary.withOpacity(0.2),
+              color: AppColor.primary.withValues(alpha: 0.2),
               spreadRadius: 1,
               blurRadius: 1,
               offset: const Offset(0, 1),
@@ -829,7 +829,7 @@ class DividerWrapper extends StatelessWidget {
       padding: const EdgeInsets.only(left: 45),
       child: Divider(
         height: 0,
-        color: Colors.grey.withOpacity(0.8),
+        color: Colors.grey.withValues(alpha: 0.8),
       ),
     );
   }

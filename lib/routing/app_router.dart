@@ -51,7 +51,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       // Floor 1 screen (reuses current levels map for MVP)
       GoRoute(
         path: '/floor/1',
-        builder: (context, state) => const LevelsMapScreen(),
+        builder: (context, state) => const LevelsMapScreen(floorMode: true),
       ),
       // BizLevel Tower overview (MVP)
       GoRoute(

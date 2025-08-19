@@ -23,7 +23,7 @@ class SettingBox extends StatelessWidget {
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: AppColor.shadowColor.withOpacity(0.1),
+            color: AppColor.shadowColor.withValues(alpha: 0.1),
             spreadRadius: 1,
             blurRadius: 1,
             offset: const Offset(0, 1), // changes position of shadow

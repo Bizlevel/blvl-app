@@ -78,7 +78,7 @@ class RootApp extends ConsumerWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: AppColor.shadowColor.withOpacity(0.1),
+            color: AppColor.shadowColor.withValues(alpha: 0.1),
             blurRadius: 1,
             spreadRadius: 1,
             offset: const Offset(1, 1),

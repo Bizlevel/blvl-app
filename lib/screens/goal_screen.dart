@@ -335,7 +335,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: [
                         BoxShadow(
-                          color: AppColor.shadowColor.withOpacity(0.1),
+                          color: AppColor.shadowColor.withValues(alpha: 0.1),
                           blurRadius: 4,
                           offset: const Offset(0, 2),
                         ),
@@ -537,7 +537,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: [
                         BoxShadow(
-                          color: AppColor.shadowColor.withOpacity(0.1),
+                          color: AppColor.shadowColor.withValues(alpha: 0.1),
                           blurRadius: 4,
                           offset: const Offset(0, 2),
                         ),
@@ -627,7 +627,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                                 overflow: TextOverflow.ellipsis,
                               ),
                               selected: isSelected,
-                              selectedColor: AppColor.premium.withOpacity(0.18),
+                              selectedColor: AppColor.premium.withValues(alpha: 0.18),
                               backgroundColor: Colors.white,
                               shape: StadiumBorder(
                                 side: BorderSide(
@@ -681,7 +681,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                                 boxShadow: [
                                   BoxShadow(
                                     color:
-                                        AppColor.shadowColor.withOpacity(0.1),
+                                        AppColor.shadowColor.withValues(alpha: 0.1),
                                     blurRadius: 4,
                                     offset: const Offset(0, 2),
                                   ),
@@ -1013,9 +1013,9 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
           height: 24,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: AppColor.primary.withOpacity(0.2),
+            color: AppColor.primary.withValues(alpha: 0.2),
             border: Border.all(
-              color: AppColor.primary.withOpacity(0.4),
+              color: AppColor.primary.withValues(alpha: 0.4),
               width: 2,
             ),
           ),
@@ -1159,7 +1159,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
-              color: AppColor.shadowColor.withOpacity(0.1),
+              color: AppColor.shadowColor.withValues(alpha: 0.1),
               blurRadius: 4,
               offset: const Offset(0, 2),
             ),
@@ -1204,7 +1204,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: AppColor.shadowColor.withOpacity(0.1),
+            color: AppColor.shadowColor.withValues(alpha: 0.1),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),

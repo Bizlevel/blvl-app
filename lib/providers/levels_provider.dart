@@ -4,6 +4,7 @@ import 'package:bizlevel/providers/levels_repository_provider.dart';
 import 'package:bizlevel/providers/subscription_provider.dart';
 import 'package:bizlevel/providers/auth_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:bizlevel/utils/formatters.dart';
 
 /// Provides список уровней с учётом прогресса пользователя.
 final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
@@ -61,6 +62,7 @@ final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
       'image': level.imageUrl,
       'level': level.number,
       'name': level.title,
+      'displayCode': formatLevelCode(1, level.number),
       'lessons': () {
         final lessonsAgg = json['lessons'];
         if (lessonsAgg is List && lessonsAgg.isNotEmpty) {
@@ -81,4 +83,42 @@ final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
       'artifact_url': json['artifact_url'],
     };
   }).toList();
+});
+
+/// Определяет «куда продолжить» на главном экране.
+/// Возвращает: { levelId, levelNumber, floorId: 1, requiresPremium }
+final nextLevelToContinueProvider =
+    FutureProvider<Map<String, dynamic>>((ref) async {
+  final levels = await ref.watch(levelsProvider.future);
+
+  final hasPremium =
+      ref.watch(currentUserProvider.select((user) => user.value?.isPremium)) ??
+          false;
+  final subscriptionStatus =
+      ref.watch(subscriptionProvider.select((sub) => sub.value));
+  final bool isPremium = hasPremium || (subscriptionStatus == 'active');
+
+  // 1) Пытаемся найти текущий уровень
+  Map<String, dynamic>? candidate = levels
+      .cast<Map<String, dynamic>?>()
+      .firstWhere((l) => (l?['isCurrent'] as bool? ?? false),
+          orElse: () => null);
+
+  // 2) Иначе — первый доступный, который ещё не завершён
+  candidate ??= levels.firstWhere(
+    (l) =>
+        (l['isLocked'] as bool? ?? true) == false &&
+        (l['isCompleted'] as bool? ?? false) == false,
+    orElse: () => levels.first,
+  );
+
+  final int levelNumber = candidate['level'] as int? ?? 0;
+  final bool requiresPremium = (levelNumber > 3) && !isPremium;
+
+  return {
+    'levelId': candidate['id'] as int,
+    'levelNumber': levelNumber,
+    'floorId': 1,
+    'requiresPremium': requiresPremium,
+  };
 });
