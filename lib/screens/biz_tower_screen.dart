@@ -19,17 +19,17 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
   final GlobalKey _stackKey = GlobalKey();
   List<_Segment> _segments = [];
   List<Map<String, dynamic>> _lastNodes = const [];
+  int? _lastScrolledTo;
 
   Future<void> _scrollToLevelNumber(int levelNumber) async {
     try {
       final key = _nodeKeys[levelNumber];
       if (key?.currentContext != null) {
-        await Scrollable.ensureVisible(
-          key!.currentContext!,
-          duration: const Duration(milliseconds: 500),
-          curve: Curves.easeInOut,
-          alignment: 0.3,
-        );
+        if (!mounted) return;
+        await Scrollable.ensureVisible(key!.currentContext!,
+            duration: const Duration(milliseconds: 500),
+            curve: Curves.easeInOut,
+            alignment: 0.3);
       }
     } catch (e, st) {
       Sentry.captureException(e, stackTrace: st);
@@ -79,10 +79,17 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
               orElse: () => levelNodes.first,
             );
 
-            // Автоскролл после первого фрейма
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              _scrollToLevelNumber(current?['level'] as int? ?? 0);
-            });
+            // Автоскролл только при смене целевого узла,
+            // чтобы не мешать кликам во время постоянных перерисовок
+            // После вычисления current выше он всегда не null (есть минимум один levelNode)
+            final int targetLevel = (current['level'] as int? ?? 0);
+            if (_lastScrolledTo != targetLevel) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (!mounted) return;
+                _scrollToLevelNumber(targetLevel);
+              });
+              _lastScrolledTo = targetLevel;
+            }
 
             return LayoutBuilder(builder: (context, c) {
               return Stack(key: _stackKey, children: [
@@ -108,6 +115,7 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
                 ),
                 SafeArea(
                   child: SingleChildScrollView(
+                    primary: false,
                     controller: _scrollController,
                     physics: const BouncingScrollPhysics(
                         parent: AlwaysScrollableScrollPhysics()),
@@ -276,6 +284,12 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
         borderRadius: BorderRadius.circular(12),
         onTap: () {
           try {
+            Sentry.addBreadcrumb(Breadcrumb(
+              level: SentryLevel.info,
+              category: 'ui.tap',
+              message:
+                  'tower.tap level=$levelNumber locked=$isLocked completed=$isCompleted blockedByCheckpoint=$blockedByCheckpoint',
+            ));
             // Разрешаем открывать уже пройденные уровни всегда
             final bool canOpen = isCompleted || !isLocked;
             if (!canOpen) {
@@ -283,14 +297,21 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
                 ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Завершите предыдущий этаж')));
               } else if (premiumLock) {
-                context.go('/premium');
+                context.push('/premium');
               } else {
                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
                     content: Text('Завершите предыдущий уровень')));
               }
               return;
             }
-            context.go('/levels/${data['id']}');
+            // Передаём номер уровня как query-параметр, чтобы экран уровня
+            // корректно определял сценарий (например, для уровня 0 — профиль)
+            // Используем push, чтобы по возврату оставаться на экране башни.
+            // Небольшая задержка, чтобы исключить конкуренцию с пост‑фрейм скроллом
+            Future.microtask(() {
+              if (!mounted) return;
+              context.push('/levels/${data['id']}?num=$levelNumber');
+            });
           } catch (e, st) {
             Sentry.captureException(e, stackTrace: st);
           }

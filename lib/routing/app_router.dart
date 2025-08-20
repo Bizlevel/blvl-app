@@ -62,7 +62,8 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: '/levels/:id',
         builder: (context, state) {
           final id = int.tryParse(state.pathParameters['id'] ?? '0') ?? 0;
-          return LevelDetailScreen(levelId: id);
+          final levelNum = int.tryParse(state.uri.queryParameters['num'] ?? '');
+          return LevelDetailScreen(levelId: id, levelNumber: levelNum);
         },
       ),
     ],

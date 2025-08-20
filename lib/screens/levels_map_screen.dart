@@ -6,7 +6,6 @@ import 'package:bizlevel/widgets/level_card.dart';
 import 'package:bizlevel/widgets/user_info_bar.dart';
 import 'package:bizlevel/widgets/notification_box.dart';
 import 'package:shimmer/shimmer.dart';
-import 'package:bizlevel/screens/level_detail_screen.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:go_router/go_router.dart';
 
@@ -128,13 +127,9 @@ class LevelsMapScreen extends ConsumerWidget {
                   compact: true,
                   onTap: () {
                     try {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => LevelDetailScreen(
-                              levelId: levelData['id'] as int,
-                              levelNumber: levelData['level'] as int),
-                        ),
-                      );
+                      final id = levelData['id'] as int;
+                      final num = levelData['level'] as int;
+                      context.push('/levels/$id?num=$num');
                     } catch (e, st) {
                       Sentry.captureException(e, stackTrace: st);
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -215,13 +210,9 @@ class LevelsMapScreen extends ConsumerWidget {
                   compact: !isCurrent,
                   onTap: () {
                     try {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => LevelDetailScreen(
-                              levelId: l['id'] as int,
-                              levelNumber: l['level'] as int),
-                        ),
-                      );
+                      final id = l['id'] as int;
+                      final num = l['level'] as int;
+                      context.push('/levels/$id?num=$num');
                     } catch (e, st) {
                       Sentry.captureException(e, stackTrace: st);
                       ScaffoldMessenger.of(context).showSnackBar(
