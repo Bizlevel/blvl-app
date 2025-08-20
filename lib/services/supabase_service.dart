@@ -135,7 +135,8 @@ class SupabaseService {
         final response = await Supabase.instance.client
             .from('levels')
             .select(
-                'id, number, title, description, image_url, cover_path, artifact_title, artifact_description, artifact_url, is_free, lessons(count), user_progress(is_completed)')
+                'id, number, title, description, image_url, cover_path, artifact_title, artifact_description, artifact_url, is_free, lessons(count), user_progress!inner(user_id, is_completed)')
+            .eq('user_progress.user_id', userId)
             .order('number', ascending: true);
         return (response as List<dynamic>)
             .map((e) => Map<String, dynamic>.from(e as Map))
