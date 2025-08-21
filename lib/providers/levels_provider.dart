@@ -11,15 +11,14 @@ import 'package:hive_flutter/hive_flutter.dart';
 final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final repo = ref.watch(levelsRepositoryProvider);
 
-  final int? userCurrentLevel =
-      ref.watch(currentUserProvider.select((user) => user.value?.currentLevel));
-  final hasPremium =
-      ref.watch(currentUserProvider.select((user) => user.value?.isPremium));
-  final subscriptionStatus =
-      ref.watch(subscriptionProvider.select((sub) => sub.value));
+  // Дожидаемся профиля пользователя, чтобы избежать расчётов с null userId
+  final user = await ref.watch(currentUserProvider.future);
+  // Не блокируемся на стриме подписки: берём текущее значение, если оно уже есть
+  final subscriptionStatus = ref.watch(subscriptionProvider).asData?.value;
 
+  final int? userCurrentLevel = user?.currentLevel;
   final bool isPremium =
-      (hasPremium ?? false) || (subscriptionStatus == 'active');
+      (user?.isPremium ?? false) || (subscriptionStatus == 'active');
 
   final userId = Supabase.instance.client.auth.currentUser?.id;
   final rows = await repo.fetchLevels(userId: userId);
@@ -60,7 +59,9 @@ final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
 
     return {
       'id': level.id,
-      'image': level.imageUrl,
+      // Репозиторий мог подставить подписанный cover в json['image'].
+      // Используем его с приоритетом, иначе fallback на image_url из модели.
+      'image': (json['image'] ?? level.imageUrl),
       'level': level.number,
       'name': level.title,
       'displayCode': formatLevelCode(1, level.number),
@@ -71,7 +72,8 @@ final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
         }
         return 0;
       }(),
-      'isLocked': isLocked,
+      // Уровень 0 должен быть всегда доступен
+      'isLocked': level.number == 0 ? false : isLocked,
       'isCompleted': isCompleted,
       'isCurrent': level.number == userCurrentLevel,
       'lockReason': isLocked
@@ -95,26 +97,34 @@ final nextLevelToContinueProvider =
   final hasPremium =
       ref.watch(currentUserProvider.select((user) => user.value?.isPremium)) ??
           false;
+  final int? userCurrentLevel =
+      ref.watch(currentUserProvider.select((user) => user.value?.currentLevel));
   final subscriptionStatus =
       ref.watch(subscriptionProvider.select((sub) => sub.value));
   final bool isPremium = hasPremium || (subscriptionStatus == 'active');
 
-  // 1) Пытаемся найти текущий уровень
+  // 1) Если есть текущий незавершённый — продолжаем его
   Map<String, dynamic>? candidate = levels
       .cast<Map<String, dynamic>?>()
-      .firstWhere((l) => (l?['isCurrent'] as bool? ?? false),
+      .firstWhere(
+          (l) =>
+              (l?['isCurrent'] as bool? ?? false) &&
+              (l?['isCompleted'] as bool? ?? false) == false,
           orElse: () => null);
 
-  // 2) Иначе — первый доступный, который ещё не завершён
+  // 2) Иначе — берём уровень по номеру current_level (даже если он заблокирован премиумом)
   candidate ??= levels.firstWhere(
-    (l) =>
-        (l['isLocked'] as bool? ?? true) == false &&
-        (l['isCompleted'] as bool? ?? false) == false,
+    (l) => (l['level'] as int? ?? -1) == (userCurrentLevel ?? -999),
     orElse: () => levels.first,
   );
 
   final int levelNumber = candidate['level'] as int? ?? 0;
-  final bool requiresPremium = (levelNumber > 3) && !isPremium;
+  // Опираемся на данные уровня: если уровень помечен как «Только для премиум»,
+  // и у пользователя нет премиума — требуется премиум. Иначе — нет.
+  final String? lockReason = candidate['lockReason'] as String?;
+  final bool isPremiumLock =
+      lockReason != null && lockReason.toLowerCase().contains('премиум');
+  final bool requiresPremium = isPremiumLock && !isPremium;
 
   return {
     'levelId': candidate['id'] as int,
@@ -148,7 +158,7 @@ final towerNodesProvider =
 
   // Чекпоинты после уровней (MVP — считаем пройденными, состояние подключим в 34.3)
   const checkpointAfter = <int>{2, 3, 5, 7, 9, 10};
-  final Set<int> blockedNextLevels = {};
+  final Set<int> blockedNextLevels = {}; // MVP: блокировку не применяем
 
   // Уровни 1..N
   for (final l in levels.where((x) => (x['level'] as int? ?? 0) > 0)) {
@@ -166,9 +176,7 @@ final towerNodesProvider =
         'isCompleted': cp[num] == true,
         'source': 'default',
       });
-      if (!(cp[num] == true)) {
-        blockedNextLevels.add(num + 1);
-      }
+      // MVP: не блокируем следующий уровень чекпоинтом
     }
   }
 

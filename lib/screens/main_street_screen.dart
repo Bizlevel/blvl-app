@@ -72,8 +72,10 @@ class MainStreetScreen extends ConsumerWidget {
                                     if (requiresPremium) {
                                       context.go('/premium');
                                     } else {
-                                      final levelId = next['levelId'] as int;
-                                      context.go('/levels/$levelId');
+                                      final levelNumber =
+                                          next['levelNumber'] as int? ?? 0;
+                                      context
+                                          .go('/tower?scrollTo=$levelNumber');
                                     }
                                   } catch (e, st) {
                                     Sentry.captureException(e, stackTrace: st);
@@ -96,8 +98,8 @@ class MainStreetScreen extends ConsumerWidget {
                           error: (e, _) => SizedBox(
                             height: 48,
                             child: ElevatedButton(
-                              onPressed: () => context.go('/floor/1'),
-                              child: const Text('Продолжить'),
+                              onPressed: () => context.go('/tower'),
+                              child: const Text('Открыть башню'),
                             ),
                           ),
                         );
