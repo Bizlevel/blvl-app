@@ -11,15 +11,14 @@ import 'package:hive_flutter/hive_flutter.dart';
 final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final repo = ref.watch(levelsRepositoryProvider);
 
-  final int? userCurrentLevel =
-      ref.watch(currentUserProvider.select((user) => user.value?.currentLevel));
-  final hasPremium =
-      ref.watch(currentUserProvider.select((user) => user.value?.isPremium));
-  final subscriptionStatus =
-      ref.watch(subscriptionProvider.select((sub) => sub.value));
+  // Дожидаемся профиля пользователя, чтобы избежать расчётов с null userId
+  final user = await ref.watch(currentUserProvider.future);
+  // Не блокируемся на стриме подписки: берём текущее значение, если оно уже есть
+  final subscriptionStatus = ref.watch(subscriptionProvider).asData?.value;
 
+  final int? userCurrentLevel = user?.currentLevel;
   final bool isPremium =
-      (hasPremium ?? false) || (subscriptionStatus == 'active');
+      (user?.isPremium ?? false) || (subscriptionStatus == 'active');
 
   final userId = Supabase.instance.client.auth.currentUser?.id;
   final rows = await repo.fetchLevels(userId: userId);
@@ -159,7 +158,7 @@ final towerNodesProvider =
 
   // Чекпоинты после уровней (MVP — считаем пройденными, состояние подключим в 34.3)
   const checkpointAfter = <int>{2, 3, 5, 7, 9, 10};
-  final Set<int> blockedNextLevels = {};
+  final Set<int> blockedNextLevels = {}; // MVP: блокировку не применяем
 
   // Уровни 1..N
   for (final l in levels.where((x) => (x['level'] as int? ?? 0) > 0)) {
@@ -177,9 +176,7 @@ final towerNodesProvider =
         'isCompleted': cp[num] == true,
         'source': 'default',
       });
-      if (!(cp[num] == true)) {
-        blockedNextLevels.add(num + 1);
-      }
+      // MVP: не блокируем следующий уровень чекпоинтом
     }
   }
 

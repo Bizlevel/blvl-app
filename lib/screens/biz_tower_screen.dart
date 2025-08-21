@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/providers/levels_provider.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:go_router/go_router.dart';
 
 class BizTowerScreen extends ConsumerStatefulWidget {
-  const BizTowerScreen({super.key});
+  final int? scrollTo;
+  const BizTowerScreen({super.key, this.scrollTo});
 
   @override
   ConsumerState<BizTowerScreen> createState() => _BizTowerScreenState();
@@ -61,6 +62,17 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
           data: (nodes) {
             _lastNodes = nodes;
             _scheduleRecompute();
+            // Обработка запроса автоскролла через переданный параметр scrollTo
+            bool scrolledByQuery = false;
+            final int? requested = widget.scrollTo;
+            if (requested != null && _lastScrolledTo != requested) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (!mounted) return;
+                _scrollToLevelNumber(requested);
+              });
+              _lastScrolledTo = requested;
+              scrolledByQuery = true;
+            }
             // Определяем текущий узел уровня для автоскролла
             final levelNodes = nodes
                 .where((n) => n['type'] == 'level')
@@ -83,7 +95,7 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
             // чтобы не мешать кликам во время постоянных перерисовок
             // После вычисления current выше он всегда не null (есть минимум один levelNode)
             final int targetLevel = (current['level'] as int? ?? 0);
-            if (_lastScrolledTo != targetLevel) {
+            if (!scrolledByQuery && _lastScrolledTo != targetLevel) {
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 if (!mounted) return;
                 _scrollToLevelNumber(targetLevel);
@@ -128,6 +140,29 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
                           mainAxisSize: MainAxisSize.min,
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
+                            // Тизеры этажей 2..4 (должны быть выше уровней этажа 1)
+                            const _FloorDivider(),
+                            _FloorSection(
+                                child: _LockedFloorTile(
+                                    title: 'Этаж 2: Продажи',
+                                    onTap: () => ScaffoldMessenger.of(context)
+                                        .showSnackBar(const SnackBar(
+                                            content: Text('Скоро'))))),
+                            const _FloorDivider(),
+                            _FloorSection(
+                                child: _LockedFloorTile(
+                                    title: 'Этаж 3: Команда',
+                                    onTap: () => ScaffoldMessenger.of(context)
+                                        .showSnackBar(const SnackBar(
+                                            content: Text('Скоро'))))),
+                            const _FloorDivider(),
+                            _FloorSection(
+                                child: _LockedFloorTile(
+                                    title: 'Этаж 4: Масштабирование',
+                                    onTap: () => ScaffoldMessenger.of(context)
+                                        .showSnackBar(const SnackBar(
+                                            content: Text('Скоро'))))),
+                            const SizedBox(height: 12),
                             // Рендер узлов: снизу вверх — сначала уровень 0, затем этаж 1 и уровни
                             ...nodes.reversed.map((n) {
                               final type = n['type'];
@@ -194,29 +229,6 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
                                 ),
                               );
                             }),
-                            const SizedBox(height: 12),
-                            // Тизеры этажей 2..4 (Скоро)
-                            const _FloorDivider(),
-                            _FloorSection(
-                                child: _LockedFloorTile(
-                                    title: 'Этаж 2: Продажи',
-                                    onTap: () => ScaffoldMessenger.of(context)
-                                        .showSnackBar(const SnackBar(
-                                            content: Text('Скоро'))))),
-                            const _FloorDivider(),
-                            _FloorSection(
-                                child: _LockedFloorTile(
-                                    title: 'Этаж 3: Команда',
-                                    onTap: () => ScaffoldMessenger.of(context)
-                                        .showSnackBar(const SnackBar(
-                                            content: Text('Скоро'))))),
-                            const _FloorDivider(),
-                            _FloorSection(
-                                child: _LockedFloorTile(
-                                    title: 'Этаж 4: Масштабирование',
-                                    onTap: () => ScaffoldMessenger.of(context)
-                                        .showSnackBar(const SnackBar(
-                                            content: Text('Скоро'))))),
                           ],
                         ),
                       ),
@@ -229,15 +241,35 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (e, st) {
             Sentry.captureException(e, stackTrace: st);
-            return ListView(
-              padding: const EdgeInsets.all(16),
-              children: const [
-                _LockedFloorTile(title: 'Этаж 0: Ресепшн'),
-                _LockedFloorTile(title: 'Этаж 1: База предпринимательства'),
-                _LockedFloorTile(title: 'Этаж 2: Продажи'),
-                _LockedFloorTile(title: 'Этаж 3: Команда'),
-                _LockedFloorTile(title: 'Этаж 4: Масштабирование'),
-              ],
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('Не удалось загрузить башню',
+                        style: TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 8),
+                    Text(e.toString(),
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.black54)),
+                    const SizedBox(height: 16),
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        try {
+                          // Перезапрос узлов
+                          ref.invalidate(towerNodesProvider);
+                        } catch (ex, stx) {
+                          Sentry.captureException(ex, stackTrace: stx);
+                        }
+                      },
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Повторить'),
+                    ),
+                  ],
+                ),
+              ),
             );
           },
         );
@@ -297,7 +329,9 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
                 ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Завершите предыдущий этаж')));
               } else if (premiumLock) {
-                context.push('/premium');
+                if (mounted) {
+                  context.go('/premium');
+                }
               } else {
                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
                     content: Text('Завершите предыдущий уровень')));
