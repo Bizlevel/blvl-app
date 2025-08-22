@@ -503,11 +503,11 @@ void _recomputeSegments() {
   final stackBox = stackCtx.findRenderObject() as RenderBox?;
   if (stackBox == null) return;
 
-  // 1) Карта статусов уровней
+  // Статусы уровней
   final Map<int, Map<String, dynamic>> levelData = {
     for (final n in _lastNodes.where((e) => e['type'] == 'level'))
       (n['level'] as int):
-          (n['data'] as Map).cast<String, dynamic>() // isCompleted/isCurrent/isLocked внутри
+          (n['data'] as Map).cast<String, dynamic>()
   };
 
   bool isLevelCompleted(int lvl) =>
@@ -517,23 +517,17 @@ void _recomputeSegments() {
   bool isLevelLocked(int lvl) =>
       (levelData[lvl]?['isLocked'] as bool?) ?? false;
 
-  // 2) Карта статусов чекпоинтов: ключи соответствуют _squareKeys[-afterLevel]
-  final Map<int, bool> cpCompleted = {
-    for (final n in _lastNodes.where((e) => e['type'] == 'checkpoint'))
-      -(n['afterLevel'] as int): (n['isCompleted'] as bool?) ?? false
-  };
-
-  // 3) Формируем ПОРЯДОК так же, как ты рендеришь: снизу вверх => nodes.reversed
+  // Порядок узлов ровно как на экране (уровни и чекпоинты)
   final ordered = _lastNodes.reversed.where((n) {
     final t = n['type'];
     return t == 'level' || t == 'checkpoint';
   }).map<int?>((n) {
     if (n['type'] == 'level') return n['level'] as int?;
-    // чекпоинт привязываем к отрицательному индексу
+    // чекпоинт привязан к -afterLevel
     return -(n['afterLevel'] as int);
   }).whereType<int>().toList(growable: false);
 
-  // 4) Снимаем центры виджетов по _squareKeys для каждого ID (уровни >=0, чекпоинты <0)
+  // Координаты центров
   final List<_NodePoint> points = [];
   for (final id in ordered) {
     final key = _squareKeys[id];
@@ -547,30 +541,26 @@ void _recomputeSegments() {
     points.add(_NodePoint(id, centerLocal));
   }
 
-  // 5) Функция выбора цвета сегмента по «from-узлу»
-  Color colorFor(int id) {
-    if (id >= 0) {
-      if (isLevelCompleted(id)) return AppColor.success;
-      if (isLevelCurrent(id)) return AppColor.info;
-      if (isLevelLocked(id)) return Colors.grey.withOpacity(0.6);
-      return AppColor.info;
-    } else {
-      // чекпоинт
-      final done = cpCompleted[id] ?? false;
-      return done ? AppColor.success : AppColor.info;
-    }
+  // Цвет берём по уровню-источнику отрезка.
+  // Если источник — чекпоинт (-N), используем цвет уровня N.
+  Color colorForFromId(int fromId) {
+    final baseLevel = fromId >= 0 ? fromId : (-fromId); // игнорируем статус чекпоинта
+    if (isLevelCompleted(baseLevel)) return AppColor.success;
+    if (isLevelCurrent(baseLevel)) return AppColor.info;
+    if (isLevelLocked(baseLevel)) return Colors.grey.withOpacity(0.6);
+    return AppColor.info;
   }
 
-  // 6) Строим сегменты между соседними точками
   final List<_Segment> newSegments = [];
   for (int i = 0; i < points.length - 1; i++) {
     final a = points[i];
     final b = points[i + 1];
-    newSegments.add(_Segment(a.point, b.point, colorFor(a.levelNumber)));
+    newSegments.add(_Segment(a.point, b.point, colorForFromId(a.levelNumber)));
   }
 
   setState(() => _segments = newSegments);
 }
+
 }
 
 Alignment _alignmentForLevel(int level) {
