@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.bizlevel"
+    namespace = "kz.bizlevel.bizlevel"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = "27.0.12077973"
 
