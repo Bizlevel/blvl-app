@@ -17,6 +17,7 @@ class BizTowerScreen extends ConsumerStatefulWidget {
 class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
   final ScrollController _scrollController = ScrollController();
   final Map<int, GlobalKey> _nodeKeys = {};
+  final Map<int, GlobalKey> _squareKeys = {};
   final GlobalKey _stackKey = GlobalKey();
   List<_Segment> _segments = [];
   List<Map<String, dynamic>> _lastNodes = const [];
@@ -172,32 +173,20 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
                               }
                               if (type == 'checkpoint') {
                                 final int after = n['afterLevel'] as int;
-                                final bool done =
-                                    n['isCompleted'] as bool? ?? false;
+                                final bool done = n['isCompleted'] as bool? ?? false;
+                                final align = Alignment.center;
                                 return Padding(
-                                  padding:
-                                      const EdgeInsets.symmetric(vertical: 8),
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
                                   child: _FloorSection(
-                                    child: _CheckpointTile(
-                                      afterLevel: after,
-                                      isCompleted: done,
-                                      onComplete: () async {
-                                        try {
-                                          final box = await Hive.openBox(
-                                              'tower_checkpoints');
-                                          await box.put('after_${after}', true);
-                                          if (context.mounted) {
-                                            ScaffoldMessenger.of(context)
-                                                .showSnackBar(const SnackBar(
-                                                    content: Text(
-                                                        'Чекпоинт пройден')));
-                                          }
-                                          ref.invalidate(towerNodesProvider);
-                                        } catch (e, st) {
-                                          Sentry.captureException(e,
-                                              stackTrace: st);
-                                        }
-                                      },
+                                    child: Align(
+                                      alignment: align,
+                                      child: _buildCheckpointNode(
+                                        context,
+                                        afterLevel: after,
+                                        isCompleted: done,
+                                        align: align,
+                                        ref: ref, // добавили
+                                      ),
                                     ),
                                   ),
                                 );
@@ -312,7 +301,6 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        key: _nodeKeys[levelNumber],
         borderRadius: BorderRadius.circular(12),
         onTap: () {
           try {
@@ -373,6 +361,7 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
               ) 
             ),
             Container(
+              key: _squareKeys[levelNumber] = _squareKeys[levelNumber] ?? GlobalKey(),
               width: 88,
               height: 88,
               decoration: BoxDecoration(
@@ -425,6 +414,85 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
     );
   }
 
+Widget _buildCheckpointNode(BuildContext context,
+    {required int afterLevel,
+    required bool isCompleted,
+    required Alignment align,
+    required WidgetRef ref}) {
+  // Чтобы ключи не пересекались с уровнями — используем отрицательный индекс
+  final int checkpointKey = -afterLevel;
+  _squareKeys[checkpointKey] = _squareKeys[checkpointKey] ?? GlobalKey();
+
+  return Column(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: SizedBox(
+          width: 88,
+          child: Text(
+            'Чекпоинт',
+            textAlign: align == Alignment.centerLeft
+                ? TextAlign.left
+                : (align == Alignment.centerRight
+                    ? TextAlign.right
+                    : TextAlign.center),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+          ),
+        ),
+      ),
+      InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: isCompleted
+            ? null
+            : () async {
+                try {
+                  final box = await Hive.openBox('tower_checkpoints');
+                  await box.put('after_${afterLevel}', true);
+
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Чекпоинт пройден')),
+                    );
+                  }
+
+                  // Обновляем towerNodesProvider
+                  ref.invalidate(towerNodesProvider);
+                } catch (e, st) {
+                  Sentry.captureException(e, stackTrace: st);
+                }
+              },
+        child: Container(
+          key: _squareKeys[checkpointKey],
+          width: 60,
+          height: 60,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x22000000),
+                blurRadius: 6,
+                offset: Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Center(
+            child: Icon(
+              isCompleted ? Icons.flag : Icons.flag_outlined,
+              color: isCompleted ? AppColor.success : AppColor.info,
+              size: 30,
+            ),
+          ),
+        ),
+      ),
+    ],
+  );
+}
+
+
   void _scheduleRecompute() {
     WidgetsBinding.instance.addPostFrameCallback((_) => _recomputeSegments());
   }
@@ -448,7 +516,7 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
 
     final List<_NodePoint> points = [];
     for (final num in levelNumbers) {
-      final key = _nodeKeys[num];
+      final key = _squareKeys[num];
       final ctx = key?.currentContext;
       final box = ctx?.findRenderObject() as RenderBox?;
       if (box == null) continue;
@@ -556,50 +624,6 @@ class _FloorSection extends StatelessWidget {
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 900),
       child: child,
-    );
-  }
-}
-
-class _CheckpointTile extends StatelessWidget {
-  final int afterLevel;
-  final bool isCompleted;
-  final VoidCallback onComplete;
-  const _CheckpointTile(
-      {required this.afterLevel,
-      required this.isCompleted,
-      required this.onComplete});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: const [
-          BoxShadow(
-              color: Color(0x11000000), blurRadius: 8, offset: Offset(0, 4)),
-        ],
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        children: [
-          Icon(
-            isCompleted ? Icons.check_circle : Icons.flag_outlined,
-            color: isCompleted ? AppColor.success : AppColor.info,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              'Чекпоинт после уровня $afterLevel',
-              style: const TextStyle(fontSize: 14),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: isCompleted ? null : onComplete,
-            child: const Text('Завершить'),
-          ),
-        ],
-      ),
     );
   }
 }
