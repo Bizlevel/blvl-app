@@ -7,7 +7,6 @@ import 'package:bizlevel/providers/levels_provider.dart';
 import 'package:bizlevel/utils/formatters.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'dart:math' as math;
 
 class MainStreetScreen extends ConsumerWidget {
   const MainStreetScreen({super.key});
@@ -123,13 +122,23 @@ class _BackgroundLayer extends StatelessWidget {
   const _BackgroundLayer();
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(builder: (context, constraints) {
-      return SvgPicture.asset(
-        'assets/images/street/background.svg',
-        fit: BoxFit.cover,
-        alignment: Alignment.bottomCenter,
-      );
-    });
+    // Безопасная загрузка: если background.svg отсутствует, ни на что не влияет
+    return FutureBuilder<String>(
+      future: DefaultAssetBundle.of(context)
+          .loadString('assets/images/street/background.svg')
+          .catchError((_) => ''),
+      builder: (context, snapshot) {
+        final String data = snapshot.data ?? '';
+        if (data.isEmpty) {
+          return const SizedBox.shrink();
+        }
+        return SvgPicture.string(
+          data,
+          fit: BoxFit.cover,
+          alignment: Alignment.bottomCenter,
+        );
+      },
+    );
   }
 }
 
@@ -148,16 +157,13 @@ class _MainActionsGrid extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return LayoutBuilder(builder: (context, constraints) {
       const double gap = 12;
-      final double maxSquareByWidth = (constraints.maxWidth - gap) / 2;
-      final double maxSquareByHeight = (constraints.maxHeight - 2 * gap) / 3;
-      final double tileSide =
-          math.max(0, math.min(maxSquareByWidth, maxSquareByHeight));
+      final double rowHeight = (constraints.maxHeight - 2 * gap) / 3;
 
       return Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           SizedBox(
-            height: tileSide,
+            height: rowHeight,
             child: Row(
               children: [
                 Expanded(
@@ -165,6 +171,7 @@ class _MainActionsGrid extends ConsumerWidget {
                     key: const Key('ms_card_library'),
                     title: 'Библиотека',
                     icon: Icons.menu_book,
+                    svgAsset: 'assets/images/street/library.svg',
                     state: _CardState.soon,
                     onTap: () => _showSoonSnackBar(context),
                   ),
@@ -175,6 +182,7 @@ class _MainActionsGrid extends ConsumerWidget {
                     key: const Key('ms_card_marketplace'),
                     title: 'Маркетплейс',
                     icon: Icons.storefront,
+                    svgAsset: 'assets/images/street/marketplace.svg',
                     state: _CardState.soon,
                     onTap: () => _showSoonSnackBar(context),
                   ),
@@ -184,7 +192,7 @@ class _MainActionsGrid extends ConsumerWidget {
           ),
           const SizedBox(height: gap),
           SizedBox(
-            height: tileSide,
+            height: rowHeight,
             child: Row(
               children: [
                 Expanded(
@@ -192,6 +200,7 @@ class _MainActionsGrid extends ConsumerWidget {
                     key: const Key('ms_card_trainers'),
                     title: 'База тренеров',
                     icon: Icons.chat_bubble,
+                    svgAsset: 'assets/images/street/training_base.svg',
                     state: _CardState.active,
                     onTap: () {
                       try {
@@ -213,6 +222,7 @@ class _MainActionsGrid extends ConsumerWidget {
                     key: const Key('ms_card_coworking'),
                     title: 'Коворкинг',
                     icon: Icons.workspaces_outline,
+                    svgAsset: 'assets/images/street/coworking.svg',
                     state: _CardState.soon,
                     onTap: () => _showSoonSnackBar(context),
                   ),
@@ -221,35 +231,32 @@ class _MainActionsGrid extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: gap),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Flexible(
-                child: FractionallySizedBox(
-                  widthFactor: 0.7,
-                  child: SizedBox(
-                    height: tileSide,
-                    child: _MainActionCard(
-                      key: const Key('ms_card_tower'),
-                      title: 'Башня БизЛевел',
-                      icon: Icons.apartment,
-                      state: _CardState.active,
-                      onTap: () {
-                        try {
-                          context.go('/tower');
-                        } catch (e, st) {
-                          Sentry.captureException(e, stackTrace: st);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                                content: Text('Не удалось открыть башню')),
-                          );
-                        }
-                      },
-                    ),
+          SizedBox(
+            height: rowHeight,
+            child: Row(
+              children: [
+                Expanded(
+                  child: _MainActionCard(
+                    key: const Key('ms_card_tower'),
+                    title: 'Башня БизЛевел',
+                    icon: Icons.apartment,
+                    svgAsset: 'assets/images/street/tower.svg',
+                    state: _CardState.active,
+                    onTap: () {
+                      try {
+                        context.go('/tower');
+                      } catch (e, st) {
+                        Sentry.captureException(e, stackTrace: st);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                              content: Text('Не удалось открыть башню')),
+                        );
+                      }
+                    },
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       );
@@ -264,6 +271,7 @@ class _MainActionCard extends StatelessWidget {
   final IconData icon;
   final _CardState state;
   final VoidCallback? onTap;
+  final String? svgAsset;
 
   const _MainActionCard({
     super.key,
@@ -271,43 +279,65 @@ class _MainActionCard extends StatelessWidget {
     required this.icon,
     required this.state,
     required this.onTap,
+    this.svgAsset,
   });
 
   @override
   Widget build(BuildContext context) {
     final bool isSoon = state == _CardState.soon;
     final Color foreground = isSoon
-        ? Theme.of(context).textTheme.bodyMedium!.color!.withOpacity(0.6)
+        ? Theme.of(context).textTheme.bodyMedium!.color!.withValues(alpha: 0.6)
         : Theme.of(context).textTheme.bodyMedium!.color!;
-    final Color border = Colors.grey.withOpacity(0.25);
+    final Color border = Colors.grey.withValues(alpha: 0.25);
 
     return Semantics(
       label: title,
       button: true,
-      child: Card(
-        color: Colors.white.withOpacity(isSoon ? 0.8 : 1.0),
-        elevation: 2,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: border),
-        ),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+      child: AspectRatio(
+        aspectRatio: 1,
+        child: Card(
+          color: const Color.fromARGB(255, 212, 212, 212), // фон карточки = фон иконок
+          elevation: 6, // более выраженная тень
+          shadowColor: Colors.black.withValues(alpha: 0.15),
+          surfaceTintColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: border),
+          ),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: onTap,
+            child: Stack(
               children: [
-                Icon(icon, size: 24, color: foreground),
-                const SizedBox(width: 12),
-                Flexible(
+                // Иконка на весь доступный размер
+                Positioned.fill(
+                  child: Center(
+                    child: FractionallySizedBox(
+                      widthFactor: 0.9, // -10%
+                      heightFactor: 0.9, // -10%
+                      child: svgAsset != null
+                          ? SvgPicture.asset(
+                              svgAsset!,
+                              fit: BoxFit.contain,
+                            )
+                          : Icon(
+                              icon,
+                              size: 64,
+                              color: foreground,
+                            ),
+                    ),
+                  ),
+                ),
+                // Заголовок в левом верхнем углу внутри карточки
+                Positioned(
+                  top: 8,
+                  left: 8,
                   child: Text(
                     title,
-                    textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.titleMedium!.copyWith(
-                          color: foreground,
+                          color: const Color(0xFF757575),
                           fontWeight: FontWeight.w600,
+                          fontSize: 16,
                         ),
                   ),
                 ),
