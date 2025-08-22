@@ -94,6 +94,17 @@ serve(async (req: Request): Promise<Response> => {
     if (bot === 'alex') bot = 'max';
     const isMax = bot === 'max';
 
+    // Логируем входящие параметры для отладки
+    console.log('🔧 DEBUG: Входящие параметры:', {
+      mode,
+      messagesCount: Array.isArray(messages) ? messages.length : 0,
+      userContext: userContext ? 'ЕСТЬ' : 'НЕТ',
+      levelContext: levelContext ? 'ЕСТЬ' : 'НЕТ',
+      knowledgeContext: knowledgeContext ? 'ЕСТЬ' : 'НЕТ',
+      bot,
+      isMax,
+    });
+
     // ==============================
     // QUIZ MODE (short reply, no RAG)
     // ==============================
@@ -233,6 +244,7 @@ serve(async (req: Request): Promise<Response> => {
     // Для Alex (бот-трекер) RAG отключаем полностью
     let ragContext = '';
     if (!isMax && typeof lastUserMessage === 'string' && lastUserMessage.trim().length > 0) {
+      console.log('🔧 DEBUG: RAG включен для бота:', bot, 'последнее сообщение:', lastUserMessage.substring(0, 100));
       try {
         const embeddingModel = Deno.env.get("OPENAI_EMBEDDING_MODEL") || "text-embedding-3-small";
         const matchThreshold = parseFloat(Deno.env.get("RAG_MATCH_THRESHOLD") || "0.35");
@@ -269,6 +281,12 @@ serve(async (req: Request): Promise<Response> => {
           if (matchError) {
             console.error('ERR rag_match_documents', { message: matchError.message });
           }
+          
+          console.log('🔧 DEBUG: RAG результаты:', { 
+            found: Array.isArray(results) ? results.length : 0, 
+            error: matchError?.message || 'none',
+            metadataFilter: Object.keys(metadataFilter).length ? metadataFilter : 'none'
+          });
 
           const docs = Array.isArray(results) ? results : [];
           // Сжатие чанков в тезисы
@@ -280,6 +298,9 @@ serve(async (req: Request): Promise<Response> => {
           ragContext = joined;
           if (ragContext) {
             setCached(ragCache, ragKeyBase, ragContext, ragTtlMs);
+            console.log('🔧 DEBUG: RAG контекст создан, длина:', ragContext.length, 'символов');
+          } else {
+            console.log('🔧 DEBUG: RAG контекст пустой');
           }
         }
       } catch (e) {
@@ -335,6 +356,7 @@ serve(async (req: Request): Promise<Response> => {
       knowledgeContext_present: Boolean(knowledgeContext),
       bot: isMax ? 'max' : 'leo',
       mode,
+      lastUserMessage: Array.isArray(messages) ? [...messages].reverse().find((m: any) => m?.role === 'user')?.content?.substring(0, 100) : 'none',
     });
     
     // Extra goal/sprint/reminders/quote context for Alex (tracker)
@@ -531,6 +553,17 @@ ${quoteBlock ? `Цитата дня: ${quoteBlock}\n` : ''}
 - Не говори, что у тебя нет доступа к профилю. Используй данные из разделов выше (Персонализация, Персона, Память, Итоги) и отвечай по ним.`;
 
     const systemPrompt = isMax ? systemPromptAlex : systemPromptLeo;
+
+    // Логируем финальный промпт для отладки
+    console.log('🔧 DEBUG: Финальный промпт:', {
+      bot: isMax ? 'max' : 'leo',
+      hasRagContext: Boolean(ragContext),
+      ragContextLength: ragContext ? ragContext.length : 0,
+      hasUserContext: Boolean(userContextText),
+      hasLevelContext: Boolean(levelContext),
+      hasMemories: Boolean(memoriesText),
+      hasSummaries: Boolean(recentSummaries),
+    });
 
     // --- Безопасный вызов OpenAI с валидацией конфигурации ---
     const apiKey = Deno.env.get("OPENAI_API_KEY");

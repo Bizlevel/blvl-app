@@ -103,6 +103,7 @@ class LeoService {
   }
 
   /// Отправляет сообщение с использованием RAG системы
+  /// RAG автоматически выполняется на сервере для всех запросов (кроме бота 'max')
   Future<Map<String, dynamic>> sendMessageWithRAG({
     required List<Map<String, dynamic>> messages,
     required String userContext,
@@ -126,7 +127,6 @@ class LeoService {
             'messages': messages,
             'userContext': userContext,
             'levelContext': levelContext,
-            'enableRag': true,
             'bot': bot,
           }),
           options: Options(headers: {
@@ -249,7 +249,7 @@ class LeoService {
   }
 
   /// Получает контекст из базы знаний
-  // _getKnowledgeContext удалён: серверная функция leo-chat теперь сама строит контекст.
+  /// RAG теперь встроен в серверную функцию leo-chat и выполняется автоматически
 
   /// Generic retry with exponential backoff (300ms, 600ms)
   Future<T> _withRetry<T>(Future<T> Function() action,
