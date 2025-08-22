@@ -30,7 +30,8 @@ flutter_ios_podfile_setup
 
 target 'Runner' do
   # Линкуем все Flutter‑плагины как статические фреймворки
-  use_frameworks! :linkage => :static
+  #use_frameworks! :linkage => :static
+  use_frameworks!
 
   # Подхватываем плагины, сгенерированные Flutter
   flutter_install_all_ios_pods(File.dirname(File.realpath(__FILE__)))
