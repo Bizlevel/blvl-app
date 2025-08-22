@@ -39,9 +39,6 @@ target 'Runner' do
   pod 'Sentry/HybridSDK',
     :git => 'https://github.com/getsentry/sentry-cocoa.git',
     :tag => '8.52.1'
-  
-  # ✅ фиксируем app_links минимум 6.4.0
-  pod 'app_links', :path => '../.symlinks/plugins/app_links/ios'
 
 
 end
