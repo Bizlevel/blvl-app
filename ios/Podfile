@@ -41,7 +41,8 @@ target 'Runner' do
     :tag => '8.52.1'
   
   # ✅ фиксируем app_links минимум 6.4.0
-  pod 'app_links', '>= 6.4.0', :path => '../.symlinks/plugins/app_links/ios'
+  pod 'app_links', :path => '../.symlinks/plugins/app_links/ios'
+
 
 end
 
