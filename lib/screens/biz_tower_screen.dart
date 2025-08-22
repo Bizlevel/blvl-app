@@ -497,54 +497,80 @@ Widget _buildCheckpointNode(BuildContext context,
     WidgetsBinding.instance.addPostFrameCallback((_) => _recomputeSegments());
   }
 
-  void _recomputeSegments() {
-    final stackCtx = _stackKey.currentContext;
-    if (stackCtx == null) return;
-    final stackBox = stackCtx.findRenderObject() as RenderBox?;
-    if (stackBox == null) return;
+void _recomputeSegments() {
+  final stackCtx = _stackKey.currentContext;
+  if (stackCtx == null) return;
+  final stackBox = stackCtx.findRenderObject() as RenderBox?;
+  if (stackBox == null) return;
 
-    final List<int> levelNumbers = _lastNodes
-        .where((n) => n['type'] == 'level')
-        .map<int>((n) => n['level'] as int)
-        .toList()
-      ..sort();
+  // 1) Карта статусов уровней
+  final Map<int, Map<String, dynamic>> levelData = {
+    for (final n in _lastNodes.where((e) => e['type'] == 'level'))
+      (n['level'] as int):
+          (n['data'] as Map).cast<String, dynamic>() // isCompleted/isCurrent/isLocked внутри
+  };
 
-    final Map<int, Map<String, dynamic>> levelData = {
-      for (final n in _lastNodes.where((e) => e['type'] == 'level'))
-        (n['level'] as int): (n['data'] as Map).cast<String, dynamic>()
-    };
+  bool isLevelCompleted(int lvl) =>
+      (levelData[lvl]?['isCompleted'] as bool?) ?? false;
+  bool isLevelCurrent(int lvl) =>
+      (levelData[lvl]?['isCurrent'] as bool?) ?? false;
+  bool isLevelLocked(int lvl) =>
+      (levelData[lvl]?['isLocked'] as bool?) ?? false;
 
-    final List<_NodePoint> points = [];
-    for (final num in levelNumbers) {
-      final key = _squareKeys[num];
-      final ctx = key?.currentContext;
-      final box = ctx?.findRenderObject() as RenderBox?;
-      if (box == null) continue;
-      final size = box.size;
-      final centerGlobal =
-          box.localToGlobal(Offset(size.width / 2, size.height / 2));
-      final centerLocal = stackBox.globalToLocal(centerGlobal);
-      points.add(_NodePoint(num, centerLocal));
-    }
+  // 2) Карта статусов чекпоинтов: ключи соответствуют _squareKeys[-afterLevel]
+  final Map<int, bool> cpCompleted = {
+    for (final n in _lastNodes.where((e) => e['type'] == 'checkpoint'))
+      -(n['afterLevel'] as int): (n['isCompleted'] as bool?) ?? false
+  };
 
-    final List<_Segment> segments = [];
-    for (int i = 0; i < points.length - 1; i++) {
-      final a = points[i];
-      final b = points[i + 1];
-      final data = levelData[a.levelNumber] ?? const {};
-      final bool completed = data['isCompleted'] == true;
-      final bool current = data['isCurrent'] == true;
-      final bool locked = data['isLocked'] == true;
-      final color = completed
-          ? AppColor.success
-          : (current
-              ? AppColor.info
-              : (locked ? Colors.grey.withOpacity(0.6) : AppColor.info));
-      segments.add(_Segment(a.point, b.point, color));
-    }
+  // 3) Формируем ПОРЯДОК так же, как ты рендеришь: снизу вверх => nodes.reversed
+  final ordered = _lastNodes.reversed.where((n) {
+    final t = n['type'];
+    return t == 'level' || t == 'checkpoint';
+  }).map<int?>((n) {
+    if (n['type'] == 'level') return n['level'] as int?;
+    // чекпоинт привязываем к отрицательному индексу
+    return -(n['afterLevel'] as int);
+  }).whereType<int>().toList(growable: false);
 
-    setState(() => _segments = segments);
+  // 4) Снимаем центры виджетов по _squareKeys для каждого ID (уровни >=0, чекпоинты <0)
+  final List<_NodePoint> points = [];
+  for (final id in ordered) {
+    final key = _squareKeys[id];
+    final ctx = key?.currentContext;
+    final box = ctx?.findRenderObject() as RenderBox?;
+    if (box == null) continue;
+    final size = box.size;
+    final centerGlobal =
+        box.localToGlobal(Offset(size.width / 2, size.height / 2));
+    final centerLocal = stackBox.globalToLocal(centerGlobal);
+    points.add(_NodePoint(id, centerLocal));
   }
+
+  // 5) Функция выбора цвета сегмента по «from-узлу»
+  Color colorFor(int id) {
+    if (id >= 0) {
+      if (isLevelCompleted(id)) return AppColor.success;
+      if (isLevelCurrent(id)) return AppColor.info;
+      if (isLevelLocked(id)) return Colors.grey.withOpacity(0.6);
+      return AppColor.info;
+    } else {
+      // чекпоинт
+      final done = cpCompleted[id] ?? false;
+      return done ? AppColor.success : AppColor.info;
+    }
+  }
+
+  // 6) Строим сегменты между соседними точками
+  final List<_Segment> newSegments = [];
+  for (int i = 0; i < points.length - 1; i++) {
+    final a = points[i];
+    final b = points[i + 1];
+    newSegments.add(_Segment(a.point, b.point, colorFor(a.levelNumber)));
+  }
+
+  setState(() => _segments = newSegments);
+}
 }
 
 Alignment _alignmentForLevel(int level) {
