@@ -147,7 +147,7 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
                                     title: 'Этаж 2: Продажи',
                                     onTap: () => ScaffoldMessenger.of(context)
                                         .showSnackBar(const SnackBar(
-                                            content: Text('Скоро'))))),
+                                            content: Text('ppp'))))),
                             const _FloorDivider(),
                             _FloorSection(
                                 child: _LockedFloorTile(
@@ -355,7 +355,8 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
           children: [
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
-              child: Text(
+              child: SizedBox(
+                width: 88, child: Text(
                 _truncateToTwoWords(levelNumber == 0
                     ? 'Уровень 0: Первый шаг'
                     : 'Уровень $levelNumber: ${data['name']}'),
@@ -364,11 +365,12 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
                     : (align == Alignment.centerRight
                         ? TextAlign.right
                         : TextAlign.center),
-                maxLines: 2,
+                maxLines: 3,
                 overflow: TextOverflow.ellipsis,
                 style:
                     const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
               ),
+              ) 
             ),
             Container(
               width: 88,
@@ -615,6 +617,7 @@ class _Segment {
   _Segment(this.a, this.b, this.color);
 }
 
+
 class _TowerPathPainter extends CustomPainter {
   final List<_Segment> segments;
   _TowerPathPainter({required this.segments});
@@ -627,12 +630,13 @@ class _TowerPathPainter extends CustomPainter {
         ..strokeWidth = 2
         ..style = PaintingStyle.stroke
         ..isAntiAlias = true;
-      // Рисуем мягкую диагональную кривую (квадратичная Безье), чтобы линии не были строго вертикальными
-      final midX = (s.a.dx + s.b.dx) / 2;
-      final control = Offset(midX, s.a.dy + (s.b.dy - s.a.dy) * 0.3);
+      // Рисуем линию с одним углом 90 градусов:
+      // Сначала вертикально до уровня B по X, затем горизонтально до точки B
+      final corner = Offset(s.b.dx, s.a.dy);
       final path = Path()
         ..moveTo(s.a.dx, s.a.dy)
-        ..quadraticBezierTo(control.dx, control.dy, s.b.dx, s.b.dy);
+        ..lineTo(corner.dx, corner.dy)
+        ..lineTo(s.b.dx, s.b.dy);
       canvas.drawPath(path, paint);
     }
   }
