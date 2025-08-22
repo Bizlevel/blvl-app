@@ -564,15 +564,16 @@ void _recomputeSegments() {
 }
 
 Alignment _alignmentForLevel(int level) {
-  if (level <= 0) return Alignment.center;
-  final int idx = (level - 1) % 3; // 0,1,2 → центр, лево, право
-  switch (idx) {
-    case 0:
-      return Alignment.center;
-    case 1:
-      return Alignment.centerLeft;
-    default:
-      return Alignment.centerRight;
+  if (level <= 0) return Alignment.center; // L0 по центру
+
+  // Маппинг трёх колонок слева-направо: 1=лево, 2=центр, 3=право
+  // Последовательность: 1,2,3,2,1,2,3,2, ...
+  final m = (level - 1) % 4; // ОБЯЗАТЕЛЬНО (level - 1), а не level % 4
+  switch (m) {
+    case 0: return Alignment.centerLeft;   // 1
+    case 1: return Alignment.center;       // 2
+    case 2: return Alignment.centerRight;  // 3
+    default: return Alignment.center;      // 2
   }
 }
 
