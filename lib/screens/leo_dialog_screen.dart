@@ -243,9 +243,17 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
   }
 
   List<Map<String, dynamic>> _buildChatContext() {
-    return _messages
+    final List<Map<String, dynamic>> ctx = _messages
         .map((m) => {'role': m['role'], 'content': m['content']})
         .toList();
+    // В режиме мини‑кейса добавляем системный промпт фасилитатора как первое сообщение
+    if (widget.caseMode) {
+      final sp = widget.systemPrompt?.trim();
+      if (sp != null && sp.isNotEmpty) {
+        ctx.insert(0, {'role': 'system', 'content': sp});
+      }
+    }
+    return ctx;
   }
 
   @override

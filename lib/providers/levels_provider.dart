@@ -140,6 +140,33 @@ final towerNodesProvider =
     FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final levels = await ref.watch(levelsProvider.future);
   final Map<int, bool> cp = await _readCheckpointState();
+  // Загрузим мини-кейсы и прогресс пользователя по ним (id ∈ {1,2,3})
+  final supa = Supabase.instance.client;
+  final List<dynamic> casesRows = await supa
+      .from('mini_cases')
+      .select('id, after_level, title, is_required, active')
+      .order('after_level');
+
+  final Map<int, Map<String, dynamic>> miniCasesByAfterLevel = {
+    for (final r in casesRows)
+      (r['after_level'] as int): Map<String, dynamic>.from(r as Map)
+  };
+
+  final List<int> caseIds =
+      casesRows.map<int>((r) => (r['id'] as int)).toList(growable: false);
+  final Set<int> doneCaseIds = <int>{};
+  if (caseIds.isNotEmpty) {
+    final List<dynamic> prog = await supa
+        .from('user_case_progress')
+        .select('case_id, status')
+        .inFilter('case_id', caseIds);
+    for (final p in prog) {
+      final status = (p['status'] as String?)?.toLowerCase() ?? 'started';
+      if (status == 'completed' || status == 'skipped') {
+        doneCaseIds.add((p['case_id'] as num).toInt());
+      }
+    }
+  }
 
   // Каркас узлов: level | divider | checkpoint
   final List<Map<String, dynamic>> nodes = [];
@@ -156,9 +183,10 @@ final towerNodesProvider =
   // Разделитель «Этаж 1»
   nodes.add({'type': 'divider', 'title': 'Этаж 1: База предпринимательства'});
 
-  // Чекпоинты после уровней (MVP — считаем пройденными, состояние подключим в 34.3)
-  const checkpointAfter = <int>{2, 3, 5, 7, 9, 10};
-  final Set<int> blockedNextLevels = {}; // MVP: блокировку не применяем
+  // Чекпоинты-плашки (без блокировки) для уровней без мини‑кейсов
+  const checkpointAfterNoCase = <int>{2, 5, 7, 10};
+  // Номера уровней, которые заблокированы мини‑кейсом до его выполнения
+  final Set<int> blockedNextLevels = {};
 
   // Уровни 1..N
   for (final l in levels.where((x) => (x['level'] as int? ?? 0) > 0)) {
@@ -169,14 +197,31 @@ final towerNodesProvider =
       'data': l,
       'blockedByCheckpoint': blockedNextLevels.contains(num),
     });
-    if (checkpointAfter.contains(num)) {
+    // Вставляем мини‑кейс после 3/6/9 (если активен), иначе — визуальный чекпоинт
+    final mini = miniCasesByAfterLevel[num];
+    if (mini != null) {
+      final int caseId = (mini['id'] as int);
+      final bool isRequired = (mini['is_required'] as bool? ?? true);
+      final bool isDone = doneCaseIds.contains(caseId);
+      nodes.add({
+        'type': 'mini_case',
+        'afterLevel': num,
+        'caseId': caseId,
+        'title': mini['title'],
+        'isCompleted': isDone,
+      });
+      if (isRequired && !isDone) {
+        // Блокируем следующий уровень до завершения/пропуска кейса
+        blockedNextLevels.add(num + 1);
+      }
+    } else if (checkpointAfterNoCase.contains(num)) {
       nodes.add({
         'type': 'checkpoint',
         'afterLevel': num,
         'isCompleted': cp[num] == true,
         'source': 'default',
       });
-      // MVP: не блокируем следующий уровень чекпоинтом
+      // Чекпоинт‑тизер не блокирует путь
     }
   }
 

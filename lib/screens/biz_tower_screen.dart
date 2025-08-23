@@ -510,11 +510,6 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
     return List<int>.generate(count, (i) => pattern[i % pattern.length]);
   }
 
-  // Вспомогательная структура для размещённых узлов
-  // ignore: unused_element
-  _Placed _placedDebug() => _Placed(
-      item: const {}, row: 0, col: 0, left: 0, top: 0, squareTop: 0, size: 0);
-
   Widget _buildLevelNode(BuildContext context,
       {required Map<String, dynamic> data,
       bool blockedByCheckpoint = false,
