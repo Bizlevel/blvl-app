@@ -14,6 +14,8 @@ import '../screens/main_street_screen.dart';
 import '../screens/biz_tower_screen.dart';
 import '../screens/leo_chat_screen.dart';
 import '../screens/goal_screen.dart';
+// material import не требуется
+import '../screens/mini_case_screen.dart';
 
 /// Riverpod provider that exposes the [GoRouter] instance used across the app.
 ///
@@ -62,6 +64,13 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           final id = int.tryParse(state.pathParameters['id'] ?? '0') ?? 0;
           final levelNum = int.tryParse(state.uri.queryParameters['num'] ?? '');
           return LevelDetailScreen(levelId: id, levelNumber: levelNum);
+        },
+      ),
+      GoRoute(
+        path: '/case/:id',
+        builder: (context, state) {
+          final caseId = int.tryParse(state.pathParameters['id'] ?? '0') ?? 0;
+          return MiniCaseScreen(caseId: caseId);
         },
       ),
     ],
@@ -129,3 +138,5 @@ final goRouterProvider = Provider<GoRouter>((ref) {
     },
   );
 });
+
+// stub removed (реализован MiniCaseScreen)

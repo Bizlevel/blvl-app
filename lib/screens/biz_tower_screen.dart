@@ -18,12 +18,28 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
   final ScrollController _scrollController = ScrollController();
   final Map<int, GlobalKey> _nodeKeys = {};
   final GlobalKey _stackKey = GlobalKey();
+  // Сегменты старого painter больше не используются
+  // ignore: unused_field
   List<_Segment> _segments = [];
+  // Центры Y размещённых level-узлов для точного автоскролла
+  final Map<int, double> _levelCenterY = {};
   List<Map<String, dynamic>> _lastNodes = const [];
   int? _lastScrolledTo;
 
   Future<void> _scrollToLevelNumber(int levelNumber) async {
     try {
+      // Пытаемся использовать расчётные координаты
+      final double? centerY = _levelCenterY[levelNumber];
+      if (centerY != null && _scrollController.hasClients) {
+        final double viewport = _scrollController.position.viewportDimension;
+        final double target =
+            (centerY - viewport * 0.3).clamp(0, double.infinity);
+        await _scrollController.animateTo(target,
+            duration: const Duration(milliseconds: 500),
+            curve: Curves.easeInOut);
+        return;
+      }
+      // Фолбэк на ensureVisible (если координаты ещё не рассчитаны)
       final key = _nodeKeys[levelNumber];
       if (key?.currentContext != null) {
         if (!mounted) return;
@@ -39,6 +55,9 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Открытие экрана — breadcrumb (однократно)
+    Sentry.addBreadcrumb(Breadcrumb(
+        level: SentryLevel.info, category: 'tower', message: 'tower_opened'));
     return Scaffold(
       appBar: AppBar(
         centerTitle: true,
@@ -117,14 +136,8 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
                     ],
                   ),
                 ),
-                // Дороги между узлами
-                Positioned.fill(
-                  child: IgnorePointer(
-                    child: CustomPaint(
-                      painter: _TowerPathPainter(segments: _segments),
-                    ),
-                  ),
-                ),
+                // Дороги между узлами: рисуются внутри сетки (_buildTowerGrid) новым painter
+                const SizedBox.shrink(),
                 SafeArea(
                   child: SingleChildScrollView(
                     primary: false,
@@ -144,91 +157,27 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
                             const _FloorDivider(),
                             _FloorSection(
                                 child: _LockedFloorTile(
-                                    title: 'Этаж 2: Продажи',
+                                    title: 'Этаж 4',
                                     onTap: () => ScaffoldMessenger.of(context)
                                         .showSnackBar(const SnackBar(
                                             content: Text('Скоро'))))),
                             const _FloorDivider(),
                             _FloorSection(
                                 child: _LockedFloorTile(
-                                    title: 'Этаж 3: Команда',
+                                    title: 'Этаж 3',
                                     onTap: () => ScaffoldMessenger.of(context)
                                         .showSnackBar(const SnackBar(
                                             content: Text('Скоро'))))),
                             const _FloorDivider(),
                             _FloorSection(
                                 child: _LockedFloorTile(
-                                    title: 'Этаж 4: Масштабирование',
+                                    title: 'Этаж 2',
                                     onTap: () => ScaffoldMessenger.of(context)
                                         .showSnackBar(const SnackBar(
                                             content: Text('Скоро'))))),
                             const SizedBox(height: 12),
-                            // Рендер узлов: снизу вверх — сначала уровень 0, затем этаж 1 и уровни
-                            ...nodes.reversed.map((n) {
-                              final type = n['type'];
-                              if (type == 'divider') {
-                                // Лейбл этажа вынесен в AppBar (закреплён)
-                                return const SizedBox.shrink();
-                              }
-                              if (type == 'checkpoint') {
-                                final int after = n['afterLevel'] as int;
-                                final bool done =
-                                    n['isCompleted'] as bool? ?? false;
-                                return Padding(
-                                  padding:
-                                      const EdgeInsets.symmetric(vertical: 8),
-                                  child: _FloorSection(
-                                    child: _CheckpointTile(
-                                      afterLevel: after,
-                                      isCompleted: done,
-                                      onComplete: () async {
-                                        try {
-                                          final box = await Hive.openBox(
-                                              'tower_checkpoints');
-                                          await box.put('after_${after}', true);
-                                          if (context.mounted) {
-                                            ScaffoldMessenger.of(context)
-                                                .showSnackBar(const SnackBar(
-                                                    content: Text(
-                                                        'Чекпоинт пройден')));
-                                          }
-                                          ref.invalidate(towerNodesProvider);
-                                        } catch (e, st) {
-                                          Sentry.captureException(e,
-                                              stackTrace: st);
-                                        }
-                                      },
-                                    ),
-                                  ),
-                                );
-                              }
-                              // level
-                              final data =
-                                  (n['data'] as Map).cast<String, dynamic>();
-                              final bool blockedByCheckpoint =
-                                  n['blockedByCheckpoint'] as bool? ?? false;
-                              final int num = data['level'] as int? ?? 0;
-                              final Alignment align = _alignmentForLevel(num);
-                              return Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 16),
-                                child: _FloorSection(
-                                  child: SizedBox(
-                                    width: double.infinity,
-                                    child: Align(
-                                      alignment: align,
-                                      child: _buildLevelNode(
-                                        context,
-                                        data: data,
-                                        blockedByCheckpoint:
-                                            blockedByCheckpoint,
-                                        align: align,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              );
-                            }),
+                            // Секция сетки узлов этажа 1: статичная 3-колоночная раскладка
+                            _buildTowerGrid(context, ref, nodes),
                           ],
                         ),
                       ),
@@ -290,6 +239,281 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
       }),
     );
   }
+
+  // Статичная 3‑колоночная сетка узлов башни (этаж 1)
+  Widget _buildTowerGrid(
+      BuildContext context, WidgetRef ref, List<Map<String, dynamic>> nodes) {
+    // Берём только объекты (уровни/чекпоинты/мини-кейсы). Разделители отрисованы выше.
+    final items =
+        nodes.where((n) => n['type'] != 'divider').toList(growable: false);
+
+    return LayoutBuilder(builder: (context, constraints) {
+      final double totalWidth = constraints.maxWidth;
+      const double sidePadding = 24;
+      final double columnWidth =
+          ((totalWidth - sidePadding * 2) / 3).clamp(84.0, 500.0);
+      const double nodeSize = 88;
+      const double checkpointSize = 72;
+      const double rowHeight = 120;
+      const double levelLabelHeight = 34; // высота текста над квадратом уровня
+      final List<int> columns = _generateColumns(items.length);
+      final double canvasHeight = (items.length + 1) * rowHeight;
+
+      // Предварительно вычислим позиции и сегменты для painter
+      final List<_Placed> placed = [];
+      for (int i = 0; i < items.length; i++) {
+        final item = items[i];
+        final bool isCheckpoint =
+            (item['type'] == 'checkpoint' || item['type'] == 'mini_case');
+        final double size = isCheckpoint ? checkpointSize : nodeSize;
+        final double left =
+            sidePadding + columns[i] * columnWidth + (columnWidth - size) / 2;
+        final double centerY = canvasHeight - (i + 0.5) * rowHeight;
+        final double squareTop = centerY - size / 2;
+        final double widgetTop =
+            isCheckpoint ? squareTop : squareTop - levelLabelHeight;
+        placed.add(_Placed(
+            item: item,
+            row: i,
+            col: columns[i],
+            left: left,
+            top: widgetTop,
+            squareTop: squareTop,
+            size: size));
+      }
+
+      // Обновим карту центров уровней для автоскролла
+      _levelCenterY.clear();
+
+      final List<_GridSegment> segments = [];
+      for (int i = 0; i < placed.length - 1; i++) {
+        final a = placed[i];
+        final b = placed[i + 1];
+        final Offset aCenter =
+            Offset(a.left + a.size / 2, a.squareTop + a.size / 2);
+        final Offset bCenter =
+            Offset(b.left + b.size / 2, b.squareTop + b.size / 2);
+
+        // Сохраняем центр Y для level-узлов
+        final String aType = (a.item['type'] as String? ?? 'level');
+        if (aType == 'level') {
+          try {
+            final data = (a.item['data'] as Map).cast<String, dynamic>();
+            final int levelNumber = data['level'] as int? ?? -1;
+            if (levelNumber >= 0) {
+              _levelCenterY[levelNumber] = aCenter.dy;
+            }
+          } catch (_) {}
+        }
+
+        // Точка выхода из A: если колонки разные — из стороны по направлению к B, иначе — из верхней стороны центра
+        late Offset start;
+        if (a.col == b.col) {
+          // Всегда выходим из нижнего узла через боковую грань
+          if (a.col == 2) {
+            start = Offset(a.left, aCenter.dy); // левая грань центра
+          } else {
+            start = Offset(a.left + a.size, aCenter.dy); // правая грань центра
+          }
+        } else if (a.col < b.col) {
+          start = Offset(a.left + a.size, aCenter.dy); // правая грань центр
+        } else {
+          start = Offset(a.left, aCenter.dy); // левая грань центр
+        }
+        // Точка входа в B: снизу по центру
+        final Offset end = Offset(bCenter.dx, b.squareTop + b.size);
+
+        // Цвет по статусу стартового узла
+        Color color = AppColor.info;
+        if (aType == 'level') {
+          final data = (a.item['data'] as Map).cast<String, dynamic>();
+          final bool isCompleted = data['isCompleted'] == true;
+          final bool isCurrent = data['isCurrent'] == true;
+          final bool isLocked = data['isLocked'] == true;
+          color = isCompleted
+              ? AppColor.success
+              : (isCurrent
+                  ? AppColor.info
+                  : (isLocked ? Colors.grey.withOpacity(0.6) : AppColor.info));
+        } else if (aType == 'checkpoint' || aType == 'mini_case') {
+          final bool done = a.item['isCompleted'] as bool? ?? false;
+          color = done ? AppColor.success : AppColor.info;
+        }
+        segments.add(_GridSegment(start: start, end: end, color: color));
+      }
+
+      // Учтём последний узел для карты центров
+      if (placed.isNotEmpty) {
+        final last = placed.last;
+        final String lastType = (last.item['type'] as String? ?? 'level');
+        if (lastType == 'level') {
+          try {
+            final data = (last.item['data'] as Map).cast<String, dynamic>();
+            final int levelNumber = data['level'] as int? ?? -1;
+            if (levelNumber >= 0) {
+              _levelCenterY[levelNumber] = last.squareTop + last.size / 2;
+            }
+          } catch (_) {}
+        }
+      }
+
+      return SizedBox(
+        height: canvasHeight,
+        width: double.infinity,
+        child: Stack(
+          children: [
+            // Слой путей
+            Positioned.fill(
+              child: IgnorePointer(
+                child: CustomPaint(
+                  painter: _GridPathPainter(segments: segments),
+                ),
+              ),
+            ),
+            for (int i = 0; i < items.length; i++)
+              _positionedNode(
+                context: context,
+                ref: ref,
+                item: items[i],
+                row: i, // нижняя строка = 0
+                col: columns[i],
+                columnWidth: columnWidth,
+                sidePadding: sidePadding,
+                canvasHeight: canvasHeight,
+                nodeSize: nodeSize,
+                checkpointSize: checkpointSize,
+                rowHeight: rowHeight,
+              ),
+          ],
+        ),
+      );
+    });
+  }
+
+  // Размещает один объект сетки
+  Widget _positionedNode({
+    required BuildContext context,
+    required WidgetRef ref,
+    required Map<String, dynamic> item,
+    required int row,
+    required int col,
+    required double columnWidth,
+    required double sidePadding,
+    required double canvasHeight,
+    required double nodeSize,
+    required double checkpointSize,
+    required double rowHeight,
+  }) {
+    final type = item['type'] as String?;
+    final bool isCheckpoint = type == 'checkpoint' || type == 'mini_case';
+    final double size = isCheckpoint ? checkpointSize : nodeSize;
+    final double left =
+        sidePadding + col * columnWidth + (columnWidth - size) / 2;
+    final double top = canvasHeight -
+        (row + 1) * rowHeight -
+        (nodeSize - size) / 2; // единая высота строки
+
+    if (isCheckpoint) {
+      // Компактный квадрат чекпоинта
+      return Positioned(
+        left: left,
+        top: top,
+        child: _buildCheckpointNode(context, ref, item, size),
+      );
+    }
+
+    // Узел уровня: используем существующую отрисовку
+    final data = (item['data'] as Map).cast<String, dynamic>();
+    final bool blockedByCheckpoint =
+        item['blockedByCheckpoint'] as bool? ?? false;
+    final int num = data['level'] as int? ?? 0;
+    final Alignment align = _alignmentForLevel(num);
+
+    return Positioned(
+      left: left,
+      top: top,
+      width: nodeSize,
+      child: _buildLevelNode(
+        context,
+        data: data,
+        blockedByCheckpoint: blockedByCheckpoint,
+        align: align,
+      ),
+    );
+  }
+
+  // Компактный квадрат чекпоинта/мини‑кейса в сетке
+  Widget _buildCheckpointNode(BuildContext context, WidgetRef ref,
+      Map<String, dynamic> node, double size) {
+    final String type = node['type'] as String? ?? 'checkpoint';
+    final bool isCompleted = node['isCompleted'] as bool? ?? false;
+    final int after = node['afterLevel'] as int? ?? 0;
+    final int? caseId = node['caseId'] as int?;
+
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () async {
+            try {
+              if (type == 'mini_case' && caseId != null) {
+                context.push('/case/$caseId');
+              } else if (!isCompleted) {
+                final box = await Hive.openBox('tower_checkpoints');
+                await box.put('after_${after}', true);
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Чекпоинт пройден')),
+                );
+                ref.invalidate(towerNodesProvider);
+              }
+            } catch (e, st) {
+              Sentry.captureException(e, stackTrace: st);
+            }
+          },
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.black12),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x11000000),
+                  blurRadius: 8,
+                  offset: Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Center(
+              child: Icon(
+                type == 'mini_case'
+                    ? Icons.work_outline
+                    : (isCompleted
+                        ? Icons.check_circle
+                        : Icons.center_focus_strong),
+                color: type == 'mini_case'
+                    ? AppColor.info
+                    : (isCompleted ? AppColor.success : Colors.black54),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<int> _generateColumns(int count) {
+    const List<int> pattern = [1, 0, 2, 1, 0, 2, 1, 2, 0, 1];
+    return List<int>.generate(count, (i) => pattern[i % pattern.length]);
+  }
+
+  // Вспомогательная структура для размещённых узлов
+  // ignore: unused_element
+  _Placed _placedDebug() => _Placed(
+      item: const {}, row: 0, col: 0, left: 0, top: 0, squareTop: 0, size: 0);
 
   Widget _buildLevelNode(BuildContext context,
       {required Map<String, dynamic> data,
@@ -384,7 +608,7 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
                   ),
                   if (isCurrent)
                     BoxShadow(
-                      color: AppColor.premium.withOpacity(0.55),
+                      color: AppColor.premium.withValues(alpha: 0.55),
                       blurRadius: 18,
                       spreadRadius: 1,
                       offset: const Offset(0, 0),
@@ -558,49 +782,9 @@ class _FloorSection extends StatelessWidget {
   }
 }
 
-class _CheckpointTile extends StatelessWidget {
-  final int afterLevel;
-  final bool isCompleted;
-  final VoidCallback onComplete;
-  const _CheckpointTile(
-      {required this.afterLevel,
-      required this.isCompleted,
-      required this.onComplete});
+// Старый `_CheckpointTile` больше не используется (заменён компактным узлом в сетке)
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: const [
-          BoxShadow(
-              color: Color(0x11000000), blurRadius: 8, offset: Offset(0, 4)),
-        ],
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        children: [
-          Icon(
-            isCompleted ? Icons.check_circle : Icons.flag_outlined,
-            color: isCompleted ? AppColor.success : AppColor.info,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              'Чекпоинт после уровня $afterLevel',
-              style: const TextStyle(fontSize: 14),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: isCompleted ? null : onComplete,
-            child: const Text('Завершить'),
-          ),
-        ],
-      ),
-    );
-  }
-}
+// Старый `_MiniCaseTile` больше не используется (заменён компактным узлом в сетке)
 
 class _NodePoint {
   final int levelNumber;
@@ -615,9 +799,35 @@ class _Segment {
   _Segment(this.a, this.b, this.color);
 }
 
-class _TowerPathPainter extends CustomPainter {
-  final List<_Segment> segments;
-  _TowerPathPainter({required this.segments});
+class _Placed {
+  final Map<String, dynamic> item;
+  final int row;
+  final int col;
+  final double left;
+  final double top;
+  final double squareTop; // фактический top квадрата (без подписи)
+  final double size;
+  _Placed({
+    required this.item,
+    required this.row,
+    required this.col,
+    required this.left,
+    required this.top,
+    required this.squareTop,
+    required this.size,
+  });
+}
+
+class _GridSegment {
+  final Offset start;
+  final Offset end;
+  final Color color;
+  _GridSegment({required this.start, required this.end, required this.color});
+}
+
+class _GridPathPainter extends CustomPainter {
+  final List<_GridSegment> segments;
+  _GridPathPainter({required this.segments});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -627,18 +837,35 @@ class _TowerPathPainter extends CustomPainter {
         ..strokeWidth = 2
         ..style = PaintingStyle.stroke
         ..isAntiAlias = true;
-      // Рисуем мягкую диагональную кривую (квадратичная Безье), чтобы линии не были строго вертикальными
-      final midX = (s.a.dx + s.b.dx) / 2;
-      final control = Offset(midX, s.a.dy + (s.b.dy - s.a.dy) * 0.3);
-      final path = Path()
-        ..moveTo(s.a.dx, s.a.dy)
-        ..quadraticBezierTo(control.dx, control.dy, s.b.dx, s.b.dy);
+
+      final path = Path();
+      final double r = 20;
+      final dx = s.end.dx - s.start.dx;
+      final dy = s.end.dy - s.start.dy;
+
+      path.moveTo(s.start.dx, s.start.dy);
+      if (dx.abs() < 1 || dy.abs() < 1) {
+        // Прямая вертикаль или горизонталь
+        path.lineTo(s.end.dx, s.end.dy);
+      } else {
+        // Манхэттен с входом строго снизу по центру верхнего узла:
+        // горизонталь → скругление к вертикали под центром B → вертикаль до end
+        final alignX = s.end.dx;
+        final preCornerX = s.start.dx < alignX ? alignX - r : alignX + r;
+        path.lineTo(preCornerX, s.start.dy);
+        final control = Offset(alignX, s.start.dy);
+        final cornerY = s.start.dy + (s.end.dy > s.start.dy ? r : -r);
+        path.quadraticBezierTo(control.dx, control.dy, alignX, cornerY);
+        path.lineTo(alignX, s.end.dy);
+      }
       canvas.drawPath(path, paint);
     }
   }
 
   @override
-  bool shouldRepaint(covariant _TowerPathPainter oldDelegate) {
+  bool shouldRepaint(covariant _GridPathPainter oldDelegate) {
     return oldDelegate.segments != segments;
   }
 }
+
+// Старый painter `_TowerPathPainter` удалён (заменён `_GridPathPainter`)
