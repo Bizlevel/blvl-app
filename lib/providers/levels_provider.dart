@@ -5,7 +5,7 @@ import 'package:bizlevel/providers/subscription_provider.dart';
 import 'package:bizlevel/providers/auth_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bizlevel/utils/formatters.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+// import 'package:hive_flutter/hive_flutter.dart';
 import 'package:bizlevel/providers/goals_providers.dart';
 
 /// Provides список уровней с учётом прогресса пользователя.
@@ -176,7 +176,7 @@ final nextLevelToContinueProvider =
 final towerNodesProvider =
     FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final levels = await ref.watch(levelsProvider.future);
-  final Map<int, bool> cp = await _readCheckpointState();
+  // Локальное состояние старых чекпоинтов больше не используется
   // Загрузим мини-кейсы и прогресс пользователя по ним (id ∈ {1,2,3})
   final supa = Supabase.instance.client;
   final List<dynamic> casesRows = await supa
@@ -232,9 +232,7 @@ final towerNodesProvider =
   // Разделитель «Этаж 1»
   nodes.add({'type': 'divider', 'title': 'Этаж 1: База предпринимательства'});
 
-  // Обычные чекпоинты‑тизеры (без блокировки) для уровней без мини‑кейсов
-  // Целевые чекпоинты цели обрабатываются отдельно (после 4/7/10)
-  const checkpointAfterNoCase = <int>{2, 5};
+  // Убраны пустые чекпоинты‑заглушки: оставляем только реальные mini_case и goal_checkpoint
   // Номера уровней, которые заблокированы мини‑кейсом до его выполнения
   final Set<int> blockedNextLevels = {};
 
@@ -280,34 +278,10 @@ final towerNodesProvider =
             : (goalVersion == 3 ? 'v3 SMART' : 'v4 Финал'),
         'isCompleted': isCompleted,
       });
-    } else if (checkpointAfterNoCase.contains(num)) {
-      nodes.add({
-        'type': 'checkpoint',
-        'afterLevel': num,
-        'isCompleted': cp[num] == true,
-        'source': 'default',
-      });
-      // Чекпоинт‑тизер не блокирует путь
     }
   }
 
   return nodes;
 });
 
-Future<Map<int, bool>> _readCheckpointState() async {
-  try {
-    final box = await Hive.openBox('tower_checkpoints');
-    final Map<int, bool> state = {};
-    for (final key in box.keys) {
-      final value = box.get(key) == true;
-      final str = key.toString();
-      if (str.startsWith('after_')) {
-        final n = int.tryParse(str.substring(6));
-        if (n != null) state[n] = value;
-      }
-    }
-    return state;
-  } catch (_) {
-    return {};
-  }
-}
+// _readCheckpointState удалён как неиспользуемый вместе с пустыми чекпоинтами

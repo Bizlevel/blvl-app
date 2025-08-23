@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/providers/levels_provider.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+// import 'package:hive_flutter/hive_flutter.dart';
 import 'package:go_router/go_router.dart';
 
 class BizTowerScreen extends ConsumerStatefulWidget {
@@ -257,7 +257,8 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
       final double columnWidth =
           ((totalWidth - sidePadding * 2) / 3).clamp(84.0, 500.0);
       const double nodeSize = 88;
-      const double checkpointSize = 72;
+      // Чекпоинты теперь такого же размера, как узлы уровней
+      const double checkpointSize = 88;
       const double rowHeight = 120;
       const double levelLabelHeight = 34; // высота текста над квадратом уровня
       final List<int> columns = _generateColumns(items.length);
@@ -268,7 +269,7 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
       for (int i = 0; i < items.length; i++) {
         final item = items[i];
         final bool isCheckpoint =
-            (item['type'] == 'checkpoint' || item['type'] == 'mini_case');
+            (item['type'] == 'mini_case' || item['type'] == 'goal_checkpoint');
         final double size = isCheckpoint ? checkpointSize : nodeSize;
         final double left =
             sidePadding + columns[i] * columnWidth + (columnWidth - size) / 2;
@@ -339,7 +340,7 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
               : (isCurrent
                   ? AppColor.info
                   : (isLocked ? Colors.grey.withOpacity(0.6) : AppColor.info));
-        } else if (aType == 'checkpoint' || aType == 'mini_case') {
+        } else if (aType == 'mini_case' || aType == 'goal_checkpoint') {
           final bool done = a.item['isCompleted'] as bool? ?? false;
           color = done ? AppColor.success : AppColor.info;
         }
@@ -420,11 +421,18 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
         (nodeSize - size) / 2; // единая высота строки
 
     if (isCheckpoint) {
-      // Компактный квадрат чекпоинта
+      // Квадрат чекпоинта по стилю уровня, но с белым фоном и подписью
       return Positioned(
         left: left,
-        top: top,
-        child: _buildCheckpointNode(context, ref, item, size),
+        top: top - 34, // место для подписи сверху
+        width: nodeSize,
+        child: _buildStyledCheckpointNode(
+            context: context,
+            ref: ref,
+            node: item,
+            size: nodeSize,
+            align: _alignmentForLevel(
+                ((item['afterLevel'] as int? ?? 0) + 1))),
       );
     }
 
@@ -448,71 +456,95 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
     );
   }
 
-  // Компактный квадрат чекпоинта/мини‑кейса в сетке
-  Widget _buildCheckpointNode(BuildContext context, WidgetRef ref,
-      Map<String, dynamic> node, double size) {
+  // Старый компактный checkpoint-рендер больше не используется (заменён стилизованным)
+
+  // Новый стиль чекпоинта: как квадрат уровня, но белый, с подписью
+  Widget _buildStyledCheckpointNode({
+    required BuildContext context,
+    required WidgetRef ref,
+    required Map<String, dynamic> node,
+    required double size,
+    required Alignment align,
+  }) {
     final String type = node['type'] as String? ?? 'checkpoint';
     final bool isCompleted = node['isCompleted'] as bool? ?? false;
     final int after = node['afterLevel'] as int? ?? 0;
     final int? caseId = node['caseId'] as int?;
     final int? goalVersion = node['version'] as int?;
 
-    return SizedBox(
-      width: size,
-      height: size,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: () async {
-            try {
-              if (type == 'mini_case' && caseId != null) {
-                context.push('/case/$caseId');
-              } else if (type == 'goal_checkpoint' && goalVersion != null) {
-                context.push('/goal-checkpoint/$goalVersion');
-              } else if (!isCompleted) {
-                final box = await Hive.openBox('tower_checkpoints');
-                await box.put('after_${after}', true);
-                if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Чекпоинт пройден')),
-                );
-                ref.invalidate(towerNodesProvider);
-              }
-            } catch (e, st) {
-              Sentry.captureException(e, stackTrace: st);
+    String label;
+    if (type == 'mini_case') {
+      final caseIndex = after == 3 ? 1 : (after == 6 ? 2 : (after == 9 ? 3 : 0));
+      label = caseIndex > 0 ? 'Кейс $caseIndex' : 'Кейс';
+    } else if (type == 'goal_checkpoint') {
+      label = 'Кристаллизация цели ${goalVersion ?? ''}'.trim();
+    } else {
+      label = '';
+    }
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () async {
+          try {
+            if (type == 'mini_case' && caseId != null) {
+              context.push('/case/$caseId');
+            } else if (type == 'goal_checkpoint' && goalVersion != null) {
+              context.push('/goal-checkpoint/$goalVersion');
             }
-          },
-          child: Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.black12),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x11000000),
-                  blurRadius: 8,
-                  offset: Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Center(
-              child: Icon(
-                type == 'mini_case'
-                    ? Icons.work_outline
-                    : (type == 'goal_checkpoint'
-                        ? (isCompleted ? Icons.flag : Icons.flag_outlined)
-                        : (isCompleted
-                            ? Icons.check_circle
-                            : Icons.center_focus_strong)),
-                color: type == 'mini_case'
-                    ? AppColor.info
-                    : (type == 'goal_checkpoint'
-                        ? (isCompleted ? AppColor.success : AppColor.info)
-                        : (isCompleted ? AppColor.success : Colors.black54)),
+          } catch (e, st) {
+            Sentry.captureException(e, stackTrace: st);
+          }
+        },
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                label,
+                textAlign: align == Alignment.centerLeft
+                    ? TextAlign.left
+                    : (align == Alignment.centerRight
+                        ? TextAlign.right
+                        : TextAlign.center),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
               ),
             ),
-          ),
+            Container(
+              width: size,
+              height: size,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.black12),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x11000000),
+                    blurRadius: 8,
+                    offset: Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Center(
+                child: Icon(
+                  type == 'mini_case'
+                      ? Icons.work_outline
+                      : (type == 'goal_checkpoint'
+                          ? (isCompleted ? Icons.flag : Icons.flag_outlined)
+                          : Icons.center_focus_strong),
+                  color: type == 'mini_case'
+                      ? AppColor.info
+                      : (type == 'goal_checkpoint'
+                          ? (isCompleted ? AppColor.success : AppColor.info)
+                          : Colors.black54),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
