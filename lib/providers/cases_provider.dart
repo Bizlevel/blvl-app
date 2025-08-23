@@ -23,12 +23,25 @@ class CaseActions {
 }
 
 final caseActionsProvider = Provider<CaseActions>((ref) {
-  final repo = ref.watch(casesRepositoryProvider);
+  // Use read here since we only need to call methods, not rebuild on repo changes
+  final repo = ref.read(casesRepositoryProvider);
   return CaseActions(
-    start: (id) => repo.startCase(id),
-    skip: (id) => repo.skipCase(id),
-    complete: (id) => repo.completeCase(id),
-    incrementHint: (id) => repo.incrementHint(id),
+    start: (id) async {
+      await repo.startCase(id);
+      // Invalidate the specific case status so consumers pick up the new value
+      ref.invalidate(caseStatusProvider(id));
+    },
+    skip: (id) async {
+      await repo.skipCase(id);
+      ref.invalidate(caseStatusProvider(id));
+    },
+    complete: (id) async {
+      await repo.completeCase(id);
+      ref.invalidate(caseStatusProvider(id));
+    },
+    incrementHint: (id) async {
+      await repo.incrementHint(id);
+      ref.invalidate(caseStatusProvider(id));
+    },
   );
 });
-

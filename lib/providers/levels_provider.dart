@@ -6,6 +6,7 @@ import 'package:bizlevel/providers/auth_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bizlevel/utils/formatters.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:bizlevel/providers/goals_providers.dart';
 
 /// Provides список уровней с учётом прогресса пользователя.
 final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
@@ -93,6 +94,13 @@ final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
 final nextLevelToContinueProvider =
     FutureProvider<Map<String, dynamic>>((ref) async {
   final levels = await ref.watch(levelsProvider.future);
+  // Интеграция незавершённых goal_checkpoint как следующей цели (36.9)
+  // Используем towerNodesProvider, чтобы найти ближайший незавершённый checkpoint цели
+  final nodes = await ref.watch(towerNodesProvider.future);
+  // Ищем первый узел goal_checkpoint с isCompleted=false и запоминаем его afterLevel
+  final Map<String, dynamic> pendingGoalCp = nodes.firstWhere(
+      (n) => n['type'] == 'goal_checkpoint' && (n['isCompleted'] != true),
+      orElse: () => <String, dynamic>{});
 
   final hasPremium =
       ref.watch(currentUserProvider.select((user) => user.value?.isPremium)) ??
@@ -102,6 +110,35 @@ final nextLevelToContinueProvider =
   final subscriptionStatus =
       ref.watch(subscriptionProvider.select((sub) => sub.value));
   final bool isPremium = hasPremium || (subscriptionStatus == 'active');
+
+  // 0) Если есть незавершённый чекпоинт цели — предлагаем дойти до него (скролл)
+  if (pendingGoalCp.isNotEmpty) {
+    final int afterLevel = pendingGoalCp['afterLevel'] as int? ?? 0;
+    final int targetLevel = afterLevel; // скроллим к уровню перед чекпоинтом
+    final int? gver = pendingGoalCp['version'] as int?;
+    // Найдём сам уровень в списке levels
+    final candidate = levels.firstWhere(
+      (l) => (l['level'] as int? ?? -1) == targetLevel,
+      orElse: () => levels.first,
+    );
+    final String? lockReason = candidate['lockReason'] as String?;
+    final bool isPremiumLock =
+        lockReason != null && lockReason.toLowerCase().contains('премиум');
+    final hasPremium =
+        ref.watch(currentUserProvider.select((u) => u.value?.isPremium)) ??
+            false;
+    final subscriptionStatus =
+        ref.watch(subscriptionProvider.select((s) => s.value));
+    final bool isPremiumActive = hasPremium || (subscriptionStatus == 'active');
+    final bool requiresPremium = isPremiumLock && !isPremiumActive;
+    return {
+      'levelId': candidate['id'] as int,
+      'levelNumber': targetLevel,
+      'floorId': 1,
+      'requiresPremium': requiresPremium,
+      if (gver != null) 'goalCheckpointVersion': gver,
+    };
+  }
 
   // 1) Если есть текущий незавершённый — продолжаем его
   Map<String, dynamic>? candidate = levels
@@ -145,13 +182,14 @@ final towerNodesProvider =
   final List<dynamic> casesRows = await supa
       .from('mini_cases')
       .select('id, after_level, title, is_required, active')
+      .eq('active', true)
       .order('after_level');
 
   final Map<int, Map<String, dynamic>> miniCasesByAfterLevel = {
     for (final r in casesRows)
-      (r['after_level'] as int): Map<String, dynamic>.from(r as Map)
+      if (r is Map<String, dynamic> && r['after_level'] != null)
+        (r['after_level'] as num).toInt(): Map<String, dynamic>.from(r)
   };
-
   final List<int> caseIds =
       casesRows.map<int>((r) => (r['id'] as int)).toList(growable: false);
   final Set<int> doneCaseIds = <int>{};
@@ -168,6 +206,17 @@ final towerNodesProvider =
     }
   }
 
+  // Статусы версий цели (v2 после L4, v3 после L7, v4 после L10)
+  final Map<int, int> goalCheckpointVersionByAfterLevel = const {
+    4: 2,
+    7: 3,
+    10: 4,
+  };
+  // Проверяем наличие версий через провайдер (единый источник истины)
+  final bool hasV2 = await ref.watch(hasGoalVersionProvider(2).future);
+  final bool hasV3 = await ref.watch(hasGoalVersionProvider(3).future);
+  final bool hasV4 = await ref.watch(hasGoalVersionProvider(4).future);
+
   // Каркас узлов: level | divider | checkpoint
   final List<Map<String, dynamic>> nodes = [];
 
@@ -183,8 +232,9 @@ final towerNodesProvider =
   // Разделитель «Этаж 1»
   nodes.add({'type': 'divider', 'title': 'Этаж 1: База предпринимательства'});
 
-  // Чекпоинты-плашки (без блокировки) для уровней без мини‑кейсов
-  const checkpointAfterNoCase = <int>{2, 5, 7, 10};
+  // Обычные чекпоинты‑тизеры (без блокировки) для уровней без мини‑кейсов
+  // Целевые чекпоинты цели обрабатываются отдельно (после 4/7/10)
+  const checkpointAfterNoCase = <int>{2, 5};
   // Номера уровней, которые заблокированы мини‑кейсом до его выполнения
   final Set<int> blockedNextLevels = {};
 
@@ -197,7 +247,7 @@ final towerNodesProvider =
       'data': l,
       'blockedByCheckpoint': blockedNextLevels.contains(num),
     });
-    // Вставляем мини‑кейс после 3/6/9 (если активен), иначе — визуальный чекпоинт
+    // Вставляем мини‑кейс после 3/6/9 (если активен)
     final mini = miniCasesByAfterLevel[num];
     if (mini != null) {
       final int caseId = (mini['id'] as int);
@@ -214,6 +264,22 @@ final towerNodesProvider =
         // Блокируем следующий уровень до завершения/пропуска кейса
         blockedNextLevels.add(num + 1);
       }
+    }
+
+    // Вставляем чекпоинт цели после 4/7/10
+    final int? goalVersion = goalCheckpointVersionByAfterLevel[num];
+    if (goalVersion != null) {
+      final bool isCompleted =
+          goalVersion == 2 ? hasV2 : (goalVersion == 3 ? hasV3 : hasV4);
+      nodes.add({
+        'type': 'goal_checkpoint',
+        'afterLevel': num,
+        'version': goalVersion,
+        'title': goalVersion == 2
+            ? 'v2 Метрики'
+            : (goalVersion == 3 ? 'v3 SMART' : 'v4 Финал'),
+        'isCompleted': isCompleted,
+      });
     } else if (checkpointAfterNoCase.contains(num)) {
       nodes.add({
         'type': 'checkpoint',

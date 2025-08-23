@@ -16,6 +16,7 @@ import '../screens/leo_chat_screen.dart';
 import '../screens/goal_screen.dart';
 // material import не требуется
 import '../screens/mini_case_screen.dart';
+import '../screens/goal_checkpoint_screen.dart';
 
 /// Riverpod provider that exposes the [GoRouter] instance used across the app.
 ///
@@ -71,6 +72,14 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final caseId = int.tryParse(state.pathParameters['id'] ?? '0') ?? 0;
           return MiniCaseScreen(caseId: caseId);
+        },
+      ),
+      GoRoute(
+        path: '/goal-checkpoint/:version',
+        builder: (context, state) {
+          final version =
+              int.tryParse(state.pathParameters['version'] ?? '0') ?? 0;
+          return GoalCheckpointScreen(version: version);
         },
       ),
     ],

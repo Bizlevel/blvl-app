@@ -18,9 +18,7 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
   final ScrollController _scrollController = ScrollController();
   final Map<int, GlobalKey> _nodeKeys = {};
   final GlobalKey _stackKey = GlobalKey();
-  // Сегменты старого painter больше не используются
-  // ignore: unused_field
-  List<_Segment> _segments = [];
+
   // Центры Y размещённых level-узлов для точного автоскролла
   final Map<int, double> _levelCenterY = {};
   List<Map<String, dynamic>> _lastNodes = const [];
@@ -228,7 +226,13 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
           onPressed: () async {
             try {
               final next = await ref.read(nextLevelToContinueProvider.future);
-              await _scrollToLevelNumber(next['levelNumber'] as int? ?? 0);
+              final int? gver = next['goalCheckpointVersion'] as int?;
+              if (gver != null) {
+                if (!mounted) return;
+                context.push('/goal-checkpoint/$gver');
+              } else {
+                await _scrollToLevelNumber(next['levelNumber'] as int? ?? 0);
+              }
             } catch (e, st) {
               Sentry.captureException(e, stackTrace: st);
             }
@@ -405,7 +409,9 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
     required double rowHeight,
   }) {
     final type = item['type'] as String?;
-    final bool isCheckpoint = type == 'checkpoint' || type == 'mini_case';
+    final bool isCheckpoint = type == 'checkpoint' ||
+        type == 'mini_case' ||
+        type == 'goal_checkpoint';
     final double size = isCheckpoint ? checkpointSize : nodeSize;
     final double left =
         sidePadding + col * columnWidth + (columnWidth - size) / 2;
@@ -449,6 +455,7 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
     final bool isCompleted = node['isCompleted'] as bool? ?? false;
     final int after = node['afterLevel'] as int? ?? 0;
     final int? caseId = node['caseId'] as int?;
+    final int? goalVersion = node['version'] as int?;
 
     return SizedBox(
       width: size,
@@ -461,6 +468,8 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
             try {
               if (type == 'mini_case' && caseId != null) {
                 context.push('/case/$caseId');
+              } else if (type == 'goal_checkpoint' && goalVersion != null) {
+                context.push('/goal-checkpoint/$goalVersion');
               } else if (!isCompleted) {
                 final box = await Hive.openBox('tower_checkpoints');
                 await box.put('after_${after}', true);
@@ -491,12 +500,16 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
               child: Icon(
                 type == 'mini_case'
                     ? Icons.work_outline
-                    : (isCompleted
-                        ? Icons.check_circle
-                        : Icons.center_focus_strong),
+                    : (type == 'goal_checkpoint'
+                        ? (isCompleted ? Icons.flag : Icons.flag_outlined)
+                        : (isCompleted
+                            ? Icons.check_circle
+                            : Icons.center_focus_strong)),
                 color: type == 'mini_case'
                     ? AppColor.info
-                    : (isCompleted ? AppColor.success : Colors.black54),
+                    : (type == 'goal_checkpoint'
+                        ? (isCompleted ? AppColor.success : AppColor.info)
+                        : (isCompleted ? AppColor.success : Colors.black54)),
               ),
             ),
           ),
@@ -658,10 +671,10 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
         .toList()
       ..sort();
 
-    final Map<int, Map<String, dynamic>> levelData = {
-      for (final n in _lastNodes.where((e) => e['type'] == 'level'))
-        (n['level'] as int): (n['data'] as Map).cast<String, dynamic>()
-    };
+    // final Map<int, Map<String, dynamic>> levelData = {
+    //   for (final n in _lastNodes.where((e) => e['type'] == 'level'))
+    //     (n['level'] as int): (n['data'] as Map).cast<String, dynamic>()
+    // };
 
     final List<_NodePoint> points = [];
     for (final num in levelNumbers) {
@@ -675,24 +688,6 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
       final centerLocal = stackBox.globalToLocal(centerGlobal);
       points.add(_NodePoint(num, centerLocal));
     }
-
-    final List<_Segment> segments = [];
-    for (int i = 0; i < points.length - 1; i++) {
-      final a = points[i];
-      final b = points[i + 1];
-      final data = levelData[a.levelNumber] ?? const {};
-      final bool completed = data['isCompleted'] == true;
-      final bool current = data['isCurrent'] == true;
-      final bool locked = data['isLocked'] == true;
-      final color = completed
-          ? AppColor.success
-          : (current
-              ? AppColor.info
-              : (locked ? Colors.grey.withOpacity(0.6) : AppColor.info));
-      segments.add(_Segment(a.point, b.point, color));
-    }
-
-    setState(() => _segments = segments);
   }
 }
 
@@ -787,12 +782,12 @@ class _NodePoint {
   _NodePoint(this.levelNumber, this.point);
 }
 
-class _Segment {
-  final Offset a;
-  final Offset b;
-  final Color color;
-  _Segment(this.a, this.b, this.color);
-}
+// class _Segment {
+//   final Offset a;
+//   final Offset b;
+//   final Color color;
+//   _Segment(this.a, this.b, this.color);
+// }
 
 class _Placed {
   final Map<String, dynamic> item;
