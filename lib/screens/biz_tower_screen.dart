@@ -275,8 +275,10 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
             sidePadding + columns[i] * columnWidth + (columnWidth - size) / 2;
         final double centerY = canvasHeight - (i + 0.5) * rowHeight;
         final double squareTop = centerY - size / 2;
-        final double widgetTop =
-            isCheckpoint ? squareTop : squareTop - levelLabelHeight;
+        // Все узлы (уровни и чекпоинты) имеют подпись сверху, поэтому
+        // подвинем квадрат вверх на высоту подписи, чтобы центр совпадал
+        // с расчётным centerY и входящие линии приходили в нижний край квадрата.
+        final double widgetTop = squareTop - levelLabelHeight;
         placed.add(_Placed(
             item: item,
             row: i,
@@ -424,15 +426,14 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
       // Квадрат чекпоинта по стилю уровня, но с белым фоном и подписью
       return Positioned(
         left: left,
-        top: top - 34, // место для подписи сверху
+        top: top - 34,
         width: nodeSize,
         child: _buildStyledCheckpointNode(
             context: context,
             ref: ref,
             node: item,
             size: nodeSize,
-            align: _alignmentForLevel(
-                ((item['afterLevel'] as int? ?? 0) + 1))),
+            align: _alignmentForLevel(((item['afterLevel'] as int? ?? 0) + 1))),
       );
     }
 
@@ -474,7 +475,8 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
 
     String label;
     if (type == 'mini_case') {
-      final caseIndex = after == 3 ? 1 : (after == 6 ? 2 : (after == 9 ? 3 : 0));
+      final caseIndex =
+          after == 3 ? 1 : (after == 6 ? 2 : (after == 9 ? 3 : 0));
       label = caseIndex > 0 ? 'Кейс $caseIndex' : 'Кейс';
     } else if (type == 'goal_checkpoint') {
       label = 'Кристаллизация цели ${goalVersion ?? ''}'.trim();
@@ -511,7 +513,8 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
                         : TextAlign.center),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                style:
+                    const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
               ),
             ),
             Container(
