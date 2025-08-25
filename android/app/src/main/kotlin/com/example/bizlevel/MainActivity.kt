@@ -1,4 +1,4 @@
-package com.example.bizlevel
+package kz.bizlevel.bizlevel
 
 import io.flutter.embedding.android.FlutterActivity
 
