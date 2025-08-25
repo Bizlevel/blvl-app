@@ -6,7 +6,8 @@ import 'package:bizlevel/widgets/level_card.dart';
 import 'package:bizlevel/widgets/user_info_bar.dart';
 import 'package:bizlevel/widgets/notification_box.dart';
 import 'package:shimmer/shimmer.dart';
-import 'package:bizlevel/screens/level_detail_screen.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
+import 'package:go_router/go_router.dart';
 
 class LevelsMapScreen extends ConsumerWidget {
   const LevelsMapScreen({super.key});
@@ -23,7 +24,7 @@ class LevelsMapScreen extends ConsumerWidget {
             pinned: true,
             snap: true,
             floating: true,
-            title: _buildAppBar(ref),
+            title: _buildAppBar(context, ref),
           ),
           _buildLevels(context, ref),
         ],
@@ -31,7 +32,7 @@ class LevelsMapScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildAppBar(WidgetRef ref) {
+  Widget _buildAppBar(BuildContext context, WidgetRef ref) {
     // Используем переиспользуемый виджет UserInfoBar
     return Row(
       children: const [
@@ -65,14 +66,18 @@ class LevelsMapScreen extends ConsumerWidget {
                 return LevelCard(
                   data: levelData,
                   width: double.infinity,
+                  compact: true,
                   onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => LevelDetailScreen(
-                            levelId: levelData['id'] as int,
-                            levelNumber: levelData['level'] as int),
-                      ),
-                    );
+                    try {
+                      final num = levelData['level'] as int;
+                      context.go('/tower?scrollTo=$num');
+                    } catch (e, st) {
+                      Sentry.captureException(e, stackTrace: st);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                            content: Text('Не удалось открыть башню')),
+                      );
+                    }
                   },
                 );
               },
@@ -141,3 +146,5 @@ class LevelsMapScreen extends ConsumerWidget {
     }
   }
 }
+
+// _FloorProgressDots удалён вместе с режимом floorMode

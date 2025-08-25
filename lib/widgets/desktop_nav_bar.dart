@@ -19,7 +19,7 @@ class DesktopNavBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final navRail = NavigationRail(
       extended: true,
-      backgroundColor: Colors.white.withOpacity(0.8),
+      backgroundColor: Colors.white.withValues(alpha: 0.8),
       selectedIndex: activeIndex,
       onDestinationSelected: onTabSelected,
       labelType: NavigationRailLabelType.none,

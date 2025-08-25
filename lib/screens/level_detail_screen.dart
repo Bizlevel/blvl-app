@@ -21,6 +21,7 @@ import 'package:bizlevel/services/auth_service.dart';
 import 'package:bizlevel/providers/user_skills_provider.dart';
 import 'package:bizlevel/providers/goals_repository_provider.dart';
 import 'package:bizlevel/providers/goals_providers.dart';
+import 'package:go_router/go_router.dart';
 
 /// Shows a level as full-screen blocks (Intro → Lesson → Quiz → …).
 class LevelDetailScreen extends ConsumerStatefulWidget {
@@ -187,12 +188,8 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
                                       content: Text('Уровень завершён!')),
                                 );
                                 if ((widget.levelNumber ?? -1) == 1) {
-                                  // После уровня 1: открыть страницу «Цель» (v1)
                                   if (context.mounted) {
-                                    Navigator.of(context).pop();
-                                    // Переход на /goal через Navigator (GoRouter не импортируем здесь)
-                                    // ignore: use_build_context_synchronously
-                                    Navigator.of(context).pushNamed('/goal');
+                                    context.go('/goal');
                                   }
                                 } else {
                                   Navigator.of(context).pop();
@@ -729,6 +726,7 @@ class _ProfileFormBlock extends _PageBlock {
                 about: about,
                 goal: goal,
                 avatarId: selectedAvatarId,
+                onboardingCompleted: true,
               );
           // onSaved будет вызван кнопкой ниже, с передачей целевого индекса
           if (context.mounted) {
@@ -791,7 +789,7 @@ class _ProfileFormBlock extends _PageBlock {
                           borderRadius: BorderRadius.circular(14),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
+                              color: Colors.black.withValues(alpha: 0.1),
                               blurRadius: 2,
                             ),
                           ],

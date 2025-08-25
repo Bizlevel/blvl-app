@@ -4,20 +4,21 @@ import 'package:bizlevel/providers/levels_repository_provider.dart';
 import 'package:bizlevel/providers/subscription_provider.dart';
 import 'package:bizlevel/providers/auth_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:bizlevel/utils/formatters.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
 /// Provides список уровней с учётом прогресса пользователя.
 final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final repo = ref.watch(levelsRepositoryProvider);
 
-  final int? userCurrentLevel =
-      ref.watch(currentUserProvider.select((user) => user.value?.currentLevel));
-  final hasPremium =
-      ref.watch(currentUserProvider.select((user) => user.value?.isPremium));
-  final subscriptionStatus =
-      ref.watch(subscriptionProvider.select((sub) => sub.value));
+  // Дожидаемся профиля пользователя, чтобы избежать расчётов с null userId
+  final user = await ref.watch(currentUserProvider.future);
+  // Не блокируемся на стриме подписки: берём текущее значение, если оно уже есть
+  final subscriptionStatus = ref.watch(subscriptionProvider).asData?.value;
 
+  final int? userCurrentLevel = user?.currentLevel;
   final bool isPremium =
-      (hasPremium ?? false) || (subscriptionStatus == 'active');
+      (user?.isPremium ?? false) || (subscriptionStatus == 'active');
 
   final userId = Supabase.instance.client.auth.currentUser?.id;
   final rows = await repo.fetchLevels(userId: userId);
@@ -58,9 +59,12 @@ final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
 
     return {
       'id': level.id,
-      'image': level.imageUrl,
+      // Репозиторий мог подставить подписанный cover в json['image'].
+      // Используем его с приоритетом, иначе fallback на image_url из модели.
+      'image': (json['image'] ?? level.imageUrl),
       'level': level.number,
       'name': level.title,
+      'displayCode': formatLevelCode(1, level.number),
       'lessons': () {
         final lessonsAgg = json['lessons'];
         if (lessonsAgg is List && lessonsAgg.isNotEmpty) {
@@ -68,7 +72,8 @@ final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
         }
         return 0;
       }(),
-      'isLocked': isLocked,
+      // Уровень 0 должен быть всегда доступен
+      'isLocked': level.number == 0 ? false : isLocked,
       'isCompleted': isCompleted,
       'isCurrent': level.number == userCurrentLevel,
       'lockReason': isLocked
@@ -82,3 +87,116 @@ final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
     };
   }).toList();
 });
+
+/// Определяет «куда продолжить» на главном экране.
+/// Возвращает: { levelId, levelNumber, floorId: 1, requiresPremium }
+final nextLevelToContinueProvider =
+    FutureProvider<Map<String, dynamic>>((ref) async {
+  final levels = await ref.watch(levelsProvider.future);
+
+  final hasPremium =
+      ref.watch(currentUserProvider.select((user) => user.value?.isPremium)) ??
+          false;
+  final int? userCurrentLevel =
+      ref.watch(currentUserProvider.select((user) => user.value?.currentLevel));
+  final subscriptionStatus =
+      ref.watch(subscriptionProvider.select((sub) => sub.value));
+  final bool isPremium = hasPremium || (subscriptionStatus == 'active');
+
+  // 1) Если есть текущий незавершённый — продолжаем его
+  Map<String, dynamic>? candidate = levels
+      .cast<Map<String, dynamic>?>()
+      .firstWhere(
+          (l) =>
+              (l?['isCurrent'] as bool? ?? false) &&
+              (l?['isCompleted'] as bool? ?? false) == false,
+          orElse: () => null);
+
+  // 2) Иначе — берём уровень по номеру current_level (даже если он заблокирован премиумом)
+  candidate ??= levels.firstWhere(
+    (l) => (l['level'] as int? ?? -1) == (userCurrentLevel ?? -999),
+    orElse: () => levels.first,
+  );
+
+  final int levelNumber = candidate['level'] as int? ?? 0;
+  // Опираемся на данные уровня: если уровень помечен как «Только для премиум»,
+  // и у пользователя нет премиума — требуется премиум. Иначе — нет.
+  final String? lockReason = candidate['lockReason'] as String?;
+  final bool isPremiumLock =
+      lockReason != null && lockReason.toLowerCase().contains('премиум');
+  final bool requiresPremium = isPremiumLock && !isPremium;
+
+  return {
+    'levelId': candidate['id'] as int,
+    'levelNumber': levelNumber,
+    'floorId': 1,
+    'requiresPremium': requiresPremium,
+  };
+});
+
+/// Узлы башни (MVP): уровень 0 → divider(этаж 1) → уровни 1..10, чекпоинты будут
+/// добавлены в 34.3 (сейчас помечаем их как завершённые для совместимости).
+final towerNodesProvider =
+    FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  final levels = await ref.watch(levelsProvider.future);
+  final Map<int, bool> cp = await _readCheckpointState();
+
+  // Каркас узлов: level | divider | checkpoint
+  final List<Map<String, dynamic>> nodes = [];
+
+  // Добавляем уровень 0, если он присутствует
+  final level0 = levels.firstWhere(
+    (l) => (l['level'] as int? ?? -1) == 0,
+    orElse: () => <String, dynamic>{},
+  );
+  if (level0.isNotEmpty) {
+    nodes.add({'type': 'level', 'level': 0, 'data': level0});
+  }
+
+  // Разделитель «Этаж 1»
+  nodes.add({'type': 'divider', 'title': 'Этаж 1: База предпринимательства'});
+
+  // Чекпоинты после уровней (MVP — считаем пройденными, состояние подключим в 34.3)
+  const checkpointAfter = <int>{2, 3, 5, 7, 9, 10};
+  final Set<int> blockedNextLevels = {}; // MVP: блокировку не применяем
+
+  // Уровни 1..N
+  for (final l in levels.where((x) => (x['level'] as int? ?? 0) > 0)) {
+    final int num = l['level'] as int? ?? 0;
+    nodes.add({
+      'type': 'level',
+      'level': num,
+      'data': l,
+      'blockedByCheckpoint': blockedNextLevels.contains(num),
+    });
+    if (checkpointAfter.contains(num)) {
+      nodes.add({
+        'type': 'checkpoint',
+        'afterLevel': num,
+        'isCompleted': cp[num] == true,
+        'source': 'default',
+      });
+      // MVP: не блокируем следующий уровень чекпоинтом
+    }
+  }
+
+  return nodes;
+});
+
+Future<Map<int, bool>> _readCheckpointState() async {
+  try {
+    final box = await Hive.openBox('tower_checkpoints');
+    final Map<int, bool> state = {};
+    for (final key in box.keys) {
+      final value = box.get(key) == true;
+      final str = key.toString();
+      if (str.startsWith('after_')) {
+        final n = int.tryParse(str.substring(6));
+        if (n != null) state[n] = value;
+      }
+    }
+    return state;
+  } catch (_) {
+    return {};
+  }
+}

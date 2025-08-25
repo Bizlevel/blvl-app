@@ -10,7 +10,6 @@ import '../providers/auth_provider.dart';
 import '../screens/profile_screen.dart';
 import '../screens/level_detail_screen.dart';
 import '../screens/premium_screen.dart';
-import '../screens/levels_map_screen.dart';
 import '../screens/main_street_screen.dart';
 import '../screens/biz_tower_screen.dart';
 import '../screens/leo_chat_screen.dart';
@@ -48,21 +47,21 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: '/profile',
         builder: (context, state) => const ProfileScreen(),
       ),
-      // Floor 1 screen (reuses current levels map for MVP)
-      GoRoute(
-        path: '/floor/1',
-        builder: (context, state) => const LevelsMapScreen(),
-      ),
       // BizLevel Tower overview (MVP)
       GoRoute(
         path: '/tower',
-        builder: (context, state) => const BizTowerScreen(),
+        builder: (context, state) {
+          final scrollParam =
+              int.tryParse(state.uri.queryParameters['scrollTo'] ?? '');
+          return BizTowerScreen(scrollTo: scrollParam);
+        },
       ),
       GoRoute(
         path: '/levels/:id',
         builder: (context, state) {
           final id = int.tryParse(state.pathParameters['id'] ?? '0') ?? 0;
-          return LevelDetailScreen(levelId: id);
+          final levelNum = int.tryParse(state.uri.queryParameters['num'] ?? '');
+          return LevelDetailScreen(levelId: id, levelNumber: levelNum);
         },
       ),
     ],

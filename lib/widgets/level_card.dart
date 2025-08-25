@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 import 'custom_image.dart';
+import 'package:bizlevel/utils/formatters.dart';
 
 class LevelCard extends StatefulWidget {
   const LevelCard({
@@ -12,12 +13,14 @@ class LevelCard extends StatefulWidget {
     this.width = double.infinity,
     this.height = 290,
     this.onTap,
+    this.compact = false,
   });
 
   final Map<String, dynamic> data;
   final double width;
   final double height;
   final GestureTapCallback? onTap;
+  final bool compact;
 
   @override
   State<LevelCard> createState() => _LevelCardState();
@@ -40,7 +43,9 @@ class _LevelCardState extends State<LevelCard> {
         final double cardWidth = constraints.maxWidth;
         // Отношение ширины к высоте изображения ~ 5:3
         final bool isMobile = MediaQuery.of(context).size.width < 600;
-        final double imageRatio = isMobile ? 0.5 : 0.6;
+        // В компактном режиме уменьшаем высоту изображения (~-40%)
+        final double imageRatio =
+            widget.compact ? (isMobile ? 0.3 : 0.36) : (isMobile ? 0.5 : 0.6);
         final double imageHeight = cardWidth * imageRatio;
 
         return GestureDetector(
@@ -57,23 +62,22 @@ class _LevelCardState extends State<LevelCard> {
             margin: const EdgeInsets.symmetric(vertical: AppSpacing.small),
             decoration: BoxDecoration(
               color: Colors.transparent,
-              border: Border.all(color: Colors.grey.withOpacity(0.3)),
+              border: Border.all(
+                color: _isCurrent
+                    ? AppColor.info
+                    : Colors.grey.withValues(alpha: 0.3),
+                width: _isCurrent ? 2 : 1,
+              ),
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: AppColor.shadowColor.withOpacity(
-                    0.1 + (_hover ? 0.1 : 0),
+                  color: AppColor.shadowColor.withValues(
+                    alpha: 0.1 + (_hover ? 0.1 : 0),
                   ),
                   spreadRadius: _hover ? 2 : 1,
                   blurRadius: _hover ? 6 : 1,
                   offset: const Offset(1, 1),
                 ),
-                if (_isCurrent)
-                  BoxShadow(
-                    color: AppColor.premium.withOpacity(0.6),
-                    spreadRadius: 0,
-                    blurRadius: 12,
-                  ),
               ],
             ),
             child: Stack(
@@ -91,13 +95,14 @@ class _LevelCardState extends State<LevelCard> {
                   right: 15,
                   child: _buildLevelNumber(),
                 ),
-                // Level info (title + lessons count)
-                Positioned(
-                  top: imageHeight + 10,
-                  left: 0,
-                  right: 0,
-                  child: _buildInfo(),
-                ),
+                // Level info (title + lessons count) — скрываем в компактном режиме, кроме текущего
+                if (!(widget.compact && !_isCurrent))
+                  Positioned(
+                    top: imageHeight + 10,
+                    left: 0,
+                    right: 0,
+                    child: _buildInfo(),
+                  ),
                 // Completed overlay
                 if (_isCompleted && !_isLocked) _buildCompletedOverlay(),
                 // Current level overlay
@@ -136,7 +141,7 @@ class _LevelCardState extends State<LevelCard> {
       child: Container(
         padding: const EdgeInsets.all(6),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.8),
+          color: Colors.white.withValues(alpha: 0.8),
           shape: BoxShape.circle,
         ),
         child: const Icon(Icons.check, color: AppColor.success, size: 20),
@@ -159,7 +164,7 @@ class _LevelCardState extends State<LevelCard> {
         child: Container(
           padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.9),
+            color: Colors.white.withValues(alpha: 0.9),
             shape: BoxShape.circle,
           ),
           child: const Icon(Icons.star, color: AppColor.premium, size: 20),
@@ -172,7 +177,7 @@ class _LevelCardState extends State<LevelCard> {
     return Positioned.fill(
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.grey.withOpacity(0.6),
+          color: Colors.grey.withValues(alpha: 0.6),
           borderRadius: BorderRadius.circular(20),
         ),
         child: const Center(
@@ -209,7 +214,14 @@ class _LevelCardState extends State<LevelCard> {
 
   Widget _buildLevelNumber() {
     final levelNum = widget.data["level"] as int? ?? 0;
-    final String label = levelNum == 0 ? 'Первый шаг' : 'Уровень $levelNum';
+    final String label;
+    if (widget.compact) {
+      // Показываем код уровня (101..110) или «Ресепшн» для 0
+      final code = formatLevelCode(1, levelNum);
+      label = levelNum == 0 ? code : code;
+    } else {
+      label = levelNum == 0 ? 'Первый шаг' : 'Уровень $levelNum';
+    }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
@@ -217,7 +229,7 @@ class _LevelCardState extends State<LevelCard> {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: AppColor.shadowColor.withOpacity(0.05),
+            color: AppColor.shadowColor.withValues(alpha: 0.05),
             spreadRadius: 1,
             blurRadius: 1,
             offset: const Offset(0, 0),

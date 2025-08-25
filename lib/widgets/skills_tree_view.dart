@@ -52,7 +52,7 @@ class SkillsTreeView extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
@@ -144,7 +144,7 @@ class _SkillRow extends StatelessWidget {
               return LinearProgressIndicator(
                 value: value,
                 minHeight: 6,
-                backgroundColor: color.withOpacity(0.2),
+                backgroundColor: color.withValues(alpha: 0.2),
                 valueColor: AlwaysStoppedAnimation<Color>(color),
               );
             },

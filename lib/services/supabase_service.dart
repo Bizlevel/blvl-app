@@ -135,13 +135,17 @@ class SupabaseService {
         final response = await Supabase.instance.client
             .from('levels')
             .select(
-                'id, number, title, description, image_url, cover_path, artifact_title, artifact_description, artifact_url, is_free, lessons(count), user_progress(is_completed)')
+                'id, number, title, description, image_url, cover_path, artifact_title, artifact_description, artifact_url, is_free, lessons(count), user_progress(user_id, is_completed)')
             .order('number', ascending: true);
         return (response as List<dynamic>)
             .map((e) => Map<String, dynamic>.from(e as Map))
             .toList();
       } on PostgrestException catch (e, st) {
         await Sentry.captureException(e, stackTrace: st);
+        // При истёкшем JWT выходим из аккаунта, чтобы пользователь заново залогинился
+        if ((e.message).toLowerCase().contains('jwt')) {
+          await Supabase.instance.client.auth.signOut();
+        }
         rethrow;
       } on SocketException {
         throw Exception('Нет соединения с интернетом');
