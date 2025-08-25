@@ -112,6 +112,7 @@ final nextLevelToContinueProvider =
   final bool isPremium = hasPremium || (subscriptionStatus == 'active');
 
   // 0) Если есть незавершённый чекпоинт цели — предлагаем дойти до него (скролл)
+  //    Только если предшествующий ему уровень действительно завершён пользователем
   if (pendingGoalCp.isNotEmpty) {
     final int afterLevel = pendingGoalCp['afterLevel'] as int? ?? 0;
     final int targetLevel = afterLevel; // скроллим к уровню перед чекпоинтом
@@ -121,23 +122,29 @@ final nextLevelToContinueProvider =
       (l) => (l['level'] as int? ?? -1) == targetLevel,
       orElse: () => levels.first,
     );
-    final String? lockReason = candidate['lockReason'] as String?;
-    final bool isPremiumLock =
-        lockReason != null && lockReason.toLowerCase().contains('премиум');
-    final hasPremium =
-        ref.watch(currentUserProvider.select((u) => u.value?.isPremium)) ??
-            false;
-    final subscriptionStatus =
-        ref.watch(subscriptionProvider.select((s) => s.value));
-    final bool isPremiumActive = hasPremium || (subscriptionStatus == 'active');
-    final bool requiresPremium = isPremiumLock && !isPremiumActive;
-    return {
-      'levelId': candidate['id'] as int,
-      'levelNumber': targetLevel,
-      'floorId': 1,
-      'requiresPremium': requiresPremium,
-      if (gver != null) 'goalCheckpointVersion': gver,
-    };
+    // Пропускаем checkpoint, если предшествующий уровень ещё не завершён
+    if ((candidate['isCompleted'] as bool? ?? false) == false) {
+      // Падать на checkpoint сейчас нельзя — продолжим обычной логикой ниже
+    } else {
+      final String? lockReason = candidate['lockReason'] as String?;
+      final bool isPremiumLock =
+          lockReason != null && lockReason.toLowerCase().contains('премиум');
+      final hasPremium =
+          ref.watch(currentUserProvider.select((u) => u.value?.isPremium)) ??
+              false;
+      final subscriptionStatus =
+          ref.watch(subscriptionProvider.select((s) => s.value));
+      final bool isPremiumActive =
+          hasPremium || (subscriptionStatus == 'active');
+      final bool requiresPremium = isPremiumLock && !isPremiumActive;
+      return {
+        'levelId': candidate['id'] as int,
+        'levelNumber': targetLevel,
+        'floorId': 1,
+        'requiresPremium': requiresPremium,
+        if (gver != null) 'goalCheckpointVersion': gver,
+      };
+    }
   }
 
   // 1) Если есть текущий незавершённый — продолжаем его

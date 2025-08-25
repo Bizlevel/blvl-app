@@ -78,8 +78,10 @@ class MainStreetScreen extends ConsumerWidget {
                                       } else {
                                         final levelNumber =
                                             next['levelNumber'] as int? ?? 0;
-                                        context
-                                            .go('/tower?scrollTo=$levelNumber');
+                                        final levelId =
+                                            next['levelId'] as int? ?? 0;
+                                        context.go(
+                                            '/levels/$levelId?num=$levelNumber');
                                       }
                                     }
                                   } catch (e, st) {

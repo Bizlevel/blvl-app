@@ -6,6 +6,15 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 // import 'package:hive_flutter/hive_flutter.dart';
 import 'package:go_router/go_router.dart';
 
+// Геометрические константы башни (задаются централизованно)
+const double kNodeSize = 88.0;
+const double kCheckpointSize = 88.0;
+const double kRowHeight =
+    128.0; // базовая высота строки (с запасом под 2 строки заголовка)
+const double kLabelHeight = 34.0; // высота лейбла над квадратом
+const double kSidePadding = 24.0; // боковые отступы внутри сетки
+const double kCornerRadius = 20.0; // радиус скругления углов линий
+
 class BizTowerScreen extends ConsumerStatefulWidget {
   final int? scrollTo;
   const BizTowerScreen({super.key, this.scrollTo});
@@ -18,26 +27,13 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
   final ScrollController _scrollController = ScrollController();
   final Map<int, GlobalKey> _nodeKeys = {};
   final GlobalKey _stackKey = GlobalKey();
-
-  // Центры Y размещённых level-узлов для точного автоскролла
-  final Map<int, double> _levelCenterY = {};
+  // Ранее использовалось для пересчётов; оставлено для возможной телеметрии
+  // ignore: unused_field
   List<Map<String, dynamic>> _lastNodes = const [];
   int? _lastScrolledTo;
 
   Future<void> _scrollToLevelNumber(int levelNumber) async {
     try {
-      // Пытаемся использовать расчётные координаты
-      final double? centerY = _levelCenterY[levelNumber];
-      if (centerY != null && _scrollController.hasClients) {
-        final double viewport = _scrollController.position.viewportDimension;
-        final double target =
-            (centerY - viewport * 0.3).clamp(0, double.infinity);
-        await _scrollController.animateTo(target,
-            duration: const Duration(milliseconds: 500),
-            curve: Curves.easeInOut);
-        return;
-      }
-      // Фолбэк на ensureVisible (если координаты ещё не рассчитаны)
       final key = _nodeKeys[levelNumber];
       if (key?.currentContext != null) {
         if (!mounted) return;
@@ -45,6 +41,10 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
             duration: const Duration(milliseconds: 500),
             curve: Curves.easeInOut,
             alignment: 0.3);
+        Sentry.addBreadcrumb(Breadcrumb(
+            level: SentryLevel.info,
+            category: 'tower',
+            message: 'tower_autoscroll_done level=$levelNumber'));
       }
     } catch (e, st) {
       Sentry.captureException(e, stackTrace: st);
@@ -78,7 +78,6 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
         return nodesAsync.when(
           data: (nodes) {
             _lastNodes = nodes;
-            _scheduleRecompute();
             // Обработка запроса автоскролла через переданный параметр scrollTo
             bool scrolledByQuery = false;
             final int? requested = widget.scrollTo;
@@ -205,6 +204,10 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
                     ElevatedButton.icon(
                       onPressed: () {
                         try {
+                          Sentry.addBreadcrumb(Breadcrumb(
+                              level: SentryLevel.info,
+                              category: 'tower',
+                              message: 'tower_retry'));
                           // Перезапрос узлов
                           ref.invalidate(towerNodesProvider);
                         } catch (ex, stx) {
@@ -221,26 +224,6 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
           },
         );
       }),
-      floatingActionButton: Consumer(builder: (context, ref, _) {
-        return FloatingActionButton.extended(
-          onPressed: () async {
-            try {
-              final next = await ref.read(nextLevelToContinueProvider.future);
-              final int? gver = next['goalCheckpointVersion'] as int?;
-              if (gver != null) {
-                if (!mounted) return;
-                context.push('/goal-checkpoint/$gver');
-              } else {
-                await _scrollToLevelNumber(next['levelNumber'] as int? ?? 0);
-              }
-            } catch (e, st) {
-              Sentry.captureException(e, stackTrace: st);
-            }
-          },
-          icon: const Icon(Icons.arrow_upward),
-          label: const Text('Продолжить'),
-        );
-      }),
     );
   }
 
@@ -253,14 +236,12 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
 
     return LayoutBuilder(builder: (context, constraints) {
       final double totalWidth = constraints.maxWidth;
-      const double sidePadding = 24;
       final double columnWidth =
-          ((totalWidth - sidePadding * 2) / 3).clamp(84.0, 500.0);
-      const double nodeSize = 88;
-      // Чекпоинты теперь такого же размера, как узлы уровней
-      const double checkpointSize = 88;
-      const double rowHeight = 120;
-      const double levelLabelHeight = 34; // высота текста над квадратом уровня
+          ((totalWidth - kSidePadding * 2) / 3).clamp(84.0, 500.0);
+      // Адаптивная высота строки: на узких экранах добавляем небольшой запас
+      final bool isNarrow = totalWidth < 420;
+      final double rowHeight = isNarrow ? (kRowHeight + 8.0) : kRowHeight;
+      // Размер checkpoint совпадает с размером level (MVP)
       final List<int> columns = _generateColumns(items.length);
       final double canvasHeight = (items.length + 1) * rowHeight;
 
@@ -270,27 +251,29 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
         final item = items[i];
         final bool isCheckpoint =
             (item['type'] == 'mini_case' || item['type'] == 'goal_checkpoint');
-        final double size = isCheckpoint ? checkpointSize : nodeSize;
+        final double size = isCheckpoint ? kCheckpointSize : kNodeSize;
+        int colIndex = columns[i];
+        if (i > 0 && colIndex == placed[i - 1].col) {
+          // Избегаем подряд одинаковых колонок: выбираем соседнюю
+          final int alt1 = (colIndex + 1) % 3;
+          final int alt2 = (colIndex + 2) % 3;
+          colIndex = alt1 != placed[i - 1].col ? alt1 : alt2;
+        }
         final double left =
-            sidePadding + columns[i] * columnWidth + (columnWidth - size) / 2;
+            kSidePadding + colIndex * columnWidth + (columnWidth - size) / 2;
         final double centerY = canvasHeight - (i + 0.5) * rowHeight;
         final double squareTop = centerY - size / 2;
-        // Все узлы (уровни и чекпоинты) имеют подпись сверху, поэтому
-        // подвинем квадрат вверх на высоту подписи, чтобы центр совпадал
-        // с расчётным centerY и входящие линии приходили в нижний край квадрата.
-        final double widgetTop = squareTop - levelLabelHeight;
+        // Все узлы имеют подпись сверху: квадрат смещается вверх на высоту лейбла
+        final double widgetTop = squareTop - kLabelHeight;
         placed.add(_Placed(
             item: item,
             row: i,
-            col: columns[i],
+            col: colIndex,
             left: left,
             top: widgetTop,
             squareTop: squareTop,
             size: size));
       }
-
-      // Обновим карту центров уровней для автоскролла
-      _levelCenterY.clear();
 
       final List<_GridSegment> segments = [];
       for (int i = 0; i < placed.length - 1; i++) {
@@ -301,27 +284,13 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
         final Offset bCenter =
             Offset(b.left + b.size / 2, b.squareTop + b.size / 2);
 
-        // Сохраняем центр Y для level-узлов
         final String aType = (a.item['type'] as String? ?? 'level');
-        if (aType == 'level') {
-          try {
-            final data = (a.item['data'] as Map).cast<String, dynamic>();
-            final int levelNumber = data['level'] as int? ?? -1;
-            if (levelNumber >= 0) {
-              _levelCenterY[levelNumber] = aCenter.dy;
-            }
-          } catch (_) {}
-        }
 
-        // Точка выхода из A: если колонки разные — из стороны по направлению к B, иначе — из верхней стороны центра
+        // Точка выхода из A: если колонки одинаковые — снизу по центру; иначе — из боковой стороны по направлению к B на высоте центра
         late Offset start;
         if (a.col == b.col) {
-          // Всегда выходим из нижнего узла через боковую грань
-          if (a.col == 2) {
-            start = Offset(a.left, aCenter.dy); // левая грань центра
-          } else {
-            start = Offset(a.left + a.size, aCenter.dy); // правая грань центра
-          }
+          start =
+              Offset(aCenter.dx, a.squareTop + a.size); // нижняя грань центра
         } else if (a.col < b.col) {
           start = Offset(a.left + a.size, aCenter.dy); // правая грань центр
         } else {
@@ -349,20 +318,7 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
         segments.add(_GridSegment(start: start, end: end, color: color));
       }
 
-      // Учтём последний узел для карты центров
-      if (placed.isNotEmpty) {
-        final last = placed.last;
-        final String lastType = (last.item['type'] as String? ?? 'level');
-        if (lastType == 'level') {
-          try {
-            final data = (last.item['data'] as Map).cast<String, dynamic>();
-            final int levelNumber = data['level'] as int? ?? -1;
-            if (levelNumber >= 0) {
-              _levelCenterY[levelNumber] = last.squareTop + last.size / 2;
-            }
-          } catch (_) {}
-        }
-      }
+      // Карта центров для автоскролла больше не используется (ensureVisible)
 
       return SizedBox(
         height: canvasHeight,
@@ -383,13 +339,10 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
                 ref: ref,
                 item: items[i],
                 row: i, // нижняя строка = 0
-                col: columns[i],
-                columnWidth: columnWidth,
-                sidePadding: sidePadding,
-                canvasHeight: canvasHeight,
-                nodeSize: nodeSize,
-                checkpointSize: checkpointSize,
-                rowHeight: rowHeight,
+                col: placed[i].col,
+                left: placed[i].left,
+                top: placed[i].top,
+                size: placed[i].size,
               ),
           ],
         ),
@@ -404,36 +357,27 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
     required Map<String, dynamic> item,
     required int row,
     required int col,
-    required double columnWidth,
-    required double sidePadding,
-    required double canvasHeight,
-    required double nodeSize,
-    required double checkpointSize,
-    required double rowHeight,
+    required double left,
+    required double top,
+    required double size,
   }) {
     final type = item['type'] as String?;
     final bool isCheckpoint = type == 'checkpoint' ||
         type == 'mini_case' ||
         type == 'goal_checkpoint';
-    final double size = isCheckpoint ? checkpointSize : nodeSize;
-    final double left =
-        sidePadding + col * columnWidth + (columnWidth - size) / 2;
-    final double top = canvasHeight -
-        (row + 1) * rowHeight -
-        (nodeSize - size) / 2; // единая высота строки
 
     if (isCheckpoint) {
       // Квадрат чекпоинта по стилю уровня, но с белым фоном и подписью
       return Positioned(
         left: left,
-        top: top - 34,
-        width: nodeSize,
+        top: top,
+        width: size,
         child: _buildStyledCheckpointNode(
             context: context,
             ref: ref,
             node: item,
-            size: nodeSize,
-            align: _alignmentForLevel(((item['afterLevel'] as int? ?? 0) + 1))),
+            size: size,
+            align: _alignmentForColumn(col)),
       );
     }
 
@@ -441,13 +385,12 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
     final data = (item['data'] as Map).cast<String, dynamic>();
     final bool blockedByCheckpoint =
         item['blockedByCheckpoint'] as bool? ?? false;
-    final int num = data['level'] as int? ?? 0;
-    final Alignment align = _alignmentForLevel(num);
+    final Alignment align = _alignmentForColumn(col);
 
     return Positioned(
       left: left,
       top: top,
-      width: nodeSize,
+      width: size,
       child: _buildLevelNode(
         context,
         data: data,
@@ -490,6 +433,14 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
         borderRadius: BorderRadius.circular(12),
         onTap: () async {
           try {
+            // Гейтинг: вход возможен только если завершён предыдущий уровень
+            final prevDone = node['prevLevelCompleted'] as bool? ?? false;
+            if (!prevDone) {
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                  content: Text('Завершите предыдущий уровень')));
+              return;
+            }
             if (type == 'mini_case' && caseId != null) {
               context.push('/case/$caseId');
             } else if (type == 'goal_checkpoint' && goalVersion != null) {
@@ -499,55 +450,63 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
             Sentry.captureException(e, stackTrace: st);
           }
         },
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Text(
-                label,
-                textAlign: align == Alignment.centerLeft
-                    ? TextAlign.left
-                    : (align == Alignment.centerRight
-                        ? TextAlign.right
-                        : TextAlign.center),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style:
-                    const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-              ),
-            ),
-            Container(
-              width: size,
-              height: size,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.black12),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x11000000),
-                    blurRadius: 8,
-                    offset: Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Center(
-                child: Icon(
-                  type == 'mini_case'
-                      ? Icons.work_outline
-                      : (type == 'goal_checkpoint'
-                          ? (isCompleted ? Icons.flag : Icons.flag_outlined)
-                          : Icons.center_focus_strong),
-                  color: type == 'mini_case'
-                      ? AppColor.info
-                      : (type == 'goal_checkpoint'
-                          ? (isCompleted ? AppColor.success : AppColor.info)
-                          : Colors.black54),
+        child: Semantics(
+          label: type == 'mini_case'
+              ? 'Мини-кейс после уровня $after'
+              : (type == 'goal_checkpoint'
+                  ? 'Чекпоинт цели версии ${goalVersion ?? ''}'
+                  : 'Чекпоинт'),
+          button: true,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(
+                  label,
+                  textAlign: align == Alignment.centerLeft
+                      ? TextAlign.left
+                      : (align == Alignment.centerRight
+                          ? TextAlign.right
+                          : TextAlign.center),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w700),
                 ),
               ),
-            ),
-          ],
+              Container(
+                width: size,
+                height: size,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.black12),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x11000000),
+                      blurRadius: 8,
+                      offset: Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Center(
+                  child: Icon(
+                    type == 'mini_case'
+                        ? Icons.work_outline
+                        : (type == 'goal_checkpoint'
+                            ? (isCompleted ? Icons.flag : Icons.flag_outlined)
+                            : Icons.center_focus_strong),
+                    color: type == 'mini_case'
+                        ? AppColor.info
+                        : (type == 'goal_checkpoint'
+                            ? (isCompleted ? AppColor.success : AppColor.info)
+                            : Colors.black54),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -593,8 +552,8 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
             final bool canOpen = isCompleted || !isLocked;
             if (!canOpen) {
               if (blockedByCheckpoint) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Завершите предыдущий этаж')));
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                    content: Text('Завершите предыдущий уровень')));
               } else if (premiumLock) {
                 if (mounted) {
                   context.go('/premium');
@@ -617,123 +576,92 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
             Sentry.captureException(e, stackTrace: st);
           }
         },
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Text(
-                _truncateToTwoWords(levelNumber == 0
-                    ? 'Уровень 0: Первый шаг'
-                    : 'Уровень $levelNumber: ${data['name']}'),
-                textAlign: align == Alignment.centerLeft
-                    ? TextAlign.left
-                    : (align == Alignment.centerRight
-                        ? TextAlign.right
-                        : TextAlign.center),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style:
-                    const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+        child: Semantics(
+          label: 'Уровень $levelNumber',
+          button: true,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(
+                  _truncateToTwoWords(levelNumber == 0
+                      ? 'Уровень 0: Первый шаг'
+                      : 'Уровень $levelNumber: ${data['name']}'),
+                  textAlign: align == Alignment.centerLeft
+                      ? TextAlign.left
+                      : (align == Alignment.centerRight
+                          ? TextAlign.right
+                          : TextAlign.center),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w700),
+                ),
               ),
-            ),
-            Container(
-              width: 88,
-              height: 88,
-              decoration: BoxDecoration(
-                color: AppColor.info,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  const BoxShadow(
-                    color: Color(0x22000000),
-                    blurRadius: 10,
-                    offset: Offset(0, 6),
-                  ),
-                  if (isCurrent)
-                    BoxShadow(
-                      color: AppColor.premium.withValues(alpha: 0.55),
-                      blurRadius: 18,
-                      spreadRadius: 1,
-                      offset: const Offset(0, 0),
+              Container(
+                width: kNodeSize,
+                height: kNodeSize,
+                decoration: BoxDecoration(
+                  color: AppColor.info,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    const BoxShadow(
+                      color: Color(0x22000000),
+                      blurRadius: 10,
+                      offset: Offset(0, 6),
                     ),
-                ],
-              ),
-              child: Stack(
-                children: [
-                  Center(
-                    child: Icon(
-                      isCompleted
-                          ? Icons.check
-                          : (isLocked && !isCompleted
-                              ? Icons.lock
-                              : Icons.stop),
-                      color: Colors.white,
-                      size: 36,
-                    ),
-                  ),
-                  if (isCurrent)
-                    const Positioned(
-                      top: 6,
-                      right: 6,
+                    if (isCurrent)
+                      BoxShadow(
+                        color: AppColor.premium.withValues(alpha: 0.55),
+                        blurRadius: 18,
+                        spreadRadius: 1,
+                        offset: const Offset(0, 0),
+                      ),
+                  ],
+                ),
+                child: Stack(
+                  children: [
+                    Center(
                       child: Icon(
-                        Icons.star,
-                        color: AppColor.premium,
-                        size: 20,
+                        isCompleted
+                            ? Icons.check
+                            : (isLocked && !isCompleted
+                                ? Icons.lock
+                                : Icons.circle),
+                        color: Colors.white,
+                        size: 36,
                       ),
                     ),
-                ],
+                    if (isCurrent)
+                      const Positioned(
+                        top: 6,
+                        right: 6,
+                        child: Icon(
+                          Icons.star,
+                          color: AppColor.premium,
+                          size: 20,
+                        ),
+                      ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
-  void _scheduleRecompute() {
-    WidgetsBinding.instance.addPostFrameCallback((_) => _recomputeSegments());
-  }
-
-  void _recomputeSegments() {
-    final stackCtx = _stackKey.currentContext;
-    if (stackCtx == null) return;
-    final stackBox = stackCtx.findRenderObject() as RenderBox?;
-    if (stackBox == null) return;
-
-    final List<int> levelNumbers = _lastNodes
-        .where((n) => n['type'] == 'level')
-        .map<int>((n) => n['level'] as int)
-        .toList()
-      ..sort();
-
-    // final Map<int, Map<String, dynamic>> levelData = {
-    //   for (final n in _lastNodes.where((e) => e['type'] == 'level'))
-    //     (n['level'] as int): (n['data'] as Map).cast<String, dynamic>()
-    // };
-
-    final List<_NodePoint> points = [];
-    for (final num in levelNumbers) {
-      final key = _nodeKeys[num];
-      final ctx = key?.currentContext;
-      final box = ctx?.findRenderObject() as RenderBox?;
-      if (box == null) continue;
-      final size = box.size;
-      final centerGlobal =
-          box.localToGlobal(Offset(size.width / 2, size.height / 2));
-      final centerLocal = stackBox.globalToLocal(centerGlobal);
-      points.add(_NodePoint(num, centerLocal));
-    }
-  }
+  // Ранее пересчитывались центры для автоскролла; теперь используется ensureVisible
 }
 
-Alignment _alignmentForLevel(int level) {
-  if (level <= 0) return Alignment.center;
-  final int idx = (level - 1) % 3; // 0,1,2 → центр, лево, право
-  switch (idx) {
+Alignment _alignmentForColumn(int col) {
+  switch (col) {
     case 0:
-      return Alignment.center;
-    case 1:
       return Alignment.centerLeft;
+    case 1:
+      return Alignment.center;
     default:
       return Alignment.centerRight;
   }
@@ -811,11 +739,11 @@ class _FloorSection extends StatelessWidget {
 
 // Старый `_MiniCaseTile` больше не используется (заменён компактным узлом в сетке)
 
-class _NodePoint {
-  final int levelNumber;
-  final Offset point;
-  _NodePoint(this.levelNumber, this.point);
-}
+// class _NodePoint {
+//   final int levelNumber;
+//   final Offset point;
+//   _NodePoint(this.levelNumber, this.point);
+// }
 
 // class _Segment {
 //   final Offset a;
@@ -864,7 +792,7 @@ class _GridPathPainter extends CustomPainter {
         ..isAntiAlias = true;
 
       final path = Path();
-      final double r = 20;
+      final double r = kCornerRadius;
       final dx = s.end.dx - s.start.dx;
       final dy = s.end.dy - s.start.dy;
 
