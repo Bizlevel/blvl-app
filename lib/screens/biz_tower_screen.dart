@@ -495,7 +495,7 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.black26, width: 2),
+                  border: Border.all(color: Colors.black26, width: 4),
                   boxShadow: [
                     const BoxShadow(
                       color: Color(0x11000000),
@@ -522,6 +522,7 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
                         : (type == 'goal_checkpoint'
                             ? (isCompleted ? AppColor.success : AppColor.info)
                             : Colors.black54),
+                    size: size * 0.7,
                   ),
                 ),
               ),
@@ -623,7 +624,7 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
                   color: AppColor.info,
                   borderRadius: BorderRadius.circular(12),
                   border:
-                      Border.all(color: _darker(AppColor.info, 0.2), width: 2),
+                      Border.all(color: _darker(AppColor.info, 0.2), width: 4),
                   boxShadow: [
                     const BoxShadow(
                       color: Color(0x22000000),
@@ -655,7 +656,7 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
                                 ? Icons.lock
                                 : Icons.circle),
                         color: Colors.white,
-                        size: 36,
+                        size: kNodeSize * 0.7,
                       ),
                     ),
                     if (isCurrent)
