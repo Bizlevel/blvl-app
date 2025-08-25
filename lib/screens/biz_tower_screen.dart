@@ -14,6 +14,8 @@ const double kRowHeight =
 const double kLabelHeight = 34.0; // высота лейбла над квадратом
 const double kSidePadding = 24.0; // боковые отступы внутри сетки
 const double kCornerRadius = 20.0; // радиус скругления углов линий
+const double kPathStroke = 8.0; // толщина путей
+const double kPathAlpha = 0.6; // прозрачность путей
 
 class BizTowerScreen extends ConsumerStatefulWidget {
   final int? scrollTo;
@@ -299,7 +301,7 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
         // Точка входа в B: снизу по центру
         final Offset end = Offset(bCenter.dx, b.squareTop + b.size);
 
-        // Цвет по статусу стартового узла
+        // Цвет по статусу стартового узла (прозрачность применим при добавлении сегмента)
         Color color = AppColor.info;
         if (aType == 'level') {
           final data = (a.item['data'] as Map).cast<String, dynamic>();
@@ -315,7 +317,8 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
           final bool done = a.item['isCompleted'] as bool? ?? false;
           color = done ? AppColor.success : AppColor.info;
         }
-        segments.add(_GridSegment(start: start, end: end, color: color));
+        segments.add(_GridSegment(
+            start: start, end: end, color: color.withValues(alpha: kPathAlpha)));
       }
 
       // Карта центров для автоскролла больше не используется (ensureVisible)
@@ -325,6 +328,18 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
         width: double.infinity,
         child: Stack(
           children: [
+            // Слой точечной сетки фона
+            Positioned.fill(
+              child: IgnorePointer(
+                child: CustomPaint(
+                  painter: _DotGridPainter(
+                    spacing: 120,
+                    radius: 3,
+                    color: Colors.black.withValues(alpha: 0.06),
+                  ),
+                ),
+              ),
+            ),
             // Слой путей
             Positioned.fill(
               child: IgnorePointer(
@@ -481,12 +496,18 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.black12),
-                  boxShadow: const [
-                    BoxShadow(
+                  border: Border.all(color: Colors.black26, width: 2),
+                  boxShadow: [
+                    const BoxShadow(
                       color: Color(0x11000000),
                       blurRadius: 8,
                       offset: Offset(0, 4),
+                    ),
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.14),
+                      blurRadius: 14,
+                      spreadRadius: 1,
+                      offset: const Offset(0, 6),
                     ),
                   ],
                 ),
@@ -605,11 +626,19 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
                 decoration: BoxDecoration(
                   color: AppColor.info,
                   borderRadius: BorderRadius.circular(12),
+                  border:
+                      Border.all(color: _darker(AppColor.info, 0.2), width: 2),
                   boxShadow: [
                     const BoxShadow(
                       color: Color(0x22000000),
                       blurRadius: 10,
                       offset: Offset(0, 6),
+                    ),
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.18),
+                      blurRadius: 16,
+                      spreadRadius: 2,
+                      offset: const Offset(0, 8),
                     ),
                     if (isCurrent)
                       BoxShadow(
@@ -787,7 +816,7 @@ class _GridPathPainter extends CustomPainter {
     for (final s in segments) {
       final paint = Paint()
         ..color = s.color
-        ..strokeWidth = 2
+        ..strokeWidth = kPathStroke
         ..style = PaintingStyle.stroke
         ..isAntiAlias = true;
 
@@ -822,3 +851,35 @@ class _GridPathPainter extends CustomPainter {
 }
 
 // Старый painter `_TowerPathPainter` удалён (заменён `_GridPathPainter`)
+
+Color _darker(Color c, double t) {
+  final lerped = Color.lerp(c, Colors.black, t);
+  return lerped ?? c;
+}
+
+class _DotGridPainter extends CustomPainter {
+  final double spacing;
+  final double radius;
+  final Color color;
+  _DotGridPainter({required this.spacing, required this.radius, required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill
+      ..isAntiAlias = true;
+    for (double y = spacing / 2; y < size.height; y += spacing) {
+      for (double x = spacing / 2; x < size.width; x += spacing) {
+        canvas.drawCircle(Offset(x, y), radius, paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DotGridPainter oldDelegate) {
+    return oldDelegate.spacing != spacing ||
+        oldDelegate.radius != radius ||
+        oldDelegate.color != color;
+  }
+}
