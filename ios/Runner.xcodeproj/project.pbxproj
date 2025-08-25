@@ -369,7 +369,11 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+<<<<<<< HEAD
 				PRODUCT_BUNDLE_IDENTIFIER = kz.bizlevel.bizlevelapp;
+=======
+				PRODUCT_BUNDLE_IDENTIFIER = bizlevel.app;
+>>>>>>> origin/prelaunch
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
@@ -503,7 +507,11 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+<<<<<<< HEAD
 				PRODUCT_BUNDLE_IDENTIFIER = kz.bizlevel.bizlevelapp;
+=======
+				PRODUCT_BUNDLE_IDENTIFIER = bizlevel.app;
+>>>>>>> origin/prelaunch
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -526,7 +534,11 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+<<<<<<< HEAD
 				PRODUCT_BUNDLE_IDENTIFIER = kz.bizlevel.bizlevelapp;
+=======
+				PRODUCT_BUNDLE_IDENTIFIER = bizlevel.app;
+>>>>>>> origin/prelaunch
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;

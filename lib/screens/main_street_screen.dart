@@ -71,10 +71,18 @@ class MainStreetScreen extends ConsumerWidget {
                                     if (requiresPremium) {
                                       context.go('/premium');
                                     } else {
-                                      final levelNumber =
-                                          next['levelNumber'] as int? ?? 0;
-                                      context
-                                          .go('/tower?scrollTo=$levelNumber');
+                                      final int? gver =
+                                          next['goalCheckpointVersion'] as int?;
+                                      if (gver != null) {
+                                        context.go('/goal-checkpoint/$gver');
+                                      } else {
+                                        final levelNumber =
+                                            next['levelNumber'] as int? ?? 0;
+                                        final levelId =
+                                            next['levelId'] as int? ?? 0;
+                                        context.go(
+                                            '/levels/$levelId?num=$levelNumber');
+                                      }
                                     }
                                   } catch (e, st) {
                                     Sentry.captureException(e, stackTrace: st);
@@ -296,7 +304,8 @@ class _MainActionCard extends StatelessWidget {
       child: AspectRatio(
         aspectRatio: 1,
         child: Card(
-          color: const Color.fromARGB(255, 212, 212, 212), // фон карточки = фон иконок
+          color: const Color.fromARGB(
+              255, 212, 212, 212), // фон карточки = фон иконок
           elevation: 6, // более выраженная тень
           shadowColor: Colors.black.withValues(alpha: 0.15),
           surfaceTintColor: Colors.white,

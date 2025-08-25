@@ -5,7 +5,8 @@ import 'package:bizlevel/providers/subscription_provider.dart';
 import 'package:bizlevel/providers/auth_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bizlevel/utils/formatters.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+// import 'package:hive_flutter/hive_flutter.dart';
+import 'package:bizlevel/providers/goals_providers.dart';
 
 /// Provides список уровней с учётом прогресса пользователя.
 final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
@@ -93,6 +94,13 @@ final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
 final nextLevelToContinueProvider =
     FutureProvider<Map<String, dynamic>>((ref) async {
   final levels = await ref.watch(levelsProvider.future);
+  // Интеграция незавершённых goal_checkpoint как следующей цели (36.9)
+  // Используем towerNodesProvider, чтобы найти ближайший незавершённый checkpoint цели
+  final nodes = await ref.watch(towerNodesProvider.future);
+  // Ищем первый узел goal_checkpoint с isCompleted=false и запоминаем его afterLevel
+  final Map<String, dynamic> pendingGoalCp = nodes.firstWhere(
+      (n) => n['type'] == 'goal_checkpoint' && (n['isCompleted'] != true),
+      orElse: () => <String, dynamic>{});
 
   final hasPremium =
       ref.watch(currentUserProvider.select((user) => user.value?.isPremium)) ??
@@ -102,6 +110,42 @@ final nextLevelToContinueProvider =
   final subscriptionStatus =
       ref.watch(subscriptionProvider.select((sub) => sub.value));
   final bool isPremium = hasPremium || (subscriptionStatus == 'active');
+
+  // 0) Если есть незавершённый чекпоинт цели — предлагаем дойти до него (скролл)
+  //    Только если предшествующий ему уровень действительно завершён пользователем
+  if (pendingGoalCp.isNotEmpty) {
+    final int afterLevel = pendingGoalCp['afterLevel'] as int? ?? 0;
+    final int targetLevel = afterLevel; // скроллим к уровню перед чекпоинтом
+    final int? gver = pendingGoalCp['version'] as int?;
+    // Найдём сам уровень в списке levels
+    final candidate = levels.firstWhere(
+      (l) => (l['level'] as int? ?? -1) == targetLevel,
+      orElse: () => levels.first,
+    );
+    // Пропускаем checkpoint, если предшествующий уровень ещё не завершён
+    if ((candidate['isCompleted'] as bool? ?? false) == false) {
+      // Падать на checkpoint сейчас нельзя — продолжим обычной логикой ниже
+    } else {
+      final String? lockReason = candidate['lockReason'] as String?;
+      final bool isPremiumLock =
+          lockReason != null && lockReason.toLowerCase().contains('премиум');
+      final hasPremium =
+          ref.watch(currentUserProvider.select((u) => u.value?.isPremium)) ??
+              false;
+      final subscriptionStatus =
+          ref.watch(subscriptionProvider.select((s) => s.value));
+      final bool isPremiumActive =
+          hasPremium || (subscriptionStatus == 'active');
+      final bool requiresPremium = isPremiumLock && !isPremiumActive;
+      return {
+        'levelId': candidate['id'] as int,
+        'levelNumber': targetLevel,
+        'floorId': 1,
+        'requiresPremium': requiresPremium,
+        if (gver != null) 'goalCheckpointVersion': gver,
+      };
+    }
+  }
 
   // 1) Если есть текущий незавершённый — продолжаем его
   Map<String, dynamic>? candidate = levels
@@ -139,7 +183,46 @@ final nextLevelToContinueProvider =
 final towerNodesProvider =
     FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final levels = await ref.watch(levelsProvider.future);
-  final Map<int, bool> cp = await _readCheckpointState();
+  // Локальное состояние старых чекпоинтов больше не используется
+  // Загрузим мини-кейсы и прогресс пользователя по ним (id ∈ {1,2,3})
+  final supa = Supabase.instance.client;
+  final List<dynamic> casesRows = await supa
+      .from('mini_cases')
+      .select('id, after_level, title, is_required, active')
+      .eq('active', true)
+      .order('after_level');
+
+  final Map<int, Map<String, dynamic>> miniCasesByAfterLevel = {
+    for (final r in casesRows)
+      if (r is Map<String, dynamic> && r['after_level'] != null)
+        (r['after_level'] as num).toInt(): Map<String, dynamic>.from(r)
+  };
+  final List<int> caseIds =
+      casesRows.map<int>((r) => (r['id'] as int)).toList(growable: false);
+  final Set<int> doneCaseIds = <int>{};
+  if (caseIds.isNotEmpty) {
+    final List<dynamic> prog = await supa
+        .from('user_case_progress')
+        .select('case_id, status')
+        .inFilter('case_id', caseIds);
+    for (final p in prog) {
+      final status = (p['status'] as String?)?.toLowerCase() ?? 'started';
+      if (status == 'completed' || status == 'skipped') {
+        doneCaseIds.add((p['case_id'] as num).toInt());
+      }
+    }
+  }
+
+  // Статусы версий цели (v2 после L4, v3 после L7, v4 после L10)
+  final Map<int, int> goalCheckpointVersionByAfterLevel = const {
+    4: 2,
+    7: 3,
+    10: 4,
+  };
+  // Проверяем наличие версий через провайдер (единый источник истины)
+  final bool hasV2 = await ref.watch(hasGoalVersionProvider(2).future);
+  final bool hasV3 = await ref.watch(hasGoalVersionProvider(3).future);
+  final bool hasV4 = await ref.watch(hasGoalVersionProvider(4).future);
 
   // Каркас узлов: level | divider | checkpoint
   final List<Map<String, dynamic>> nodes = [];
@@ -156,9 +239,9 @@ final towerNodesProvider =
   // Разделитель «Этаж 1»
   nodes.add({'type': 'divider', 'title': 'Этаж 1: База предпринимательства'});
 
-  // Чекпоинты после уровней (MVP — считаем пройденными, состояние подключим в 34.3)
-  const checkpointAfter = <int>{2, 3, 5, 7, 9, 10};
-  final Set<int> blockedNextLevels = {}; // MVP: блокировку не применяем
+  // Убраны пустые чекпоинты‑заглушки: оставляем только реальные mini_case и goal_checkpoint
+  // Номера уровней, которые заблокированы мини‑кейсом до его выполнения
+  final Set<int> blockedNextLevels = {};
 
   // Уровни 1..N
   for (final l in levels.where((x) => (x['level'] as int? ?? 0) > 0)) {
@@ -169,34 +252,43 @@ final towerNodesProvider =
       'data': l,
       'blockedByCheckpoint': blockedNextLevels.contains(num),
     });
-    if (checkpointAfter.contains(num)) {
+    // Вставляем мини‑кейс после 3/6/9 (если активен)
+    final mini = miniCasesByAfterLevel[num];
+    if (mini != null) {
+      final int caseId = (mini['id'] as int);
+      final bool isRequired = (mini['is_required'] as bool? ?? true);
+      final bool isDone = doneCaseIds.contains(caseId);
       nodes.add({
-        'type': 'checkpoint',
+        'type': 'mini_case',
         'afterLevel': num,
-        'isCompleted': cp[num] == true,
-        'source': 'default',
+        'caseId': caseId,
+        'title': mini['title'],
+        'isCompleted': isDone,
       });
-      // MVP: не блокируем следующий уровень чекпоинтом
+      if (isRequired && !isDone) {
+        // Блокируем следующий уровень до завершения/пропуска кейса
+        blockedNextLevels.add(num + 1);
+      }
+    }
+
+    // Вставляем чекпоинт цели после 4/7/10
+    final int? goalVersion = goalCheckpointVersionByAfterLevel[num];
+    if (goalVersion != null) {
+      final bool isCompleted =
+          goalVersion == 2 ? hasV2 : (goalVersion == 3 ? hasV3 : hasV4);
+      nodes.add({
+        'type': 'goal_checkpoint',
+        'afterLevel': num,
+        'version': goalVersion,
+        'title': goalVersion == 2
+            ? 'v2 Метрики'
+            : (goalVersion == 3 ? 'v3 SMART' : 'v4 Финал'),
+        'isCompleted': isCompleted,
+      });
     }
   }
 
   return nodes;
 });
 
-Future<Map<int, bool>> _readCheckpointState() async {
-  try {
-    final box = await Hive.openBox('tower_checkpoints');
-    final Map<int, bool> state = {};
-    for (final key in box.keys) {
-      final value = box.get(key) == true;
-      final str = key.toString();
-      if (str.startsWith('after_')) {
-        final n = int.tryParse(str.substring(6));
-        if (n != null) state[n] = value;
-      }
-    }
-    return state;
-  } catch (_) {
-    return {};
-  }
-}
+// _readCheckpointState удалён как неиспользуемый вместе с пустыми чекпоинтами

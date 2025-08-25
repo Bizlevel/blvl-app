@@ -69,6 +69,7 @@ flutter:
     - assets/icons/
     - assets/images/avatars/
     - assets/images/
+    - assets/images/cases/
     - assets/images/street/
     - assets/images/lvls/
     - .env
