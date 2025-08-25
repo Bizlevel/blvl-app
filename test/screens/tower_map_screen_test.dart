@@ -63,4 +63,50 @@ void main() {
     // Проверим наличие разделителя «Этаж 1»
     expect(find.textContaining('Этаж 1'), findsWidgets);
   });
+
+  testWidgets('Башня: автоскролл по параметру scrollTo', (tester) async {
+    final mockLevels = [
+      {
+        'id': 0,
+        'image': '',
+        'level': 0,
+        'name': 'Первый шаг',
+        'lessons': 1,
+        'isLocked': false,
+        'isCompleted': true,
+        'isCurrent': false
+      },
+      {
+        'id': 1,
+        'image': '',
+        'level': 1,
+        'name': 'L1',
+        'lessons': 1,
+        'isLocked': false,
+        'isCompleted': false,
+        'isCurrent': false
+      },
+      {
+        'id': 2,
+        'image': '',
+        'level': 2,
+        'name': 'L2',
+        'lessons': 1,
+        'isLocked': false,
+        'isCompleted': false,
+        'isCurrent': true
+      },
+    ];
+
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        levelsProvider.overrideWith((ref) async => mockLevels),
+      ],
+      child: const MaterialApp(home: BizTowerScreen(scrollTo: 2)),
+    ));
+
+    await tester.pumpAndSettle();
+    // Smoke: экран не падает, заголовок есть, ensureVisible отработал без исключений
+    expect(find.text('Башня БизЛевел'), findsOneWidget);
+  });
 }

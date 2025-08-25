@@ -44,11 +44,14 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
   bool _commitment = false;
 
   Timer? _debounce;
+  // ignore: unused_field
   bool _saving = false;
   int _selectedVersion = 1;
   Map<int, Map<String, dynamic>> _versions = {};
   int _selectedSprint = 1;
-  bool _isEditing = false; // режим редактирования текущей версии
+  // Редактирование отключено на странице «Цель» (read-only таблица)
+  // ignore: unused_field
+  bool _isEditing = false;
   bool _sprintSaved = false; // флаг успешного сохранения спринта
 
   // Sprint check-in form
@@ -115,6 +118,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
 
   // Автосохранение отключено
 
+  // ignore: unused_element
   bool _isValidV1() {
     String s(String v) => v.trim();
     return s(_goalInitialCtrl.text).length >= 10 &&
@@ -122,6 +126,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
         s(_mainObstacleCtrl.text).length >= 10;
   }
 
+  // ignore: unused_element
   bool _isValidV2() {
     String s(String v) => v.trim();
     return s(_goalRefinedCtrl.text).length >= 10 &&
@@ -131,6 +136,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
         double.tryParse(_financialGoalCtrl.text.trim()) != null;
   }
 
+  // ignore: unused_element
   bool _isValidV3() {
     String s(String v) => v.trim();
     return s(_goalSmartCtrl.text).length >= 10 &&
@@ -140,6 +146,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
         s(_s4Ctrl.text).length >= 5;
   }
 
+  // ignore: unused_element
   bool _isValidV4() {
     String s(String v) => v.trim();
     return s(_finalWhatCtrl.text).length >= 10 &&
@@ -148,110 +155,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
         _commitment;
   }
 
-  Future<void> _saveGoal({bool silent = false}) async {
-    if (_saving) return;
-    setState(() => _saving = true);
-    try {
-      final repo = ref.read(goalsRepositoryProvider);
-      // Определяем существующие версии и последнюю
-      final all = await ref.read(goalVersionsProvider.future);
-      final byVersion = {
-        for (final m in all) m['version'] as int: Map<String, dynamic>.from(m)
-      };
-      final latestVersion = byVersion.keys.isEmpty
-          ? 0
-          : byVersion.keys.reduce((a, b) => a > b ? a : b);
-
-      // Сборка данных по выбранной версии
-      Map<String, dynamic> versionData;
-      String goalText;
-      if (_selectedVersion == 1) {
-        if (!_isValidV1()) throw 'Заполните все поля v1';
-        versionData = {
-          'goal_initial': _goalInitialCtrl.text.trim(),
-          'goal_why': _goalWhyCtrl.text.trim(),
-          'main_obstacle': _mainObstacleCtrl.text.trim(),
-        };
-        goalText = _goalInitialCtrl.text.trim();
-      } else if (_selectedVersion == 2) {
-        if (!_isValidV2()) throw 'Заполните все поля v2 корректно';
-        versionData = {
-          'goal_refined': _goalRefinedCtrl.text.trim(),
-          'metric_name': _metricNameCtrl.text.trim(),
-          'metric_from': double.parse(_metricFromCtrl.text.trim()),
-          'metric_to': double.parse(_metricToCtrl.text.trim()),
-          'financial_goal': double.parse(_financialGoalCtrl.text.trim()),
-        };
-        goalText = _goalRefinedCtrl.text.trim();
-      } else if (_selectedVersion == 3) {
-        if (!_isValidV3()) throw 'Заполните все поля v3';
-        versionData = {
-          'goal_smart': _goalSmartCtrl.text.trim(),
-          'sprint1_goal': _s1Ctrl.text.trim(),
-          'sprint2_goal': _s2Ctrl.text.trim(),
-          'sprint3_goal': _s3Ctrl.text.trim(),
-          'sprint4_goal': _s4Ctrl.text.trim(),
-        };
-        goalText = _goalSmartCtrl.text.trim();
-      } else {
-        if (!_isValidV4()) {
-          throw 'Заполните все поля v4 и подтвердите готовность';
-        }
-        versionData = {
-          'final_what': _finalWhatCtrl.text.trim(),
-          'final_when': _finalWhenCtrl.text.trim(),
-          'final_how': _finalHowCtrl.text.trim(),
-          'commitment': _commitment,
-        };
-        goalText = _finalWhatCtrl.text.trim();
-      }
-
-      // Создание/обновление в зависимости от существования записи для выбранной версии
-      if (byVersion.containsKey(_selectedVersion)) {
-        final row = byVersion[_selectedVersion]!;
-        // Редактируем только последнюю доступную версию
-        if (_selectedVersion != latestVersion) {
-          throw 'Редактировать можно только текущую версию';
-        }
-        await repo.updateGoalById(
-          id: row['id'] as String,
-          goalText: goalText,
-          versionData: versionData,
-        );
-      } else {
-        // Создаём новую версию только если выбранная = последняя + 1
-        if (_selectedVersion != latestVersion + 1) {
-          throw 'Нельзя пропустить версии';
-        }
-        await repo.upsertGoalVersion(
-          version: _selectedVersion,
-          goalText: goalText,
-          versionData: versionData,
-        );
-      }
-
-      if (!silent && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Цель сохранена')),
-        );
-      }
-
-      // Инвалидируем провайдеры
-      ref.invalidate(goalLatestProvider);
-      ref.invalidate(goalVersionsProvider);
-      setState(() {
-        _saving = false;
-        _isEditing = false; // после сохранения показываем режим просмотра
-      });
-    } catch (e) {
-      setState(() => _saving = false);
-      if (!silent && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка сохранения: $e')),
-        );
-      }
-    }
-  }
+  // Сохранение версий отключено на странице «Цель». Редактирование доступно только в чекпоинтах.
 
   void _fillControllersFor(int version) {
     // Очистка или заполнение из данных
@@ -572,29 +476,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                                 );
                               },
                             ),
-                            Builder(builder: (context) {
-                              final hasAny = _versions.isNotEmpty;
-                              final latest = hasAny
-                                  ? _versions.keys
-                                      .reduce((a, b) => a > b ? a : b)
-                                  : 0;
-                              final exists =
-                                  _versions.containsKey(_selectedVersion);
-                              final canEdit =
-                                  exists && _selectedVersion == latest;
-                              return SizedBox(
-                                height: 44,
-                                width: 44,
-                                child: IconButton(
-                                  icon: const Icon(Icons.edit,
-                                      color: Colors.grey),
-                                  tooltip: 'Редактировать',
-                                  onPressed: (canEdit && !_isEditing)
-                                      ? () => setState(() => _isEditing = true)
-                                      : null,
-                                ),
-                              );
-                            }),
+                            const SizedBox(height: 44, width: 44),
                           ],
                         ),
                         const SizedBox(height: 12),
@@ -627,7 +509,8 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                                 overflow: TextOverflow.ellipsis,
                               ),
                               selected: isSelected,
-                              selectedColor: AppColor.premium.withValues(alpha: 0.18),
+                              selectedColor:
+                                  AppColor.premium.withValues(alpha: 0.18),
                               backgroundColor: Colors.white,
                               shape: StadiumBorder(
                                 side: BorderSide(
@@ -643,18 +526,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                                         _selectedVersion = v;
                                         _fillControllersFor(v);
                                         // Логика редактирования при переключении версий:
-                                        final hasAny = _versions.isNotEmpty;
-                                        final latest = hasAny
-                                            ? _versions.keys
-                                                .reduce((a, b) => a > b ? a : b)
-                                            : 0;
-                                        final exists = _versions.containsKey(v);
-                                        // Если выбираем новую (latest+1) → сразу редактируем
-                                        if (!exists && v == latest + 1) {
-                                          _isEditing = true;
-                                        } else {
-                                          _isEditing = false;
-                                        }
+                                        _isEditing = false;
                                       });
                                     }
                                   : null,
@@ -670,226 +542,10 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                         ),
                         const SizedBox(height: 12),
 
-                        if (_selectedVersion == 1) ...[
-                          if (!_versions.containsKey(1))
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(12),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color:
-                                        AppColor.shadowColor.withValues(alpha: 0.1),
-                                    blurRadius: 4,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(Icons.lock_outline,
-                                      color: Colors.grey.shade400, size: 28),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          '🔒 Версия v1 «Набросок» заполняется на Уровне 1',
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .titleSmall
-                                              ?.copyWith(
-                                                color: Colors.grey.shade700,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          'Пройдите Уровень 1 и заполните Набросок цели. После этого вы сможете редактировать здесь.',
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .bodySmall
-                                              ?.copyWith(
-                                                color: Colors.grey.shade600,
-                                                height: 1.3,
-                                              ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            )
-                          else ...[
-                            // Основная цель
-                            _GroupHeader('Основная цель'),
-                            CustomTextBox(
-                                controller: _goalInitialCtrl,
-                                readOnly: !_isEditing,
-                                readOnlySoftBackground: true,
-                                hint: 'Чего хочу достичь за 28 дней'),
-                            const SizedBox(height: 16),
-
-                            // Мотивация
-                            _GroupHeader('Почему сейчас'),
-                            CustomTextBox(
-                                controller: _goalWhyCtrl,
-                                readOnly: !_isEditing,
-                                readOnlySoftBackground: true,
-                                hint: 'Почему это важно именно сейчас*'),
-                            const SizedBox(height: 16),
-
-                            // Препятствие
-                            _GroupHeader('Препятствие'),
-                            CustomTextBox(
-                                controller: _mainObstacleCtrl,
-                                readOnly: !_isEditing,
-                                readOnlySoftBackground: true,
-                                hint: 'Главное препятствие*'),
-                          ]
-                        ] else if (_selectedVersion == 2) ...[
-                          // Уточненная цель
-                          _GroupHeader('Уточненная цель'),
-                          CustomTextBox(
-                              controller: _goalRefinedCtrl,
-                              readOnly: !_isEditing,
-                              readOnlySoftBackground: true,
-                              hint: 'Конкретная цель*'),
-                          const SizedBox(height: 16),
-
-                          // Метрика
-                          _GroupHeader('Метрика'),
-                          CustomTextBox(
-                              controller: _metricNameCtrl,
-                              readOnly: !_isEditing,
-                              readOnlySoftBackground: true,
-                              hint: 'Ключевая метрика*'),
-                          const SizedBox(height: 12),
-                          Row(children: [
-                            Expanded(
-                              child: CustomTextBox(
-                                  controller: _metricFromCtrl,
-                                  readOnly: !_isEditing,
-                                  readOnlySoftBackground: true,
-                                  keyboardType: TextInputType.number,
-                                  hint: 'Текущее значение*'),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: CustomTextBox(
-                                  controller: _metricToCtrl,
-                                  readOnly: !_isEditing,
-                                  readOnlySoftBackground: true,
-                                  keyboardType: TextInputType.number,
-                                  hint: 'Целевое значение*'),
-                            ),
-                          ]),
-                          const SizedBox(height: 16),
-
-                          // Финансы
-                          _GroupHeader('Финансовая цель'),
-                          CustomTextBox(
-                              controller: _financialGoalCtrl,
-                              readOnly: !_isEditing,
-                              readOnlySoftBackground: true,
-                              keyboardType: TextInputType.number,
-                              hint: 'Финансовый результат в ₸*'),
-                        ] else if (_selectedVersion == 3) ...[
-                          // SMART-план
-                          _GroupHeader('SMART-план'),
-                          CustomTextBox(
-                              controller: _goalSmartCtrl,
-                              readOnly: !_isEditing,
-                              readOnlySoftBackground: true,
-                              hint: 'SMART-формулировка цели*'),
-                          const SizedBox(height: 16),
-
-                          // Спринты
-                          _GroupHeader('План спринтов'),
-                          CustomTextBox(
-                              controller: _s1Ctrl,
-                              hint: 'Спринт 1 (1–7 дни)*',
-                              readOnly: !_isEditing,
-                              readOnlySoftBackground: true),
-                          const SizedBox(height: 12),
-                          CustomTextBox(
-                              controller: _s2Ctrl,
-                              hint: 'Спринт 2 (8–14 дни)*',
-                              readOnly: !_isEditing,
-                              readOnlySoftBackground: true),
-                          const SizedBox(height: 12),
-                          CustomTextBox(
-                              controller: _s3Ctrl,
-                              hint: 'Спринт 3 (15–21 дни)*',
-                              readOnly: !_isEditing,
-                              readOnlySoftBackground: true),
-                          const SizedBox(height: 12),
-                          CustomTextBox(
-                              controller: _s4Ctrl,
-                              hint: 'Спринт 4 (22–28 дни)*',
-                              readOnly: !_isEditing,
-                              readOnlySoftBackground: true),
-                        ] else ...[
-                          // Финальный план
-                          _GroupHeader('Финальный план'),
-                          CustomTextBox(
-                              controller: _finalWhatCtrl,
-                              readOnly: !_isEditing,
-                              readOnlySoftBackground: true,
-                              hint: 'Что именно достигну*'),
-                          const SizedBox(height: 12),
-                          CustomTextBox(
-                              controller: _finalWhenCtrl,
-                              readOnly: !_isEditing,
-                              readOnlySoftBackground: true,
-                              hint: 'К какой дате (28 дней)*'),
-                          const SizedBox(height: 12),
-                          CustomTextBox(
-                              controller: _finalHowCtrl,
-                              readOnly: !_isEditing,
-                              readOnlySoftBackground: true,
-                              hint: 'Через какие ключевые действия*'),
-                          const SizedBox(height: 16),
-
-                          // Готовность
-                          _GroupHeader('Готовность'),
-                          Row(children: [
-                            Switch(
-                                value: _commitment,
-                                onChanged: _isEditing
-                                    ? (v) => setState(() => _commitment = v)
-                                    : null),
-                            const SizedBox(width: 12),
-                            const Expanded(child: Text('Я готов к реализации')),
-                          ]),
-                        ],
+                        _buildVersionTable(context, _selectedVersion),
 
                         const SizedBox(height: 12),
-                        Row(children: [
-                          SizedBox(
-                            height: 44,
-                            child: ElevatedButton(
-                              onPressed: (_selectedVersion == 1 &&
-                                      !_versions.containsKey(1))
-                                  ? null
-                                  : ((!_saving && _isEditing)
-                                      ? () => _saveGoal()
-                                      : null),
-                              child: _saving
-                                  ? const SizedBox(
-                                      width: 18,
-                                      height: 18,
-                                      child: CircularProgressIndicator(
-                                          strokeWidth: 2, color: Colors.white),
-                                    )
-                                  : const Text('Сохранить'),
-                            ),
-                          ),
-                        ]),
+                        const SizedBox.shrink(),
                       ],
                     ),
                   ),
@@ -973,6 +629,75 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
   }
 
   // Удалены: _getVersionStatus/_getVersionTooltip не используются после упрощения UI переключателя
+
+  Widget _buildVersionTable(BuildContext context, int version) {
+    final Map<String, dynamic> vData =
+        (_versions[version]?['version_data'] as Map?)
+                ?.cast<String, dynamic>() ??
+            {};
+    List<List<String>> rows;
+    if (version == 1) {
+      rows = [
+        ['Основная цель', (vData['goal_initial'] ?? '').toString()],
+        ['Почему сейчас', (vData['goal_why'] ?? '').toString()],
+        ['Препятствие', (vData['main_obstacle'] ?? '').toString()],
+      ];
+    } else if (version == 2) {
+      rows = [
+        ['Уточненная цель', (vData['goal_refined'] ?? '').toString()],
+        ['Метрика', (vData['metric_name'] ?? '').toString()],
+        ['Текущее значение', (vData['metric_from'] ?? '').toString()],
+        ['Целевое значение', (vData['metric_to'] ?? '').toString()],
+        ['Финансовая цель', (vData['financial_goal'] ?? '').toString()],
+      ];
+    } else if (version == 3) {
+      rows = [
+        ['SMART‑формулировка', (vData['goal_smart'] ?? '').toString()],
+        ['Спринт 1', (vData['sprint1_goal'] ?? '').toString()],
+        ['Спринт 2', (vData['sprint2_goal'] ?? '').toString()],
+        ['Спринт 3', (vData['sprint3_goal'] ?? '').toString()],
+        ['Спринт 4', (vData['sprint4_goal'] ?? '').toString()],
+      ];
+    } else {
+      rows = [
+        ['Что достигну', (vData['final_what'] ?? '').toString()],
+        ['К какой дате', (vData['final_when'] ?? '').toString()],
+        ['Ключевые действия', (vData['final_how'] ?? '').toString()],
+        ['Готовность', ((vData['commitment'] ?? false) == true) ? 'Да' : 'Нет'],
+      ];
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ...rows.map((r) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 180,
+                    child: Text(
+                      r[0],
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodyMedium
+                          ?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      r[1].isEmpty ? '—' : r[1],
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ),
+                ],
+              ),
+            )),
+      ],
+    );
+  }
 
   Widget _build7DayTimeline() {
     return LayoutBuilder(

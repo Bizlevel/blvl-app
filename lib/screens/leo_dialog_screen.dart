@@ -16,6 +16,8 @@ class LeoDialogScreen extends ConsumerStatefulWidget {
   final String? userContext;
   final String? levelContext;
   final String bot; // 'leo' | 'alex'
+  final bool caseMode; // режим мини‑кейса: не тратим лимиты, не сохраняем чаты
+  final String? systemPrompt; // опц. системный промпт (для кейса)
 
   const LeoDialogScreen({
     super.key,
@@ -23,6 +25,8 @@ class LeoDialogScreen extends ConsumerStatefulWidget {
     this.userContext,
     this.levelContext,
     this.bot = 'leo',
+    this.caseMode = false,
+    this.systemPrompt,
   });
 
   @override
@@ -57,8 +61,13 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
     _leo = ref.read(leoServiceProvider);
     _fetchRemaining();
     _chatId = widget.chatId;
-    // Автоприветствие для Алекса при открытии нового диалога (не сохраняем в БД)
-    if (widget.bot == 'alex' && _chatId == null && _messages.isEmpty) {
+    // Автоприветствие: кейс → задание; иначе Алекс.
+    if (widget.caseMode && _chatId == null && _messages.isEmpty) {
+      _messages.add({
+        'role': 'assistant',
+        'content': 'Начнём с короткого задания. Ответьте в 2–3 предложениях.',
+      });
+    } else if (widget.bot == 'alex' && _chatId == null && _messages.isEmpty) {
       _messages.add({
         'role': 'assistant',
         'content':
@@ -182,18 +191,18 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
     _scrollToBottom();
 
     try {
-      // Save user message & decrement limit atomically
-      if (_chatId == null) {
-        // создаём диалог при первом сообщении
-        _chatId = await _leo.saveConversation(
-            role: 'user', content: text, bot: widget.bot);
-        // сразу загрузим (чтобы появился счётчик и т.д.)
-      } else {
-        await _leo.saveConversation(
-            chatId: _chatId, role: 'user', content: text);
+      // В режиме кейса не создаём чат и не тратим лимиты
+      if (!widget.caseMode) {
+        if (_chatId == null) {
+          _chatId = await _leo.saveConversation(
+              role: 'user', content: text, bot: widget.bot);
+        } else {
+          await _leo.saveConversation(
+              chatId: _chatId, role: 'user', content: text);
+        }
+        final rem = await _leo.decrementMessageCount();
+        if (mounted) setState(() => _remaining = rem);
       }
-      final rem = await _leo.decrementMessageCount();
-      if (mounted) setState(() => _remaining = rem);
 
       // Get assistant response with RAG if context is available
       String assistantMsg;
@@ -214,8 +223,10 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
       );
       assistantMsg = response['message']['content'] as String? ?? '';
 
-      await _leo.saveConversation(
-          chatId: _chatId, role: 'assistant', content: assistantMsg);
+      if (!widget.caseMode) {
+        await _leo.saveConversation(
+            chatId: _chatId, role: 'assistant', content: assistantMsg);
+      }
 
       if (!mounted) return;
       setState(() {
@@ -232,9 +243,17 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
   }
 
   List<Map<String, dynamic>> _buildChatContext() {
-    return _messages
+    final List<Map<String, dynamic>> ctx = _messages
         .map((m) => {'role': m['role'], 'content': m['content']})
         .toList();
+    // В режиме мини‑кейса добавляем системный промпт фасилитатора как первое сообщение
+    if (widget.caseMode) {
+      final sp = widget.systemPrompt?.trim();
+      if (sp != null && sp.isNotEmpty) {
+        ctx.insert(0, {'role': 'system', 'content': sp});
+      }
+    }
+    return ctx;
   }
 
   @override

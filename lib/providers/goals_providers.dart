@@ -68,3 +68,14 @@ final dailyQuoteProvider = FutureProvider<Map<String, dynamic>?>((ref) async {
   final repo = ref.read(goalsRepositoryProvider);
   return repo.getDailyQuote();
 });
+
+/// Проверяет наличие версии цели у текущего пользователя
+final hasGoalVersionProvider =
+    FutureProvider.family<bool, int>((ref, version) async {
+  final all = await ref.watch(goalVersionsProvider.future);
+  for (final m in all) {
+    final int? v = m['version'] as int?;
+    if (v == version) return true;
+  }
+  return false;
+});
