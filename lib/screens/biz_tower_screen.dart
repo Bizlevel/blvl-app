@@ -318,7 +318,9 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
           color = done ? AppColor.success : AppColor.info;
         }
         segments.add(_GridSegment(
-            start: start, end: end, color: color.withValues(alpha: kPathAlpha)));
+            start: start,
+            end: end,
+            color: color.withValues(alpha: kPathAlpha)));
       }
 
       // Карта центров для автоскролла больше не используется (ensureVisible)
@@ -479,13 +481,10 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Text(
                   label,
-                  textAlign: align == Alignment.centerLeft
-                      ? TextAlign.left
-                      : (align == Alignment.centerRight
-                          ? TextAlign.right
-                          : TextAlign.center),
+                  textAlign: TextAlign.center,
                   maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+                  softWrap: true,
+                  overflow: TextOverflow.visible,
                   style: const TextStyle(
                       fontSize: 13, fontWeight: FontWeight.w700),
                 ),
@@ -606,16 +605,13 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
               Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Text(
-                  _truncateToTwoWords(levelNumber == 0
+                  levelNumber == 0
                       ? 'Уровень 0: Первый шаг'
-                      : 'Уровень $levelNumber: ${data['name']}'),
-                  textAlign: align == Alignment.centerLeft
-                      ? TextAlign.left
-                      : (align == Alignment.centerRight
-                          ? TextAlign.right
-                          : TextAlign.center),
+                      : 'Уровень $levelNumber: ${data['name']}',
+                  textAlign: TextAlign.center,
                   maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+                  softWrap: true,
+                  overflow: TextOverflow.visible,
                   style: const TextStyle(
                       fontSize: 13, fontWeight: FontWeight.w700),
                 ),
@@ -696,16 +692,7 @@ Alignment _alignmentForColumn(int col) {
   }
 }
 
-String _truncateToTwoWords(String input) {
-  // Оставляем префикс "Уровень N:" и ограничиваем часть названия двумя словами
-  final parts = input.split(':');
-  if (parts.length < 2) return input;
-  final head = parts.first; // "Уровень N"
-  final tail = parts.sublist(1).join(':').trim();
-  final words = tail.split(RegExp(r'\s+'));
-  final limited = words.take(2).join(' ');
-  return '$head: $limited';
-}
+// _truncateToTwoWords больше не требуется: заголовок рендерится полностью в 2 строки
 
 class _LockedFloorTile extends StatelessWidget {
   final String title;
@@ -861,7 +848,8 @@ class _DotGridPainter extends CustomPainter {
   final double spacing;
   final double radius;
   final Color color;
-  _DotGridPainter({required this.spacing, required this.radius, required this.color});
+  _DotGridPainter(
+      {required this.spacing, required this.radius, required this.color});
 
   @override
   void paint(Canvas canvas, Size size) {
