@@ -59,10 +59,73 @@ function summarizeChunk(content: string, maxChars = 400): string {
   return (summary.length > maxChars ? summary.slice(0, maxChars) + '…' : summary);
 }
 
+// Функция расчета стоимости
+function calculateCost(usage: any, model: string = 'gpt-4.1-mini'): number {
+  const inputTokens = usage.prompt_tokens || 0;
+  const outputTokens = usage.completion_tokens || 0;
+  
+  let inputCostPer1K = 0.0004;  // GPT-4.1-mini по умолчанию
+  let outputCostPer1K = 0.0016;
+  
+  if (model === 'gpt-4.1') {
+    inputCostPer1K = 0.002;
+    outputCostPer1K = 0.008;
+  } else if (model === 'gpt-5-mini') {
+    inputCostPer1K = 0.00025;
+    outputCostPer1K = 0.002;
+  }
+  
+  const totalCost = (
+    (inputTokens * inputCostPer1K / 1000) +
+    (outputTokens * outputCostPer1K / 1000)
+  );
+  
+  return Math.round(totalCost * 1000000) / 1000000; // Округляем до 6 знаков
+}
+
+// Функция для сохранения данных о стоимости AI запроса
+async function saveAIMessageData(
+  userId: string | null,
+  chatId: string | null,
+  leoMessageId: string | null,
+  usage: any,
+  cost: number,
+  model: string,
+  bot: string,
+  requestType: string = 'chat'
+): Promise<void> {
+  if (!userId) return; // Пропускаем, если пользователь не авторизован
+  
+  try {
+    const { error } = await supabaseAdmin
+      .from('ai_message')
+      .insert({
+        user_id: userId,
+        chat_id: chatId,
+        leo_message_id: leoMessageId,
+        model_used: model,
+        input_tokens: usage.prompt_tokens || 0,
+        output_tokens: usage.completion_tokens || 0,
+        total_tokens: usage.total_tokens || (usage.prompt_tokens || 0) + (usage.completion_tokens || 0),
+        cost_usd: cost,
+        bot_type: bot === 'max' ? 'max' : (requestType === 'quiz' ? 'quiz' : 'leo'),
+        request_type: requestType,
+      });
+
+    if (error) {
+      console.error('ERR save_ai_message', { message: error.message });
+    } else {
+      console.log('INFO ai_message_saved', { userId, botType: bot, cost });
+    }
+  } catch (e: any) {
+    console.error('ERR save_ai_message_exception', { message: String(e).slice(0, 200) });
+  }
+}
+
 // CORS headers for mobile app requests
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-user-jwt",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
@@ -70,6 +133,12 @@ const corsHeaders: Record<string, string> = {
 const supabaseAdmin = createClient(
   Deno.env.get("SUPABASE_URL")!,
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+);
+
+// Alternative client for JWT validation (with anon key)
+const supabaseAuth = createClient(
+  Deno.env.get("SUPABASE_URL")!,
+  Deno.env.get("SUPABASE_ANON_KEY")!,
 );
 
 // Initialize OpenAI client (API key is taken from OPENAI_API_KEY env var)
@@ -81,28 +150,107 @@ serve(async (req: Request): Promise<Response> => {
     return new Response("ok", { headers: corsHeaders });
   }
 
+  // DEBUG: Add version marker
+  console.log('🔧 DEBUG: leo-chat v2.0 started - JWT debugging version');
+  console.log('🔧 DEBUG: Request method:', req.method);
+  console.log('🔧 DEBUG: Request URL:', req.url);
+
+  // Validate environment variables
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
+  const openaiKey = Deno.env.get("OPENAI_API_KEY");
+
+  console.log('INFO env_check', {
+    supabaseUrl: supabaseUrl?.substring(0, 30) + '...',
+    hasServiceKey: Boolean(supabaseServiceKey),
+    hasAnonKey: Boolean(supabaseAnonKey),
+    hasOpenaiKey: Boolean(openaiKey)
+  });
+
+  if (!supabaseUrl || !supabaseServiceKey || !openaiKey) {
+    console.error("ERR missing_env_vars", { 
+      hasSupabaseUrl: Boolean(supabaseUrl),
+      hasSupabaseServiceKey: Boolean(supabaseServiceKey),
+      hasSupabaseAnonKey: Boolean(supabaseAnonKey),
+      hasOpenaiKey: Boolean(openaiKey)
+    });
+    return new Response(
+      JSON.stringify({ 
+        error: "Configuration error", 
+        details: "Missing required environment variables",
+        missing: {
+          supabaseUrl: !supabaseUrl,
+          supabaseServiceKey: !supabaseServiceKey,
+          supabaseAnonKey: !supabaseAnonKey,
+          openaiKey: !openaiKey
+        }
+      }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
   try {
     // Read request body once to support additional parameters
     const body = await req.json();
+    console.log('🔧 DEBUG: Request body parsed successfully');
+    
+    // TEMPORARY: Return version info to confirm deployment
+    if (body?.version_check === true) {
+      return new Response(
+        JSON.stringify({ 
+          version: "v2.0-jwt-debug",
+          timestamp: new Date().toISOString(),
+          env_vars: {
+            hasSupabaseUrl: Boolean(Deno.env.get("SUPABASE_URL")),
+            hasServiceKey: Boolean(Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")),
+            hasAnonKey: Boolean(Deno.env.get("SUPABASE_ANON_KEY")),
+            hasOpenaiKey: Boolean(Deno.env.get("OPENAI_API_KEY"))
+          }
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
     const mode = typeof body?.mode === 'string' ? String(body.mode) : '';
     const messages = body?.messages;
     const userContext = body?.userContext;
     const levelContext = body?.levelContext;
-    const knowledgeContext = body?.knowledgeContext;
+    const chatId = body?.chatId; // Добавляем извлечение chatId
     let bot: string = typeof body?.bot === 'string' ? String(body.bot) : 'leo';
     // Backward compatibility: treat 'alex' as 'max'
     if (bot === 'alex') bot = 'max';
     const isMax = bot === 'max';
 
+    // Добавляем логирование chatId
+    console.log('🔧 DEBUG: chatId из запроса:', chatId);
+    
     // Логируем входящие параметры для отладки
     console.log('🔧 DEBUG: Входящие параметры:', {
       mode,
       messagesCount: Array.isArray(messages) ? messages.length : 0,
-      userContext: userContext ? 'ЕСТЬ' : 'НЕТ',
-      levelContext: levelContext ? 'ЕСТЬ' : 'НЕТ',
-      knowledgeContext: knowledgeContext ? 'ЕСТЬ' : 'НЕТ',
+      userContext: userContext ? `"${userContext}"` : 'НЕТ',
+      levelContext: levelContext ? `"${levelContext}"` : 'НЕТ',
       bot,
       isMax,
+    });
+    
+    // Дополнительная отладка для проверки типов
+    console.log('🔧 DEBUG: Типы параметров:', {
+      userContextType: typeof userContext,
+      levelContextType: typeof levelContext,
+      userContextIsNull: userContext === null,
+      levelContextIsNull: levelContext === null,
+      userContextIsUndefined: userContext === undefined,
+      levelContextIsUndefined: levelContext === undefined,
+    });
+    
+    // Дополнительная отладка для проверки значений
+    console.log('🔧 DEBUG: Значения параметров:', {
+      userContextValue: userContext,
+      levelContextValue: levelContext,
+      userContextIsStringNull: userContext === 'null',
+      levelContextIsStringNull: levelContext === 'null',
     });
 
     // ==============================
@@ -120,14 +268,14 @@ serve(async (req: Request): Promise<Response> => {
 
         const systemPromptQuiz = `Ты отвечаешь как Лео в режиме проверки знаний. Пиши коротко, по‑русски, без вступительных фраз и без предложений помощи.
 Если ответ неверный: поддержи и дай мягкую подсказку в 1–2 предложения, не раскрывай правильный вариант.
-Если ответ верный: поздравь (1 фраза) и добавь 2–3 строки, как применить знание с учётом персонализации пользователя (если передана).`;
+Если ответ верный: поздравь (1 фраза) и добавь 2–3 строки, как применить знание в жизни с учётом персонализации пользователя (если передана).`;
 
         const userMsgParts = [
           question ? `Вопрос: ${question}` : '',
           options.length ? `Варианты: ${options.join(' | ')}` : '',
           `Выбранный индекс: ${selectedIndex}`,
           `Правильный индекс: ${correctIndex}`,
-          typeof userContext === 'string' && userContext.trim() ? `Персонализация: ${userContext.trim()}` : '',
+          typeof userContext === 'string' && userContext.trim() && userContext !== 'null' ? `Персонализация: ${userContext.trim()}` : '',
           `Результат: ${isCorrect ? 'верно' : 'неверно'}`,
         ].filter(Boolean).join('\n');
 
@@ -151,6 +299,13 @@ serve(async (req: Request): Promise<Response> => {
 
         const assistantMessage = completion.choices[0].message;
         const usage = completion.usage;
+        const model = Deno.env.get("OPENAI_MODEL") || "gpt-4.1-mini";
+        const cost = calculateCost(usage, model);
+        
+        // Сохраняем данные о стоимости (но НЕ возвращаем пользователю)
+        // В quiz режиме нет chatId и leoMessageId
+        await saveAIMessageData(userId, null, null, usage, cost, model, 'quiz', 'quiz');
+        
         return new Response(
           JSON.stringify({ message: assistantMessage, usage }),
           { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
@@ -176,60 +331,110 @@ serve(async (req: Request): Promise<Response> => {
 
     // Try to extract user context from bearer token (optional)
     const authHeader = req.headers.get("Authorization") || req.headers.get("authorization");
+    const userJwtHeader = req.headers.get("x-user-jwt");
     let userContextText = "";
     let profileText = ""; // формируем отдельно, чтобы при отсутствии JWT всё равно использовать client userContext
     let personaSummary = "";
     let userId: string | null = null;
 
     // No PII: do not log tokens, only presence
-    console.log('INFO auth_header_present', { present: Boolean(authHeader) });
-    
-    if (authHeader?.startsWith("Bearer ")) {
-      const jwt = authHeader.replace("Bearer ", "");
-      // Do not log JWT content or length
-
-      const { data: { user }, error } = await supabaseAdmin.auth.getUser(jwt);
-      console.log('INFO auth_get_user', { ok: !error, user: user?.id ? 'present' : 'absent' });
-
-      if (!error && user) {
-        userId = user.id;
-        const personaTtlMs = ttlMsFromEnv('PERSONA_CACHE_TTL_SEC', 180);
-        // Try persona cache first
-        const cachedPersona = getCached(personaCache, user.id);
-        if (cachedPersona) {
-          personaSummary = cachedPersona;
-        }
-
-        const { data: profile } = await supabaseAdmin
-          .from("users")
-          .select("name, about, goal, business_area, experience_level, persona_summary")
-          .eq("id", user.id)
-          .single();
-
-        if (profile) {
-          const { name, about, goal, business_area, experience_level, persona_summary } = profile as any;
-          // Собираем профиль пользователя
-          profileText = `Имя пользователя: ${name ?? "не указано"}. Цель: ${goal ?? "не указана"}. О себе: ${about ?? "нет информации"}. Сфера деятельности: ${business_area ?? "не указана"}. Уровень опыта: ${experience_level ?? "не указан"}.`;
-
-          // Персона: берём сохранённую, иначе кратко формируем из профиля
-          if (!personaSummary) {
-            if (typeof persona_summary === 'string' && persona_summary.trim().length > 0) {
-              personaSummary = persona_summary.trim();
-            } else {
-              const compact = [name && `Имя: ${name}`, goal && `Цель: ${goal}`, business_area && `Сфера: ${business_area}`, experience_level && `Опыт: ${experience_level}`]
-                .filter(Boolean).join('; ');
-              personaSummary = compact || '';
-            }
-          }
-          if (personaSummary) {
-            setCached(personaCache, user.id, personaSummary, personaTtlMs);
-          }
+    console.log('INFO auth_header_present', { present: Boolean(authHeader), userJwtPresent: Boolean(userJwtHeader) });
+      // Prefer explicit user JWT header; otherwise try Authorization
+      let jwt: string | null = null;
+      if (typeof userJwtHeader === 'string' && userJwtHeader.trim().length > 20) {
+        jwt = userJwtHeader.trim();
+      } else if (authHeader?.startsWith("Bearer ")) {
+        const token = authHeader.replace("Bearer ", "").trim();
+        const anon = (Deno.env.get("SUPABASE_ANON_KEY") || '').trim();
+        const service = (Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || '').trim();
+        // Ignore anon/service keys, only treat as user JWT if different
+        if (token && token !== anon && token !== service) {
+          jwt = token;
         }
       }
-    }
+
+      if (!jwt) {
+        return new Response(
+          JSON.stringify({ code: 401, message: "Missing authorization header" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      try {
+        console.log('INFO processing_jwt', {
+          jwtLength: jwt.length,
+          jwtPrefix: jwt.substring(0, 30),
+          hasSupabaseUrl: Boolean(Deno.env.get("SUPABASE_URL")),
+          hasServiceKey: Boolean(Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"))
+        });
+
+        // Try with auth client first (anon key), fallback to admin client
+        let authResult = await supabaseAuth.auth.getUser(jwt);
+        if (authResult.error) {
+          console.log('WARN auth_client_failed, trying admin client');
+          authResult = await supabaseAdmin.auth.getUser(jwt);
+        }
+        const { data: { user }, error } = authResult as any;
+        console.log('INFO auth_get_user', { ok: !error, user: user?.id ? 'present' : 'absent' });
+
+        if (error) {
+          console.log('ERROR auth_error', { message: error.message, code: error.code, details: error });
+          return new Response(
+            JSON.stringify({
+              error: "JWT validation failed",
+              details: {
+                message: error.message,
+                code: error.code,
+                supabaseUrl: Deno.env.get("SUPABASE_URL"),
+                hasServiceKey: Boolean(Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"))
+              }
+            }),
+            { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        if (user) {
+          userId = user.id;
+          const personaTtlMs = ttlMsFromEnv('PERSONA_CACHE_TTL_SEC', 180);
+          // Try persona cache first
+          const cachedPersona = getCached(personaCache, user.id);
+          if (cachedPersona) {
+            personaSummary = cachedPersona;
+          }
+
+          const { data: profile } = await supabaseAdmin
+            .from("users")
+            .select("name, about, goal, business_area, experience_level, persona_summary")
+            .eq("id", user.id)
+            .single();
+
+          if (profile) {
+            const { name, about, goal, business_area, experience_level, persona_summary } = profile as any;
+            // Собираем профиль пользователя
+            profileText = `Имя пользователя: ${name ?? "не указано"}. Цель: ${goal ?? "не указана"}. О себе: ${about ?? "нет информации"}. Сфера деятельности: ${business_area ?? "не указана"}. Уровень опыта: ${experience_level ?? "не указан"}.`;
+
+            // Персона: берём сохранённую, иначе кратко формируем из профиля
+            if (!personaSummary) {
+              if (typeof persona_summary === 'string' && persona_summary.trim().length > 0) {
+                personaSummary = persona_summary.trim();
+              } else {
+                const compact = [name && `Имя: ${name}`, goal && `Цель: ${goal}`, business_area && `Сфера: ${business_area}`, experience_level && `Опыт: ${experience_level}`]
+                  .filter(Boolean).join('; ');
+                personaSummary = compact || '';
+              }
+            }
+            if (personaSummary) {
+              setCached(personaCache, user.id, personaSummary, personaTtlMs);
+            }
+          }
+        }
+      } catch (authErr: any) {
+        console.log('ERR auth_process', { message: String(authErr).slice(0, 200) });
+      }
 
     // Объединяем профиль и клиентский контекст независимо от авторизации
-    if (typeof userContext === 'string' && userContext.trim().length > 0) {
+    // Фильтруем строки "null" и пустые значения
+    if (typeof userContext === 'string' && userContext.trim().length > 0 && userContext !== 'null') {
       userContextText = `${profileText ? profileText + "\n" : ''}${userContext.trim()}`;
     } else {
       userContextText = profileText;
@@ -263,7 +468,7 @@ serve(async (req: Request): Promise<Response> => {
           // Передаём фильтры метаданных, если есть levelContext/skill внутри него (ожидается как "level_id: X" или JSON)
           let metadataFilter: any = {};
           try {
-            if (levelContext && typeof levelContext === 'string') {
+            if (levelContext && typeof levelContext === 'string' && levelContext !== 'null') {
               const m = levelContext.match(/level[_ ]?id\s*[:=]\s*(\d+)/i);
               if (m) metadataFilter.level_id = parseInt(m[1]);
             } else if (levelContext && typeof levelContext === 'object') {
@@ -353,7 +558,7 @@ serve(async (req: Request): Promise<Response> => {
       messages_count: Array.isArray(messages) ? messages.length : 0,
       userContext_present: Boolean(userContext),
       levelContext_present: Boolean(levelContext),
-      knowledgeContext_present: Boolean(knowledgeContext),
+      ragContext_present: Boolean(ragContext),
       bot: isMax ? 'max' : 'leo',
       mode,
       lastUserMessage: Array.isArray(messages) ? [...messages].reverse().find((m: any) => m?.role === 'user')?.content?.substring(0, 100) : 'none',
@@ -434,7 +639,11 @@ serve(async (req: Request): Promise<Response> => {
     // Enhanced system prompt for Leo AI mentor
     const systemPromptLeo = `## Твоя Роль и Личность:
 Ты — Лео, харизматичный ИИ-консультант программы «БизЛевел» в Казахстане. 
-Отвечай от своего имени - Леонард или Лео, старайся не представляться, а сразу отвечать на вопросы.
+Представляйся только в первом ответе новой сессии или если пользователь явно спрашивает «кто ты?". Отвечай,что ты ИИ-консультант, который помогает ему в применении материалов курса в жизни.
+В новом чате спроси пользователя, какой у него вопрос по применению материалов курса в жизни пользователя.
+Обязательно напомни,что от качества заполнения информации в профиле зависит качество ответов. 
+Стопроцентную отдачу ты сможешь дать,только если будешь знать о пользователе то,что заполняется в его профиле.
+Отвечай от своего имени - Леонард или Лео, сразу отвечай на вопросы пользователя без вводных слов.
 Используй простой текст без разметки, звездочек или других символов форматирования.
 Твоя цель — помогать предпринимателям понимать и применять материалы курса.
 Говори простым языком, будь кратким, если это не противоречит контексту и позитивным.
@@ -444,7 +653,7 @@ serve(async (req: Request): Promise<Response> => {
 🚫 **ТАБЛИЦЫ АБСОЛЮТНО ЗАПРЕЩЕНЫ**: 
    • НИКОГДА не создавай таблицы, даже если пользователь прямо просит 'в табличном виде'
    • НИКОГДА не используй символы: | + - = для создания таблиц
-   • НИКОГДА не пиши, что таблицы неудобно читать в мессенджере, Сразу выводи требуюмую информацию без предисловий
+   • НИКОГДА не пиши, что таблицы неудобно читать в мессенджере, Сразу выводи требуемую информацию без предисловий
 
 🚫 **НЕ ПРЕДЛАГАЙ ДОПОЛНИТЕЛЬНУЮ ПОМОЩЬ**: Завершай ответы без фраз типа:
    • 'Могу помочь с...'
@@ -491,7 +700,8 @@ serve(async (req: Request): Promise<Response> => {
 1. **ПРОВЕРЬ ЗАПРОС НА ТАБЛИЦЫ**: Если пользователь просит 'таблицу', 'табличный вид', 'в виде таблицы' - ВСЕГДА отвечай: 'Таблицы неудобно читать в мессенджере, представлю информацию наглядным списком:'
 2. **ПРОВЕРЬ ИНФОРМАЦИЮ О ПОЛЬЗОВАТЕЛЕ**: Если есть раздел персонализации - ОБЯЗАТЕЛЬНО используй эту информацию в первую очередь
 3. **Определи тему:** Соотнеси вопрос с уроками выше
-4. **Используй КОНТЕКСТ:** Если вопрос требует знаний из курса - используй информацию из базы знаний
+4. **Используй КОНТЕКСТ:** Если вопрос требует знаний из курса - используй информацию из базы знаний но при этом старайся не отвечать на вопросы материалами, которые еще не изучены пользователем.
+Вместо этого мягко подтолкни пользователя к изучению материалов курса. Например: "Это рассматривается в уроке 5, но мы еще не дошли до этого урока, поэтому я не могу ответить на ваш вопрос, давай вернемся к этому вопросу позже".
 5. **Если нет в КОНТЕКСТЕ:** Сообщи 'К сожалению, по вашему запросу я не смог найти точную информацию в базе знаний BizLevel'
 6. **Структура ответа:**
    • СРАЗУ четкое объяснение с примером (БЕЗ вводных фраз, типа Я считаю, Я думаю, Я понимаю, Я полагаю и других)
@@ -521,19 +731,23 @@ ${memoriesText ? `\n## Личные заметки (память):\n${memoriesTe
 ${recentSummaries ? `\n## Итоги прошлых обсуждений:\n${recentSummaries}` : ''}
 ${ragContext ? `\n## RAG контекст (база знаний):\n${ragContext}` : ''}
 ${userContextText ? `\n## ПЕРСОНАЛИЗАЦИЯ ДЛЯ ПОЛЬЗОВАТЕЛЯ:\n${userContextText}` : ''}
-${levelContext ? `\n## КОНТЕКСТ УРОКА:\n${levelContext}` : ''}
-${knowledgeContext ? `\n## БАЗА ЗНАНИЙ (клиент):\n${knowledgeContext}` : ''}`;
+${levelContext && levelContext !== 'null' ? `\n## КОНТЕКСТ УРОКА:\n${levelContext}` : ''}`;
 
     // Alex (goal tracker) prompt — коротко, конкретно, приоритет цели/спринтов
     const systemPromptAlex = `## Твоя роль и тон:
-Ты — Макс, трекер цели BizLevel. Отвечай коротко, конкретно и по делу.
-Фокус: помочь пользователю сформулировать и кристаллизовать цель, поддерживать её достижение в 28‑дневных спринтах.
+Ты — Макс, трекер цели BizLevel. Отвечай коротко, конкретно и по делу. Ты можешь отвечать на вопросы только ведущие к достижению цели, установленной пользователем.
+Фокус: помочь пользователю сформулировать и кристаллизовать цель после прохождения пользователем Уровня 4, поддерживать её достижение в 28‑дневных спринтах.
 Представляйся только в первом ответе новой сессии или если пользователь явно спрашивает «кто ты?».
+Ты можешь обсуждать с пользователем реалистичность и точность формулировки цели, и должен помогать сформулировать ее точнее и реалистичнее.
 Не используй таблицы и не предлагай «дополнительную помощь». Сразу давай следующий шаг.
 
 ## Приоритет ответа:
-1) Цель и метрики пользователя → 2) Следующие микро‑шаги на сегодня/неделю → 3) Дополнение из базы знаний курса (если нужно) → 4) Краткое завершение.
-Если цель присутствует в блоках «Персонализация» или «Цель», НЕ проси пользователя повторять её. Кратко перескажи и предложи шаг. Если данных совсем нет, тогда запроси одно ключевое уточнение.
+1) Цель и метрики пользователя (при необходимости уточнение и помощь в формулировке кристально конкретной, достижимой, измеримой, релевантной сфере деятельности и своевременной цели) → 
+2) Следующие микро‑шаги на сегодня/неделю → 
+3) Дополнение из базы знаний курса (если нужно) → 
+4) Краткое завершение.
+Если цель присутствует в блоках «Персонализация» или «Цель», НЕ проси пользователя повторять её. Кратко перескажи и предложи шаг. 
+Если данных совсем нет, тогда мягко подталкивай пользователя к качественному заполнению информации в профиле и формулировке цели.
 
 ## Данные пользователя и контекст:
 ${personaSummary ? `Персона: ${personaSummary}\n` : ''}
@@ -543,14 +757,15 @@ ${remindersBlock ? `Незафиксированные напоминания:\n
 ${recentSummaries ? `Итоги прошлых обсуждений:\n${recentSummaries}\n` : ''}
 ${memoriesText ? `Личные заметки:\n${memoriesText}\n` : ''}
 ${userContextText ? `Персонализация: ${userContextText}\n` : ''}
-${levelContext ? `Контекст экрана/урока: ${levelContext}\n` : ''}
+${levelContext && levelContext !== 'null' ? `Контекст экрана/урока: ${levelContext}\n` : ''}
 ${quoteBlock ? `Цитата дня: ${quoteBlock}\n` : ''}
 
 ## Правила формата:
 - Без таблиц, эмодзи и вводных фраз. 2–5 коротких абзацев или маркированный список.
 - Всегда укажи один следующий шаг (микро‑действие) c реалистичным сроком в ближайшие 1–3 дня.
 - Если данных недостаточно — попроси уточнение по одному самому важному пункту.
-- Не говори, что у тебя нет доступа к профилю. Используй данные из разделов выше (Персонализация, Персона, Память, Итоги) и отвечай по ним.`;
+- Если у тебя не хватает информации из профиля, сообщи пользователю, что требуется заполнить информацию в профиле, при этом напомни ему, что от качества заполнения информации в профиле зависит качество работы пользователя с курсом.
+При отсутствии необходимой информации используй данные из разделов выше (Персонализация, Персона, Память, Итоги) и отвечай по ним.`;
 
     const systemPrompt = isMax ? systemPromptAlex : systemPromptLeo;
 
@@ -563,6 +778,13 @@ ${quoteBlock ? `Цитата дня: ${quoteBlock}\n` : ''}
       hasLevelContext: Boolean(levelContext),
       hasMemories: Boolean(memoriesText),
       hasSummaries: Boolean(recentSummaries),
+    });
+    
+    // Дополнительная отладка для проверки контекста
+    console.log('🔧 DEBUG: Детали контекста:', {
+      userContextText: userContextText ? `"${userContextText.substring(0, 100)}..."` : 'НЕТ',
+      levelContext: levelContext ? `"${levelContext}"` : 'НЕТ',
+      ragContext: ragContext ? `"${ragContext.substring(0, 100)}..."` : 'НЕТ',
     });
 
     // --- Безопасный вызов OpenAI с валидацией конфигурации ---
@@ -588,8 +810,14 @@ ${quoteBlock ? `Цитата дня: ${quoteBlock}\n` : ''}
 
       const assistantMessage = completion.choices[0].message;
       const usage = completion.usage; // prompt/completion/total tokens
+      const model = Deno.env.get("OPENAI_MODEL") || "gpt-4.1-mini";
+      const cost = calculateCost(usage, model);
 
       console.log('🔧 DEBUG: Ответ от OpenAI:', assistantMessage.content?.substring(0, 100));
+
+      // Сохраняем данные о стоимости (но НЕ возвращаем пользователю)
+      // В обычном режиме чата используем переданный chatId
+      await saveAIMessageData(userId, chatId, null, usage, cost, model, bot, 'chat');
 
       return new Response(
         JSON.stringify({ message: assistantMessage, usage }),

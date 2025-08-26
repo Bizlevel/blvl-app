@@ -130,22 +130,18 @@ class _BackgroundLayer extends StatelessWidget {
   const _BackgroundLayer();
   @override
   Widget build(BuildContext context) {
-    // Безопасная загрузка: если background.svg отсутствует, ни на что не влияет
-    return FutureBuilder<String>(
-      future: DefaultAssetBundle.of(context)
-          .loadString('assets/images/street/background.svg')
-          .catchError((_) => ''),
-      builder: (context, snapshot) {
-        final String data = snapshot.data ?? '';
-        if (data.isEmpty) {
-          return const SizedBox.shrink();
-        }
-        return SvgPicture.string(
-          data,
-          fit: BoxFit.cover,
-          alignment: Alignment.bottomCenter,
-        );
-      },
+    // Простой градиентный фон вместо отсутствующего background.svg
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            AppColor.appBgColor,
+            AppColor.appBgColor.withOpacity(0.8),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -33,15 +33,24 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
 
   Future<void> _bootstrap() async {
     try {
-      Sentry.addBreadcrumb(Breadcrumb(
-        category: 'case',
-        level: SentryLevel.info,
-        message: 'case_opened',
-        data: {'caseId': widget.caseId},
-      ));
+      try {
+        Sentry.addBreadcrumb(Breadcrumb(
+          category: 'case',
+          level: SentryLevel.info,
+          message: 'case_opened',
+          data: {'caseId': widget.caseId},
+        ));
+      } catch (_) {
+        // Sentry не настроен, игнорируем
+      }
       await ref.read(caseActionsProvider).start(widget.caseId);
     } catch (e, st) {
-      await Sentry.captureException(e, stackTrace: st);
+      try {
+        await Sentry.captureException(e, stackTrace: st);
+      } catch (_) {
+        // Sentry не настроен, просто логируем в консоль
+        print('DEBUG: Exception (Sentry not configured): $e');
+      }
     }
 
     try {
@@ -56,7 +65,12 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
         _loading = false;
       });
     } catch (e, st) {
-      await Sentry.captureException(e, stackTrace: st);
+      try {
+        await Sentry.captureException(e, stackTrace: st);
+      } catch (_) {
+        // Sentry не настроен, просто логируем в консоль
+        print('DEBUG: Exception (Sentry not configured): $e');
+      }
       if (!mounted) return;
       setState(() => _loading = false);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -212,12 +226,16 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
 
   Future<void> _openDialog() async {
     try {
-      Sentry.addBreadcrumb(Breadcrumb(
+      try {
+        Sentry.addBreadcrumb(Breadcrumb(
         category: 'case',
         level: SentryLevel.info,
         message: 'case_dialog_started',
         data: {'caseId': widget.caseId},
       ));
+      } catch (_) {
+        // Sentry не настроен, игнорируем
+      }
       final systemPrompt = _buildCaseSystemPrompt();
       await Navigator.of(context).push(MaterialPageRoute(
         builder: (_) => LeoDialogScreen(
@@ -230,7 +248,12 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
       if (!mounted) return;
       setState(() => _dialogOpened = true);
     } catch (e, st) {
-      await Sentry.captureException(e, stackTrace: st);
+      try {
+        await Sentry.captureException(e, stackTrace: st);
+      } catch (_) {
+        // Sentry не настроен, просто логируем в консоль
+        print('DEBUG: Exception (Sentry not configured): $e');
+      }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Не удалось открыть диалог')));
@@ -241,6 +264,19 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
     final title = _caseMeta?['title']?.toString() ?? '';
     final afterLevel = _caseMeta?['after_level']?.toString() ?? '';
     final skill = _caseMeta?['skill_name']?.toString() ?? '';
+    final user = Supabase.instance.client.auth.currentUser;
+
+    final hasProfile = user != null; 
+    if (!hasProfile) {
+    return 'Режим: case_facilitатор. Ты — Лео, фасилитатор мини‑кейса. '
+        'Кейс: "$title" (после уровня $afterLevel, навык: $skill). '
+        '⚠️ ВАЖНО: Профиль пользователя не заполнен или заполнен неполностью. '
+        'Сначала помоги пользователю заполнить профиль (имя, сфера деятельности, цель, опыт), '
+        'а затем переходи к кейсу. Объясни, что качество ответов зависит от полноты профиля. '
+        'Задавай чёткие вопросы и оценивай ответы по 5‑уровневой шкале качества. '
+        'Формат ответов короткий (2–3 предложения). Поддерживай мотивацию и давай мягкие подсказки.';
+    }
+  
     return 'Режим: case_facilitатор. Ты — Лео, фасилитатор мини‑кейса. '
         'Кейс: "$title" (после уровня $afterLevel, навык: $skill). '
         'Задавай чёткие вопросы и оценивай ответы по 5‑уровневой шкале качества. '
@@ -287,12 +323,16 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
 
   Future<void> _complete() async {
     try {
-      Sentry.addBreadcrumb(Breadcrumb(
+      try {
+        Sentry.addBreadcrumb(Breadcrumb(
         category: 'case',
         level: SentryLevel.info,
         message: 'case_completed',
         data: {'caseId': widget.caseId},
       ));
+      } catch (_) {
+        // Sentry не настроен, игнорируем
+      }
       await ref.read(caseActionsProvider).complete(widget.caseId);
       final after = _caseMeta?['after_level'] as int?;
       final target = after != null ? after + 1 : null;
@@ -303,7 +343,12 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
         context.go('/tower');
       }
     } catch (e, st) {
-      await Sentry.captureException(e, stackTrace: st);
+      try {
+        await Sentry.captureException(e, stackTrace: st);
+      } catch (_) {
+        // Sentry не настроен, просто логируем в консоль
+        print('DEBUG: Exception (Sentry not configured): $e');
+      }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Не удалось завершить мини‑кейс')));
@@ -312,12 +357,16 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
 
   Future<void> _onSkip() async {
     try {
-      Sentry.addBreadcrumb(Breadcrumb(
+      try {
+        Sentry.addBreadcrumb(Breadcrumb(
         category: 'case',
         level: SentryLevel.info,
         message: 'case_skipped',
         data: {'caseId': widget.caseId},
       ));
+      } catch (_) {
+        // Sentry не настроен, игнорируем
+      }
       await ref.read(caseActionsProvider).skip(widget.caseId);
       final after = _caseMeta?['after_level'] as int?;
       final target = after != null ? after + 1 : null;
@@ -328,7 +377,12 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
         context.go('/tower');
       }
     } catch (e, st) {
-      await Sentry.captureException(e, stackTrace: st);
+      try {
+        await Sentry.captureException(e, stackTrace: st);
+      } catch (_) {
+        // Sentry не настроен, просто логируем в консоль
+        print('DEBUG: Exception (Sentry not configured): $e');
+      }
       if (!mounted) return;
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('Не удалось пропустить')));

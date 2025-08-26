@@ -207,21 +207,34 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
       // Get assistant response with RAG if context is available
       String assistantMsg;
 
+      // Фильтруем строки "null" и пустые значения
+      final cleanUserContext = (widget.userContext == 'null' || widget.userContext?.isEmpty == true) ? '' : (widget.userContext ?? '');
+      final cleanLevelContext = (widget.levelContext == 'null' || widget.levelContext?.isEmpty == true) ? '' : (widget.levelContext ?? '');
+      
       print('🔧 DEBUG: userContext = "${widget.userContext}"');
       print('🔧 DEBUG: levelContext = "${widget.levelContext}"');
-      print(
-          '🔧 DEBUG: userContext.isNotEmpty = ${widget.userContext?.isNotEmpty}');
-      print(
-          '🔧 DEBUG: levelContext.isNotEmpty = ${widget.levelContext?.isNotEmpty}');
+      print('🔧 DEBUG: cleanUserContext = "$cleanUserContext"');
+      print('🔧 DEBUG: cleanLevelContext = "$cleanLevelContext"');
+      print('🔧 DEBUG: userContext.isNotEmpty = ${cleanUserContext.isNotEmpty}');
+      print('🔧 DEBUG: levelContext.isNotEmpty = ${cleanLevelContext.isNotEmpty}');
 
       // Единый вызов: сервер выполнит RAG + персонализацию при необходимости
+      print('🔧 DEBUG: Отправляем запрос к sendMessageWithRAG...');
+      print('🔧 DEBUG: messages count: ${_buildChatContext().length}');
+      print('🔧 DEBUG: bot: ${widget.bot}');
+      
       final response = await _leo.sendMessageWithRAG(
         messages: _buildChatContext(),
-        userContext: widget.userContext ?? '',
-        levelContext: widget.levelContext ?? '',
+        userContext: cleanUserContext,
+        levelContext: cleanLevelContext,
         bot: widget.bot,
+        chatId: _chatId, // Добавляем передачу chatId
       );
+      
+      print('🔧 DEBUG: Получен ответ от sendMessageWithRAG');
+      print('🔧 DEBUG: response keys: ${response.keys.toList()}');
       assistantMsg = response['message']['content'] as String? ?? '';
+      print('🔧 DEBUG: assistantMsg length: ${assistantMsg.length}');
 
       if (!widget.caseMode) {
         await _leo.saveConversation(
@@ -234,9 +247,11 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
       });
       _scrollToBottom();
     } catch (e) {
+      print('🔧 DEBUG: ОШИБКА при отправке сообщения: $e');
+      print('🔧 DEBUG: Тип ошибки: ${e.runtimeType}');
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(e.toString())));
+          .showSnackBar(SnackBar(content: Text('Ошибка: $e')));
     } finally {
       if (mounted) setState(() => _isSending = false);
     }

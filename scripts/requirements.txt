@@ -1,0 +1,11 @@
+# Зависимости для скрипта индексации кейсов BizLevel
+# pip install -r requirements.txt
+
+# Основные зависимости
+openai>=1.3.0
+supabase>=2.0.0
+python-dotenv>=1.0.0
+
+# Дополнительные (если уже не установлены)
+requests>=2.31.0
+typing-extensions>=4.7.0

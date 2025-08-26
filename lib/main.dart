@@ -49,7 +49,8 @@ Future<void> main() async {
   final dsn = envOrDefine('SENTRY_DSN');
 
   if (dsn.isEmpty) {
-    // Без Sentry
+    // Без Sentry - просто запускаем приложение
+    print('INFO: Sentry DSN not configured, running without Sentry');
     runApp(const ProviderScope(child: MyApp()));
   } else {
     // С Sentry, но в той же зоне

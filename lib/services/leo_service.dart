@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:bizlevel/utils/env_helper.dart';
 
 /// Typed failure for any Leo related errors.
 class LeoFailure implements Exception {
@@ -57,7 +58,9 @@ class LeoService {
           '/leo-chat',
           data: jsonEncode({'messages': messages, 'bot': bot}),
           options: Options(headers: {
-            'Authorization': 'Bearer ${session.accessToken}',
+            'Authorization': 'Bearer ${envOrDefine('SUPABASE_ANON_KEY')}',
+            'apikey': envOrDefine('SUPABASE_ANON_KEY'),
+            'x-user-jwt': session.accessToken,
             'Content-Type': 'application/json',
           }),
         );
@@ -67,7 +70,8 @@ class LeoService {
 
         if (response.statusCode == 200 &&
             response.data is Map<String, dynamic>) {
-          return Map<String, dynamic>.from(response.data);
+          final responseData = Map<String, dynamic>.from(response.data);
+          return responseData;
         } else {
           final message =
               (response.data is Map && response.data['error'] != null)
@@ -76,7 +80,12 @@ class LeoService {
           throw LeoFailure(message);
         }
       } on DioException catch (e) {
-        await Sentry.captureException(e);
+        try {
+          await Sentry.captureException(e);
+        } catch (_) {
+          // Sentry не настроен, просто логируем в консоль
+          print('DEBUG: Exception (Sentry not configured): $e');
+        }
         if (e.error is SocketException) {
           throw LeoFailure('Нет соединения с интернетом');
         }
@@ -96,7 +105,12 @@ class LeoService {
         }
         throw LeoFailure('Сетевая ошибка при обращении к Leo');
       } catch (e) {
-        await Sentry.captureException(e);
+        try {
+          await Sentry.captureException(e);
+        } catch (_) {
+          // Sentry не настроен, просто логируем в консоль
+          print('DEBUG: Exception (Sentry not configured): $e');
+        }
         throw LeoFailure('Не удалось получить ответ Leo');
       }
     });
@@ -109,35 +123,58 @@ class LeoService {
     required String userContext,
     required String levelContext,
     String bot = 'leo',
+    String? chatId, // Добавляем chatId параметр
   }) async {
     final session = _client.auth.currentSession;
     if (session == null) {
       throw LeoFailure('Пользователь не авторизован');
     }
 
-    // print('🔧 DEBUG: sendMessageWithRAG');
+    print('🔧 DEBUG: sendMessageWithRAG начался');
+    print('🔧 DEBUG: session.user.id = ${session.user?.id}');
+    print('🔧 DEBUG: JWT длина = ${session.accessToken.length}');
+    print('🔧 DEBUG: JWT начинается с = ${session.accessToken.substring(0, 20)}...');
+    print('🔧 DEBUG: chatId = $chatId'); // Добавляем логирование chatId
 
     // Отправляем сообщения в Edge Function. Встроенный RAG выполняется на сервере.
-    // print('🔧 DEBUG: messages.length = ${messages.length}');
     return _withRetry(() async {
       try {
+        // Фильтруем строки "null" и пустые значения
+        final cleanUserContext = (userContext == 'null' || userContext.isEmpty) ? null : userContext;
+        final cleanLevelContext = (levelContext == 'null' || levelContext.isEmpty) ? null : levelContext;
+        
+        print('🔧 DEBUG: Отправляем POST запрос к /leo-chat');
+        print('🔧 DEBUG: payload size = ${jsonEncode({
+            'messages': messages,
+            'userContext': cleanUserContext,
+            'levelContext': cleanLevelContext,
+            'bot': bot,
+            'chatId': chatId, // Добавляем chatId в payload
+          }).length} символов');
+        
         final response = await _edgeDio.post(
           '/leo-chat',
           data: jsonEncode({
             'messages': messages,
-            'userContext': userContext,
-            'levelContext': levelContext,
+            'userContext': cleanUserContext,
+            'levelContext': cleanLevelContext,
             'bot': bot,
+            'chatId': chatId, // Добавляем chatId в payload
           }),
           options: Options(headers: {
-            'Authorization': 'Bearer ${session.accessToken}',
+            'Authorization': 'Bearer ${envOrDefine('SUPABASE_ANON_KEY')}',
+            'apikey': envOrDefine('SUPABASE_ANON_KEY'),
+            'x-user-jwt': session.accessToken,
             'Content-Type': 'application/json',
           }),
         );
+        
+        print('🔧 DEBUG: Получен HTTP ответ: ${response.statusCode}');
 
         if (response.statusCode == 200 &&
             response.data is Map<String, dynamic>) {
-          return Map<String, dynamic>.from(response.data);
+          final responseData = Map<String, dynamic>.from(response.data);
+          return responseData;
         } else {
           final message =
               (response.data is Map && response.data['error'] != null)
@@ -146,7 +183,12 @@ class LeoService {
           throw LeoFailure(message);
         }
       } on DioException catch (e) {
-        await Sentry.captureException(e);
+        try {
+          await Sentry.captureException(e);
+        } catch (_) {
+          // Sentry не настроен, просто логируем в консоль
+          print('DEBUG: Exception (Sentry not configured): $e');
+        }
         if (e.error is SocketException) {
           throw LeoFailure('Нет соединения с интернетом');
         }
@@ -166,7 +208,12 @@ class LeoService {
         }
         throw LeoFailure('Сетевая ошибка при обращении к Leo');
       } catch (e) {
-        await Sentry.captureException(e);
+        try {
+          await Sentry.captureException(e);
+        } catch (_) {
+          // Sentry не настроен, просто логируем в консоль
+          print('DEBUG: Exception (Sentry not configured): $e');
+        }
         throw LeoFailure('Не удалось получить ответ Leo');
       }
     });
@@ -187,6 +234,9 @@ class LeoService {
       throw LeoFailure('Пользователь не авторизован');
     }
 
+    // Фильтруем строки "null" и пустые значения
+    final cleanUserContext = (userContext == 'null' || userContext.isEmpty) ? null : userContext;
+    
     final payload = {
       'mode': 'quiz',
       'isCorrect': selectedIndex == correctIndex,
@@ -196,7 +246,7 @@ class LeoService {
         'selectedIndex': selectedIndex,
         'correctIndex': correctIndex,
       },
-      'userContext': userContext,
+      'userContext': cleanUserContext,
       'maxTokens': maxTokens,
     };
 
@@ -206,7 +256,9 @@ class LeoService {
           '/leo-chat',
           data: jsonEncode(payload),
           options: Options(headers: {
-            'Authorization': 'Bearer ${session.accessToken}',
+            'Authorization': 'Bearer ${envOrDefine('SUPABASE_ANON_KEY')}',
+            'apikey': envOrDefine('SUPABASE_ANON_KEY'),
+            'x-user-jwt': session.accessToken,
             'Content-Type': 'application/json',
           }),
         );
@@ -224,7 +276,12 @@ class LeoService {
         if (e.error is SocketException) {
           throw LeoFailure('Нет соединения с интернетом');
         }
-        await Sentry.captureException(e);
+        try {
+          await Sentry.captureException(e);
+        } catch (_) {
+          // Sentry не настроен, просто логируем в консоль
+          print('DEBUG: Exception (Sentry not configured): $e');
+        }
         final data = e.response?.data;
         if (data is Map) {
           final err = (data['error'] ?? data['message'])?.toString();
@@ -242,7 +299,12 @@ class LeoService {
         }
         throw LeoFailure('Сетевая ошибка при обращении к Leo (quiz)');
       } catch (e) {
-        await Sentry.captureException(e);
+        try {
+          await Sentry.captureException(e);
+        } catch (_) {
+          // Sentry не настроен, просто логируем в консоль
+          print('DEBUG: Exception (Sentry not configured): $e');
+        }
         throw LeoFailure('Не удалось получить ответ Leo (quiz)');
       }
     });
@@ -387,6 +449,45 @@ class LeoService {
       throw LeoFailure(e.message);
     } catch (e) {
       throw LeoFailure('Не удалось сохранить сообщение');
+    }
+  }
+
+
+
+  /// Публичный метод для сохранения данных о стоимости AI запроса в таблицу ai_message
+  /// Позволяет внешним компонентам сохранять данные о стоимости
+  Future<void> saveAiMessageData({
+    required String leoMessageId,
+    required String chatId,
+    required String userId,
+    required int inputTokens,
+    required int outputTokens,
+    required double costUsd,
+    required String modelUsed,
+    required String botType,
+    String requestType = 'chat',
+  }) async {
+    try {
+      await _client.from('ai_message').insert({
+        'leo_message_id': leoMessageId,
+        'chat_id': chatId,
+        'user_id': userId,
+        'input_tokens': inputTokens,
+        'output_tokens': outputTokens,
+        'total_tokens': inputTokens + outputTokens,
+        'cost_usd': costUsd,
+        'model_used': modelUsed,
+        'bot_type': botType,
+        'request_type': requestType,
+      });
+
+      print('🔧 DEBUG: AI message data saved via public method');
+    } on PostgrestException catch (e) {
+      print('Warning: Failed to save AI message data to database: ${e.message}');
+      rethrow; // Пробрасываем ошибку для обработки на уровне выше
+    } catch (e) {
+      print('Warning: Unexpected error saving AI message data: $e');
+      rethrow;
     }
   }
 }
