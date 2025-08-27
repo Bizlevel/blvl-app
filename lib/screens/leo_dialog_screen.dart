@@ -61,6 +61,9 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
     _leo = ref.read(leoServiceProvider);
     _fetchRemaining();
     _chatId = widget.chatId;
+    print('🔧 DEBUG: Инициализация chatId: $_chatId');
+    print('🔧 DEBUG: widget.chatId: ${widget.chatId}');
+    print('🔧 DEBUG: Тип widget.chatId: ${widget.chatId.runtimeType}');
     // Автоприветствие: кейс → задание; иначе Алекс.
     if (widget.caseMode && _chatId == null && _messages.isEmpty) {
       _messages.add({
@@ -159,7 +162,10 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
     print('🔧 DEBUG: text = "${_inputController.text.trim()}"');
     print('🔧 DEBUG: _isSending = $_isSending');
     print('🔧 DEBUG: _remaining = $_remaining');
-
+    print('🔧 DEBUG: Отправляем сообщение с chatId: $_chatId');
+    print('🔧 DEBUG: Тип chatId: ${_chatId.runtimeType}');
+    print('🔧 DEBUG: chatId равен null: ${_chatId == null}');
+    // Сообщение не добавляем здесь!
     // Check limit
     if (_remaining == 0) {
       ScaffoldMessenger.of(context).showSnackBar(

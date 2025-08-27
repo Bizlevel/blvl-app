@@ -95,27 +95,48 @@ async function saveAIMessageData(
   requestType: string = 'chat'
 ): Promise<void> {
   if (!userId) return; // Пропускаем, если пользователь не авторизован
-  
+
+  // Безопасное преобразование к integer
+  const safeInt = (v: any) => {
+    const n = parseInt(v);
+    return isNaN(n) ? 0 : Math.min(Math.max(n, 0), 2147483647);
+  };
+
+  const inputTokens = safeInt(usage?.prompt_tokens);
+  const outputTokens = safeInt(usage?.completion_tokens);
+  const totalTokens = safeInt(
+    usage?.total_tokens ?? (usage?.prompt_tokens ?? 0) + (usage?.completion_tokens ?? 0)
+  );
+
+  // Проверка cost
+  let safeCost = cost;
+  if (typeof safeCost !== 'number' || isNaN(safeCost)) {
+    console.warn('WARN: cost is NaN or not a number, setting to 0', { cost });
+    safeCost = 0;
+  }
+
+  const payload = {
+    user_id: userId,
+    chat_id: chatId,
+    leo_message_id: leoMessageId,
+    model_used: model,
+    input_tokens: inputTokens,
+    output_tokens: outputTokens,
+    total_tokens: totalTokens,
+    cost_usd: safeCost,
+    bot_type: bot === 'max' ? 'max' : (requestType === 'quiz' ? 'quiz' : 'leo'),
+    request_type: requestType,
+  };
+
   try {
     const { error } = await supabaseAdmin
       .from('ai_message')
-      .insert({
-        user_id: userId,
-        chat_id: chatId,
-        leo_message_id: leoMessageId,
-        model_used: model,
-        input_tokens: usage.prompt_tokens || 0,
-        output_tokens: usage.completion_tokens || 0,
-        total_tokens: usage.total_tokens || (usage.prompt_tokens || 0) + (usage.completion_tokens || 0),
-        cost_usd: cost,
-        bot_type: bot === 'max' ? 'max' : (requestType === 'quiz' ? 'quiz' : 'leo'),
-        request_type: requestType,
-      });
+      .insert(payload);
 
     if (error) {
       console.error('ERR save_ai_message', { message: error.message });
     } else {
-      console.log('INFO ai_message_saved', { userId, botType: bot, cost });
+      console.log('INFO ai_message_saved', { userId, botType: bot, cost: safeCost });
     }
   } catch (e: any) {
     console.error('ERR save_ai_message_exception', { message: String(e).slice(0, 200) });
