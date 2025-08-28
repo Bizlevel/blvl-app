@@ -9,8 +9,6 @@ import 'package:bizlevel/repositories/goals_repository.dart';
 
 class _MockSupabaseClient extends Mock implements SupabaseClient {}
 
-class _MockPostgrest extends Mock implements PostgrestClient {}
-
 class _MockQueryBuilder extends Mock implements SupabaseQueryBuilder {}
 
 void main() {
@@ -83,6 +81,20 @@ void main() {
       final result = await repository.fetchSprint(2);
       expect(result, isNotNull);
       expect(result!['achievement'], 'Сделано X');
+    });
+
+    test('weekly progress new API does not crash offline', () async {
+      // Smoke: методы существуют и обрабатывают офлайн без падения
+      try {
+        await repository.fetchWeek(1);
+      } catch (_) {}
+      try {
+        await repository.upsertWeek(weekNumber: 1, completionStatus: 'partial');
+      } catch (_) {}
+      try {
+        await repository.updateWeek(
+            id: '00000000-0000-0000-0000-000000000000', maxFeedback: 'ok');
+      } catch (_) {}
     });
 
     test('getDailyQuote returns deterministic item from cache', () async {

@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bizlevel/utils/env_helper.dart';
+import 'package:bizlevel/utils/env_helper.dart';
 
 /// Typed failure for any Leo related errors.
 class LeoFailure implements Exception {
@@ -61,6 +62,9 @@ class LeoService {
             'Authorization': 'Bearer ${envOrDefine('SUPABASE_ANON_KEY')}',
             'apikey': envOrDefine('SUPABASE_ANON_KEY'),
             'x-user-jwt': session.accessToken,
+            'Authorization': 'Bearer ${envOrDefine('SUPABASE_ANON_KEY')}',
+            'apikey': envOrDefine('SUPABASE_ANON_KEY'),
+            'x-user-jwt': session.accessToken,
             'Content-Type': 'application/json',
           }),
         );
@@ -80,6 +84,12 @@ class LeoService {
           throw LeoFailure(message);
         }
       } on DioException catch (e) {
+        try {
+          await Sentry.captureException(e);
+        } catch (_) {
+          // Sentry не настроен, просто логируем в консоль
+          print('DEBUG: Exception (Sentry not configured): $e');
+        }
         try {
           await Sentry.captureException(e);
         } catch (_) {
@@ -133,25 +143,30 @@ class LeoService {
     print('🔧 DEBUG: sendMessageWithRAG начался');
     print('🔧 DEBUG: session.user.id = ${session.user?.id}');
     print('🔧 DEBUG: JWT длина = ${session.accessToken.length}');
-    print('🔧 DEBUG: JWT начинается с = ${session.accessToken.substring(0, 20)}...');
+    print(
+        '🔧 DEBUG: JWT начинается с = ${session.accessToken.substring(0, 20)}...');
     print('🔧 DEBUG: chatId = $chatId'); // Добавляем логирование chatId
 
     // Отправляем сообщения в Edge Function. Встроенный RAG выполняется на сервере.
     return _withRetry(() async {
       try {
         // Фильтруем строки "null" и пустые значения
-        final cleanUserContext = (userContext == 'null' || userContext.isEmpty) ? null : userContext;
-        final cleanLevelContext = (levelContext == 'null' || levelContext.isEmpty) ? null : levelContext;
-        
+        final cleanUserContext =
+            (userContext == 'null' || userContext.isEmpty) ? null : userContext;
+        final cleanLevelContext =
+            (levelContext == 'null' || levelContext.isEmpty)
+                ? null
+                : levelContext;
+
         print('🔧 DEBUG: Отправляем POST запрос к /leo-chat');
         print('🔧 DEBUG: payload size = ${jsonEncode({
-            'messages': messages,
-            'userContext': cleanUserContext,
-            'levelContext': cleanLevelContext,
-            'bot': bot,
-            'chatId': chatId, // Добавляем chatId в payload
-          }).length} символов');
-        
+              'messages': messages,
+              'userContext': cleanUserContext,
+              'levelContext': cleanLevelContext,
+              'bot': bot,
+              'chatId': chatId, // Добавляем chatId в payload
+            }).length} символов');
+
         final response = await _edgeDio.post(
           '/leo-chat',
           data: jsonEncode({
@@ -168,7 +183,7 @@ class LeoService {
             'Content-Type': 'application/json',
           }),
         );
-        
+
         print('🔧 DEBUG: Получен HTTP ответ: ${response.statusCode}');
 
         if (response.statusCode == 200 &&
@@ -235,8 +250,9 @@ class LeoService {
     }
 
     // Фильтруем строки "null" и пустые значения
-    final cleanUserContext = (userContext == 'null' || userContext.isEmpty) ? null : userContext;
-    
+    final cleanUserContext =
+        (userContext == 'null' || userContext.isEmpty) ? null : userContext;
+
     final payload = {
       'mode': 'quiz',
       'isCorrect': selectedIndex == correctIndex,
@@ -452,8 +468,6 @@ class LeoService {
     }
   }
 
-
-
   /// Публичный метод для сохранения данных о стоимости AI запроса в таблицу ai_message
   /// Позволяет внешним компонентам сохранять данные о стоимости
   Future<void> saveAiMessageData({
@@ -483,7 +497,8 @@ class LeoService {
 
       print('🔧 DEBUG: AI message data saved via public method');
     } on PostgrestException catch (e) {
-      print('Warning: Failed to save AI message data to database: ${e.message}');
+      print(
+          'Warning: Failed to save AI message data to database: ${e.message}');
       rethrow; // Пробрасываем ошибку для обработки на уровне выше
     } catch (e) {
       print('Warning: Unexpected error saving AI message data: $e');

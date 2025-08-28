@@ -20,6 +20,9 @@ import 'package:go_router/go_router.dart';
 import 'services/supabase_service.dart';
 import 'theme/color.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:bizlevel/services/notifications_service.dart';
+import 'package:timezone/data/latest.dart' as tz;
+import 'package:timezone/timezone.dart' as tz;
 
 Future<void> main() async {
   // КРИТИЧНО для web: Все инициализации должны быть в одной зоне
@@ -45,6 +48,14 @@ Future<void> main() async {
   await Hive.openBox('goals');
   await Hive.openBox('weekly_progress');
   await Hive.openBox('quotes');
+
+  // Инициализация таймзон и локальных уведомлений (MVP)
+  try {
+    tz.initializeTimeZones();
+    tz.setLocalLocation(tz.getLocation(DateTime.now().timeZoneName));
+    await NotificationsService.instance.initialize();
+    await NotificationsService.instance.scheduleWeeklyPlan();
+  } catch (_) {}
 
   final dsn = envOrDefine('SENTRY_DSN');
 

@@ -2,14 +2,21 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 
 import 'package:bizlevel/providers/goals_providers.dart';
+import 'package:bizlevel/screens/goal/widgets/motivation_card.dart';
 import 'package:bizlevel/providers/goals_repository_provider.dart';
-import 'package:bizlevel/widgets/custom_textfield.dart';
+
 import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/widgets/floating_chat_bubble.dart';
 import 'package:bizlevel/providers/auth_provider.dart';
 import 'package:bizlevel/screens/leo_dialog_screen.dart';
+import 'package:bizlevel/screens/goal/widgets/goal_compact_card.dart';
+import 'package:bizlevel/screens/goal/widgets/crystallization_section.dart';
+import 'package:bizlevel/screens/goal/widgets/progress_widget.dart';
+import 'package:bizlevel/screens/goal/widgets/sprint_section.dart';
+import 'package:bizlevel/screens/goal/controller/goal_screen_controller.dart';
 
 class GoalScreen extends ConsumerStatefulWidget {
   const GoalScreen({super.key});
@@ -19,25 +26,26 @@ class GoalScreen extends ConsumerStatefulWidget {
 }
 
 class _GoalScreenState extends ConsumerState<GoalScreen> {
+  // v1 controllers
   final TextEditingController _goalInitialCtrl = TextEditingController();
   final TextEditingController _goalWhyCtrl = TextEditingController();
   final TextEditingController _mainObstacleCtrl = TextEditingController();
 
-  // v2
+  // v2 controllers
   final TextEditingController _goalRefinedCtrl = TextEditingController();
   final TextEditingController _metricNameCtrl = TextEditingController();
   final TextEditingController _metricFromCtrl = TextEditingController();
   final TextEditingController _metricToCtrl = TextEditingController();
   final TextEditingController _financialGoalCtrl = TextEditingController();
 
-  // v3
+  // v3 controllers
   final TextEditingController _goalSmartCtrl = TextEditingController();
   final TextEditingController _s1Ctrl = TextEditingController();
   final TextEditingController _s2Ctrl = TextEditingController();
   final TextEditingController _s3Ctrl = TextEditingController();
   final TextEditingController _s4Ctrl = TextEditingController();
 
-  // v4
+  // v4 controllers
   final TextEditingController _finalWhatCtrl = TextEditingController();
   final TextEditingController _finalWhenCtrl = TextEditingController();
   final TextEditingController _finalHowCtrl = TextEditingController();
@@ -46,13 +54,15 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
   Timer? _debounce;
   // ignore: unused_field
   bool _saving = false;
-  int _selectedVersion = 1;
-  Map<int, Map<String, dynamic>> _versions = {};
   int _selectedSprint = 1;
-  // Редактирование отключено на странице «Цель» (read-only таблица)
-  // ignore: unused_field
-  bool _isEditing = false;
-  bool _sprintSaved = false; // флаг успешного сохранения спринта
+  bool _sprintSaved = false; // локальный флаг для кнопки чата после сохранения
+  final GlobalKey _sprintSectionKey = GlobalKey();
+  bool _goalCardExpanded =
+      false; // компактная карточка цели: свёрнута/развёрнута
+  // Check-in techniques (визуальные чекбоксы вместо текстовых полей)
+  // Техники недели (для чек-ина): используем чекбоксы ниже формы
+  // Чекбоксы техник удалены — используем текстовое поле ниже по форме чек‑ина
+  final TextEditingController _techOtherCtrl = TextEditingController();
 
   // Sprint check-in form
   final TextEditingController _achievementCtrl = TextEditingController();
@@ -66,22 +76,20 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
   final TextEditingController _consultedBenefitCtrl = TextEditingController();
   final TextEditingController _techniquesDetailsCtrl = TextEditingController();
 
+  // Checkboxes for weekly checks
+  bool _chkEisenhower = false;
+  bool _chkAccounting = false;
+  bool _chkUSP = false;
+  bool _chkSMART = false;
+
   @override
   void initState() {
     super.initState();
-    // Загружаем все версии и заполняем контроллеры по текущей
+    // Загружаем версии через контроллер
     Future.microtask(() async {
-      final all = await ref.read(goalVersionsProvider.future);
-      _versions = {
-        for (final m in all) m['version'] as int: Map<String, dynamic>.from(m)
-      };
-      final hasAny = _versions.isNotEmpty;
-      // Показываем последнюю версию, если есть, иначе v1
-      _selectedVersion =
-          hasAny ? (_versions.keys.reduce((a, b) => a > b ? a : b)) : 1;
-      // По умолчанию стартуем в режиме просмотра (в т.ч. когда v1 ещё нет — раздел заблокирован)
-      _isEditing = false;
-      _fillControllersFor(_selectedVersion);
+      await ref.read(goalScreenControllerProvider.notifier).loadVersions();
+      final st = ref.read(goalScreenControllerProvider);
+      _fillControllersFor(st.selectedVersion, st.versions);
       if (mounted) setState(() {});
     });
 
@@ -113,6 +121,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
     _artifactsDetailsCtrl.dispose();
     _consultedBenefitCtrl.dispose();
     _techniquesDetailsCtrl.dispose();
+    _techOtherCtrl.dispose();
     super.dispose();
   }
 
@@ -157,10 +166,11 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
 
   // Сохранение версий отключено на странице «Цель». Редактирование доступно только в чекпоинтах.
 
-  void _fillControllersFor(int version) {
+  void _fillControllersFor(
+      int version, Map<int, Map<String, dynamic>> versions) {
     // Очистка или заполнение из данных
     Map<String, dynamic>? v(int idx) {
-      final raw = _versions[idx]?['version_data'];
+      final raw = versions[idx]?['version_data'];
       if (raw is Map) {
         return Map<String, dynamic>.from(raw);
       }
@@ -196,9 +206,13 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
     }
   }
 
+  // _miniMetric удалён — не используется в новой версии прогресс‑виджета
+
+  // _buildCurrentWeekSummary удалён — блок «Текущая неделя» исключён
+
   @override
   Widget build(BuildContext context) {
-    final quoteAsync = ref.watch(dailyQuoteProvider);
+    // Перемещено в MotivationCard
 
     // Определяем максимально доступную версию на основе текущего уровня пользователя
     final currentUserAsync = ref.watch(currentUserProvider);
@@ -216,6 +230,46 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
       appBar: AppBar(
         centerTitle: true,
         title: const Text('Цель'),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: Builder(builder: (context) {
+              final avatarId = currentUserAsync.asData?.value?.avatarId;
+              final Widget avatar = avatarId != null
+                  ? CircleAvatar(
+                      radius: 16,
+                      backgroundImage: AssetImage(
+                        'assets/images/avatars/avatar_${avatarId}.png',
+                      ),
+                      backgroundColor: Colors.transparent,
+                    )
+                  : const CircleAvatar(
+                      radius: 16,
+                      child: Icon(Icons.person_outline, size: 18),
+                    );
+              return GestureDetector(
+                onTap: () {
+                  Sentry.addBreadcrumb(Breadcrumb(
+                    category: 'ui',
+                    type: 'click',
+                    message: 'goal_header_avatar_tap',
+                    level: SentryLevel.info,
+                  ));
+                },
+                child: avatar,
+              );
+            }),
+          ),
+        ],
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFFF8FAFC), Color(0xFFE0F2FE)],
+            ),
+          ),
+        ),
       ),
       body: Stack(children: [
         Center(
@@ -227,332 +281,129 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Мотивация от Макса
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [Color(0xFFF8FAFC), Color(0xFFE0F2FE)],
-                      ),
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColor.shadowColor.withValues(alpha: 0.1),
-                          blurRadius: 4,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: quoteAsync.when(
-                      data: (q) {
-                        if (q == null) {
-                          // Данных нет (пусто/офлайн без кеша) — показываем компактный плейсхолдер с аватаром
-                          return Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const CircleAvatar(
-                                radius: 28,
-                                backgroundImage: AssetImage(
-                                    'assets/images/avatars/avatar_max.png'),
-                                backgroundColor: Colors.transparent,
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Text(
-                                  'Цитата недоступна',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .bodyMedium
-                                      ?.copyWith(
-                                        color: Colors.grey.shade600,
-                                        height: 1.4,
-                                      ),
-                                ),
-                              )
-                            ],
-                          );
-                        }
-                        final text = (q['quote_text'] as String?) ?? '';
-                        final String? author = q['author'] as String?;
-                        return Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Аватар Макса
-                            CircleAvatar(
-                              radius: 28,
-                              backgroundImage: const AssetImage(
-                                  'assets/images/avatars/avatar_max.png'),
-                              backgroundColor: Colors.transparent,
-                            ),
-                            const SizedBox(width: 16),
-                            // Цитата и автор
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  LayoutBuilder(
-                                    builder: (context, constraints) {
-                                      final isDesktop =
-                                          constraints.maxWidth > 600;
-                                      return Text(
-                                        'Мотивация от Макса',
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .titleMedium
-                                            ?.copyWith(
-                                              fontWeight: FontWeight.w600,
-                                              fontSize: isDesktop
-                                                  ? (Theme.of(context)
-                                                              .textTheme
-                                                              .titleMedium
-                                                              ?.fontSize ??
-                                                          16) +
-                                                      1
-                                                  : null,
-                                            ),
-                                      );
-                                    },
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    '"$text"',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodyMedium
-                                        ?.copyWith(
-                                          fontStyle: FontStyle.italic,
-                                          height: 1.4,
-                                        ),
-                                    maxLines: 3,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  const SizedBox(height: 4),
-                                  if (author != null && author.isNotEmpty)
-                                    Text(
-                                      '— $author',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodySmall
-                                          ?.copyWith(
-                                            color: AppColor.primary,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                    ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        );
-                      },
-                      loading: () => Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Скелетон аватара
-                          Container(
-                            width: 56,
-                            height: 56,
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade300,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          // Скелетон текста
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Container(
-                                  width: double.infinity,
-                                  height: 20,
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey.shade300,
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                Container(
-                                  width: double.infinity,
-                                  height: 16,
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey.shade300,
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Container(
-                                  width: 120,
-                                  height: 16,
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey.shade300,
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Container(
-                                  width: 80,
-                                  height: 14,
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey.shade300,
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                ),
-                              ],
-                            ),
+                  const MotivationCard(),
+                  const SizedBox(height: 20),
+
+                  // Единый блок: Моя цель + Кристаллизация цели
+                  Builder(builder: (context) {
+                    final gs = ref.watch(goalScreenControllerProvider);
+                    final gctrl =
+                        ref.read(goalScreenControllerProvider.notifier);
+                    return Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColor.shadowColor.withValues(alpha: 0.1),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
                           ),
                         ],
                       ),
-                      error: (_, __) => Row(
+                      child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const CircleAvatar(
-                            radius: 28,
-                            backgroundImage: AssetImage(
-                                'assets/images/avatars/avatar_max.png'),
-                            backgroundColor: Colors.transparent,
+                          // Заголовок «Моя цель» + карточка
+                          Text(
+                            'Моя цель',
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleLarge
+                                ?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
                           ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Text(
-                              'Цитата недоступна',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodyMedium
-                                  ?.copyWith(
-                                    color: Colors.grey.shade600,
-                                    height: 1.4,
-                                  ),
-                            ),
-                          )
+                          const SizedBox(height: 8),
+                          GoalCompactCard(
+                            versions: gs.versions,
+                            expanded: _goalCardExpanded,
+                            onToggle: () => setState(
+                                () => _goalCardExpanded = !_goalCardExpanded),
+                            onOpenChat: _openChatWithMax,
+                            metricActual:
+                                double.tryParse(_metricActualCtrl.text.trim()),
+                          ),
+                          const SizedBox(height: 16),
+                          CrystallizationSection(
+                            versions: gs.versions,
+                            selectedVersion: gs.selectedVersion,
+                            allowedMaxVersion: allowedMax,
+                            historyExpanded: gs.historyExpanded,
+                            onSelectVersion: (v) {
+                              gctrl.selectVersion(v);
+                              _fillControllersFor(v, gs.versions);
+                              setState(() {});
+                            },
+                            onToggleHistory: () {
+                              gctrl.toggleHistory();
+                              setState(() {});
+                              Sentry.addBreadcrumb(Breadcrumb(
+                                category: 'ui',
+                                type: 'click',
+                                message: 'goal_history_toggle',
+                                data: {'expanded': gs.historyExpanded},
+                                level: SentryLevel.info,
+                              ));
+                            },
+                          ),
                         ],
                       ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
+                    );
+                  }),
+                  const SizedBox(height: 16),
 
-                  // Кристаллизация цели
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColor.shadowColor.withValues(alpha: 0.1),
-                          blurRadius: 4,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Заголовок секции «Кристаллизация цели»
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            LayoutBuilder(
-                              builder: (context, constraints) {
-                                final isDesktop = constraints.maxWidth > 600;
-                                return Text(
-                                  'Кристаллизация цели',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .titleLarge
-                                      ?.copyWith(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: isDesktop
-                                            ? (Theme.of(context)
-                                                        .textTheme
-                                                        .titleLarge
-                                                        ?.fontSize ??
-                                                    22) +
-                                                1
-                                            : null,
-                                      ),
-                                );
-                              },
-                            ),
-                            const SizedBox(height: 44, width: 44),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        // Переключатель версий 1..4: один ряд, компактные кнопки, без галочек
-                        Row(
-                          children: List.generate(4, (i) {
-                            final v = i + 1;
-                            final isSelected = _selectedVersion == v;
-                            final bool hasAny = _versions.isNotEmpty;
-                            final int latest = hasAny
-                                ? _versions.keys.reduce((a, b) => a > b ? a : b)
-                                : 0;
-                            final available = v <= allowedMax &&
-                                ((!hasAny && v == 1) ||
-                                    _versions.containsKey(v) ||
-                                    (hasAny && v == latest + 1));
-
-                            final String labelText = _getVersionLabel(v);
-
-                            final chip = ChoiceChip(
-                              showCheckmark: false,
-                              labelPadding:
-                                  const EdgeInsets.symmetric(horizontal: 6),
-                              visualDensity: const VisualDensity(
-                                  horizontal: -3, vertical: -3),
-                              materialTapTargetSize:
-                                  MaterialTapTargetSize.shrinkWrap,
-                              label: Text(
-                                labelText,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              selected: isSelected,
-                              selectedColor:
-                                  AppColor.premium.withValues(alpha: 0.18),
-                              backgroundColor: Colors.white,
-                              shape: StadiumBorder(
-                                side: BorderSide(
-                                  color: isSelected
-                                      ? AppColor.premium
-                                      : AppColor.borderColor,
-                                ),
-                              ),
-                              onSelected: available
-                                  ? (sel) {
-                                      if (!sel) return;
-                                      setState(() {
-                                        _selectedVersion = v;
-                                        _fillControllersFor(v);
-                                        // Логика редактирования при переключении версий:
-                                        _isEditing = false;
-                                      });
-                                    }
-                                  : null,
-                            );
-
-                            return Expanded(
-                              child: Padding(
-                                padding: EdgeInsets.only(right: i < 3 ? 8 : 0),
-                                child: SizedBox(height: 36, child: chip),
-                              ),
-                            );
-                          }),
-                        ),
-                        const SizedBox(height: 12),
-
-                        _buildVersionTable(context, _selectedVersion),
-
-                        const SizedBox(height: 12),
-                        const SizedBox.shrink(),
-                      ],
-                    ),
-                  ),
+                  // 2) Прогресс-виджет (визуальная мотивация)
+                  Builder(builder: (context) {
+                    final gs = ref.watch(goalScreenControllerProvider);
+                    return ProgressWidget(
+                      versions: gs.versions,
+                      metricActual:
+                          double.tryParse(_metricActualCtrl.text.trim()),
+                      achievementText: _achievementCtrl.text.trim(),
+                      metricActualText: _metricActualCtrl.text.trim(),
+                      insightText: _keyInsightCtrl.text.trim(),
+                    );
+                  }),
 
                   const SizedBox(height: 20),
+
                   // Путь к цели (28-дневный спринт)
-                  _buildSprintSection(context),
+                  Builder(builder: (context) {
+                    final gs = ref.watch(goalScreenControllerProvider);
+                    return SprintSection(
+                      versions: gs.versions,
+                      selectedSprint: _selectedSprint,
+                      onSelectSprint: (s) {
+                        setState(() {
+                          _selectedSprint = s;
+                          _sprintSaved = false;
+                        });
+                        _loadSprintIfAny(s);
+                        _scrollToSprintSection();
+                      },
+                      achievementCtrl: _achievementCtrl,
+                      metricActualCtrl: _metricActualCtrl,
+                      keyInsightCtrl: _keyInsightCtrl,
+                      techOtherCtrl: _techOtherCtrl,
+                      chkEisenhower: _chkEisenhower,
+                      chkAccounting: _chkAccounting,
+                      chkUSP: _chkUSP,
+                      chkSMART: _chkSMART,
+                      onToggleEisenhower: (v) =>
+                          setState(() => _chkEisenhower = v),
+                      onToggleAccounting: (v) =>
+                          setState(() => _chkAccounting = v),
+                      onToggleUSP: (v) => setState(() => _chkUSP = v),
+                      onToggleSMART: (v) => setState(() => _chkSMART = v),
+                      onSave: _onSaveSprint,
+                      showChatButton: _sprintSaved,
+                      onOpenChat: _openChatWithMax,
+                      sectionKey: _sprintSectionKey,
+                    );
+                  }),
                 ],
               ),
             ),
@@ -564,8 +415,11 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
           child: FloatingChatBubble(
             chatId: null,
             systemPrompt:
-                'Режим трекера цели: обсуждаем версию v$_selectedVersion и прогресс спринтов. Будь краток, поддерживай фокус, предлагай следующий шаг.',
-            userContext: _buildTrackerUserContext(),
+                'Режим трекера цели: обсуждаем версию v${ref.watch(goalScreenControllerProvider).selectedVersion} и прогресс спринтов. Будь краток, поддерживай фокус, предлагай следующий шаг.',
+            userContext: _buildTrackerUserContext(
+              ref.watch(goalScreenControllerProvider).versions,
+              ref.watch(goalScreenControllerProvider).selectedVersion,
+            ),
             levelContext: 'current_level: $currentLevel',
             bot: 'max',
           ),
@@ -574,20 +428,21 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
     );
   }
 
-  String _buildTrackerUserContext() {
-    final vData = (_versions[_selectedVersion]?['version_data'] as Map?) ?? {};
-    final sb = StringBuffer('goal_version: $_selectedVersion\n');
-    if (_selectedVersion == 1) {
+  String _buildTrackerUserContext(
+      Map<int, Map<String, dynamic>> versions, int selectedVersion) {
+    final vData = (versions[selectedVersion]?['version_data'] as Map?) ?? {};
+    final sb = StringBuffer('goal_version: $selectedVersion\n');
+    if (selectedVersion == 1) {
       sb.writeln('goal_initial: ${vData['goal_initial'] ?? ''}');
       sb.writeln('goal_why: ${vData['goal_why'] ?? ''}');
       sb.writeln('main_obstacle: ${vData['main_obstacle'] ?? ''}');
-    } else if (_selectedVersion == 2) {
+    } else if (selectedVersion == 2) {
       sb.writeln('goal_refined: ${vData['goal_refined'] ?? ''}');
       sb.writeln('metric: ${vData['metric_name'] ?? ''}');
       sb.writeln(
           'from: ${vData['metric_from'] ?? ''} to: ${vData['metric_to'] ?? ''}');
       sb.writeln('financial_goal: ${vData['financial_goal'] ?? ''}');
-    } else if (_selectedVersion == 3) {
+    } else if (selectedVersion == 3) {
       sb.writeln('goal_smart: ${vData['goal_smart'] ?? ''}');
       sb.writeln('sprint1: ${vData['sprint1_goal'] ?? ''}');
       sb.writeln('sprint2: ${vData['sprint2_goal'] ?? ''}');
@@ -613,392 +468,9 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
     return sb.toString();
   }
 
-  String _getVersionLabel(int version) {
-    switch (version) {
-      case 1:
-        return '1. Набросок';
-      case 2:
-        return '2. Метрики';
-      case 3:
-        return '3. SMART';
-      case 4:
-        return '4. Финал';
-      default:
-        return '$version';
-    }
-  }
-
   // Удалены: _getVersionStatus/_getVersionTooltip не используются после упрощения UI переключателя
 
-  Widget _buildVersionTable(BuildContext context, int version) {
-    final Map<String, dynamic> vData =
-        (_versions[version]?['version_data'] as Map?)
-                ?.cast<String, dynamic>() ??
-            {};
-    List<List<String>> rows;
-    if (version == 1) {
-      rows = [
-        ['Основная цель', (vData['goal_initial'] ?? '').toString()],
-        ['Почему сейчас', (vData['goal_why'] ?? '').toString()],
-        ['Препятствие', (vData['main_obstacle'] ?? '').toString()],
-      ];
-    } else if (version == 2) {
-      rows = [
-        ['Уточненная цель', (vData['goal_refined'] ?? '').toString()],
-        ['Метрика', (vData['metric_name'] ?? '').toString()],
-        ['Текущее значение', (vData['metric_from'] ?? '').toString()],
-        ['Целевое значение', (vData['metric_to'] ?? '').toString()],
-        ['Финансовая цель', (vData['financial_goal'] ?? '').toString()],
-      ];
-    } else if (version == 3) {
-      rows = [
-        ['SMART‑формулировка', (vData['goal_smart'] ?? '').toString()],
-        ['Спринт 1', (vData['sprint1_goal'] ?? '').toString()],
-        ['Спринт 2', (vData['sprint2_goal'] ?? '').toString()],
-        ['Спринт 3', (vData['sprint3_goal'] ?? '').toString()],
-        ['Спринт 4', (vData['sprint4_goal'] ?? '').toString()],
-      ];
-    } else {
-      rows = [
-        ['Что достигну', (vData['final_what'] ?? '').toString()],
-        ['К какой дате', (vData['final_when'] ?? '').toString()],
-        ['Ключевые действия', (vData['final_how'] ?? '').toString()],
-        ['Готовность', ((vData['commitment'] ?? false) == true) ? 'Да' : 'Нет'],
-      ];
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        ...rows.map((r) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SizedBox(
-                    width: 180,
-                    child: Text(
-                      r[0],
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodyMedium
-                          ?.copyWith(fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      r[1].isEmpty ? '—' : r[1],
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                  ),
-                ],
-              ),
-            )),
-      ],
-    );
-  }
-
-  Widget _build7DayTimeline() {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isWideScreen = constraints.maxWidth > 600;
-
-        if (isWideScreen) {
-          // Горизонтальная timeline для широких экранов
-          return Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: List.generate(7, (i) => _buildDayDot(i + 1)),
-          );
-        } else {
-          // Компактная вертикальная timeline для мобильных
-          return SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: List.generate(
-                7,
-                (i) => Padding(
-                  padding: const EdgeInsets.only(right: 16),
-                  child: _buildDayDot(i + 1),
-                ),
-              ),
-            ),
-          );
-        }
-      },
-    );
-  }
-
-  Widget _buildDayDot(int day) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 24,
-          height: 24,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: AppColor.primary.withValues(alpha: 0.2),
-            border: Border.all(
-              color: AppColor.primary.withValues(alpha: 0.4),
-              width: 2,
-            ),
-          ),
-          child: Center(
-            child: Text(
-              '$day',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: AppColor.primary,
-                  ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'День $day',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                fontSize: 10,
-                color: Colors.grey,
-              ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildCheckInForm() {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isDesktop = constraints.maxWidth > 600;
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Основные поля
-            _GroupHeader('Итоги спринта'),
-            _LabeledField(
-                label: 'Что достигнуто',
-                child: CustomTextBox(
-                    controller: _achievementCtrl,
-                    hint: 'Опишите главное достижение недели')),
-            const SizedBox(height: 12),
-
-            if (isDesktop)
-              // Desktop layout - две колонки
-              Row(children: [
-                Expanded(
-                  child: _LabeledField(
-                      label: 'Ключевая метрика (факт)',
-                      child: CustomTextBox(
-                          controller: _metricActualCtrl,
-                          keyboardType: TextInputType.number,
-                          hint: 'Фактическое значение')),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: _LabeledField(
-                      label: 'Главный инсайт недели',
-                      child: CustomTextBox(
-                          controller: _keyInsightCtrl,
-                          hint: 'Что поняли или узнали нового')),
-                ),
-              ])
-            else
-              // Mobile layout - одна колонка
-              Column(children: [
-                _LabeledField(
-                    label: 'Ключевая метрика (факт)',
-                    child: CustomTextBox(
-                        controller: _metricActualCtrl,
-                        keyboardType: TextInputType.number,
-                        hint: 'Фактическое значение')),
-                const SizedBox(height: 12),
-                _LabeledField(
-                    label: 'Главный инсайт недели',
-                    child: CustomTextBox(
-                        controller: _keyInsightCtrl,
-                        hint: 'Что поняли или узнали нового')),
-              ]),
-
-            const SizedBox(height: 16),
-
-            // Проверки недели (текстовые поля)
-            _GroupHeader('Проверки недели'),
-            _LabeledField(
-                label: 'Использовал артефакты',
-                child: CustomTextBox(
-                    controller: _artifactsDetailsCtrl, hint: 'Какие именно')),
-            const SizedBox(height: 12),
-            _LabeledField(
-                label: 'Консультировался с тренерами',
-                child: CustomTextBox(
-                    controller: _consultedBenefitCtrl,
-                    hint: 'Какую пользу извлекли')),
-            const SizedBox(height: 12),
-            _LabeledField(
-                label: 'Применял техники из уроков',
-                child: CustomTextBox(
-                    controller: _techniquesDetailsCtrl,
-                    hint: 'Какие техники были полезными')),
-            const SizedBox(height: 16),
-
-            // Кнопки
-            Row(
-              children: [
-                SizedBox(
-                  height: 44,
-                  child: ElevatedButton.icon(
-                    icon: const Icon(Icons.checklist),
-                    label: const Text('📝 Записать итоги спринта'),
-                    onPressed: _onSaveSprint,
-                  ),
-                ),
-                if (_sprintSaved) ...[
-                  const SizedBox(width: 12),
-                  SizedBox(
-                    height: 44,
-                    child: OutlinedButton.icon(
-                      icon: const Icon(Icons.chat_bubble_outline),
-                      label: const Text('Обсудить с Максом'),
-                      onPressed: _openChatWithMax,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildSprintSection(BuildContext context) {
-    // Доступно после v4: если нет v4 — показываем 🔒
-    final hasV4 = _versions.containsKey(4);
-    if (!hasV4) {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: AppColor.shadowColor.withValues(alpha: 0.1),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.lock_outline, color: Colors.grey.shade400, size: 28),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '🔒 Путь к цели заблокирован',
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          color: Colors.grey.shade700,
-                          fontWeight: FontWeight.w600,
-                        ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Завершите версию v4 для разблокировки 28-дневного пути к цели',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.grey.shade600,
-                          height: 1.3,
-                        ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: AppColor.shadowColor.withValues(alpha: 0.1),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Заголовок секции
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final isDesktop = constraints.maxWidth > 600;
-              return Text(
-                'Путь к цели',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      fontSize: isDesktop
-                          ? (Theme.of(context)
-                                      .textTheme
-                                      .titleMedium
-                                      ?.fontSize ??
-                                  16) +
-                              1
-                          : null,
-                    ),
-              );
-            },
-          ),
-          const SizedBox(height: 16),
-
-          // Переключатель спринтов 1..4
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(4, (i) {
-              final s = i + 1;
-              return Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: SizedBox(
-                  height: 44,
-                  child: ChoiceChip(
-                    label: Text('Спринт $s'),
-                    selected: _selectedSprint == s,
-                    onSelected: (sel) {
-                      if (!sel) return;
-                      setState(() {
-                        _selectedSprint = s;
-                        _sprintSaved =
-                            false; // сбрасываем флаг при переключении
-                      });
-                      // Попробуем подгрузить сохранённый чек-ин
-                      _loadSprintIfAny(s);
-                    },
-                  ),
-                ),
-              );
-            }),
-          ),
-          const SizedBox(height: 12),
-
-          // Mini-timeline из 7 дней (центрированная)
-          Center(child: _build7DayTimeline()),
-          const SizedBox(height: 16),
-
-          // Форма чек-ина спринта
-          _buildCheckInForm(),
-        ],
-      ),
-    );
-  }
+  // _build7DayTimeline/_buildDayDot удалены — в новой версии не используются
 
   Future<void> _loadSprintIfAny(int sprintNumber) async {
     final existing = await ref.read(sprintProvider(sprintNumber).future);
@@ -1033,6 +505,17 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
   Future<void> _onSaveSprint() async {
     try {
       final repo = ref.read(goalsRepositoryProvider);
+      // Собираем чекбоксы в текст деталей техник (минимальная интеграция без DDL)
+      final List<String> checks = [];
+      if (_chkEisenhower) checks.add('Матрица Эйзенхауэра');
+      if (_chkAccounting) checks.add('Финансовый учёт');
+      if (_chkUSP) checks.add('УТП');
+      if (_chkSMART) checks.add('SMART‑планирование');
+      if (_techOtherCtrl.text.trim().isNotEmpty) {
+        checks.add('Другое: ${_techOtherCtrl.text.trim()}');
+      }
+      final String techniquesSummary = checks.join(', ');
+
       await repo.upsertSprint(
         sprintNumber: _selectedSprint,
         achievement: _achievementCtrl.text.trim().isEmpty
@@ -1046,9 +529,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
             : _usedArtifacts,
         consultedLeo:
             _consultedBenefitCtrl.text.trim().isNotEmpty ? true : _consultedLeo,
-        appliedTechniques: _techniquesDetailsCtrl.text.trim().isNotEmpty
-            ? true
-            : _appliedTechniques,
+        appliedTechniques: (techniquesSummary.isNotEmpty || _appliedTechniques),
         keyInsight: _keyInsightCtrl.text.trim().isEmpty
             ? null
             : _keyInsightCtrl.text.trim(),
@@ -1058,14 +539,13 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
         consultedBenefit: _consultedBenefitCtrl.text.trim().isEmpty
             ? null
             : _consultedBenefitCtrl.text.trim(),
-        techniquesDetails: _techniquesDetailsCtrl.text.trim().isEmpty
-            ? null
-            : _techniquesDetailsCtrl.text.trim(),
+        techniquesDetails: techniquesSummary.isEmpty ? null : techniquesSummary,
       );
       if (!mounted) return;
       setState(() => _sprintSaved = true);
       ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Итоги спринта сохранены')));
+      _openChatWithMax();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1073,71 +553,34 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
     }
   }
 
+  // Helpers for 38.14/38.15
+
+  void _scrollToSprintSection() {
+    final ctx = _sprintSectionKey.currentContext;
+    if (ctx != null) {
+      Scrollable.ensureVisible(ctx,
+          duration: const Duration(milliseconds: 300));
+    }
+  }
+
   void _openChatWithMax() {
-    // Открываем чат с Максом с контекстом спринта
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.9,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
-        builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          child: ref.read(currentUserProvider).when(
-                data: (user) => LeoDialogScreen(
-                  chatId: null,
-                  userContext: _buildTrackerUserContext(),
-                  levelContext: 'current_level: ${user?.currentLevel ?? 0}',
-                  bot: 'max',
+    // Открываем полноэкранный чат с Максом
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => ref.read(currentUserProvider).when(
+              data: (user) => LeoDialogScreen(
+                chatId: null,
+                userContext: _buildTrackerUserContext(
+                  ref.watch(goalScreenControllerProvider).versions,
+                  ref.watch(goalScreenControllerProvider).selectedVersion,
                 ),
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (_, __) =>
-                    const Center(child: Text('Ошибка загрузки профиля')),
+                levelContext: 'current_level: ${user?.currentLevel ?? 0}',
+                bot: 'max',
               ),
-        ),
-      ),
-    );
-  }
-}
-
-class _LabeledField extends StatelessWidget {
-  const _LabeledField({required this.label, required this.child});
-
-  final String label;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: Theme.of(context).textTheme.bodyMedium),
-        const SizedBox(height: 6),
-        child,
-      ],
-    );
-  }
-}
-
-class _GroupHeader extends StatelessWidget {
-  const _GroupHeader(this.title);
-
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Text(
-        title,
-        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w600,
-              color: AppColor.primary,
+              loading: () => const Scaffold(
+                  body: Center(child: CircularProgressIndicator())),
+              error: (_, __) => const Scaffold(
+                  body: Center(child: Text('Ошибка загрузки профиля'))),
             ),
       ),
     );
