@@ -264,6 +264,8 @@ final towerNodesProvider =
         'caseId': caseId,
         'title': mini['title'],
         'isCompleted': isDone,
+        // Чекпоинт доступен только после завершения предыдущего уровня
+        'prevLevelCompleted': (l['isCompleted'] as bool? ?? false),
       });
       if (isRequired && !isDone) {
         // Блокируем следующий уровень до завершения/пропуска кейса
@@ -284,6 +286,8 @@ final towerNodesProvider =
             ? 'v2 Метрики'
             : (goalVersion == 3 ? 'v3 SMART' : 'v4 Финал'),
         'isCompleted': isCompleted,
+        // Разрешаем входить в чекпоинт, только если предыдущий уровень завершён
+        'prevLevelCompleted': (l['isCompleted'] as bool? ?? false),
       });
     }
   }

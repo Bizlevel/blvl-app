@@ -110,16 +110,17 @@ class GoalsRepository {
   // Weekly Progress (weekly_progress)
   // ============================
 
-  Future<Map<String, dynamic>?> fetchSprint(int sprintNumber) async {
+  // New API
+  Future<Map<String, dynamic>?> fetchWeek(int weekNumber) async {
     final Box cache = Hive.box('weekly_progress');
-    final String cacheKey = 'sprint_$sprintNumber';
+    final String cacheKey = 'week_$weekNumber';
 
     try {
       final data = await _client
           .from('weekly_progress')
           .select(
-              'id, user_id, sprint_number, achievement, metric_actual, used_artifacts, consulted_leo, applied_techniques, key_insight, artifacts_details, consulted_benefit, techniques_details, created_at')
-          .eq('sprint_number', sprintNumber)
+              'id, user_id, week_number, planned_actions, completed_actions, completion_status, metric_value, metric_progress_percent, max_feedback, chat_session_id, achievement, metric_actual, used_artifacts, consulted_leo, applied_techniques, key_insight, artifacts_details, consulted_benefit, techniques_details, created_at, updated_at')
+          .eq('week_number', weekNumber)
           .order('created_at', ascending: false)
           .limit(1)
           .maybeSingle();
@@ -140,8 +141,15 @@ class GoalsRepository {
     }
   }
 
-  Future<Map<String, dynamic>> upsertSprint({
-    required int sprintNumber,
+  Future<Map<String, dynamic>> upsertWeek({
+    required int weekNumber,
+    Map<String, dynamic>? plannedActions,
+    Map<String, dynamic>? completedActions,
+    String? completionStatus, // 'full'|'partial'|'failed'
+    num? metricValue,
+    num? metricProgressPercent,
+    String? maxFeedback,
+    String? chatSessionId,
     String? achievement,
     String? metricActual,
     bool? usedArtifacts,
@@ -153,7 +161,15 @@ class GoalsRepository {
     String? techniquesDetails,
   }) async {
     final payload = <String, dynamic>{
-      'sprint_number': sprintNumber,
+      'week_number': weekNumber,
+      if (plannedActions != null) 'planned_actions': plannedActions,
+      if (completedActions != null) 'completed_actions': completedActions,
+      if (completionStatus != null) 'completion_status': completionStatus,
+      if (metricValue != null) 'metric_value': metricValue,
+      if (metricProgressPercent != null)
+        'metric_progress_percent': metricProgressPercent,
+      if (maxFeedback != null) 'max_feedback': maxFeedback,
+      if (chatSessionId != null) 'chat_session_id': chatSessionId,
       if (achievement != null) 'achievement': achievement,
       if (metricActual != null) 'metric_actual': metricActual,
       if (usedArtifacts != null) 'used_artifacts': usedArtifacts,
@@ -169,6 +185,85 @@ class GoalsRepository {
         await _client.from('weekly_progress').insert(payload).select().single();
     return Map<String, dynamic>.from(inserted);
   }
+
+  Future<Map<String, dynamic>> updateWeek({
+    required String id,
+    Map<String, dynamic>? plannedActions,
+    Map<String, dynamic>? completedActions,
+    String? completionStatus,
+    num? metricValue,
+    num? metricProgressPercent,
+    String? maxFeedback,
+    String? chatSessionId,
+    String? achievement,
+    String? metricActual,
+    bool? usedArtifacts,
+    bool? consultedLeo,
+    bool? appliedTechniques,
+    String? keyInsight,
+    String? artifactsDetails,
+    String? consultedBenefit,
+    String? techniquesDetails,
+  }) async {
+    final payload = <String, dynamic>{
+      if (plannedActions != null) 'planned_actions': plannedActions,
+      if (completedActions != null) 'completed_actions': completedActions,
+      if (completionStatus != null) 'completion_status': completionStatus,
+      if (metricValue != null) 'metric_value': metricValue,
+      if (metricProgressPercent != null)
+        'metric_progress_percent': metricProgressPercent,
+      if (maxFeedback != null) 'max_feedback': maxFeedback,
+      if (chatSessionId != null) 'chat_session_id': chatSessionId,
+      if (achievement != null) 'achievement': achievement,
+      if (metricActual != null) 'metric_actual': metricActual,
+      if (usedArtifacts != null) 'used_artifacts': usedArtifacts,
+      if (consultedLeo != null) 'consulted_leo': consultedLeo,
+      if (appliedTechniques != null) 'applied_techniques': appliedTechniques,
+      if (keyInsight != null) 'key_insight': keyInsight,
+      if (artifactsDetails != null) 'artifacts_details': artifactsDetails,
+      if (consultedBenefit != null) 'consulted_benefit': consultedBenefit,
+      if (techniquesDetails != null) 'techniques_details': techniquesDetails,
+    };
+
+    final updated = await _client
+        .from('weekly_progress')
+        .update(payload)
+        .eq('id', id)
+        .select()
+        .single();
+    return Map<String, dynamic>.from(updated);
+  }
+
+  // Deprecated wrappers for backward compatibility
+  @Deprecated('Use fetchWeek')
+  Future<Map<String, dynamic>?> fetchSprint(int sprintNumber) =>
+      fetchWeek(sprintNumber);
+
+  @Deprecated('Use upsertWeek')
+  Future<Map<String, dynamic>> upsertSprint({
+    required int sprintNumber,
+    String? achievement,
+    String? metricActual,
+    bool? usedArtifacts,
+    bool? consultedLeo,
+    bool? appliedTechniques,
+    String? keyInsight,
+    String? artifactsDetails,
+    String? consultedBenefit,
+    String? techniquesDetails,
+  }) =>
+      upsertWeek(
+        weekNumber: sprintNumber,
+        achievement: achievement,
+        metricActual: metricActual,
+        usedArtifacts: usedArtifacts,
+        consultedLeo: consultedLeo,
+        appliedTechniques: appliedTechniques,
+        keyInsight: keyInsight,
+        artifactsDetails: artifactsDetails,
+        consultedBenefit: consultedBenefit,
+        techniquesDetails: techniquesDetails,
+      );
 
   // ============================
   // Reminders (reminder_checks)

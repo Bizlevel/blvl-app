@@ -41,6 +41,7 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
   Map<int, Map<String, dynamic>> _versions = {};
   bool _loadFailed = false;
   bool _showIntro = true;
+  String? _lastAssistantMessage;
 
   @override
   void initState() {
@@ -235,6 +236,12 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('Цель сохранена')));
       setState(() => _saving = false);
+      // Возврат на башню с автоскроллом к следующему уровню
+      try {
+        context.go('/tower?scrollTo=${_nextLevelNumber()}');
+      } catch (e, st) {
+        Sentry.captureException(e, stackTrace: st);
+      }
     } catch (e, st) {
       Sentry.captureException(e, stackTrace: st);
       if (!mounted) return;
@@ -285,6 +292,60 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
       sb.writeln('commitment: ${_commitment.toString()}');
     }
     return sb.toString();
+  }
+
+  void _onAssistantMessage(String msg) {
+    setState(() => _lastAssistantMessage = msg);
+  }
+
+  void _applySuggestionToForm() {
+    final msg = _lastAssistantMessage?.trim();
+    if (msg == null || msg.isEmpty) return;
+    // Простейший префилл без агрессивного парсинга — минимальные правки
+    if (widget.version == 2) {
+      if (_goalRefinedCtrl.text.trim().isEmpty) {
+        _goalRefinedCtrl.text = msg.split('\n').first.trim();
+      }
+      // Попытка вытащить числа для from/to
+      final numbers = RegExp(r"[-+]?[0-9]*\.?[0-9]+")
+          .allMatches(msg)
+          .map((m) => m.group(0)!)
+          .toList();
+      if (_metricFromCtrl.text.trim().isEmpty && numbers.isNotEmpty) {
+        _metricFromCtrl.text = numbers.first;
+      }
+      if (_metricToCtrl.text.trim().isEmpty && numbers.length >= 2) {
+        _metricToCtrl.text = numbers[1];
+      }
+      if (_metricNameCtrl.text.trim().isEmpty) {
+        // Наивная эвристика: искать знакомые метрики
+        final lower = msg.toLowerCase();
+        if (lower.contains('конверси')) {
+          _metricNameCtrl.text = 'Конверсия %';
+        } else if (lower.contains('выручк') || lower.contains('доход')) {
+          _metricNameCtrl.text = 'Выручка';
+        } else if (lower.contains('клиент')) {
+          _metricNameCtrl.text = 'Количество клиентов';
+        }
+      }
+    } else if (widget.version == 3) {
+      if (_goalSmartCtrl.text.trim().isEmpty) {
+        _goalSmartCtrl.text = msg.split('\n').first.trim();
+      }
+      // Простая разбивка на строки для спринтов, если есть ключевые слова
+      final lines = msg.split('\n');
+      String pick(String key) => lines
+          .firstWhere((l) => l.toLowerCase().contains(key), orElse: () => '');
+      if (_s1Ctrl.text.trim().isEmpty)
+        _s1Ctrl.text =
+            pick('недел').replaceAll(RegExp(r'^[^:]*:\s?'), '').trim();
+    } else if (widget.version == 4) {
+      if (_finalWhatCtrl.text.trim().isEmpty) {
+        _finalWhatCtrl.text = msg.split('.').first.trim();
+      }
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Предложение Макса применено')));
   }
 
   @override
@@ -419,6 +480,26 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
+                            // Встроенный чат Макса (embedded)
+                            SizedBox(
+                              height: 420,
+                              child: ref.read(currentUserProvider).when(
+                                    data: (user) => LeoDialogScreen(
+                                      chatId: null,
+                                      userContext: _buildUserContext(),
+                                      levelContext:
+                                          'current_level: ${user?.currentLevel ?? 0}',
+                                      bot: 'max',
+                                      embedded: true,
+                                      onAssistantMessage: _onAssistantMessage,
+                                    ),
+                                    loading: () => const Center(
+                                        child: CircularProgressIndicator()),
+                                    error: (_, __) => const Center(
+                                        child: Text('Ошибка загрузки профиля')),
+                                  ),
+                            ),
+                            const SizedBox(height: 16),
                             GoalVersionForm(
                               version: widget.version,
                               editing: true,
@@ -445,6 +526,19 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
                             const SizedBox(height: 12),
                             Row(
                               children: [
+                                if (_lastAssistantMessage != null)
+                                  Padding(
+                                    padding: const EdgeInsets.only(right: 12),
+                                    child: SizedBox(
+                                      height: 44,
+                                      child: OutlinedButton.icon(
+                                        icon: const Icon(Icons.content_paste),
+                                        label:
+                                            const Text('Применить предложение'),
+                                        onPressed: _applySuggestionToForm,
+                                      ),
+                                    ),
+                                  ),
                                 SizedBox(
                                   height: 44,
                                   child: ElevatedButton(
@@ -460,60 +554,6 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
                                   ),
                                 ),
                                 const SizedBox(width: 12),
-                                SizedBox(
-                                  height: 44,
-                                  child: OutlinedButton.icon(
-                                    icon: const Icon(Icons.chat_bubble_outline),
-                                    label: const Text('Сформировать с Максом'),
-                                    onPressed: () {
-                                      Sentry.addBreadcrumb(Breadcrumb(
-                                          level: SentryLevel.info,
-                                          category: 'goal',
-                                          message:
-                                              'goal_checkpoint_max_opened v=${widget.version}'));
-                                      showModalBottomSheet(
-                                        context: context,
-                                        isScrollControlled: true,
-                                        backgroundColor: Colors.transparent,
-                                        builder: (context) =>
-                                            DraggableScrollableSheet(
-                                          initialChildSize: 0.9,
-                                          minChildSize: 0.5,
-                                          maxChildSize: 0.95,
-                                          builder:
-                                              (context, scrollController) =>
-                                                  Container(
-                                            decoration: const BoxDecoration(
-                                              color: Colors.white,
-                                              borderRadius:
-                                                  BorderRadius.vertical(
-                                                      top: Radius.circular(20)),
-                                            ),
-                                            child: ref
-                                                .read(currentUserProvider)
-                                                .when(
-                                                  data: (user) =>
-                                                      LeoDialogScreen(
-                                                    chatId: null,
-                                                    userContext:
-                                                        _buildUserContext(),
-                                                    levelContext:
-                                                        'current_level: ${user?.currentLevel ?? 0}',
-                                                    bot: 'max',
-                                                  ),
-                                                  loading: () => const Center(
-                                                      child:
-                                                          CircularProgressIndicator()),
-                                                  error: (_, __) => const Center(
-                                                      child: Text(
-                                                          'Ошибка загрузки профиля')),
-                                                ),
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                ),
                               ],
                             ),
                           ],

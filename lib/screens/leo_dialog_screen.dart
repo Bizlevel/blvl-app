@@ -18,6 +18,12 @@ class LeoDialogScreen extends ConsumerStatefulWidget {
   final String bot; // 'leo' | 'alex'
   final bool caseMode; // режим мини‑кейса: не тратим лимиты, не сохраняем чаты
   final String? systemPrompt; // опц. системный промпт (для кейса)
+  final bool
+      embedded; // когда true — рендер без Scaffold/AppBar (встраиваемый вид)
+  final ValueChanged<String>?
+      onAssistantMessage; // колбэк для получения ответа ассистента
+  final List<String>?
+      recommendedChips; // опц. серверные подсказки (fallback на клиенте)
 
   const LeoDialogScreen({
     super.key,
@@ -27,6 +33,9 @@ class LeoDialogScreen extends ConsumerStatefulWidget {
     this.bot = 'leo',
     this.caseMode = false,
     this.systemPrompt,
+    this.embedded = false,
+    this.onAssistantMessage,
+    this.recommendedChips,
   });
 
   @override
@@ -40,6 +49,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
 
   final _scrollController = ScrollController();
   final _inputController = TextEditingController();
+  final _inputFocus = FocusNode();
   final List<Map<String, dynamic>> _messages = [];
 
   bool _isSending = false;
@@ -82,6 +92,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
   @override
   void dispose() {
     _debounceTimer?.cancel();
+    _inputFocus.dispose();
     super.dispose();
   }
 
@@ -232,6 +243,10 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
       setState(() {
         _messages.add({'role': 'assistant', 'content': assistantMsg});
       });
+      // Сообщаем родителю об ответе ассистента (для префилла форм)
+      try {
+        widget.onAssistantMessage?.call(assistantMsg);
+      } catch (_) {}
       _scrollToBottom();
     } catch (e) {
       if (!mounted) return;
@@ -258,6 +273,15 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.embedded) {
+      // Встраиваемый режим: без Scaffold/AppBar, только тело
+      return Column(
+        children: [
+          Expanded(child: _buildMessageList()),
+          _buildInput(),
+        ],
+      );
+    }
     return Scaffold(
       appBar: AppBar(
         backgroundColor: AppColor.primary,
@@ -321,37 +345,110 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Expanded(
-              child: TextField(
-                controller: _inputController,
-                minLines: 1,
-                maxLines: 4,
-                decoration: const InputDecoration(
-                  hintText: 'Введите сообщение...',
-                  border: OutlineInputBorder(),
-                ),
-                // Добавляем onSubmitted для отправки по Enter
-                onSubmitted: (text) {
-                  if (text.trim().isNotEmpty && !_isSending) {
-                    _sendMessage();
-                  }
-                },
-              ),
-            ),
-            const SizedBox(width: 8),
-            _isSending
-                ? const SizedBox(
-                    width: 24, height: 24, child: CircularProgressIndicator())
-                : IconButton(
-                    icon: const Icon(Icons.send),
-                    color: AppColor.primary,
-                    onPressed: _sendMessage,
+            _buildChipsRow(),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _inputController,
+                    focusNode: _inputFocus,
+                    minLines: 1,
+                    maxLines: 4,
+                    decoration: const InputDecoration(
+                      hintText: 'Введите сообщение...',
+                      border: OutlineInputBorder(),
+                    ),
+                    // Отправка по Enter
+                    onSubmitted: (text) {
+                      if (text.trim().isNotEmpty && !_isSending) {
+                        _sendMessage();
+                      }
+                    },
                   ),
+                ),
+                const SizedBox(width: 8),
+                _isSending
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator())
+                    : IconButton(
+                        icon: const Icon(Icons.send),
+                        color: AppColor.primary,
+                        onPressed: _sendMessage,
+                      ),
+              ],
+            ),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildChipsRow() {
+    final chips = _resolveRecommendedChips();
+    if (chips.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          for (final text in chips)
+            ActionChip(
+              label: Text(text, overflow: TextOverflow.ellipsis),
+              onPressed: () {
+                _inputController.text = text;
+                _inputController.selection = TextSelection.fromPosition(
+                    TextPosition(offset: _inputController.text.length));
+                _inputFocus.requestFocus();
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
+  List<String> _resolveRecommendedChips() {
+    if (widget.recommendedChips != null &&
+        widget.recommendedChips!.isNotEmpty) {
+      return widget.recommendedChips!;
+    }
+    // Клиентский фолбэк: подбираем подсказки по версии цели в userContext
+    if (widget.bot == 'max') {
+      final ctx = widget.userContext ?? '';
+      final match = RegExp(r'goal_version:\s*(\d+)').firstMatch(ctx);
+      final v = match != null ? int.tryParse(match.group(1) ?? '') : null;
+      switch (v) {
+        case 2:
+          return const [
+            '💰 Выручка',
+            '👥 Кол-во клиентов',
+            '⏱ Время на задачи',
+            '📊 Конверсия %',
+            '✏️ Другое',
+          ];
+        case 3:
+          return const [
+            'Неделя 1: Подготовка',
+            'Неделя 2: Запуск',
+            'Неделя 3: Масштабирование',
+            'Неделя 4: Оптимизация',
+          ];
+        case 4:
+          return const [
+            'Готовность 7/10',
+            'Начать завтра',
+            'Старт в понедельник',
+          ];
+        default:
+          return const [];
+      }
+    }
+    return const [];
   }
 }

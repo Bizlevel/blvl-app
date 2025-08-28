@@ -37,6 +37,10 @@ void main() {
 
     // Есть секция «Кристаллизация цели»
     expect(find.text('Кристаллизация цели'), findsOneWidget);
+    // Новые секции этапа 38.3 присутствуют (хотя бы прогресс-бар из компактной карточки)
+    expect(find.byType(LinearProgressIndicator), findsWidgets);
+    // Таймлайн недель рендерится (карточки «Нед N»)
+    expect(find.textContaining('Нед '), findsWidgets);
     // Табличные лейблы из v1 видны
     expect(find.text('Основная цель'), findsOneWidget);
     expect(find.text('Почему сейчас'), findsOneWidget);
