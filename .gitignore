@@ -52,3 +52,4 @@ venv/
 # Local build scripts with secrets
 scripts/local_build.sh
 scripts/local_build.ps1
+android/app/google-services.json
