@@ -8,6 +8,7 @@ import '../../providers/login_controller.dart';
 import '../../services/auth_service.dart';
 import '../../theme/color.dart';
 import '../../widgets/custom_textfield.dart';
+import 'package:supabase_flutter/supabase_flutter.dart'; // Keep this import
 
 class LoginScreen extends HookConsumerWidget {
   const LoginScreen({super.key});
@@ -52,6 +53,10 @@ class LoginScreen extends HookConsumerWidget {
       await ref
           .read(loginControllerProvider.notifier)
           .signIn(email: email, password: password);
+    }
+
+    Future<void> signInWithGoogle() async {
+      await ref.read(loginControllerProvider.notifier).signInWithGoogle();
     }
 
     return Scaffold(
@@ -191,6 +196,49 @@ class LoginScreen extends HookConsumerWidget {
                                     fontSize: 16,
                                     fontWeight: FontWeight.w600,
                                   ),
+                                ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      // Кнопка "Войти через Google"
+                      GestureDetector(
+                        onTap: isLoading ? null : signInWithGoogle,
+                        child: Container(
+                          height: 48,
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            color: Colors.blue, // Google brand color
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          alignment: Alignment.center,
+                          child: isLoading
+                              ? const SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 3,
+                                  ),
+                                )
+                              : Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    SvgPicture.asset(
+                                      'assets/icons/google.svg', // Assuming you have a Google icon
+                                      height: 24,
+                                      width: 24,
+                                      colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    const Text(
+                                      'Войти через Google',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                         ),
                       ),

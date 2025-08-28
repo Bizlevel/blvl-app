@@ -4,8 +4,6 @@ import 'dart:io';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-// No longer importing SupabaseService directly to enable dependency injection.
-
 /// Centralized authentication service.
 /// Wraps Supabase Auth calls and provides typed error handling.
 class AuthService {
@@ -55,6 +53,31 @@ class AuthService {
       }
       return response;
     }, unknownErrorMessage: 'Неизвестная ошибка входа');
+  }
+
+  /// Signs in a user with Google.
+  /// Throws [AuthFailure] on known errors.
+  Future<AuthResponse> signInWithGoogle() async {
+    return _handleAuthCall(() async {
+      await _client.auth.signInWithOAuth(
+        OAuthProvider.google,
+      );
+      // After the OAuth flow, check the current session.
+      // The signInWithOAuth method itself might not return AuthResponse directly
+      // in all environments or SDK versions, but it should update the session.
+      final session = _client.auth.currentSession;
+      if (session == null) {
+        throw AuthFailure('Не удалось получить сессию после входа через Google.');
+      }
+      final user = session.user;
+      if (user != null) {
+        Sentry.configureScope((scope) {
+          scope.setUser(SentryUser(id: user.id, email: user.email));
+        });
+      }
+      // Construct AuthResponse from the session.
+      return AuthResponse(session: session, user: user);
+    }, unknownErrorMessage: 'Неизвестная ошибка входа через Google');
   }
 
   /// Registers a new user with email & password.
