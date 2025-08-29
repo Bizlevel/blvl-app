@@ -154,3 +154,125 @@
 - Что сделать:
   1) Подтвердить отсутствие необходимости новых миграций; 2) Проверить Advisors — без критичных; 3) Пройтись по производительности (без тяжёлых операций в build; данные по возможности через существующие провайдеры/кеш SWR).
 - Критерии приёмки: миграции не требуются; Advisors без критичных предупреждений; UI плавный, overflow нет.
+
+
+# Этап 39: Переход на Growth Points (GP)
+
+### Задача 39.1: Полный отказ от подписок и суточных лимитов сообщений
+- Файлы: `lib/providers/subscription_provider.dart`, `lib/screens/premium_screen.dart`, `lib/screens/payment_screen.dart`, `lib/providers/levels_provider.dart`, `lib/routing/app_router.dart`, тесты `test/**`.
+- Что сделать:
+  1) Удалить провайдер и UI подписки, убрать маршруты и переходы на Premium.
+  2) Удалить использование флагов подписки в логике доступа уровней; оставить бесплатными только уровни 0–3.
+  3) Перевести гейтинг уровней на схему GP (открытие этажей за GP) — временно закрыть доступ >3 уровней до внедрения 39.7.
+  4) Убрать дневные лимиты Лео/Макса: удалить проверки `checkMessageLimit/decrementMessageCount` и весь связанный UI.
+- БД (миграция):
+  - Удалить таблицу `subscriptions` и колонку `users.is_premium` (если не используется нигде в коде после шага 39.1.2).
+  - Удалить колонки `users.leo_messages_total`, `users.leo_messages_today`, `users.leo_reset_at` и зависимые триггеры/функции.
+  - Проверить, что `payments` останется для GP‑покупок (без логики подписок).
+- Критерии приёмки: проект компилируется, уровни >3 недоступны без GP, в коде нет упоминаний подписок/лимитов.
+- Примечание к 39.1 (подписки/лимиты): все текущие пользователи — тестовые, поэтому можно удалять `subscriptions` и колонки лимитов (`users.is_premium`, `users.leo_messages_total/leo_messages_today/leo_reset_at`) в одной миграции без поэтапного софт‑лоунча.
+
+### Задача 39.2: Схема GP (ядро)
+- БД (миграции, RLS owner-only):
+  - `gp_wallets(user_id PK, balance int>=0, total_earned, total_spent, updated_at)`.
+  - `gp_ledger(id uuid PK, user_id, amount int (может <0), type enum('purchase','spend_message','spend_floor','bonus'), reference_id uuid/text, metadata jsonb, idempotency_key text unique, created_at)`.
+  - `gp_purchases(id uuid PK, user_id, package_id text, amount_kzt int, amount_gp int, provider enum('apple','google','epay','kaspi'), provider_transaction_id text, status enum('pending','completed','failed','refunded'), created_at)`.
+  - `floor_access(user_id uuid, floor_number smallint, unlocked_at timestamptz, PK(user_id, floor_number))`.
+- Индексы: `gp_ledger(user_id, created_at desc)`, `floor_access(user_id, floor_number)`.
+- Инициализация: бонус при регистрации +30 GP (миграция/триггер либо бонус‑правило, см. 39.4).
+  - Завести enum `gp_transaction_type` со значениями: `purchase`, `spend_message`, `spend_floor`, `bonus`.
+  - В `gp_ledger` создать уникальный индекс по `idempotency_key` (идемпотентность) и индекс по `(user_id, created_at desc)`.
+  - В `floor_access` индекс по `(user_id, floor_number)` (если не создан) и PK `(user_id, floor_number)`.
+  - RLS owner‑only: политики SELECT/INSERT/UPDATE только при `auth.uid() = user_id`; для `anon` — deny all.
+  - Для функций/триггеров зафиксировать `search_path = public`.
+- Критерии приёмки: миграции применяются, advisors без критичных замечаний.
+
+### Задача 39.3: Edge Functions для GP
+- Эндпоинты:
+  - `GET /gp/balance` → `{balance, total_earned, total_spent}` (кэш 5с).
+  - `POST /gp/spend {type, amount, reference_id, idempotency_key}` → транзакция SERIALIZABLE, возврат `{balance_after}`.
+  - `POST /gp/purchase/init {package_id, provider}` → создаёт `gp_purchases(pending)`, для Web возвращает `payment_url`.
+  - `POST /gp/purchase/verify {purchase_id, receipt?}` → верификация, `ledger+wallet` начисление, идемпотентность по `idempotency_key`.
+- Требования: строгая проверка JWT, отсутствие PII в логах, структурированные ошибки.
+  - Строгая проверка JWT: только `authenticated`; логи без PII.
+  - Идемпотентность: принимать заголовок `Idempotency-Key`; повторные запросы возвращают прежний результат.
+  - Единый формат ошибок: коды `gp_insufficient_balance`, `gp_invalid_package`, `gp_already_processed` (+ человекочитаемые сообщения).
+  - `GET /gp/balance` — кэш 5 секунд.
+- Критерии приёмки: ручные вызовы возвращают ожидаемые ответы, повторные запросы с тем же idempotency возвращают один и тот же результат.
+
+### Задача 39.4: Система бонусов GP (настраиваемая)
+- БД:
+  - `gp_bonus_rules(rule_key text PK, amount int, active bool, description text)`.
+  - `gp_bonus_grants(user_id uuid, rule_key text, granted_at timestamptz, PK(user_id, rule_key))`.
+- Edge:
+  - `POST /gp/bonus/claim {rule_key}`: сервер проверяет условия и идемпотентно начисляет бонус через `gp_ledger/gp_wallets`, пишет в `gp_bonus_grants`.
+- Правила (сид):
+  - `signup_bonus` (+30 GP), `profile_completed` (+50 GP при заполнении name/goal/about/avatar_id), `all_three_cases_completed` (+200 GP при status='completed' для cases 1–3).
+    - `signup_bonus` (+30 GP) — выдавать через `/gp/bonus/claim` при первом входе.
+  - `profile_completed` (+50 GP) — при заполненных `name/goal/about/avatar_id`.
+  - Для тестовой команды допускается разовая выдача через `gp_bonus_grants`.
+- Критерии приёмки: повторный вызов не даёт дублей, правила можно выключать/менять без правок клиента.
+
+### Задача 39.5: Клиент — сервис и баланс
+- Создать `GpService` (Dio/Edge): `getBalance`, `spend`, `initPurchase`, `verifyPurchase` с retry/идемпотентностью.
+- Провайдер `gpBalanceProvider` (SWR + Hive): инвалидация после списаний/покупок/бонусов.
+- UI (только где нужно показывать баланс):
+  - Верхний AppBar на `MainStreetScreen` и `BizTowerScreen` («⬡ X GP», по тапу — магазин).
+  - `ProfileScreen`: «⬡ X GP (−1 за сообщение)» вместо «Х сообщений Лео».
+- Не показывать баланс в чате.
+  - `gpBalanceProvider` — SWR + Hive; инвалидация после `spend/purchase/bonus`.
+  - UI: баланс только в AppBar (главная/башня) и на странице Профиль; в чате баланс не показывать.
+- Критерии приёмки: баланс корректно обновляется, в чате баланс отсутствует.
+
+### Задача 39.6: Списания GP за сообщения Лео/Максу
+- `LeoService.sendMessage`: перед отправкой — `GpService.spend(type='spend_message', amount=1, reference_id=chat_id, idempotency_key)`. На "insufficient" — модалка «Пополнить GP» → переход в магазин и повтор.
+- Удалить старые проверки лимитов и связанные тексты/ошибки.
+  - Перед отправкой: `POST /gp/spend` c `type='spend_message'`, `amount=1`, `reference_id=<chat_id>`, `idempotency_key=<chat_id>:<ts>:<user_id>`.
+  - На `gp_insufficient_balance` — модалка «Пополнить GP» → переход в магазин (preset `gp_1200`).
+- Критерии приёмки: при достаточном балансе сообщение уходит; при недостаточном — корректный UX без отображения баланса в чате.
+
+### Задача 39.7: Открытие этажей за GP
+- Гейтинг уровней: заменить подписку на проверку `floor_access` (этаж 1 = уровни 1–10 и т.д.).
+- UI: при попытке открыть платный этаж — полноэкранный модал «Стоимость: 1000 GP (у вас X)»; если хватает — списать через `/gp/spend` и открыть доступ; если нет — магазин с пресетом `gp_1200`.
+- `levels_provider`: учитывать `floor_access` и бесплатность 0–3 уровней.
+ - Этаж 1 = 1000 GP; уровни 0–3 бесплатные без изменений.
+  - При успехе — upsert в `floor_access` и инвалидация провайдеров уровней и баланса.
+  - UI: полноэкранный модал преимуществ; при нехватке GP — магазин с пресетом `gp_1200`.
+- Критерии приёмки: доступ работает предсказуемо, сценарии достатка/недостатка GP покрыты.
+
+### Задача 39.8: Магазин GP и платежи
+- Экран `GpStoreScreen` с 3 пакетами (300/1400/3000 GP), выделение среднего.
+- Интеграция с существующим `PaymentService` для Web (redirect‑flow), после возврата — `verify` и инвалидация баланса.
+  - Пакеты: `gp_300`, `gp_1200` (badge «ПОПУЛЯРНЫЙ»), `gp_2500` — конфиг хранить на клиенте и валидировать на сервере.
+  - Web: redirect через существующий `PaymentService` → `/gp/purchase/verify`.
+  - iOS/Android: заглушки SDK (вне MVP), интерфейсы подготовить.
+- Подготовить интерфейсы для мобильных сторах (без реализации в этом этапе).
+- Критерии приёмки: на Web покупка завершает начислением GP и обновлением баланса.
+
+### Задача 39.9: Чистка, тесты и наблюдаемость
+- Удалить/обновить тесты, завязанные на подписки/лимиты.
+- Добавить юнит‑тесты `GpService` и виджет‑тесты (чаты: списание/insufficient; башня: открытие этажа).
+- Sentry breadcrumbs: `gp_spent`, `gp_insufficient`, `gp_store_opened`, `gp_purchase_*`.
+- Скрипт сверки: при расхождении `wallets.balance` и суммы `ledger` — алерт и автокоррекция (опц.).
+  - Удалить/обновить тесты, завязанные на подписки/лимиты.
+  - Добавить тесты: списание/insufficient, открытие этажа, покупка на Web, инвалидация баланса.
+  - Sentry breadcrumbs: `gp_spent`, `gp_insufficient`, `gp_store_opened`, `gp_purchase_*`.
+- Критерии приёмки: тесты зелёные, Sentry без новых критичных ошибок.
+
+### Задача 39.10: Данные и обратная совместимость
+- Применить welcome‑бонус существующим пользователям один раз через `gp_bonus_grants`.
+- Подтвердить, что в `subscriptions` нет активных данных; если есть — согласовать конверсию в `floor_access`.
+  - Так как пользователи тестовые, можно сразу удалять подписки/лимиты без маппинга. При необходимости — выдать `floor_access` вручную тем, кто уже имеет доступ >3.
+- Критерии приёмки: у существующих пользователей баланс ≥ 30 GP, доступы соответствуют правилам GP.
+
+### Задача 39.11: Техдолг и безопасность
+- Устранить дубликаты индексов (например, `core_goals_user_updated_idx` vs `idx_core_goals_user_updated`, `lessons_level_id_order_key` vs `uniq_lessons_level_order`).
+- Зафиксировать `search_path = public` в новых функциях и триггерах (SQL/Edge), привести к рекомендациям advisors.
+
+### Задача 39.12: Smoke‑фаза GP
+- Задеплоить `/gp/balance` и `/gp/spend` в песочнице; провести ручные проверки идемпотентности и RLS.
+- После успешной проверки включить списание GP в клиенте для чатов (канареечный запуск).
+
+### Задача 39.13: Документация и курс
+- Описать формат `Idempotency-Key` и коды ошибок в README (раздел GP).
+- Зафиксировать источник курса GP↔₸ (константа на клиенте + валидация на сервере или `app_settings`).
