@@ -2,6 +2,7 @@ import 'package:bizlevel/models/user_model.dart';
 import 'package:bizlevel/providers/auth_provider.dart';
 import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/widgets/custom_image.dart';
+import 'package:bizlevel/providers/gp_providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -21,7 +22,10 @@ class UserInfoBar extends ConsumerWidget {
         if (user == null) {
           return const SizedBox.shrink();
         }
-        return _buildContent(context, user);
+        // Подключаемся к балансу ТОЛЬКО после загрузки пользователя/сессии,
+        // чтобы не стрелять ранний gp-balance без Authorization.
+        final gpAsync = ref.watch(gpBalanceProvider);
+        return _buildContent(context, user, gpAsync.value?['balance']);
       },
       loading: () => _buildPlaceholder(),
       error: (err, st) {
@@ -39,7 +43,7 @@ class UserInfoBar extends ConsumerWidget {
     );
   }
 
-  Widget _buildContent(BuildContext context, UserModel user) {
+  Widget _buildContent(BuildContext context, UserModel user, int? gpBalance) {
     // Выбираем изображение аватара: URL из БД либо локальный ресурс по id.
     String avatarPath;
     bool isNetwork;
@@ -88,6 +92,23 @@ class UserInfoBar extends ConsumerWidget {
             ),
           ],
         ),
+        const SizedBox(width: 12),
+        if (gpBalance != null)
+          Row(
+            children: [
+              const Icon(Icons.change_circle_outlined,
+                  color: AppColor.textColor, size: 18),
+              const SizedBox(width: 4),
+              Text(
+                '${gpBalance} GP',
+                style: const TextStyle(
+                  color: AppColor.textColor,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
       ],
     );
   }

@@ -29,7 +29,8 @@ class MainStreetScreen extends ConsumerWidget {
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: Row(
                     children: const [
-                      Expanded(child: UserInfoBar()),
+                      Spacer(),
+                      UserInfoBar(),
                     ],
                   ),
                 ),
@@ -59,8 +60,6 @@ class MainStreetScreen extends ConsumerWidget {
                             final int floorId = next['floorId'] as int? ?? 1;
                             final int levelNumber =
                                 next['levelNumber'] as int? ?? 0;
-                            final bool requiresPremium =
-                                next['requiresPremium'] as bool? ?? false;
                             final levelCode =
                                 formatLevelCode(floorId, levelNumber);
                             return SizedBox(
@@ -68,21 +67,17 @@ class MainStreetScreen extends ConsumerWidget {
                               child: ElevatedButton(
                                 onPressed: () {
                                   try {
-                                    if (requiresPremium) {
-                                      context.go('/premium');
+                                    final int? gver =
+                                        next['goalCheckpointVersion'] as int?;
+                                    if (gver != null) {
+                                      context.go('/goal-checkpoint/$gver');
                                     } else {
-                                      final int? gver =
-                                          next['goalCheckpointVersion'] as int?;
-                                      if (gver != null) {
-                                        context.go('/goal-checkpoint/$gver');
-                                      } else {
-                                        final levelNumber =
-                                            next['levelNumber'] as int? ?? 0;
-                                        final levelId =
-                                            next['levelId'] as int? ?? 0;
-                                        context.go(
-                                            '/levels/$levelId?num=$levelNumber');
-                                      }
+                                      final levelNumber =
+                                          next['levelNumber'] as int? ?? 0;
+                                      final levelId =
+                                          next['levelId'] as int? ?? 0;
+                                      context.go(
+                                          '/levels/$levelId?num=$levelNumber');
                                     }
                                   } catch (e, st) {
                                     Sentry.captureException(e, stackTrace: st);

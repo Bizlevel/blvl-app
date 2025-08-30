@@ -516,4 +516,25 @@ UI: на странице «Чат» карточки выбора бота по
 Задача 240829-01 fix: синхронизированы scripts/ и docs/ из main; обновлён leo_service до версии main.
 Задача 240829-01 fix: iOS/Android конфиги приведены к main; наши goal_screen и модульная tower сохранены.
 
-эЗадача 39 plan fix: Уточнил Этап 39 (GP): enum, идемпотентность, RLS, курс, UX недостатка GP; добавлены задачи 39.11–39.13. Подготовлено к миграциям и Edge.
+# Этап 39: Система валюты GP
+Задача 39.1 fix: удалены подписки и лимиты сообщений. В клиенте убраны маршрут /premium, провайдер subscriptionProvider и ссылки на Premium; уровни >3 временно закрыты с пометкой «Требуются GP». В чате сняты проверки/декремент лимитов. В БД через supabase‑mcp удалены таблица subscriptions и колонки is_premium/leo_messages_* в users.
+Задача 39.2: создано ядро GP. Добавлены enum'ы, таблицы gp_wallets/gp_ledger/gp_purchases/floor_access, индексы и owner‑only RLS. Включён триггер создания кошелька с бонусом 30 GP на signup. Advisors без критичных замечаний.
+Задача 39.3: реализованы Edge Functions: /gp/balance, /gp/spend, /gp/purchase/init, /gp/purchase/verify; добавлены SQL-функции gp_spend и gp_purchase_verify (идемпотентность, транзакции). JWT проверяется, ошибки структурированы. Advisors — без критичных проблем.
+Задача 39.4: добавлены таблицы gp_bonus_rules/gp_bonus_grants, функция gp_bonus_claim (идемпотентно) и Edge Function /gp/bonus/claim. RLS настроен (rules: SELECT, grants: owner-only). Advisors perf — без критичных замечаний.
+Задача 39.5: добавлен клиент GP: `GpService` (balance/spend/init/verify), провайдер `gpBalanceProvider` (SWR + Hive). Баланс («⬡ X GP») выведен в `UserInfoBar` и AppBar башни; профиль показывает «X GP (−1 за сообщение)». 
+Задача 39.6: в `LeoService` перед отправкой списывается 1 GP (`GpService.spend` с идемпотентностью). На недостатке GP возвращается понятная ошибка; баланс инвалидацируется в фоне. UI чата не менялся.
+Задача 39.7: доступ уровней >3 переведён на `floor_access`. Задеплоен `/gp-floor-unlock`, добавлен `GpService.unlockFloor`. В башне при попытке открыть закрытый уровень показывается модал «1000 GP», успешная покупка инвалидацирует провайдеры и баланс.
+Задача 39.8: добавлен экран «Магазин GP» (`/gp-store`) с пакетами 300/1200/2500. Для Web — редирект через существующий `PaymentService`; после оплаты — кнопка «Проверить» (verify в дальнейшем). Клик по балансу в башне ведёт в магазин.
+Задача 39.9: чистка тестов и наблюдаемость GP. Убраны сценарии подписок/лимитов в тестах (`profile_monetization_test.dart`, `leo_integration_test.dart`). В сервисах/edge-ошибках добавлен захват исключений в Sentry.
++Задача 39.10: применён welcome‑бонус 30 GP всем существующим пользователям: идемпотентные вставки в `gp_ledger/gp_bonus_grants` и upsert `gp_wallets` через supabase‑mcp. Дубликаты исключены.
+Задача 39.14: добавлены RPC-функции `gp_balance/gp_spend/gp_floor_unlock/gp_bonus_claim` (SECURITY DEFINER, SERIALIZABLE, search_path=public), индекс идемпотентности `idx_gp_ledger_idem`. Применено через supabase‑mcp; advisors security/perf без критичных замечаний.
+Задача 39.15: клиент `GpService` переведён на RPC (`gp_balance/gp_spend/gp_floor_unlock/gp_bonus_claim`) вместо Edge. Сохранены retry, Hive‑кеш и обработка ошибок. HTTP для покупок не трогали.
+Задача 39.16: интеграция: чат и башня используют `GpService` (RPC). Прямых HTTP вызовов GP вне `GpService` нет; `unlockFloor` в башне работает через RPC с idempotencyKey. Линты чистые.
+Задача 39.17: Провайдеры и кеш: подтверждён гейт по `currentSession`, баланс берётся через RPC, Hive‑кеш и фоновые рефетчи сохранены; refresh внутри провайдеров отсутствует.
+Задача 39.18: Тесты: проверены места инвалидации `gpBalanceProvider` (чат/магазин/башня); базовые сценарии списания и открытия этажа работают на RPC без 401. Новых ошибок анализатора нет.
+Задача 39.19: Добавлен dev‑fallback на Edge для RPC (только debug): при отсутствии функций `gp_*` GpService выполняет одноразовый вызов старого эндпоинта. В prod отключено.
+Задача 39.20: Advisors (security/perf) без критичных замечаний; зафиксированы WARN initplan/индексы вне области GP.
+Задача 39.21: Выполнена сверка `gp_wallets` по суммам `gp_ledger` (UPSERT); расхождений не выявлено, кошельки синхронизированы.
+Задача 39.22: README обновлён: Edge `/gp-balance|/gp-spend|/gp-floor-unlock|/gp-bonus-claim` помечены как deprecated, core‑операции на RPC; покупки остаются на `/gp-purchase-*`.
+Задача 39.23: В `GpService` добавлены breadcrumbs Sentry: `gp_balance_loaded`, `gp_spent`, `gp_floor_unlocked`, `gp_bonus_granted` (без PII). Линты чистые.
+эЗадача 39.14 fix: RPC `gp_spend/gp_bonus_claim` обновлены: `metadata` больше не `NULL` (вставляется `'{}'::jsonb`). Ошибка 23502 устранена; чат списывает GP стабильно.

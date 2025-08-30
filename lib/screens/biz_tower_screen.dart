@@ -4,6 +4,9 @@ import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/providers/levels_provider.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:go_router/go_router.dart';
+import 'package:bizlevel/providers/gp_providers.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:bizlevel/services/gp_service.dart';
 
 part 'tower/tower_constants.dart';
 part 'tower/tower_helpers.dart';
@@ -77,6 +80,34 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
             ),
           ],
         ),
+        actions: [
+          Consumer(builder: (context, ref, _) {
+            final gpAsync = ref.watch(gpBalanceProvider);
+            final balance = gpAsync.value?['balance'];
+            if (balance == null) return const SizedBox.shrink();
+            return Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: Center(
+                child: InkWell(
+                  onTap: () {
+                    // Переход в магазин GP (маршрут добавим в 39.8)
+                    try {
+                      GoRouter.of(context).go('/gp-store');
+                    } catch (_) {}
+                  },
+                  child: Row(
+                    children: [
+                      const Icon(Icons.change_circle_outlined, size: 18),
+                      const SizedBox(width: 4),
+                      Text('${balance} GP',
+                          style: const TextStyle(fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          })
+        ],
         backgroundColor: AppColor.appBarColor,
       ),
       backgroundColor: AppColor.appBgColor,

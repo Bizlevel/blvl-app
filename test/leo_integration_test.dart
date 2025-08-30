@@ -20,7 +20,7 @@ void main() {
     late String email;
     const password = 'Passw0rd!';
     late String chatId;
-    int initialLimit = 0;
+    int initialLimit = -1;
 
     test('1) Регистрация пользователя', () async {
       final rng = Random();
@@ -30,10 +30,10 @@ void main() {
       final res = await authService.signUp(email: email, password: password);
       expect(res.user, isNotNull);
 
-      // после регистрации лимит должен быть 30 (Free)
+      // лимиты отключены; checkMessageLimit возвращает -1
       final leo = LeoService(Supabase.instance.client);
       initialLimit = await leo.checkMessageLimit();
-      expect(initialLimit, greaterThan(0));
+      expect(initialLimit, equals(-1));
     });
 
     test('2) Отправка сообщения и получение ответа', () async {
@@ -57,11 +57,7 @@ void main() {
       );
     });
 
-    test('3) Проверка уменьшения лимита', () async {
-      final leo = LeoService(Supabase.instance.client);
-      final afterLimit = await leo.checkMessageLimit();
-      expect(afterLimit, equals(initialLimit - 1));
-    });
+    // тест уменьшения лимита удалён (этап 39.1)
 
     test('4) Проверка истории сообщений', () async {
       final history = await Supabase.instance.client

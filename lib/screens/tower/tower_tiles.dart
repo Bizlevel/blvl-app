@@ -110,9 +110,7 @@ class _LevelNodeTile extends StatelessWidget {
     final bool isCurrent = data['isCurrent'] == true;
     final bool isLockedBase = data['isLocked'] == true;
     final bool isLocked = isLockedBase || blockedByCheckpoint;
-    final String? lockReason = data['lockReason'] as String?;
-    final bool premiumLock =
-        (lockReason != null && lockReason.toLowerCase().contains('премиум'));
+    final bool premiumLock = false; // Премиум-гейтинг снят (этап 39.1)
     final bool isCompleted = data['isCompleted'] == true;
 
     return Material(
@@ -129,12 +127,65 @@ class _LevelNodeTile extends StatelessWidget {
             if (!canOpen) {
               if (blockedByCheckpoint) {
                 _showBlockedSnackBar(context);
-              } else if (premiumLock) {
-                if (context.mounted) {
-                  context.go('/premium');
-                }
-              } else {
-                _showBlockedSnackBar(context);
+              } else if (!premiumLock) {
+                // Предложить открыть этаж за GP (этап 39.7)
+                showDialog(
+                  context: context,
+                  builder: (ctx) {
+                    return AlertDialog(
+                      title: const Text('Открыть этаж'),
+                      content:
+                          const Text('Стоимость: 1000 GP. Открыть доступ?'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(ctx).pop(),
+                          child: const Text('Отмена'),
+                        ),
+                        TextButton(
+                          onPressed: () async {
+                            Navigator.of(ctx).pop();
+                            try {
+                              final gp = GpService(Supabase.instance.client);
+                              final userId = Supabase
+                                      .instance.client.auth.currentUser?.id ??
+                                  'anon';
+                              final idem = 'floor:' + userId + ':1';
+                              await gp.unlockFloor(
+                                  floorNumber: 1, idempotencyKey: idem);
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Этаж открыт')),
+                              );
+                              // Обновим баланс и узлы башни
+                              try {
+                                final fresh = await gp.getBalance();
+                                await GpService.saveBalanceCache(fresh);
+                              } catch (_) {}
+                              // ignore: use_build_context_synchronously
+                              if (!context.mounted) return;
+                              final container =
+                                  ProviderScope.containerOf(context);
+                              container.invalidate(levelsProvider);
+                              container.invalidate(towerNodesProvider);
+                            } on GpFailure catch (e) {
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text(e.message)),
+                              );
+                            } catch (e) {
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                    content: Text('Не удалось открыть этаж')),
+                              );
+                            }
+                          },
+                          child: const Text('Открыть'),
+                        ),
+                      ],
+                    );
+                  },
+                );
               }
               return;
             }

@@ -11,7 +11,6 @@ import 'package:bizlevel/widgets/stat_card.dart';
 // import 'package:bizlevel/widgets/setting_item.dart';
 import 'package:bizlevel/providers/levels_provider.dart';
 import 'package:bizlevel/providers/levels_repository_provider.dart';
-import 'package:bizlevel/providers/subscription_provider.dart';
 import 'package:bizlevel/models/user_model.dart';
 import 'package:go_router/go_router.dart';
 import 'package:file_picker/file_picker.dart';
@@ -19,6 +18,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:io';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:bizlevel/providers/gp_providers.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -58,7 +58,7 @@ class ProfileScreen extends ConsumerWidget {
 
         // Есть сессия - загружаем пользователя
         final currentUserAsync = ref.watch(currentUserProvider);
-        final subAsync = ref.watch(subscriptionProvider);
+        // Подписки отключены — провайдер не используется
 
         return currentUserAsync.when(
           data: (user) {
@@ -86,11 +86,8 @@ class ProfileScreen extends ConsumerWidget {
               );
             }
 
-            // определяем премиум по полю БД или активной подписке
-            final isPremium =
-                user.isPremium || (subAsync.asData?.value == 'active');
-            return _buildProfileContent(context, ref, user,
-                isPremiumOverride: isPremium);
+            // Премиум отключён; используем только поле БД (будет удалено позже)
+            return _buildProfileContent(context, ref, user);
           },
           loading: () => const Scaffold(
             body: Center(child: CircularProgressIndicator()),
@@ -149,8 +146,7 @@ class ProfileScreen extends ConsumerWidget {
       BuildContext context, WidgetRef ref, UserModel user,
       {bool? isPremiumOverride}) {
     final isPremium = isPremiumOverride ?? user.isPremium;
-    final messagesLeft =
-        isPremium ? user.leoMessagesToday : user.leoMessagesTotal;
+    final gp = ref.watch(gpBalanceProvider).value?['balance'] ?? 0;
 
     final levelsAsync = ref.watch(levelsProvider);
 
@@ -209,7 +205,10 @@ class ProfileScreen extends ConsumerWidget {
                         );
                         break;
                       case 'payments':
-                        context.go('/premium');
+                        // Платежи Premium отключены на этапе 39.1
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Скоро: покупки GP')),
+                        );
                         break;
                       case 'logout':
                         await ref.read(authServiceProvider).signOut();
@@ -292,7 +291,7 @@ class ProfileScreen extends ConsumerWidget {
                 userName: user.name,
                 avatarId: user.avatarId,
                 currentLevel: user.currentLevel,
-                messagesLeft: messagesLeft,
+                messagesLeft: gp,
                 artifactsCount: artifactsCount,
                 isPremium: isPremium,
                 artifacts: artifacts,
@@ -627,8 +626,7 @@ class _BodyState extends ConsumerState<_Body> {
                 const Center(child: Text('Ошибка загрузки навыков')),
           ),
           const SizedBox(height: AppSpacing.medium),
-          if (!widget.isPremium) _buildPremiumButton(context),
-          if (!widget.isPremium) const SizedBox(height: AppSpacing.medium),
+          // Premium отключён — кнопка скрыта
           // Секция артефактов скрыта — используйте карточку статистики выше
         ],
       ),
@@ -743,8 +741,8 @@ class _BodyState extends ConsumerState<_Body> {
         const SizedBox(width: AppSpacing.small),
         Expanded(
           child: StatCard(
-            title: "${widget.messagesLeft} Сообщений Лео",
-            icon: Icons.chat_bubble_outline,
+            title: "${widget.messagesLeft} Growth Points (GP)",
+            icon: Icons.change_circle_outlined,
           ),
         ),
         const SizedBox(width: AppSpacing.small),
@@ -777,43 +775,7 @@ class _BodyState extends ConsumerState<_Body> {
     );
   }
 
-  Widget _buildPremiumButton(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        context.go('/premium');
-      },
-      child: Container(
-        padding: const EdgeInsets.all(AppSpacing.medium),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(10),
-          color: AppColor.primary,
-          boxShadow: [
-            BoxShadow(
-              color: AppColor.primary.withValues(alpha: 0.2),
-              spreadRadius: 1,
-              blurRadius: 1,
-              offset: const Offset(0, 1),
-            ),
-          ],
-        ),
-        child: const Wrap(
-          alignment: WrapAlignment.center,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          spacing: AppSpacing.small,
-          children: [
-            Icon(Icons.star, color: Colors.white, size: 20),
-            Text(
-              "Активировать премиум",
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  // Premium кнопка удалена (этап 39.1)
 
   // Секции настроек/платежей/выхода перенесены в меню шестерёнки AppBar
 

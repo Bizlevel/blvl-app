@@ -48,6 +48,7 @@ Future<void> main() async {
   await Hive.openBox('goals');
   await Hive.openBox('weekly_progress');
   await Hive.openBox('quotes');
+  await Hive.openBox('gp');
 
   // Инициализация таймзон и локальных уведомлений (MVP)
   try {
