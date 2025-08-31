@@ -5,12 +5,16 @@ import 'package:bizlevel/widgets/custom_image.dart';
 import 'package:bizlevel/providers/gp_providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:go_router/go_router.dart';
 
 /// Универсальный бар с аватаром, именем пользователя
 /// и подписью «Ты на N уровне!».
 /// Используется в нескольких экранах (карта уровней, профиль и др.).
 class UserInfoBar extends ConsumerWidget {
-  const UserInfoBar({super.key});
+  const UserInfoBar({super.key, this.showGp = true});
+
+  final bool showGp;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -93,21 +97,31 @@ class UserInfoBar extends ConsumerWidget {
           ],
         ),
         const SizedBox(width: 12),
-        if (gpBalance != null)
-          Row(
-            children: [
-              const Icon(Icons.change_circle_outlined,
-                  color: AppColor.textColor, size: 18),
-              const SizedBox(width: 4),
-              Text(
-                '${gpBalance} GP',
-                style: const TextStyle(
-                  color: AppColor.textColor,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
+        if (showGp && gpBalance != null)
+          InkWell(
+            onTap: () {
+              try {
+                if (context.mounted) context.go('/gp-store');
+              } catch (_) {}
+            },
+            child: Row(
+              children: [
+                SvgPicture.asset(
+                  'assets/images/gp_coin.svg',
+                  width: 36,
+                  height: 36,
                 ),
-              ),
-            ],
+                const SizedBox(width: 8),
+                Text(
+                  '$gpBalance',
+                  style: const TextStyle(
+                    color: Color.fromARGB(255, 56, 56, 56),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 16,
+                  ),
+                ),
+              ],
+            ),
           ),
       ],
     );

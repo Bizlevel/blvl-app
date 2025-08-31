@@ -145,7 +145,8 @@ class AuthService {
             .single();
         final hasName = ((row['name'] as String?)?.trim().isNotEmpty ?? false);
         final hasGoal = ((row['goal'] as String?)?.trim().isNotEmpty ?? false);
-        final hasAbout = ((row['about'] as String?)?.trim().isNotEmpty ?? false);
+        final hasAbout =
+            ((row['about'] as String?)?.trim().isNotEmpty ?? false);
         final hasAvatar = (row['avatar_id'] as int?) != null;
         if (hasName && hasGoal && hasAbout && hasAvatar) {
           final gp = GpService(_client);

@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:bizlevel/providers/gp_providers.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bizlevel/services/gp_service.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 part 'tower/tower_constants.dart';
 part 'tower/tower_helpers.dart';
@@ -76,7 +77,7 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
             SizedBox(height: 2),
             Text(
               'Этаж 1: База предпринимательства',
-              style: TextStyle(fontSize: 12, color: Colors.black54),
+              style: TextStyle(fontSize: 12, color: Color.fromARGB(137, 42, 42, 42)),
             ),
           ],
         ),
@@ -97,10 +98,14 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
                   },
                   child: Row(
                     children: [
-                      const Icon(Icons.change_circle_outlined, size: 18),
-                      const SizedBox(width: 4),
-                      Text('${balance} GP',
-                          style: const TextStyle(fontWeight: FontWeight.w600)),
+                      SvgPicture.asset('assets/images/gp_coin.svg',
+                          width: 36, height: 36),
+                      const SizedBox(width: 8),
+                      Text('$balance',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 28,
+                          )),
                     ],
                   ),
                 ),
@@ -159,9 +164,9 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
                   right: 24,
                   child: Row(
                     children: [
-                      Container(width: 2, color: Colors.black26),
+                      Container(width: 3, color: Colors.black26),
                       const Spacer(),
-                      Container(width: 2, color: Colors.black26),
+                      Container(width: 3, color: Colors.black26),
                     ],
                   ),
                 ),

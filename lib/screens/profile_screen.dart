@@ -740,9 +740,45 @@ class _BodyState extends ConsumerState<_Body> {
         ),
         const SizedBox(width: AppSpacing.small),
         Expanded(
-          child: StatCard(
-            title: "${widget.messagesLeft} Growth Points (GP)",
-            icon: Icons.change_circle_outlined,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () {
+              try {
+                if (context.mounted) context.go('/gp-store');
+              } catch (_) {}
+            },
+            child: Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColor.shadowColor.withValues(alpha: 0.1),
+                    spreadRadius: 1,
+                    blurRadius: 3,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SvgPicture.asset('assets/images/gp_coin.svg',
+                      width: 40, height: 40),
+                  const SizedBox(width: 12),
+                  Text(
+                    '${widget.messagesLeft}',
+                    style: const TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w600,
+                      color: AppColor.primary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
         const SizedBox(width: AppSpacing.small),

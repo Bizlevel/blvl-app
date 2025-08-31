@@ -12,5 +12,3 @@ void main() {
     expect(read['total_spent'], 38);
   });
 }
-
-
