@@ -24,14 +24,13 @@ final gpBalanceProvider = FutureProvider<Map<String, int>>((ref) async {
   // мгновенно отдаём кеш, если есть
   final cached = GpService.readBalanceCache();
   if (cached != null) {
-    // Параллельно обновим в фоне (только если есть сессия)
+    // Параллельно обновим в фоне (только если есть сессия), без бесконечной инвалидации
     if (Supabase.instance.client.auth.currentSession != null) {
       Future.microtask(() async {
         try {
           final fresh = await ref.read(gpServiceProvider).getBalance();
           await GpService.saveBalanceCache(fresh);
-          // ignore: unused_result
-          ref.invalidateSelf();
+          // Инвалидация выполняется из мест изменения баланса (списание/покупка/бонус)
         } catch (_) {}
       });
     }

@@ -220,7 +220,10 @@ class LeoService {
                   message: 'gp_spend_skipped',
                   category: 'gp',
                   level: SentryLevel.info,
-                  data: {'reason': 'kDisableGpSpendInChat=true', 'chatId': chatId ?? 'new'},
+                  data: {
+                    'reason': 'kDisableGpSpendInChat=true',
+                    'chatId': chatId ?? 'new'
+                  },
                 ));
               } catch (_) {}
             }

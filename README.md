@@ -57,6 +57,23 @@ supabase/
 - Core‑операции (баланс, списание, открытие этажа, бонусы) переведены на Postgres RPC: `gp_balance`, `gp_spend`, `gp_floor_unlock`, `gp_bonus_claim`.
 - Edge‑маршруты `/gp-balance`, `/gp-spend`, `/gp-floor-unlock`, `/gp-bonus-claim` помечены как deprecated и используются только как dev‑fallback.
 - Покупки GP остаются на Edge: `/gp-purchase-init`, `/gp-purchase-verify`.
+ 
+### GP: ошибки и идемпотентность
+
+- Ошибки ядра:
+  - `gp_insufficient_balance`: недостаточно GP для операции (клиент показывает дружелюбное сообщение).
+  - `gp_invalid_package`: неверный пакет при инициации покупки.
+  - `gp_purchase_not_found`: покупка не найдена при верификации.
+- Идемпотентность:
+  - Списание за сообщение: `Idempotency-Key = msg:<user_id>:<chat_id|new>:<hash(content)>`.
+  - Бонус: `bonus:<rule_key>:<user_id>` (на стороне RPC один раз на правило).
+  - Покупка: `purchase:<purchase_id>` (verify повторяем безопасно).
+  - Открытие этажа: клиентский `Idempotency-Key` пробрасывается в RPC `gp_floor_unlock`.
+
+### Бонусы: точки вызова
+- `signup_bonus` — при первом успешном входе.
+- `profile_completed` — после заполнения профиля (name/goal/about/avatar_id).
+- Другие бонусы подключаются клиентом через `GpService.claimBonus(ruleKey)`.
   migrations/     – SQL-миграции схемы и безопасные функции
 ```
 

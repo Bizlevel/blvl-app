@@ -194,8 +194,9 @@ class GpService {
             'provider': provider,
           }),
           options: Options(headers: {
-            'Authorization': 'Bearer ${session.accessToken}',
+            'Authorization': 'Bearer ${envOrDefine('SUPABASE_ANON_KEY')}',
             'apikey': envOrDefine('SUPABASE_ANON_KEY'),
+            'x-user-jwt': session.accessToken,
             'Content-Type': 'application/json',
           }));
       if (resp.statusCode == 200 && resp.data is Map<String, dynamic>) {
@@ -237,8 +238,9 @@ class GpService {
       final resp = await _edgeDio.post('/gp-purchase-verify',
           data: jsonEncode({'purchase_id': purchaseId}),
           options: Options(headers: {
-            'Authorization': 'Bearer ${session.accessToken}',
+            'Authorization': 'Bearer ${envOrDefine('SUPABASE_ANON_KEY')}',
             'apikey': envOrDefine('SUPABASE_ANON_KEY'),
+            'x-user-jwt': session.accessToken,
             'Content-Type': 'application/json',
           }));
       if (resp.statusCode == 200 && resp.data is Map<String, dynamic>) {
