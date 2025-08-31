@@ -158,6 +158,16 @@ class GpService {
         }
         final msg = e.message.toString();
         if (msg.contains('gp_insufficient_balance')) {
+          try {
+            await Sentry.addBreadcrumb(Breadcrumb(
+              message: 'gp_insufficient',
+              level: SentryLevel.warning,
+              data: {
+                'type': type,
+                'amount': amount,
+              },
+            ));
+          } catch (_) {}
           throw GpFailure('Недостаточно GP');
         }
         await _capture(e);
@@ -297,6 +307,13 @@ class GpService {
       }
       final msg = e.message.toString();
       if (msg.contains('gp_insufficient_balance')) {
+        try {
+          await Sentry.addBreadcrumb(Breadcrumb(
+            message: 'gp_insufficient',
+            level: SentryLevel.warning,
+            data: {'type': 'spend_floor', 'amount': 1000, 'floor': floorNumber},
+          ));
+        } catch (_) {}
         throw GpFailure('Недостаточно GP');
       }
       await _capture(e);

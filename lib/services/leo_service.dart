@@ -79,6 +79,13 @@ class LeoService {
           });
         } on GpFailure catch (ge) {
           if (ge.message.contains('Недостаточно GP')) {
+            try {
+              await Sentry.addBreadcrumb(Breadcrumb(
+                message: 'gp_insufficient',
+                level: SentryLevel.warning,
+                data: {'where': 'leo_sendMessage'},
+              ));
+            } catch (_) {}
             throw LeoFailure('Недостаточно GP');
           }
           rethrow;
@@ -197,6 +204,13 @@ class LeoService {
           }
         } on GpFailure catch (ge) {
           if (ge.message.contains('Недостаточно GP')) {
+            try {
+              await Sentry.addBreadcrumb(Breadcrumb(
+                message: 'gp_insufficient',
+                level: SentryLevel.warning,
+                data: {'where': 'leo_sendMessageWithRAG', 'chatId': chatId ?? 'new'},
+              ));
+            } catch (_) {}
             throw LeoFailure('Недостаточно GP');
           }
           rethrow;
