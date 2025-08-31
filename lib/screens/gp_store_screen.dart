@@ -4,6 +4,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:bizlevel/providers/gp_providers.dart';
 import 'package:bizlevel/services/gp_service.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 
 class GpStoreScreen extends ConsumerWidget {
   const GpStoreScreen({super.key});
@@ -33,55 +35,37 @@ class GpStoreScreen extends ConsumerWidget {
           Center(
             child: ElevatedButton.icon(
               onPressed: () async {
-                // Пример: пользователь вводит purchase_id после возврата из оплаты
-                // Для MVP попросим вставить purchase_id вручную (или сохранить его в состоянии приложения)
-                final idController = TextEditingController();
-                final ctx = context;
-                await showDialog<void>(
-                  context: ctx,
-                  builder: (dCtx) {
-                    return AlertDialog(
-                      title: const Text('Проверить покупку'),
-                      content: TextField(
-                        controller: idController,
-                        decoration: const InputDecoration(
-                          hintText: 'Вставьте purchase_id',
-                        ),
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.of(dCtx).pop(),
-                          child: const Text('Отмена'),
-                        ),
-                        TextButton(
-                          onPressed: () async {
-                            Navigator.of(dCtx).pop();
-                            try {
-                              final gp = GpService(Supabase.instance.client);
-                              await gp.verifyPurchase(
-                                  purchaseId: idController.text.trim());
-                              if (!ctx.mounted) return;
-                              ScaffoldMessenger.of(ctx).showSnackBar(
-                                const SnackBar(
-                                    content: Text('Покупка подтверждена')),
-                              );
-                              // Инвалидация баланса
-                              final container = ProviderScope.containerOf(ctx);
-                              container.invalidate(gpBalanceProvider);
-                            } catch (_) {
-                              if (!ctx.mounted) return;
-                              ScaffoldMessenger.of(ctx).showSnackBar(
-                                const SnackBar(
-                                    content: Text('Не удалось подтвердить')),
-                              );
-                            }
-                          },
-                          child: const Text('Проверить'),
-                        ),
-                      ],
+                // Автоматическая проверка последней покупки (без ввода вручную)
+                try {
+                  final box = Hive.box('gp');
+                  final lastId = (box.get('last_purchase_id') as String?) ?? '';
+                  if (lastId.isEmpty) {
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Нет активной покупки для проверки')),
                     );
-                  },
-                );
+                    return;
+                  }
+                  await Sentry.addBreadcrumb(Breadcrumb(
+                    message: 'gp_purchase_verify_click',
+                    level: SentryLevel.info,
+                    data: {'purchase_id': lastId.substring(0, lastId.length.clamp(0, 8))},
+                  ));
+                  final gp = GpService(Supabase.instance.client);
+                  final balance = await gp.verifyPurchase(purchaseId: lastId);
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Покупка подтверждена, баланс: $balance')),
+                  );
+                  // Инвалидация баланса
+                  final container = ProviderScope.containerOf(context);
+                  container.invalidate(gpBalanceProvider);
+                } catch (_) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Не удалось подтвердить')),
+                  );
+                }
               },
               icon: const Icon(Icons.verified),
               label: const Text('Проверить покупку'),

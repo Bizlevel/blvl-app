@@ -190,6 +190,13 @@ class GpService {
           }));
       if (resp.statusCode == 200 && resp.data is Map<String, dynamic>) {
         final m = Map<String, dynamic>.from(resp.data);
+        // Сохраним purchase_id локально для кнопки «Проверить покупку»
+        try {
+          if (m['purchase_id'] != null) {
+            final box = Hive.box(_boxName);
+            await box.put('last_purchase_id', m['purchase_id'].toString());
+          }
+        } catch (_) {}
         return {
           'payment_url':
               (m['payment_url'] as String?) ?? (m['url'] as String? ?? ''),
