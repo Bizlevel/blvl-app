@@ -6,6 +6,7 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bizlevel/utils/env_helper.dart';
 import 'package:bizlevel/services/gp_service.dart';
+import 'package:bizlevel/utils/constant.dart';
 
 /// Typed failure for any Leo related errors.
 class LeoFailure implements Exception {
@@ -53,9 +54,8 @@ class LeoService {
 
     // Используем только Edge Function
     // print('🔧 DEBUG: Using Edge Function');
-    // Списываем 1 GP за сообщение (идемпотентно)
+    // Списываем 1 GP за сообщение (идемпотентно), если не включён аварийный флаг
     final gp = GpService(_client);
-    // Стабильный idempotencyKey на время одной отправки (без timestamp)
     final String idempotencyKey = _generateIdempotencyKey(
       userId: session.user.id,
       chatId: null,
@@ -65,18 +65,30 @@ class LeoService {
     return _withRetry(() async {
       try {
         try {
-          await gp.spend(
-            type: 'spend_message',
-            amount: 1,
-            idempotencyKey: idempotencyKey,
-          );
-          // Обновим кеш баланса в фоне
-          Future.microtask(() async {
+          if (!kDisableGpSpendInChat) {
+            await gp.spend(
+              type: 'spend_message',
+              amount: 1,
+              idempotencyKey: idempotencyKey,
+            );
+            // Обновим кеш баланса в фоне
+            Future.microtask(() async {
+              try {
+                final fresh = await gp.getBalance();
+                await GpService.saveBalanceCache(fresh);
+              } catch (_) {}
+            });
+          } else {
+            // Breadcrumb для наблюдаемости rollback-режима
             try {
-              final fresh = await gp.getBalance();
-              await GpService.saveBalanceCache(fresh);
+              await Sentry.addBreadcrumb(Breadcrumb(
+                message: 'gp_spend_skipped',
+                category: 'gp',
+                level: SentryLevel.info,
+                data: {'reason': 'kDisableGpSpendInChat=true'},
+              ));
             } catch (_) {}
-          });
+          }
         } on GpFailure catch (ge) {
           if (ge.message.contains('Недостаточно GP')) {
             try {
@@ -175,7 +187,7 @@ class LeoService {
         '🔧 DEBUG: JWT начинается с = ${session.accessToken.substring(0, 20)}...');
     print('🔧 DEBUG: chatId = $chatId'); // Добавляем логирование chatId
 
-    // Списываем 1 GP за сообщение (идемпотентно)
+    // Списываем 1 GP за сообщение (идемпотентно), если не включён аварийный флаг
     final gp = GpService(_client);
     final String idempotencyKey = _generateIdempotencyKey(
       userId: session.user.id,
@@ -188,19 +200,30 @@ class LeoService {
       try {
         try {
           if (!skipSpend) {
-            await gp.spend(
-              type: 'spend_message',
-              amount: 1,
-              referenceId: chatId ?? '',
-              idempotencyKey: idempotencyKey,
-            );
-            // Обновим кеш баланса в фоне
-            Future.microtask(() async {
+            if (!kDisableGpSpendInChat) {
+              await gp.spend(
+                type: 'spend_message',
+                amount: 1,
+                referenceId: chatId ?? '',
+                idempotencyKey: idempotencyKey,
+              );
+              // Обновим кеш баланса в фоне
+              Future.microtask(() async {
+                try {
+                  final fresh = await gp.getBalance();
+                  await GpService.saveBalanceCache(fresh);
+                } catch (_) {}
+              });
+            } else {
               try {
-                final fresh = await gp.getBalance();
-                await GpService.saveBalanceCache(fresh);
+                await Sentry.addBreadcrumb(Breadcrumb(
+                  message: 'gp_spend_skipped',
+                  category: 'gp',
+                  level: SentryLevel.info,
+                  data: {'reason': 'kDisableGpSpendInChat=true', 'chatId': chatId ?? 'new'},
+                ));
               } catch (_) {}
-            });
+            }
           }
         } on GpFailure catch (ge) {
           if (ge.message.contains('Недостаточно GP')) {
@@ -208,7 +231,10 @@ class LeoService {
               await Sentry.addBreadcrumb(Breadcrumb(
                 message: 'gp_insufficient',
                 level: SentryLevel.warning,
-                data: {'where': 'leo_sendMessageWithRAG', 'chatId': chatId ?? 'new'},
+                data: {
+                  'where': 'leo_sendMessageWithRAG',
+                  'chatId': chatId ?? 'new'
+                },
               ));
             } catch (_) {}
             throw LeoFailure('Недостаточно GP');
