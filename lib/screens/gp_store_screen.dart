@@ -117,11 +117,34 @@ class _GpPackTile extends StatelessWidget {
               final gp = GpService(Supabase.instance.client);
               final init =
                   await gp.initPurchase(packageId: packageId, provider: 'epay');
-              final url = Uri.parse(init['payment_url'] ?? '');
-              if (await canLaunchUrl(url)) {
+              final urlStr = init['payment_url'] ?? '';
+              final purchaseId = init['purchase_id'] ?? '';
+              final url = Uri.tryParse(urlStr);
+
+              // ТЕСТОВЫЙ РЕЖИМ (без провайдера): если вернулся mock-хост,
+              // сразу выполняем verify для сквозной проверки флоу без банка.
+              final isMock = url != null && url.host.contains('payments.example.com');
+              if (isMock && purchaseId.isNotEmpty) {
+                try {
+                  final balance = await gp.verifyPurchase(purchaseId: purchaseId);
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Покупка подтверждена (тест), баланс: $balance')),
+                  );
+                  // Инвалидация баланса
+                  final container = ProviderScope.containerOf(context);
+                  container.invalidate(gpBalanceProvider);
+                  return;
+                } catch (_) {
+                  // Падаем в обычный путь ниже
+                }
+              }
+
+              // ПРОД‑РЕЖИМ/ОБЫЧНЫЙ: открываем URL оплаты, дальше пользователь
+              // может вернуться и нажать «Проверить покупку».
+              if (url != null && await canLaunchUrl(url)) {
                 await launchUrl(url, mode: LaunchMode.externalApplication);
               }
-              // После возврата в приложение пользователь должен нажать «Проверить»
               if (!context.mounted) return;
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(

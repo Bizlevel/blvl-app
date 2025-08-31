@@ -544,3 +544,4 @@ UI: на странице «Чат» карточки выбора бота по
 Задача 39-fix-3: Визуал GP обновлён: добавлена иконка gp_coin.svg и баланс на главной (UserInfoBar), в AppBar башни и в Профиле; по нажатию переход в /gp-store. Лишние подписи "GP" убраны, использован единый стиль.
 Задача 39-fix-4: Увеличены размер монеты и цифры (×2) в UserInfoBar, Башне и Профиле. На главной улице верхняя панель выровнена: аватар/имя слева, GP справа. 
 эЗадача 40.1 fix: Привёл EXECUTE у RPC gp_balance/gp_spend/gp_floor_unlock/gp_bonus_claim/gp_purchase_verify к authenticated-only; anon/public сняты. Индексы gp_ledger (idempotency_key и user_id+created_at) подтверждены. SECURITY DEFINER и search_path=public на месте. Advisors: без критичных замечаний по GP.
+эЗадача 40.2 fix: Магазин GP — добавлен тестовый режим без провайдера: при mock URL выполняется мгновенный verify по purchase_id; обычный флоу без изменений. Баланс инвалидацируется, UX сообщений обновлён. Контракты и чат не затронуты.
