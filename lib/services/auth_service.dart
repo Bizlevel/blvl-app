@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:bizlevel/services/gp_service.dart';
 
 // No longer importing SupabaseService directly to enable dependency injection.
 
@@ -52,6 +53,16 @@ class AuthService {
         Sentry.configureScope((scope) {
           scope.setUser(SentryUser(id: user.id, email: user.email));
         });
+        // Бонус за первый вход: идемпотентно, ошибки не пробрасываем
+        try {
+          final gp = GpService(_client);
+          await gp.claimBonus(ruleKey: 'signup_bonus');
+          // Обновим кеш баланса в фоне
+          try {
+            final fresh = await gp.getBalance();
+            await GpService.saveBalanceCache(fresh);
+          } catch (_) {}
+        } catch (_) {}
       }
       return response;
     }, unknownErrorMessage: 'Неизвестная ошибка входа');
@@ -125,6 +136,26 @@ class AuthService {
       }
 
       await _client.from('users').upsert(payload);
+      // Попытка выдать бонус за заполненный профиль (идемпотентно)
+      try {
+        final row = await _client
+            .from('users')
+            .select('name, goal, about, avatar_id')
+            .eq('id', user.id)
+            .single();
+        final hasName = ((row['name'] as String?)?.trim().isNotEmpty ?? false);
+        final hasGoal = ((row['goal'] as String?)?.trim().isNotEmpty ?? false);
+        final hasAbout = ((row['about'] as String?)?.trim().isNotEmpty ?? false);
+        final hasAvatar = (row['avatar_id'] as int?) != null;
+        if (hasName && hasGoal && hasAbout && hasAvatar) {
+          final gp = GpService(_client);
+          await gp.claimBonus(ruleKey: 'profile_completed');
+          try {
+            final fresh = await gp.getBalance();
+            await GpService.saveBalanceCache(fresh);
+          } catch (_) {}
+        }
+      } catch (_) {}
     }, unknownErrorMessage: 'Не удалось сохранить профиль');
   }
 

@@ -123,13 +123,17 @@ class _GpPackTile extends StatelessWidget {
 
               // ТЕСТОВЫЙ РЕЖИМ (без провайдера): если вернулся mock-хост,
               // сразу выполняем verify для сквозной проверки флоу без банка.
-              final isMock = url != null && url.host.contains('payments.example.com');
+              final isMock =
+                  url != null && url.host.contains('payments.example.com');
               if (isMock && purchaseId.isNotEmpty) {
                 try {
-                  final balance = await gp.verifyPurchase(purchaseId: purchaseId);
+                  final balance =
+                      await gp.verifyPurchase(purchaseId: purchaseId);
                   if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Покупка подтверждена (тест), баланс: $balance')),
+                    SnackBar(
+                        content: Text(
+                            'Покупка подтверждена (тест), баланс: $balance')),
                   );
                   // Инвалидация баланса
                   final container = ProviderScope.containerOf(context);
