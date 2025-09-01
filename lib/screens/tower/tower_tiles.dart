@@ -137,11 +137,7 @@ class _LevelNodeTile extends StatelessWidget {
                       content:
                           const Text('Стоимость: 1000 GP. Открыть доступ?'),
                       actions: [
-                        TextButton(
-                          onPressed: () => Navigator.of(ctx).pop(),
-                          child: const Text('Отмена'),
-                        ),
-                        TextButton(
+                        FilledButton(
                           onPressed: () async {
                             Navigator.of(ctx).pop();
                             try {
@@ -161,17 +157,31 @@ class _LevelNodeTile extends StatelessWidget {
                                 final fresh = await gp.getBalance();
                                 await GpService.saveBalanceCache(fresh);
                               } catch (_) {}
-                              // ignore: use_build_context_synchronously
                               if (!context.mounted) return;
                               final container =
                                   ProviderScope.containerOf(context);
                               container.invalidate(levelsProvider);
                               container.invalidate(towerNodesProvider);
+                              container.invalidate(gpBalanceProvider);
                             } on GpFailure catch (e) {
                               if (!context.mounted) return;
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text(e.message)),
-                              );
+                              if (e.message.contains('Недостаточно GP')) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: const Text('Недостаточно GP'),
+                                    action: SnackBarAction(
+                                      label: 'Купить GP',
+                                      onPressed: () {
+                                        context.push('/gp-store');
+                                      },
+                                    ),
+                                  ),
+                                );
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text(e.message)),
+                                );
+                              }
                             } catch (e) {
                               if (!context.mounted) return;
                               ScaffoldMessenger.of(context).showSnackBar(
@@ -180,7 +190,7 @@ class _LevelNodeTile extends StatelessWidget {
                               );
                             }
                           },
-                          child: const Text('Открыть'),
+                          child: const Text('1000 GP'),
                         ),
                       ],
                     );
@@ -261,6 +271,103 @@ class _LevelNodeTile extends StatelessWidget {
                   ],
                 ),
               ),
+              if (levelNumber == 4 && isLocked && !blockedByCheckpoint)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      side:
+                          const BorderSide(color: AppColor.primary, width: 1.5),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                    ),
+                    onPressed: () {
+                      try {
+                        showDialog(
+                          context: context,
+                          builder: (ctx) {
+                            return AlertDialog(
+                              title: const Text('Открыть этаж'),
+                              content: const Text(
+                                  'Стоимость: 1000 GP. Открыть доступ?'),
+                              actions: [
+                                FilledButton(
+                                  onPressed: () async {
+                                    Navigator.of(ctx).pop();
+                                    try {
+                                      final gp =
+                                          GpService(Supabase.instance.client);
+                                      final userId = Supabase.instance.client
+                                              .auth.currentUser?.id ??
+                                          'anon';
+                                      final idem = 'floor:' + userId + ':1';
+                                      await gp.unlockFloor(
+                                          floorNumber: 1, idempotencyKey: idem);
+                                      if (!context.mounted) return;
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        const SnackBar(
+                                            content: Text('Этаж открыт')),
+                                      );
+                                      try {
+                                        final fresh = await gp.getBalance();
+                                        await GpService.saveBalanceCache(fresh);
+                                      } catch (_) {}
+                                      if (!context.mounted) return;
+                                      final container =
+                                          ProviderScope.containerOf(context);
+                                      container.invalidate(levelsProvider);
+                                      container.invalidate(towerNodesProvider);
+                                      container.invalidate(gpBalanceProvider);
+                                    } on GpFailure catch (e) {
+                                      if (!context.mounted) return;
+                                      if (e.message
+                                          .contains('Недостаточно GP')) {
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          SnackBar(
+                                            content:
+                                                const Text('Недостаточно GP'),
+                                            action: SnackBarAction(
+                                              label: 'Купить GP',
+                                              onPressed: () {
+                                                context.push('/gp-store');
+                                              },
+                                            ),
+                                          ),
+                                        );
+                                      } else {
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          SnackBar(content: Text(e.message)),
+                                        );
+                                      }
+                                    } catch (e) {
+                                      if (!context.mounted) return;
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        const SnackBar(
+                                            content: Text(
+                                                'Не удалось открыть этаж')),
+                                      );
+                                    }
+                                  },
+                                  child: const Text('1000 GP'),
+                                ),
+                              ],
+                            );
+                          },
+                        );
+                      } catch (e, st) {
+                        _captureError(e, st);
+                      }
+                    },
+                    child: const Text('Получить полный доступ к этажу'),
+                  ),
+                ),
             ],
           ),
         ),

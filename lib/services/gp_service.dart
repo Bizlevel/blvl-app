@@ -267,10 +267,33 @@ class GpService {
     final session = _client.auth.currentSession;
     if (session == null) throw GpFailure('Не авторизован');
     try {
-      final data = await _client.rpc('gp_floor_unlock', params: {
-        'p_floor': floorNumber,
+      // Переход на модель пакетов: покупка пакета доступа к этажу
+      final packageCode = 'FLOOR_${floorNumber}';
+      final data = await _client.rpc('gp_package_buy', params: {
+        'p_package_code': packageCode,
         'p_idempotency_key': idempotencyKey,
       });
+      // Поддерживаем оба формата ответа: record {balance_after} и скалярный int
+      if (data is num) {
+        try {
+          await Sentry.addBreadcrumb(Breadcrumb(
+            message: 'gp_floor_unlocked',
+            level: SentryLevel.info,
+            data: {'floor': floorNumber},
+          ));
+        } catch (_) {}
+        return data.toInt();
+      }
+      if (data is List && data.isNotEmpty && data.first is num) {
+        try {
+          await Sentry.addBreadcrumb(Breadcrumb(
+            message: 'gp_floor_unlocked',
+            level: SentryLevel.info,
+            data: {'floor': floorNumber},
+          ));
+        } catch (_) {}
+        return (data.first as num).toInt();
+      }
       Map<String, dynamic>? row;
       if (data is List && data.isNotEmpty && data.first is Map) {
         row = Map<String, dynamic>.from(data.first as Map);
@@ -293,6 +316,7 @@ class GpService {
         try {
           final session = _client.auth.currentSession;
           if (session == null) throw GpFailure('Не авторизован');
+          // Дев-фолбэк: старый edge эндпоинт
           final resp = await _edgeDio.post('/gp-floor-unlock',
               data: jsonEncode({'floor_number': floorNumber}),
               options: Options(headers: {
