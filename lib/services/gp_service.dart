@@ -35,12 +35,7 @@ class GpService {
         final session = _client.auth.currentSession;
         if (session == null) throw GpFailure('Не авторизован');
         final data = await _client.rpc('gp_balance');
-        Map<String, dynamic>? row;
-        if (data is List && data.isNotEmpty && data.first is Map) {
-          row = Map<String, dynamic>.from(data.first as Map);
-        } else if (data is Map) {
-          row = Map<String, dynamic>.from(data);
-        }
+        final row = _asRow(data);
         if (row != null) {
           try {
             await Sentry.addBreadcrumb(Breadcrumb(
@@ -64,11 +59,15 @@ class GpService {
           try {
             final session = _client.auth.currentSession;
             if (session == null) throw GpFailure('Не авторизован');
-            final resp = await _edgeDio.get('/gp-balance',
-                options: Options(headers: {
-                  'Authorization': 'Bearer ${session.accessToken}',
-                  'apikey': envOrDefine('SUPABASE_ANON_KEY'),
-                }));
+            final resp = await _edgeDio.get(
+              '/gp-balance',
+              options: Options(
+                headers: _edgeHeaders(
+                  authorization: 'Bearer ${session.accessToken}',
+                  apikey: envOrDefine('SUPABASE_ANON_KEY'),
+                ),
+              ),
+            );
             if (resp.statusCode == 200 && resp.data is Map<String, dynamic>) {
               final m = Map<String, dynamic>.from(resp.data);
               return {
@@ -107,12 +106,7 @@ class GpService {
           'p_idempotency_key': idempotencyKey ?? '',
         };
         final data = await _client.rpc('gp_spend', params: params);
-        Map<String, dynamic>? row;
-        if (data is List && data.isNotEmpty && data.first is Map) {
-          row = Map<String, dynamic>.from(data.first as Map);
-        } else if (data is Map) {
-          row = Map<String, dynamic>.from(data);
-        }
+        final row = _asRow(data);
         if (row != null) {
           try {
             await Sentry.addBreadcrumb(Breadcrumb(
@@ -132,19 +126,21 @@ class GpService {
           try {
             final session = _client.auth.currentSession;
             if (session == null) throw GpFailure('Не авторизован');
-            final resp = await _edgeDio.post('/gp-spend',
-                data: jsonEncode({
-                  'type': type,
-                  'amount': amount,
-                  'reference_id': referenceId,
-                }),
-                options: Options(headers: {
-                  'Authorization': 'Bearer ${session.accessToken}',
-                  'apikey': envOrDefine('SUPABASE_ANON_KEY'),
-                  if ((idempotencyKey ?? '').isNotEmpty)
-                    'Idempotency-Key': idempotencyKey,
-                  'Content-Type': 'application/json',
-                }));
+            final resp = await _edgeDio.post(
+              '/gp-spend',
+              data: jsonEncode({
+                'type': type,
+                'amount': amount,
+                'reference_id': referenceId,
+              }),
+              options: Options(
+                headers: _edgeHeaders(
+                  authorization: 'Bearer ${session.accessToken}',
+                  apikey: envOrDefine('SUPABASE_ANON_KEY'),
+                  idempotencyKey: idempotencyKey,
+                ),
+              ),
+            );
             if (resp.statusCode == 200 && resp.data is Map<String, dynamic>) {
               final m = Map<String, dynamic>.from(resp.data);
               return (m['balance_after'] as num?)?.toInt() ?? 0;
@@ -152,23 +148,19 @@ class GpService {
           } on DioException catch (de) {
             final data = de.response?.data;
             if (data is Map && data['error'] == 'gp_insufficient_balance') {
-              throw GpFailure('Недостаточно GP');
+              _throwInsufficientBalanceBreadcrumb(
+                source: 'spend',
+                extra: {'type': type, 'amount': amount},
+              );
             }
           } catch (_) {}
         }
         final msg = e.message.toString();
         if (msg.contains('gp_insufficient_balance')) {
-          try {
-            await Sentry.addBreadcrumb(Breadcrumb(
-              message: 'gp_insufficient',
-              level: SentryLevel.warning,
-              data: {
-                'type': type,
-                'amount': amount,
-              },
-            ));
-          } catch (_) {}
-          throw GpFailure('Недостаточно GP');
+          _throwInsufficientBalanceBreadcrumb(
+            source: 'spend',
+            extra: {'type': type, 'amount': amount},
+          );
         }
         await _capture(e);
         throw GpFailure('Ошибка сервера при списании GP');
@@ -268,13 +260,14 @@ class GpService {
     if (session == null) throw GpFailure('Не авторизован');
     try {
       // Переход на модель пакетов: покупка пакета доступа к этажу
-      final packageCode = 'FLOOR_${floorNumber}';
+      final packageCode = _packageCodeForFloor(floorNumber);
       final data = await _client.rpc('gp_package_buy', params: {
         'p_package_code': packageCode,
         'p_idempotency_key': idempotencyKey,
       });
       // Поддерживаем оба формата ответа: record {balance_after} и скалярный int
-      if (data is num) {
+      final scalar = _asFirstInt(data);
+      if (scalar != null) {
         try {
           await Sentry.addBreadcrumb(Breadcrumb(
             message: 'gp_floor_unlocked',
@@ -282,24 +275,9 @@ class GpService {
             data: {'floor': floorNumber},
           ));
         } catch (_) {}
-        return data.toInt();
+        return scalar;
       }
-      if (data is List && data.isNotEmpty && data.first is num) {
-        try {
-          await Sentry.addBreadcrumb(Breadcrumb(
-            message: 'gp_floor_unlocked',
-            level: SentryLevel.info,
-            data: {'floor': floorNumber},
-          ));
-        } catch (_) {}
-        return (data.first as num).toInt();
-      }
-      Map<String, dynamic>? row;
-      if (data is List && data.isNotEmpty && data.first is Map) {
-        row = Map<String, dynamic>.from(data.first as Map);
-      } else if (data is Map) {
-        row = Map<String, dynamic>.from(data);
-      }
+      final row = _asRow(data);
       if (row != null) {
         try {
           await Sentry.addBreadcrumb(Breadcrumb(
@@ -317,14 +295,17 @@ class GpService {
           final session = _client.auth.currentSession;
           if (session == null) throw GpFailure('Не авторизован');
           // Дев-фолбэк: старый edge эндпоинт
-          final resp = await _edgeDio.post('/gp-floor-unlock',
-              data: jsonEncode({'floor_number': floorNumber}),
-              options: Options(headers: {
-                'Authorization': 'Bearer ${session.accessToken}',
-                'apikey': envOrDefine('SUPABASE_ANON_KEY'),
-                'Content-Type': 'application/json',
-                'Idempotency-Key': idempotencyKey,
-              }));
+          final resp = await _edgeDio.post(
+            '/gp-floor-unlock',
+            data: jsonEncode({'floor_number': floorNumber}),
+            options: Options(
+              headers: _edgeHeaders(
+                authorization: 'Bearer ${session.accessToken}',
+                apikey: envOrDefine('SUPABASE_ANON_KEY'),
+                idempotencyKey: idempotencyKey,
+              ),
+            ),
+          );
           if (resp.statusCode == 200 && resp.data is Map<String, dynamic>) {
             final m = Map<String, dynamic>.from(resp.data);
             return (m['balance_after'] as num?)?.toInt() ?? 0;
@@ -333,14 +314,10 @@ class GpService {
       }
       final msg = e.message.toString();
       if (msg.contains('gp_insufficient_balance')) {
-        try {
-          await Sentry.addBreadcrumb(Breadcrumb(
-            message: 'gp_insufficient',
-            level: SentryLevel.warning,
-            data: {'type': 'spend_floor', 'amount': 1000, 'floor': floorNumber},
-          ));
-        } catch (_) {}
-        throw GpFailure('Недостаточно GP');
+        _throwInsufficientBalanceBreadcrumb(
+          source: 'unlock_floor',
+          extra: {'amount': 1000, 'floor': floorNumber},
+        );
       }
       await _capture(e);
       throw GpFailure('Ошибка сервера при открытии этажа');
@@ -359,12 +336,7 @@ class GpService {
       final data = await _client.rpc('gp_bonus_claim', params: {
         'p_rule_key': ruleKey,
       });
-      Map<String, dynamic>? row;
-      if (data is List && data.isNotEmpty && data.first is Map) {
-        row = Map<String, dynamic>.from(data.first as Map);
-      } else if (data is Map) {
-        row = Map<String, dynamic>.from(data);
-      }
+      final row = _asRow(data);
       if (row != null) {
         try {
           await Sentry.addBreadcrumb(Breadcrumb(
@@ -381,13 +353,16 @@ class GpService {
         try {
           final session = _client.auth.currentSession;
           if (session == null) throw GpFailure('Не авторизован');
-          final resp = await _edgeDio.post('/gp-bonus-claim',
-              data: jsonEncode({'rule_key': ruleKey}),
-              options: Options(headers: {
-                'Authorization': 'Bearer ${session.accessToken}',
-                'apikey': envOrDefine('SUPABASE_ANON_KEY'),
-                'Content-Type': 'application/json',
-              }));
+          final resp = await _edgeDio.post(
+            '/gp-bonus-claim',
+            data: jsonEncode({'rule_key': ruleKey}),
+            options: Options(
+              headers: _edgeHeaders(
+                authorization: 'Bearer ${session.accessToken}',
+                apikey: envOrDefine('SUPABASE_ANON_KEY'),
+              ),
+            ),
+          );
           if (resp.statusCode == 200 && resp.data is Map<String, dynamic>) {
             final m = Map<String, dynamic>.from(resp.data);
             return (m['balance_after'] as num?)?.toInt() ?? 0;
@@ -430,6 +405,66 @@ class GpService {
     try {
       await Sentry.captureException(e);
     } catch (_) {}
+  }
+
+  // ----------------- Internal helpers (unify parsing/headers/errors) -----------------
+
+  Map<String, dynamic>? _asRow(dynamic data) {
+    if (data is Map) {
+      return Map<String, dynamic>.from(data);
+    }
+    if (data is List && data.isNotEmpty) {
+      final first = data.first;
+      if (first is Map) {
+        return Map<String, dynamic>.from(first);
+      }
+    }
+    return null;
+  }
+
+  int? _asFirstInt(dynamic data) {
+    if (data is num) return data.toInt();
+    if (data is List && data.isNotEmpty && data.first is num) {
+      return (data.first as num).toInt();
+    }
+    return null;
+  }
+
+  Map<String, String> _edgeHeaders({
+    required String authorization,
+    required String apikey,
+    String? idempotencyKey,
+    String? xUserJwt,
+    bool json = true,
+  }) {
+    final headers = <String, String>{
+      'Authorization': authorization,
+      'apikey': apikey,
+    };
+    if (json) headers['Content-Type'] = 'application/json';
+    if (idempotencyKey != null && idempotencyKey.isNotEmpty) {
+      headers['Idempotency-Key'] = idempotencyKey;
+    }
+    if (xUserJwt != null && xUserJwt.isNotEmpty) {
+      headers['x-user-jwt'] = xUserJwt;
+    }
+    return headers;
+  }
+
+  String _packageCodeForFloor(int floorNumber) => 'FLOOR_$floorNumber';
+
+  Never _throwInsufficientBalanceBreadcrumb({
+    required String source,
+    Map<String, Object?> extra = const {},
+  }) {
+    try {
+      Sentry.addBreadcrumb(Breadcrumb(
+        message: 'gp_insufficient',
+        level: SentryLevel.warning,
+        data: {'source': source, ...extra},
+      ));
+    } catch (_) {}
+    throw GpFailure('Недостаточно GP');
   }
 
   // Helpers for local SWR cache

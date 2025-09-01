@@ -564,3 +564,13 @@ UI: на странице «Чат» карточки выбора бота по
 - RPC: создана `gp_package_buy(code, idempotency_key)` (TABLE(balance_after, granted, package_code), SECURITY DEFINER), EXECUTE для authenticated. Засидён пакет `FLOOR_1` (1000 GP).
 - Клиент: `GpService.unlockFloor` теперь вызывает `gp_package_buy('FLOOR_<n>')`. UI башни остаётся прежним; при покупке обновляются баланс и провайдеры уровней/башни.
 - Причина 42809 устранена обходом конфликтной RPC; дальнейший рефакторинг провайдеров доступа возможен через `user_packages`/`has_access`.
+
+
+# Этап 41 - Рефакторинг
+Задача 41.1: В `tower_tiles.dart` вынесены `_unlockFloor` и `_showUnlockFloorDialog`, устранено дублирование диалогов. Добавлены константы цены/этажа, конкатенации заменены на интерполяцию, `const` там, где возможно. Поведение экрана не изменено (навигация/UX прежние), обработка ошибок сохранена.
+`flutter analyze` без критичных ошибок; сборка/тесты без регрессий.
+Задача 41.2: В `GpService` добавлены приватные хелперы: `_asRow/_asFirstInt` (нормализация RPC-ответов), `_edgeHeaders` (заголовки Edge), `_packageCodeForFloor`, `_throwInsufficientBalanceBreadcrumb`. Применены точечно в `getBalance/spend/unlockFloor/claimBonus` без изменения публичного API и поведения. Убраны конкатенации/скобки в интерполяции. Линтер без критичных ошибок.
+Задача 41.4: В `env_helper.dart` исправлены линты: заменён док-комментарий на обычный, добавлены фигурные скобки для одиночного if. Логика чтения env не менялась, `flutter analyze` без критичных ошибок.
+Задача 41.5 fix: Удалён лишний импорт `flutter/widgets.dart` в `test/level_flow_test.dart` (все элементы уже доступны через `flutter/material.dart`). Остальной код теста не менялся.
+Задача 41.6 fix: Прогнан `flutter analyze` — критичных ошибок нет; предупреждения не затрагивают изменения 41.x. Запущены `flutter test` — часть тестов падает из-за существующих проблем (не связаны с 41.x). Наблюдение Sentry через breadcrumbs сохраняется, новых ошибок от правок 41.x не выявлено.
+Задача 41.7 fix: Документированы внутренние хелперы в `GpService` (`_asRow/_asFirstInt`, `_edgeHeaders`, `_packageCodeForFloor`, `_throwInsufficientBalanceBreadcrumb`) и реюз диалогов/разблокировки в `tower_tiles` (`_unlockFloor`, `_showUnlockFloorDialog`). Внешний API без изменений.

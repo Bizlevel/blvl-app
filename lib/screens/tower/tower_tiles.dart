@@ -1,5 +1,190 @@
 part of '../biz_tower_screen.dart';
 
+// Стоимость и номер пакета доступа к этажу (используются в диалогах разблокировки)
+const int _kFloorUnlockCost = 1000;
+const int _kTargetFloorNumber = 1;
+
+Future<void> _unlockFloor(BuildContext context,
+    {required int floorNumber}) async {
+  try {
+    final gp = GpService(Supabase.instance.client);
+    final userId = Supabase.instance.client.auth.currentUser?.id ?? 'anon';
+    final idem = 'floor:$userId:$floorNumber';
+    final _ =
+        await gp.unlockFloor(floorNumber: floorNumber, idempotencyKey: idem);
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Этаж открыт')),
+    );
+    // Обновим баланс и узлы башни
+    try {
+      final fresh = await gp.getBalance();
+      await GpService.saveBalanceCache(fresh);
+    } catch (_) {}
+    if (!context.mounted) return;
+    final container = ProviderScope.containerOf(context);
+    container.invalidate(levelsProvider);
+    container.invalidate(towerNodesProvider);
+    container.invalidate(gpBalanceProvider);
+  } on GpFailure catch (e) {
+    if (!context.mounted) return;
+    if (e.message.contains('Недостаточно GP')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Недостаточно GP'),
+          action: SnackBarAction(
+            label: 'Купить GP',
+            onPressed: () {
+              context.push('/gp-store');
+            },
+          ),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
+    }
+  } catch (e, st) {
+    _captureError(e, st);
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Не удалось открыть этаж')),
+    );
+  }
+}
+
+void _showUnlockFloorDialog(BuildContext context, {required int floorNumber}) {
+  showDialog(
+    context: context,
+    builder: (ctx) {
+      return AlertDialog(
+        title: const Text('Открыть этаж'),
+        content: Text('Стоимость: $_kFloorUnlockCost GP. Открыть доступ?'),
+        actions: [
+          FilledButton(
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              await _unlockFloor(context, floorNumber: floorNumber);
+            },
+            child: Text('$_kFloorUnlockCost GP'),
+          ),
+        ],
+      );
+    },
+  );
+}
+
+bool _shouldShowUnlockButton(
+    int levelNumber, bool isLocked, bool blockedByCheckpoint) {
+  return levelNumber == 4 && isLocked && !blockedByCheckpoint;
+}
+
+void _handleCheckpointTap(BuildContext context, Map<String, dynamic> node) {
+  try {
+    final prevDone = node.prevLevelCompleted;
+    if (!prevDone) {
+      if (!context.mounted) return;
+      _showBlockedSnackBar(context);
+      return;
+    }
+    final String type = node.nodeType;
+    final int? goalVersion = node.goalVersion;
+    final int? caseId = node.caseId;
+    if (type == 'mini_case' && caseId != null) {
+      if (!context.mounted) return;
+      context.push('/case/$caseId');
+    } else if (type == 'goal_checkpoint' && goalVersion != null) {
+      if (!context.mounted) return;
+      context.push('/goal-checkpoint/$goalVersion');
+    }
+  } catch (e, st) {
+    _captureError(e, st);
+  }
+}
+
+void _handleLevelTap(
+  BuildContext context, {
+  required int levelNumber,
+  required bool canOpen,
+  required bool blockedByCheckpoint,
+  required Map<String, dynamic> data,
+}) {
+  try {
+    _logBreadcrumb(
+        'tower.tap level=$levelNumber canOpen=$canOpen blockedByCheckpoint=$blockedByCheckpoint',
+        category: 'ui.tap');
+    if (!canOpen) {
+      if (blockedByCheckpoint) {
+        _showBlockedSnackBar(context);
+      } else {
+        _showUnlockFloorDialog(context, floorNumber: _kTargetFloorNumber);
+      }
+      return;
+    }
+    Future.microtask(() {
+      if (!context.mounted) return;
+      context.push('/levels/${data['id']}?num=$levelNumber');
+    });
+  } catch (e, st) {
+    _captureError(e, st);
+  }
+}
+
+Widget _buildLevelCoreTile({
+  required bool isCurrent,
+  required bool isCompleted,
+  required bool isLocked,
+}) {
+  return Container(
+    width: kNodeSize,
+    height: kNodeSize,
+    decoration: BoxDecoration(
+      color: AppColor.info,
+      borderRadius: BorderRadius.circular(kTileRadius),
+      border: Border.all(color: _darker(AppColor.info, 0.2), width: 4),
+      boxShadow: [
+        const BoxShadow(
+            color: Color(0x22000000), blurRadius: 10, offset: Offset(0, 6)),
+        BoxShadow(
+            color: Colors.black.withValues(alpha: 0.18),
+            blurRadius: 16,
+            spreadRadius: 2,
+            offset: const Offset(0, 8)),
+        if (isCurrent)
+          BoxShadow(
+              color: AppColor.premium.withValues(alpha: 0.55),
+              blurRadius: 18,
+              spreadRadius: 1,
+              offset: const Offset(0, 0)),
+      ],
+    ),
+    child: Stack(
+      children: [
+        Center(
+          child: Icon(
+            isCompleted
+                ? Icons.check
+                : (isLocked && !isCompleted ? Icons.lock : Icons.circle),
+            color: Colors.white,
+            size: kNodeSize * 0.7,
+          ),
+        ),
+        if (isCurrent)
+          const Positioned(
+            top: 6,
+            right: 6,
+            child: Icon(
+              Icons.star,
+              color: AppColor.premium,
+              size: 20,
+            ),
+          ),
+      ],
+    ),
+  );
+}
+
 class _CheckpointNodeTile extends StatelessWidget {
   final Map<String, dynamic> node;
   final double size;
@@ -12,7 +197,6 @@ class _CheckpointNodeTile extends StatelessWidget {
     final String type = node.nodeType;
     final bool isCompleted = node.nodeCompleted;
     final int after = node.afterLevel;
-    final int? caseId = node.caseId;
     final int? goalVersion = node.goalVersion;
 
     String label;
@@ -30,25 +214,7 @@ class _CheckpointNodeTile extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: () async {
-          try {
-            final prevDone = node.prevLevelCompleted;
-            if (!prevDone) {
-              if (!context.mounted) return;
-              _showBlockedSnackBar(context);
-              return;
-            }
-            if (type == 'mini_case' && caseId != null) {
-              if (!context.mounted) return;
-              context.push('/case/$caseId');
-            } else if (type == 'goal_checkpoint' && goalVersion != null) {
-              if (!context.mounted) return;
-              context.push('/goal-checkpoint/$goalVersion');
-            }
-          } catch (e, st) {
-            _captureError(e, st);
-          }
-        },
+        onTap: () => _handleCheckpointTap(context, node),
         child: Semantics(
           label: type == 'mini_case'
               ? 'Мини-кейс после уровня $after'
@@ -110,7 +276,6 @@ class _LevelNodeTile extends StatelessWidget {
     final bool isCurrent = data['isCurrent'] == true;
     final bool isLockedBase = data['isLocked'] == true;
     final bool isLocked = isLockedBase || blockedByCheckpoint;
-    final bool premiumLock = false; // Премиум-гейтинг снят (этап 39.1)
     final bool isCompleted = data['isCompleted'] == true;
 
     return Material(
@@ -118,95 +283,13 @@ class _LevelNodeTile extends StatelessWidget {
       child: InkWell(
         key: tileKey,
         borderRadius: BorderRadius.circular(12),
-        onTap: () {
-          try {
-            _logBreadcrumb(
-                'tower.tap level=$levelNumber locked=$isLocked completed=$isCompleted blockedByCheckpoint=$blockedByCheckpoint',
-                category: 'ui.tap');
-            final bool canOpen = isCompleted || !isLocked;
-            if (!canOpen) {
-              if (blockedByCheckpoint) {
-                _showBlockedSnackBar(context);
-              } else if (!premiumLock) {
-                // Предложить открыть этаж за GP (этап 39.7)
-                showDialog(
-                  context: context,
-                  builder: (ctx) {
-                    return AlertDialog(
-                      title: const Text('Открыть этаж'),
-                      content:
-                          const Text('Стоимость: 1000 GP. Открыть доступ?'),
-                      actions: [
-                        FilledButton(
-                          onPressed: () async {
-                            Navigator.of(ctx).pop();
-                            try {
-                              final gp = GpService(Supabase.instance.client);
-                              final userId = Supabase
-                                      .instance.client.auth.currentUser?.id ??
-                                  'anon';
-                              final idem = 'floor:' + userId + ':1';
-                              await gp.unlockFloor(
-                                  floorNumber: 1, idempotencyKey: idem);
-                              if (!context.mounted) return;
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Этаж открыт')),
-                              );
-                              // Обновим баланс и узлы башни
-                              try {
-                                final fresh = await gp.getBalance();
-                                await GpService.saveBalanceCache(fresh);
-                              } catch (_) {}
-                              if (!context.mounted) return;
-                              final container =
-                                  ProviderScope.containerOf(context);
-                              container.invalidate(levelsProvider);
-                              container.invalidate(towerNodesProvider);
-                              container.invalidate(gpBalanceProvider);
-                            } on GpFailure catch (e) {
-                              if (!context.mounted) return;
-                              if (e.message.contains('Недостаточно GP')) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: const Text('Недостаточно GP'),
-                                    action: SnackBarAction(
-                                      label: 'Купить GP',
-                                      onPressed: () {
-                                        context.push('/gp-store');
-                                      },
-                                    ),
-                                  ),
-                                );
-                              } else {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text(e.message)),
-                                );
-                              }
-                            } catch (e) {
-                              if (!context.mounted) return;
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                    content: Text('Не удалось открыть этаж')),
-                              );
-                            }
-                          },
-                          child: const Text('1000 GP'),
-                        ),
-                      ],
-                    );
-                  },
-                );
-              }
-              return;
-            }
-            Future.microtask(() {
-              if (!context.mounted) return;
-              context.push('/levels/${data['id']}?num=$levelNumber');
-            });
-          } catch (e, st) {
-            _captureError(e, st);
-          }
-        },
+        onTap: () => _handleLevelTap(
+          context,
+          levelNumber: levelNumber,
+          canOpen: (isCompleted || !isLocked),
+          blockedByCheckpoint: blockedByCheckpoint,
+          data: data,
+        ),
         child: Semantics(
           label: 'Уровень $levelNumber',
           button: true,
@@ -219,59 +302,13 @@ class _LevelNodeTile extends StatelessWidget {
                     : 'Уровень $levelNumber: ${data['name']}',
                 textAlign: TextAlign.center,
               ),
-              Container(
-                width: kNodeSize,
-                height: kNodeSize,
-                decoration: BoxDecoration(
-                  color: AppColor.info,
-                  borderRadius: BorderRadius.circular(kTileRadius),
-                  border:
-                      Border.all(color: _darker(AppColor.info, 0.2), width: 4),
-                  boxShadow: [
-                    const BoxShadow(
-                        color: Color(0x22000000),
-                        blurRadius: 10,
-                        offset: Offset(0, 6)),
-                    BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.18),
-                        blurRadius: 16,
-                        spreadRadius: 2,
-                        offset: const Offset(0, 8)),
-                    if (isCurrent)
-                      BoxShadow(
-                          color: AppColor.premium.withValues(alpha: 0.55),
-                          blurRadius: 18,
-                          spreadRadius: 1,
-                          offset: const Offset(0, 0)),
-                  ],
-                ),
-                child: Stack(
-                  children: [
-                    Center(
-                      child: Icon(
-                        isCompleted
-                            ? Icons.check
-                            : (isLocked && !isCompleted
-                                ? Icons.lock
-                                : Icons.circle),
-                        color: Colors.white,
-                        size: kNodeSize * 0.7,
-                      ),
-                    ),
-                    if (isCurrent)
-                      const Positioned(
-                        top: 6,
-                        right: 6,
-                        child: Icon(
-                          Icons.star,
-                          color: AppColor.premium,
-                          size: 20,
-                        ),
-                      ),
-                  ],
-                ),
+              _buildLevelCoreTile(
+                isCurrent: isCurrent,
+                isCompleted: isCompleted,
+                isLocked: isLocked,
               ),
-              if (levelNumber == 4 && isLocked && !blockedByCheckpoint)
+              if (_shouldShowUnlockButton(
+                  levelNumber, isLocked, blockedByCheckpoint))
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
                   child: OutlinedButton(
@@ -286,81 +323,8 @@ class _LevelNodeTile extends StatelessWidget {
                     ),
                     onPressed: () {
                       try {
-                        showDialog(
-                          context: context,
-                          builder: (ctx) {
-                            return AlertDialog(
-                              title: const Text('Открыть этаж'),
-                              content: const Text(
-                                  'Стоимость: 1000 GP. Открыть доступ?'),
-                              actions: [
-                                FilledButton(
-                                  onPressed: () async {
-                                    Navigator.of(ctx).pop();
-                                    try {
-                                      final gp =
-                                          GpService(Supabase.instance.client);
-                                      final userId = Supabase.instance.client
-                                              .auth.currentUser?.id ??
-                                          'anon';
-                                      final idem = 'floor:' + userId + ':1';
-                                      await gp.unlockFloor(
-                                          floorNumber: 1, idempotencyKey: idem);
-                                      if (!context.mounted) return;
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
-                                        const SnackBar(
-                                            content: Text('Этаж открыт')),
-                                      );
-                                      try {
-                                        final fresh = await gp.getBalance();
-                                        await GpService.saveBalanceCache(fresh);
-                                      } catch (_) {}
-                                      if (!context.mounted) return;
-                                      final container =
-                                          ProviderScope.containerOf(context);
-                                      container.invalidate(levelsProvider);
-                                      container.invalidate(towerNodesProvider);
-                                      container.invalidate(gpBalanceProvider);
-                                    } on GpFailure catch (e) {
-                                      if (!context.mounted) return;
-                                      if (e.message
-                                          .contains('Недостаточно GP')) {
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(
-                                          SnackBar(
-                                            content:
-                                                const Text('Недостаточно GP'),
-                                            action: SnackBarAction(
-                                              label: 'Купить GP',
-                                              onPressed: () {
-                                                context.push('/gp-store');
-                                              },
-                                            ),
-                                          ),
-                                        );
-                                      } else {
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(
-                                          SnackBar(content: Text(e.message)),
-                                        );
-                                      }
-                                    } catch (e) {
-                                      if (!context.mounted) return;
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
-                                        const SnackBar(
-                                            content: Text(
-                                                'Не удалось открыть этаж')),
-                                      );
-                                    }
-                                  },
-                                  child: const Text('1000 GP'),
-                                ),
-                              ],
-                            );
-                          },
-                        );
+                        _showUnlockFloorDialog(context,
+                            floorNumber: _kTargetFloorNumber);
                       } catch (e, st) {
                         _captureError(e, st);
                       }
