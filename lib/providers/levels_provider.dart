@@ -1,12 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:bizlevel/models/level_model.dart';
 import 'package:bizlevel/providers/levels_repository_provider.dart';
-import 'package:bizlevel/providers/subscription_provider.dart';
 import 'package:bizlevel/providers/auth_provider.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bizlevel/utils/formatters.dart';
 // import 'package:hive_flutter/hive_flutter.dart';
 import 'package:bizlevel/providers/goals_providers.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Provides список уровней с учётом прогресса пользователя.
 final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
@@ -14,15 +13,23 @@ final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
 
   // Дожидаемся профиля пользователя, чтобы избежать расчётов с null userId
   final user = await ref.watch(currentUserProvider.future);
-  // Не блокируемся на стриме подписки: берём текущее значение, если оно уже есть
-  final subscriptionStatus = ref.watch(subscriptionProvider).asData?.value;
-
   final int? userCurrentLevel = user?.currentLevel;
-  final bool isPremium =
-      (user?.isPremium ?? false) || (subscriptionStatus == 'active');
+  // Подписки отключены (этап 39.1). Доступ уровней >3 будет реализован через GP (этап 39.7).
 
   final userId = Supabase.instance.client.auth.currentUser?.id;
   final rows = await repo.fetchLevels(userId: userId);
+
+  // Получаем доступ к этажам (floor_access) — учитываем для уровней >3
+  final supa = Supabase.instance.client;
+  final List<dynamic> accessRows = await supa
+      .from('floor_access')
+      .select('floor_number')
+      .catchError((_) => <dynamic>[]);
+  final Set<int> unlockedFloors = {
+    for (final r in accessRows)
+      if (r is Map && r['floor_number'] != null)
+        (r['floor_number'] as num).toInt()
+  };
 
   // Сначала сортируем по номеру на случай, если order потерян
   rows.sort((a, b) => (a['number'] as int).compareTo(b['number'] as int));
@@ -44,8 +51,12 @@ final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
       // «Первый шаг» всегда доступен для просмотра
       isAccessible = true;
     } else if (!level.isFree && level.number > 3) {
-      // Премиум уровни открываются при активной подписке и после завершения предыдущего
-      isAccessible = isPremium && previousCompleted;
+      // Этажи >1 требуют открытия за GP (этап 39.7)
+      // Для простоты: уровни 1..10 — это этаж 1
+      final int floorNumber = 1; // текущий этаж
+      final bool hasAccess =
+          unlockedFloors.contains(floorNumber) || level.number <= 3;
+      isAccessible = hasAccess && previousCompleted;
     } else {
       // Обычные уровни доступны только после завершения предыдущего уровня
       isAccessible = previousCompleted;
@@ -79,7 +90,7 @@ final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
       'isCurrent': level.number == userCurrentLevel,
       'lockReason': isLocked
           ? (level.number > 3 && !level.isFree
-              ? 'Только для премиум'
+              ? 'Требуются GP'
               : 'Завершите предыдущий уровень')
           : null,
       'artifact_title': json['artifact_title'],
@@ -102,14 +113,9 @@ final nextLevelToContinueProvider =
       (n) => n['type'] == 'goal_checkpoint' && (n['isCompleted'] != true),
       orElse: () => <String, dynamic>{});
 
-  final hasPremium =
-      ref.watch(currentUserProvider.select((user) => user.value?.isPremium)) ??
-          false;
   final int? userCurrentLevel =
       ref.watch(currentUserProvider.select((user) => user.value?.currentLevel));
-  final subscriptionStatus =
-      ref.watch(subscriptionProvider.select((sub) => sub.value));
-  final bool isPremium = hasPremium || (subscriptionStatus == 'active');
+  // Подписки отключены — ветки, завязанные на премиум, убраны.
 
   // 0) Если есть незавершённый чекпоинт цели — предлагаем дойти до него (скролл)
   //    Только если предшествующий ему уровень действительно завершён пользователем
@@ -126,17 +132,8 @@ final nextLevelToContinueProvider =
     if ((candidate['isCompleted'] as bool? ?? false) == false) {
       // Падать на checkpoint сейчас нельзя — продолжим обычной логикой ниже
     } else {
-      final String? lockReason = candidate['lockReason'] as String?;
-      final bool isPremiumLock =
-          lockReason != null && lockReason.toLowerCase().contains('премиум');
-      final hasPremium =
-          ref.watch(currentUserProvider.select((u) => u.value?.isPremium)) ??
-              false;
-      final subscriptionStatus =
-          ref.watch(subscriptionProvider.select((s) => s.value));
-      final bool isPremiumActive =
-          hasPremium || (subscriptionStatus == 'active');
-      final bool requiresPremium = isPremiumLock && !isPremiumActive;
+      // Премиум-гейтинг отключён; признак requiresPremium всегда false
+      const bool requiresPremium = false;
       return {
         'levelId': candidate['id'] as int,
         'levelNumber': targetLevel,
@@ -165,10 +162,8 @@ final nextLevelToContinueProvider =
   final int levelNumber = candidate['level'] as int? ?? 0;
   // Опираемся на данные уровня: если уровень помечен как «Только для премиум»,
   // и у пользователя нет премиума — требуется премиум. Иначе — нет.
-  final String? lockReason = candidate['lockReason'] as String?;
-  final bool isPremiumLock =
-      lockReason != null && lockReason.toLowerCase().contains('премиум');
-  final bool requiresPremium = isPremiumLock && !isPremium;
+  // Премиум-гейтинг отключён; признак requiresPremium всегда false
+  const bool requiresPremium = false;
 
   return {
     'levelId': candidate['id'] as int,

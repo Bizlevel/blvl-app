@@ -30,6 +30,50 @@ class SupabaseService {
   /// Экспортирует [SupabaseClient] для внешнего использования.
   SupabaseClient get client => Supabase.instance.client;
 
+  /// Унифицированное преобразование ответа PostgREST в список мапов.
+  static List<Map<String, dynamic>> _asListOfMaps(dynamic response) {
+    final list = response as List<dynamic>;
+    return list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
+
+  /// Единая обработка PostgREST-исключений: логирование и signOut при истёкшем JWT.
+  static Future<void> _handlePostgrestException(
+    PostgrestException e,
+    StackTrace st,
+  ) async {
+    await Sentry.captureException(e, stackTrace: st);
+    final msg = e.message.toLowerCase();
+    if (msg.contains('jwt')) {
+      await Supabase.instance.client.auth.signOut();
+    }
+  }
+
+  /// Создание подписанной ссылки из указанного bucket'а.
+  /// Возвращает null при 404 (файл отсутствует), пробрасывает дружелюбную
+  /// сетевую ошибку при оффлайне, логирует прочие ошибки в Sentry.
+  static Future<String?> _createSignedUrl({
+    required String bucket,
+    required String path,
+    int expiresSec = 60 * 60,
+  }) async {
+    // Абсолютный URL отдаём без запроса к Storage
+    if (path.startsWith('http')) return path;
+
+    try {
+      final response = await Supabase.instance.client.storage
+          .from(bucket)
+          .createSignedUrl(path, expiresSec);
+      return response;
+    } on StorageException catch (e, st) {
+      if ((e.statusCode ?? 0) != 404) {
+        await Sentry.captureException(e, stackTrace: st);
+      }
+      return null;
+    } on SocketException {
+      throw Exception('Нет соединения с интернетом');
+    }
+  }
+
   /// Fetches all levels ordered by number.
   static Future<List<Map<String, dynamic>>> fetchLevelsRaw() async {
     return _withRetry(() async {
@@ -38,15 +82,9 @@ class SupabaseService {
             .from('levels')
             .select()
             .order('number', ascending: true);
-        return (response as List<dynamic>)
-            .map((e) => Map<String, dynamic>.from(e as Map))
-            .toList();
+        return _asListOfMaps(response);
       } on PostgrestException catch (e, st) {
-        await Sentry.captureException(e, stackTrace: st);
-        // JWT expired – выходим из аккаунта, чтобы пользователь заново залогинился
-        if (e.message.toLowerCase().contains('jwt')) {
-          await Supabase.instance.client.auth.signOut();
-        }
+        await _handlePostgrestException(e, st);
         rethrow;
       } on SocketException {
         throw Exception('Нет соединения с интернетом');
@@ -68,14 +106,9 @@ class SupabaseService {
             .eq('level_id', levelId)
             .order('order', ascending: true);
 
-        return (response as List<dynamic>)
-            .map((e) => Map<String, dynamic>.from(e as Map))
-            .toList();
+        return _asListOfMaps(response);
       } on PostgrestException catch (e, st) {
-        await Sentry.captureException(e, stackTrace: st);
-        if (e.message.toLowerCase().contains('jwt')) {
-          await Supabase.instance.client.auth.signOut();
-        }
+        await _handlePostgrestException(e, st);
         rethrow;
       } on SocketException catch (_) {
         throw Exception('Нет соединения с интернетом');
@@ -87,44 +120,14 @@ class SupabaseService {
   }
 
   static Future<String?> getArtifactSignedUrl(String path) async {
-    // Если это уже абсолютный URL, возвращаем как есть
-    if (path.startsWith('http')) return path;
-
     return _withRetry(() async {
-      try {
-        final response = await Supabase.instance.client.storage
-            .from('artifacts')
-            .createSignedUrl(path, 60 * 60);
-        return response;
-      } on StorageException catch (e, st) {
-        if ((e.statusCode ?? 0) != 404) {
-          await Sentry.captureException(e, stackTrace: st);
-        }
-        return null;
-      } on SocketException {
-        throw Exception('Нет соединения с интернетом');
-      }
+      return _createSignedUrl(bucket: 'artifacts', path: path);
     }, retries: 1);
   }
 
   static Future<String?> getCoverSignedUrl(String relativePath) async {
-    // Абсолютный URL возвращаем сразу
-    if (relativePath.startsWith('http')) return relativePath;
-
     return _withRetry(() async {
-      try {
-        final response = await Supabase.instance.client.storage
-            .from('level-covers')
-            .createSignedUrl(relativePath, 60 * 60);
-        return response;
-      } on StorageException catch (e, st) {
-        if ((e.statusCode ?? 0) != 404) {
-          await Sentry.captureException(e, stackTrace: st);
-        }
-        return null;
-      } on SocketException {
-        throw Exception('Нет соединения с интернетом');
-      }
+      return _createSignedUrl(bucket: 'level-covers', path: relativePath);
     }, retries: 1);
   }
 
@@ -137,15 +140,9 @@ class SupabaseService {
             .select(
                 'id, number, title, description, image_url, cover_path, artifact_title, artifact_description, artifact_url, is_free, lessons(count), user_progress(user_id, is_completed)')
             .order('number', ascending: true);
-        return (response as List<dynamic>)
-            .map((e) => Map<String, dynamic>.from(e as Map))
-            .toList();
+        return _asListOfMaps(response);
       } on PostgrestException catch (e, st) {
-        await Sentry.captureException(e, stackTrace: st);
-        // При истёкшем JWT выходим из аккаунта, чтобы пользователь заново залогинился
-        if ((e.message).toLowerCase().contains('jwt')) {
-          await Supabase.instance.client.auth.signOut();
-        }
+        await _handlePostgrestException(e, st);
         rethrow;
       } on SocketException {
         throw Exception('Нет соединения с интернетом');
@@ -178,19 +175,7 @@ class SupabaseService {
 
   static Future<String?> getVideoSignedUrl(String relativePath) async {
     return _withRetry(() async {
-      try {
-        final response = await Supabase.instance.client.storage
-            .from('video')
-            .createSignedUrl(relativePath, 60 * 60);
-        return response;
-      } on StorageException catch (e, st) {
-        if ((e.statusCode ?? 0) != 404) {
-          await Sentry.captureException(e, stackTrace: st);
-        }
-        return null;
-      } on SocketException {
-        throw Exception('Нет соединения с интернетом');
-      }
+      return _createSignedUrl(bucket: 'video', path: relativePath);
     }, retries: 1);
   }
 

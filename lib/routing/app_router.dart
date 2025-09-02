@@ -9,7 +9,6 @@ import '../screens/app_shell.dart';
 import '../providers/auth_provider.dart';
 import '../screens/profile_screen.dart';
 import '../screens/level_detail_screen.dart';
-import '../screens/premium_screen.dart';
 import '../screens/main_street_screen.dart';
 import '../screens/biz_tower_screen.dart';
 import '../screens/leo_chat_screen.dart';
@@ -17,6 +16,7 @@ import '../screens/goal_screen.dart';
 // material import не требуется
 import '../screens/mini_case_screen.dart';
 import '../screens/goal_checkpoint_screen.dart';
+import '../screens/gp_store_screen.dart';
 
 /// Riverpod provider that exposes the [GoRouter] instance used across the app.
 ///
@@ -82,6 +82,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           return GoalCheckpointScreen(version: version);
         },
       ),
+      GoRoute(
+        path: '/gp-store',
+        builder: (context, state) => const GpStoreScreen(),
+      ),
     ],
   );
 
@@ -100,10 +104,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const RegisterScreen(),
       ),
       // Deprecated onboarding routes removed
-      GoRoute(
-        path: '/premium',
-        builder: (context, state) => const PremiumScreen(),
-      ),
+      // Премиум-роут удалён (этап 39.1)
       appShell,
     ],
     redirect: (context, state) {

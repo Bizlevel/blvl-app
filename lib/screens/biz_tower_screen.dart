@@ -4,6 +4,10 @@ import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/providers/levels_provider.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:go_router/go_router.dart';
+import 'package:bizlevel/providers/gp_providers.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:bizlevel/services/gp_service.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 part 'tower/tower_constants.dart';
 part 'tower/tower_helpers.dart';
@@ -73,10 +77,42 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
             SizedBox(height: 2),
             Text(
               'Этаж 1: База предпринимательства',
-              style: TextStyle(fontSize: 12, color: Colors.black54),
+              style: TextStyle(fontSize: 12, color: Color.fromARGB(137, 42, 42, 42)),
             ),
           ],
         ),
+        actions: [
+          Consumer(builder: (context, ref, _) {
+            final gpAsync = ref.watch(gpBalanceProvider);
+            final balance = gpAsync.value?['balance'];
+            if (balance == null) return const SizedBox.shrink();
+            return Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: Center(
+                child: InkWell(
+                  onTap: () {
+                    // Переход в магазин GP (маршрут добавим в 39.8)
+                    try {
+                      GoRouter.of(context).go('/gp-store');
+                    } catch (_) {}
+                  },
+                  child: Row(
+                    children: [
+                      SvgPicture.asset('assets/images/gp_coin.svg',
+                          width: 36, height: 36),
+                      const SizedBox(width: 8),
+                      Text('$balance',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 28,
+                          )),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          })
+        ],
         backgroundColor: AppColor.appBarColor,
       ),
       backgroundColor: AppColor.appBgColor,
@@ -128,9 +164,9 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
                   right: 24,
                   child: Row(
                     children: [
-                      Container(width: 2, color: Colors.black26),
+                      Container(width: 3, color: Colors.black26),
                       const Spacer(),
-                      Container(width: 2, color: Colors.black26),
+                      Container(width: 3, color: Colors.black26),
                     ],
                   ),
                 ),

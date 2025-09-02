@@ -8,7 +8,6 @@ import 'package:bizlevel/models/lesson_model.dart';
 import 'package:bizlevel/screens/level_detail_screen.dart';
 import 'package:bizlevel/providers/lessons_provider.dart';
 import 'package:bizlevel/providers/lesson_progress_provider.dart';
-import 'package:flutter/widgets.dart';
 
 void main() {
   // ignore: unnecessary_null_comparison

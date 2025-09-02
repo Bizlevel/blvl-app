@@ -7,6 +7,7 @@ import 'package:bizlevel/providers/leo_service_provider.dart';
 import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/widgets/leo_message_bubble.dart';
 import 'package:bizlevel/services/leo_service.dart';
+import 'package:bizlevel/providers/gp_providers.dart';
 
 /// Dialog screen for chatting with Leo assistant.
 /// Supports pagination (30 messages per page), unread counter reset,
@@ -57,7 +58,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
   bool _hasMore =
       false; // включаем пагинацию только после реальной загрузки из БД
   int _page = 0; // 0-based page counter
-  int _remaining = -1; // −1 unknown
+  int _remaining = -1; // −1 unknown (лимиты отключены)
 
   late final LeoService _leo;
 
@@ -69,7 +70,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
   void initState() {
     super.initState();
     _leo = ref.read(leoServiceProvider);
-    _fetchRemaining();
+    // Лимиты сообщений отключены (этап 39.1)
     _chatId = widget.chatId;
     print('🔧 DEBUG: Инициализация chatId: $_chatId');
     print('🔧 DEBUG: widget.chatId: ${widget.chatId}');
@@ -99,15 +100,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
     super.dispose();
   }
 
-  Future<void> _fetchRemaining() async {
-    try {
-      final remaining = await _leo.checkMessageLimit();
-      if (!mounted) return;
-      setState(() => _remaining = remaining);
-    } catch (_) {
-      // ignore failure – treat as unlimited (will fail on send anyway)
-    }
-  }
+  // Лимиты сообщений отключены — метод удалён
 
   Future<void> _loadMessages() async {
     if (_chatId == null) return;
@@ -173,16 +166,8 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
     print('🔧 DEBUG: text = "${_inputController.text.trim()}"');
     print('🔧 DEBUG: _isSending = $_isSending');
     print('🔧 DEBUG: _remaining = $_remaining');
-    print('🔧 DEBUG: Отправляем сообщение с chatId: $_chatId');
-    print('🔧 DEBUG: Тип chatId: ${_chatId.runtimeType}');
-    print('🔧 DEBUG: chatId равен null: ${_chatId == null}');
-    // Сообщение не добавляем здесь!
-    // Check limit
-    if (_remaining == 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Лимит сообщений исчерпан')));
-      return;
-    }
+
+    // Лимиты отключены — не блокируем отправку
 
     final text = _inputController.text.trim();
     if (text.isEmpty || _isSending) return;
@@ -208,7 +193,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
     _scrollToBottom();
 
     try {
-      // В режиме кейса не создаём чат и не тратим лимиты
+      // В режиме кейса не создаём чат
       if (!widget.caseMode) {
         if (_chatId == null) {
           _chatId = await _leo.saveConversation(
@@ -217,8 +202,6 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
           await _leo.saveConversation(
               chatId: _chatId, role: 'user', content: text);
         }
-        final rem = await _leo.decrementMessageCount();
-        if (mounted) setState(() => _remaining = rem);
       }
 
       // Get assistant response with RAG if context is available
@@ -245,7 +228,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
         userContext: cleanUserContext,
         levelContext: cleanLevelContext,
         bot: widget.bot,
-        chatId: _chatId, // Добавляем передачу chatId
+        skipSpend: widget.caseMode,
       );
       
       print('🔧 DEBUG: Получен ответ от sendMessageWithRAG');
@@ -262,6 +245,11 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
       setState(() {
         _messages.add({'role': 'assistant', 'content': assistantMsg});
       });
+      // После успешного ответа обновим баланс GP в фоне
+      try {
+        // ignore: unused_result
+        ref.invalidate(gpBalanceProvider);
+      } catch (_) {}
       // Сообщаем родителю об ответе ассистента (для префилла форм)
       try {
         widget.onAssistantMessage?.call(assistantMsg);

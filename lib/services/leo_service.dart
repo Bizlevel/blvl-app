@@ -5,7 +5,8 @@ import 'package:dio/dio.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bizlevel/utils/env_helper.dart';
-import 'package:bizlevel/utils/env_helper.dart';
+import 'package:bizlevel/services/gp_service.dart';
+import 'package:bizlevel/utils/constant.dart';
 
 /// Typed failure for any Leo related errors.
 class LeoFailure implements Exception {
@@ -53,8 +54,55 @@ class LeoService {
 
     // Используем только Edge Function
     // print('🔧 DEBUG: Using Edge Function');
+    // Списываем 1 GP за сообщение (идемпотентно), если не включён аварийный флаг
+    final gp = GpService(_client);
+    final String idempotencyKey = _generateIdempotencyKey(
+      userId: session.user.id,
+      chatId: null,
+      messages: messages,
+    );
+
     return _withRetry(() async {
       try {
+        try {
+          if (!kDisableGpSpendInChat) {
+            await gp.spend(
+              type: 'spend_message',
+              amount: 1,
+              idempotencyKey: idempotencyKey,
+            );
+            // Обновим кеш баланса в фоне
+            Future.microtask(() async {
+              try {
+                final fresh = await gp.getBalance();
+                await GpService.saveBalanceCache(fresh);
+              } catch (_) {}
+            });
+          } else {
+            // Breadcrumb для наблюдаемости rollback-режима
+            try {
+              await Sentry.addBreadcrumb(Breadcrumb(
+                message: 'gp_spend_skipped',
+                category: 'gp',
+                level: SentryLevel.info,
+                data: {'reason': 'kDisableGpSpendInChat=true'},
+              ));
+            } catch (_) {}
+          }
+        } on GpFailure catch (ge) {
+          if (ge.message.contains('Недостаточно GP')) {
+            try {
+              await Sentry.addBreadcrumb(Breadcrumb(
+                message: 'gp_insufficient',
+                level: SentryLevel.warning,
+                data: {'where': 'leo_sendMessage'},
+              ));
+            } catch (_) {}
+            throw LeoFailure('Недостаточно GP');
+          }
+          rethrow;
+        }
+
         final response = await _edgeDio.post(
           '/leo-chat',
           data: jsonEncode({'messages': messages, 'bot': bot}),
@@ -134,6 +182,7 @@ class LeoService {
     required String levelContext,
     String bot = 'leo',
     String? chatId, // Добавляем chatId параметр
+    bool skipSpend = false,
   }) async {
     final session = _client.auth.currentSession;
     if (session == null) {
@@ -141,15 +190,70 @@ class LeoService {
     }
 
     print('🔧 DEBUG: sendMessageWithRAG начался');
-    print('🔧 DEBUG: session.user.id = ${session.user?.id}');
+    print('🔧 DEBUG: session.user.id = ${session.user.id}');
     print('🔧 DEBUG: JWT длина = ${session.accessToken.length}');
     print(
         '🔧 DEBUG: JWT начинается с = ${session.accessToken.substring(0, 20)}...');
     print('🔧 DEBUG: chatId = $chatId'); // Добавляем логирование chatId
 
+    // Списываем 1 GP за сообщение (идемпотентно), если не включён аварийный флаг
+    final gp = GpService(_client);
+    final String idempotencyKey = _generateIdempotencyKey(
+      userId: session.user.id,
+      chatId: chatId,
+      messages: messages,
+    );
+
     // Отправляем сообщения в Edge Function. Встроенный RAG выполняется на сервере.
     return _withRetry(() async {
       try {
+        try {
+          if (!skipSpend) {
+            if (!kDisableGpSpendInChat) {
+              await gp.spend(
+                type: 'spend_message',
+                amount: 1,
+                referenceId: chatId ?? '',
+                idempotencyKey: idempotencyKey,
+              );
+              // Обновим кеш баланса в фоне
+              Future.microtask(() async {
+                try {
+                  final fresh = await gp.getBalance();
+                  await GpService.saveBalanceCache(fresh);
+                } catch (_) {}
+              });
+            } else {
+              try {
+                await Sentry.addBreadcrumb(Breadcrumb(
+                  message: 'gp_spend_skipped',
+                  category: 'gp',
+                  level: SentryLevel.info,
+                  data: {
+                    'reason': 'kDisableGpSpendInChat=true',
+                    'chatId': chatId ?? 'new'
+                  },
+                ));
+              } catch (_) {}
+            }
+          }
+        } on GpFailure catch (ge) {
+          if (ge.message.contains('Недостаточно GP')) {
+            try {
+              await Sentry.addBreadcrumb(Breadcrumb(
+                message: 'gp_insufficient',
+                level: SentryLevel.warning,
+                data: {
+                  'where': 'leo_sendMessageWithRAG',
+                  'chatId': chatId ?? 'new'
+                },
+              ));
+            } catch (_) {}
+            throw LeoFailure('Недостаточно GP');
+          }
+          rethrow;
+        }
+
         // Фильтруем строки "null" и пустые значения
         final cleanUserContext =
             (userContext == 'null' || userContext.isEmpty) ? null : userContext;
@@ -344,6 +448,34 @@ class LeoService {
     }
   }
 
+  // Генерирует стабильный Idempotency-Key без timestamp
+  String _generateIdempotencyKey({
+    required String userId,
+    String? chatId,
+    required List<Map<String, dynamic>> messages,
+  }) {
+    String content = '';
+    try {
+      final Map<String, dynamic>? userMsg = messages
+          .cast<Map<String, dynamic>?>()
+          .firstWhere((m) => (m?['role'] == 'user'), orElse: () => null);
+      content = (userMsg?['content']?.toString() ?? '').trim();
+    } catch (_) {}
+    final int h = _stableHash(content);
+    final String cid = (chatId == null || chatId.isEmpty) ? 'new' : chatId;
+    return 'msg:$userId:$cid:$h';
+  }
+
+  // Простой детерминированный хэш (DJB2)
+  int _stableHash(String s) {
+    int hash = 5381;
+    for (int i = 0; i < s.length; i++) {
+      hash = ((hash << 5) + hash) + s.codeUnitAt(i);
+      hash &= 0x7fffffff; // ограничим позитивным int
+    }
+    return hash;
+  }
+
   String _humanizeServerError(String raw) {
     // Сокращаем технические сообщения до понятных пользователю
     if (raw.contains('openai_config_error')) {
@@ -364,47 +496,13 @@ class LeoService {
   }
 
   Future<int> checkMessageLimit() async {
-    final user = _client.auth.currentUser;
-    if (user == null) throw LeoFailure('Не авторизован');
-
-    try {
-      final data = await _client
-          .from('users')
-          .select(
-              'is_premium, leo_messages_total, leo_messages_today, leo_reset_at')
-          .eq('id', user.id)
-          .single();
-
-      final isPremium = data['is_premium'] as bool? ?? false;
-      if (isPremium) {
-        // если истек дневной лимит, сервер уже сбросил. Просто вернуть текущее
-        return data['leo_messages_today'] as int? ?? 0;
-      } else {
-        return data['leo_messages_total'] as int? ?? 0;
-      }
-    } on PostgrestException catch (e) {
-      throw LeoFailure(e.message);
-    } catch (e) {
-      throw LeoFailure('Не удалось проверить лимит сообщений');
-    }
+    // Лимиты сообщений отключены (этап 39.1); возвращаем -1 как «без лимита»
+    return -1;
   }
 
-  /// Декрементирует счётчик сообщений пользователя. Для Premium – суточный,
-  /// для Free – общий.
   Future<int> decrementMessageCount() async {
-    final user = _client.auth.currentUser;
-    if (user == null) throw LeoFailure('Не авторизован');
-
-    try {
-      // Call atomic RPC which returns remaining messages
-      final response = await _client.rpc('decrement_leo_message');
-      final remaining = response as int? ?? 0;
-      return remaining;
-    } on PostgrestException catch (e) {
-      throw LeoFailure(e.message);
-    } catch (e) {
-      throw LeoFailure('Не удалось обновить счётчик сообщений');
-    }
+    // Лимиты сообщений отключены — ничего не делаем
+    return -1;
   }
 
   /// Сохраняет одно сообщение в таблицу `leo_messages` и обновляет счётчик

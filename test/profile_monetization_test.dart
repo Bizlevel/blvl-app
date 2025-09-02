@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:bizlevel/models/user_model.dart';
 import 'package:bizlevel/providers/auth_provider.dart';
 import 'package:bizlevel/providers/levels_provider.dart';
-import 'package:bizlevel/screens/payment_screen.dart';
+// import 'package:bizlevel/screens/payment_screen.dart';
 import 'package:bizlevel/screens/profile_screen.dart';
 import 'package:bizlevel/screens/root_app.dart';
 import 'package:bizlevel/widgets/artifact_card.dart';
@@ -17,12 +17,10 @@ void main() {
       email: 'test@example.com',
       name: 'Test User',
       currentLevel: 3,
-      isPremium: false,
-      leoMessagesTotal: 25,
-      leoMessagesToday: 25,
+      // поля премиума/лимитов удалены в 39.1
     );
 
-    final premiumUser = freeUser.copyWith(isPremium: true);
+    // премиум удалён — оставляем одного пользователя
 
     final mockLevels = [
       {
@@ -52,7 +50,7 @@ void main() {
       expect(find.byType(ArtifactCard), findsOneWidget);
     });
 
-    testWidgets('Navigates to PaymentScreen', (tester) async {
+    testWidgets('Профиль отображается без экрана платежей', (tester) async {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
@@ -64,36 +62,11 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // В актуальном UI кнопка подписки может называться иначе.
-      // Пытаемся найти по ключевым словам.
-      final payButton = find.textContaining('Оплат').evaluate().isNotEmpty
-          ? find.textContaining('Оплат')
-          : find.textContaining('Преми');
-      if (payButton.evaluate().isNotEmpty) {
-        await tester.tap(payButton.first);
-        await tester.pumpAndSettle();
-      }
-      await tester.pumpAndSettle();
-
-      expect(find.byType(PaymentScreen), findsOneWidget);
-      expect(find.text('Инструкция по оплате'), findsOneWidget);
+      // Перехода на PaymentScreen больше нет
+      expect(find.textContaining('Оплат'), findsNothing);
     });
 
-    testWidgets('Premium user hides Premium button', (tester) async {
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            currentUserProvider.overrideWith((ref) async => premiumUser),
-            levelsProvider.overrideWith((ref) async => mockLevels),
-          ],
-          child: const MaterialApp(home: ProfileScreen()),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      // Текст кнопки премиума отсутствует для премиум-пользователя
-      expect(find.textContaining('Преми'), findsNothing);
-    });
+    // Тест премиума удалён (подписки сняты в 39.1)
 
     testWidgets('Bottom navigation switches tabs', (tester) async {
       await tester.pumpWidget(

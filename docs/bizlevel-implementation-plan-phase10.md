@@ -154,3 +154,231 @@
 - Что сделать:
   1) Подтвердить отсутствие необходимости новых миграций; 2) Проверить Advisors — без критичных; 3) Пройтись по производительности (без тяжёлых операций в build; данные по возможности через существующие провайдеры/кеш SWR).
 - Критерии приёмки: миграции не требуются; Advisors без критичных предупреждений; UI плавный, overflow нет.
+
+
+# Этап 39: Переход на Growth Points (GP)
+
+### Задача 39.1: Полный отказ от подписок и суточных лимитов сообщений
+- Файлы: `lib/providers/subscription_provider.dart`, `lib/screens/premium_screen.dart`, `lib/screens/payment_screen.dart`, `lib/providers/levels_provider.dart`, `lib/routing/app_router.dart`, тесты `test/**`.
+- Что сделать:
+  1) Удалить провайдер и UI подписки, убрать маршруты и переходы на Premium.
+  2) Удалить использование флагов подписки в логике доступа уровней; оставить бесплатными только уровни 0–3.
+  3) Перевести гейтинг уровней на схему GP (открытие этажей за GP) — временно закрыть доступ >3 уровней до внедрения 39.7.
+  4) Убрать дневные лимиты Лео/Макса: удалить проверки `checkMessageLimit/decrementMessageCount` и весь связанный UI.
+- БД (миграция):
+  - Удалить таблицу `subscriptions` и колонку `users.is_premium` (если не используется нигде в коде после шага 39.1.2).
+  - Удалить колонки `users.leo_messages_total`, `users.leo_messages_today`, `users.leo_reset_at` и зависимые триггеры/функции.
+  - Проверить, что `payments` останется для GP‑покупок (без логики подписок).
+- Критерии приёмки: проект компилируется, уровни >3 недоступны без GP, в коде нет упоминаний подписок/лимитов.
+- Примечание к 39.1 (подписки/лимиты): все текущие пользователи — тестовые, поэтому можно удалять `subscriptions` и колонки лимитов (`users.is_premium`, `users.leo_messages_total/leo_messages_today/leo_reset_at`) в одной миграции без поэтапного софт‑лоунча.
+
+### Задача 39.2: Схема GP (ядро)
+- БД (миграции, RLS owner-only):
+  - `gp_wallets(user_id uuid PK REFERENCES auth.users(id),
+      balance int NOT NULL DEFAULT 0 CHECK (balance >= 0),
+      total_earned int NOT NULL DEFAULT 0,
+      total_spent int NOT NULL DEFAULT 0,
+      updated_at timestamptz NOT NULL DEFAULT now())`.
+  - `gp_ledger(id uuid PK,
+      user_id uuid NOT NULL REFERENCES auth.users(id),
+      amount int NOT NULL CHECK (amount <> 0),
+      type enum('purchase','spend_message','spend_floor','bonus','refund','adjustment') NOT NULL,
+      reference_id uuid/text,
+      metadata jsonb,
+      idempotency_key text NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now())`.
+  - `gp_purchases(id uuid PK, user_id uuid NOT NULL REFERENCES auth.users(id), package_id text, amount_kzt int, amount_gp int,
+      provider enum('apple','google','epay','kaspi'),
+      provider_transaction_id text,
+      status enum('pending','completed','failed','refunded'),
+      created_at timestamptz NOT NULL DEFAULT now())`.
+  - `floor_access(user_id uuid REFERENCES auth.users(id),
+      floor_number smallint NOT NULL CHECK (floor_number >= 0),
+      unlocked_at timestamptz NOT NULL DEFAULT now(),
+      PRIMARY KEY(user_id, floor_number))`.
+- Индексы:
+  - `gp_ledger(user_id, created_at DESC)`  -- отдельный для `floor_access` не нужен из-за PK
+- Инвариант: обновление `gp_wallets` выполнять ТОЛЬКО через серверную функцию в транзакции, суммирующую `gp_ledger` и проверяющую, что баланс не уходит < 0.
+### Задача 39.3: Edge Functions для GP
+- Эндпоинты:
+  - `GET /gp/balance` → `{balance, total_earned, total_spent}` (кэш 5 секунд)
+  - `POST /gp/spend {type, amount, reference_id, idempotency_key}` → SERIALIZABLE транзакция; проверка баланса; запись в `gp_ledger` и обновление `gp_wallets`; возврат `{balance_after}`
+  - `POST /gp/purchase/init {package_id, provider}` → создаёт `gp_purchases(status=pending)`; для Web возвращает `payment_url`
+  - `POST /gp/purchase/verify {purchase_id, receipt?}` → верификация провайдера, идемпотентное начисление через `gp_ledger/gp_wallets`, обновление `gp_purchases(status=completed)`
+  - `POST /gp/floor/unlock {floor_number, idempotency_key}` → проверка доступа; списание 1000 GP (или из конфигурации); upsert в `floor_access`; возврат `{balance_after}`
+- Требования:
+  - Только `authenticated` JWT; логи без PII
+  - Идемпотентность через заголовок `Idempotency-Key`; повтор запроса возвращает прежний результат
+  - Единый формат ошибок: `gp_insufficient_balance`, `gp_invalid_package`, `gp_already_processed`
+### Задача 39.4: Система бонусов GP (настраиваемая)
+- БД:
+  - `gp_bonus_rules(rule_key text PK, amount int, active bool, description text)`.
+  - `gp_bonus_grants(user_id uuid, rule_key text, granted_at timestamptz, PK(user_id, rule_key))`.
+- Edge:
+  - `POST /gp/bonus/claim {rule_key}`: сервер в одной транзакции SERIALIZABLE: проверяет условия → INSERT `gp_bonus_grants` (PK(user_id, rule_key)) → INSERT `gp_ledger` (idempotency_key = 'bonus:'||rule_key||':'||user_id) → UPDATE `gp_wallets`. Повторные вызовы отдаются из кэша по PK/идемпотентности.
+- Правила (сид):
+  - `signup_bonus` (+30 GP), `profile_completed` (+50 GP при заполнении name/goal/about/avatar_id), `all_three_cases_completed` (+200 GP при status='completed' для cases 1–3).
+    - `signup_bonus` (+30 GP) — выдавать через `/gp/bonus/claim` при первом входе.
+  - `profile_completed` (+50 GP) — при заполненных `name/goal/about/avatar_id`.
+  - Для тестовой команды допускается разовая выдача через `gp_bonus_grants`.
+- Критерии приёмки: повторный вызов не даёт дублей, правила можно выключать/менять без правок клиента.
+- БД:
+  - `gp_bonus_rules(rule_key text PK, amount int, active bool, description text)`.
+  - `gp_bonus_grants(user_id uuid, rule_key text, granted_at timestamptz, PK(user_id, rule_key))`.
+- Edge:
+  - `POST /gp/bonus/claim {rule_key}`: сервер проверяет условия и идемпотентно начисляет бонус через `gp_ledger/gp_wallets`, пишет в `gp_bonus_grants`.
+- Правила (сид):
+  - `signup_bonus` (+30 GP), `profile_completed` (+50 GP при заполнении name/goal/about/avatar_id), `all_three_cases_completed` (+200 GP при status='completed' для cases 1–3).
+    - `signup_bonus` (+30 GP) — выдавать через `/gp/bonus/claim` при первом входе.
+  - `profile_completed` (+50 GP) — при заполненных `name/goal/about/avatar_id`.
+  - Для тестовой команды допускается разовая выдача через `gp_bonus_grants`.
+- Критерии приёмки: повторный вызов не даёт дублей, правила можно выключать/менять без правок клиента.
+
+### Задача 39.5: Клиент — сервис и баланс
+- Создать `GpService` (Dio/Edge): `getBalance`, `spend`, `initPurchase`, `verifyPurchase` с retry/идемпотентностью.
+- Провайдер `gpBalanceProvider` (SWR + Hive): инвалидация после списаний/покупок/бонусов.
+- UI (только где нужно показывать баланс):
+  - Верхний AppBar на `MainStreetScreen` и `BizTowerScreen` («⬡ X GP», по тапу — магазин).
+  - `ProfileScreen`: «⬡ X GP (−1 за сообщение)» вместо «Х сообщений Лео».
+- Не показывать баланс в чате.
+  - `gpBalanceProvider` — SWR + Hive; инвалидация после `spend/purchase/bonus`.
+  - UI: баланс только в AppBar (главная/башня) и на странице Профиль; в чате баланс не показывать.
+- Критерии приёмки: баланс корректно обновляется, в чате баланс отсутствует.
+
+### Задача 39.6: Списания GP за сообщения Лео/Максу
+- `LeoService.sendMessage`: перед отправкой — `GpService.spend(type='spend_message', amount=1, reference_id=chat_id, idempotency_key)`. На "insufficient" — модалка «Пополнить GP» → переход в магазин и повтор.
+- Удалить старые проверки лимитов и связанные тексты/ошибки.
+  - Перед отправкой: `POST /gp/spend` c `type='spend_message'`, `amount=1`,
+      `reference_id=<message_id>`, `idempotency_key=<message_id>`.
+    Клиент генерирует `message_id` (UUID v4) ДО отправки сообщения и переиспользует при ретраях.
+  - На `gp_insufficient_balance` — модалка «Пополнить GP» → переход в магазин (preset `gp_1200`).
+- Критерии приёмки: при достаточном балансе сообщение уходит; при недостаточном — корректный UX без отображения баланса в чате.
+### Задача 39.7: Открытие этажей за GP
+- Гейтинг уровней: заменить подписку на проверку `floor_access` (этаж 1 = уровни 1–10 и т.д.).
+- UI: при попытке открыть платный этаж — полноэкранный модал «Стоимость: 1000 GP (у вас X)»; 
+  если хватает — вызвать `POST /gp/floor/unlock {floor_number, idempotency_key}`.
+  На сервере в одной транзакции: проверка доступа → списание (ledger+wallet) →
+  upsert в `floor_access` → возврат нового баланса. Идемпотентность по (user_id, floor_number).
+  если нет — магазин с пресетом `gp_1200`.
+- `levels_provider`: учитывать `floor_access` и бесплатность 0–3 уровней.
+  - Этаж 1 = 1000 GP; уровни 0–3 бесплатные без изменений.
+### Задача 39.8: Магазин GP и платежи
+- Экран `GpStoreScreen` с 3 пакетами (300/1200/2500 GP), выделение среднего.
+- Интеграция с существующим `PaymentService` для Web (redirect-flow), после возврата — `verify` и инвалидация баланса.
+  - Пакеты: `gp_300`, `gp_1200` (badge «ПОПУЛЯРНЫЙ»), `gp_2500` — конфиг хранить на клиенте и валидировать на сервере
+    (сервер — единственный источник истины по цене/GP).
+    В БД: UNIQUE(provider, provider_transaction_id).
+  - Web: redirect через существующий `PaymentService` → `/gp/purchase/verify`.
+  - iOS/Android: заглушки SDK (вне MVP), интерфейсы подготовить.
+- Подготовить интерфейсы для мобильных сторах (без реализации в этом этапе).
+- Критерии приёмки: на Web покупка завершает начислением GP и обновлением баланса.
+  - iOS/Android: заглушки SDK (вне MVP), интерфейсы подготовить.
+- Подготовить интерфейсы для мобильных сторах (без реализации в этом этапе).
+- Критерии приёмки: на Web покупка завершает начислением GP и обновлением баланса.
+
+### Задача 39.9: Чистка, тесты и наблюдаемость
+- Удалить/обновить тесты, завязанные на подписки/лимиты.
+- Добавить юнит‑тесты `GpService` и виджет‑тесты (чаты: списание/insufficient; башня: открытие этажа).
+- Sentry breadcrumbs: `gp_spent`, `gp_insufficient`, `gp_store_opened`, `gp_purchase_*`.
+- Скрипт сверки: при расхождении `wallets.balance` и суммы `ledger` — алерт и автокоррекция (опц.).
+  - Удалить/обновить тесты, завязанные на подписки/лимиты.
+  - Добавить тесты: списание/insufficient, открытие этажа, покупка на Web, инвалидация баланса.
+  - Sentry breadcrumbs: `gp_spent`, `gp_insufficient`, `gp_store_opened`, `gp_purchase_*`.
+- Критерии приёмки: тесты зелёные, Sentry без новых критичных ошибок.
+
+### Задача 39.10: Данные и обратная совместимость
+- Применить welcome‑бонус существующим пользователям один раз через `gp_bonus_grants`.
+- Подтвердить, что в `subscriptions` нет активных данных; если есть — согласовать конверсию в `floor_access`.
+  - Так как пользователи тестовые, можно сразу удалять подписки/лимиты без маппинга. При необходимости — выдать `floor_access` вручную тем, кто уже имеет доступ >3.
+- Критерии приёмки: у существующих пользователей баланс ≥ 30 GP, доступы соответствуют правилам GP.
+
+### Задача 39.11: Техдолг и безопасность
+- Сначала проверить, потом устранить дубликаты индексов (например, `core_goals_user_updated_idx` vs `idx_core_goals_user_updated`, `lessons_level_id_order_key` vs `uniq_lessons_level_order`).
+- Зафиксировать `search_path = public` в новых функциях и триггерах (SQL/Edge), привести к рекомендациям advisors.
+
+### Задача 39.12: Smoke‑фаза GP
+- Задеплоить `/gp/balance` и `/gp/spend` в песочнице; провести ручные проверки идемпотентности и RLS.
+- После успешной проверки включить списание GP в клиенте для чатов (канареечный запуск).
+
+### Задача 39.13: Документация и курс
+- Описать формат `Idempotency-Key` и коды ошибок в README (раздел GP).
+- Зафиксировать источник курса GP↔₸ (константа на клиенте + валидация на сервере или `app_settings`).
+
+### Задача 39.14: Бэкенд (RPC) — серверные функции GP с идемпотентностью
+- Файлы: `supabase/migrations/` (новая миграция с SQL функциями и индексами).
+- Что сделать:
+  1) Создать RPC-функции в `public` с `SECURITY DEFINER`, `SET search_path = public`, транзакцией `SERIALIZABLE`:
+     - `gp_balance()` → `RETURNS TABLE(balance int, total_earned int, total_spent int)`; берёт данные из `gp_wallets` по `auth.uid()` (если записи нет — 0/0/0).
+     - `gp_spend(p_type text, p_amount int, p_reference_id text, p_idempotency_key text)` → `RETURNS TABLE(balance_after int)`; в транзакции: валидирует `p_amount>0`, тип в белом списке; вставляет в `gp_ledger` (idempotency_key уникальный); пересчитывает/обновляет `gp_wallets` и проверяет, что баланс ≥0.
+     - `gp_floor_unlock(p_floor smallint, p_idempotency_key text)` → `RETURNS TABLE(balance_after int)`; если `floor_access` уже есть — идемпотентно возвращает текущий баланс; иначе в транзакции списывает фиксированную сумму (1000 GP), затем upsert в `floor_access`.
+     - `gp_bonus_claim(p_rule_key text)` → `RETURNS TABLE(balance_after int)`; проверяет активность правила в `gp_bonus_rules`, один раз пишет в `gp_bonus_grants` (PK(user_id, rule_key)), затем INSERT в `gp_ledger` (idempotency_key = 'bonus:'||rule_key||':'||user_id) и обновляет `gp_wallets`.
+  2) Идемпотентность/индексы: `CREATE UNIQUE INDEX IF NOT EXISTS idx_gp_ledger_idem ON public.gp_ledger(idempotency_key);` Убедиться, что есть `gp_ledger(user_id, created_at DESC)`.
+  3) Права: `GRANT EXECUTE ON FUNCTION ... TO authenticated;` и `REVOKE ALL ON FUNCTION ... FROM anon;`.
+- Критерии приёмки: функции вызываются через PostgREST от роли `authenticated`, RLS не нарушен; дубли по `idempotency_key` возвращают прежний `balance_after`; advisors (security/performance) — без критичных предупреждений.
+
+### Задача 39.15: Клиент — перевод GpService на RPC (вместо Edge) для core-операций
+- Файлы: `lib/services/gp_service.dart`.
+- Что сделать:
+  1) Заменить HTTP-вызовы на `SupabaseClient.rpc`:
+     - `getBalance()` → `rpc('gp_balance')` c маппингом в `{balance,total_earned,total_spent}`.
+     - `spend(type,amount,referenceId,idempotencyKey)` → `rpc('gp_spend', params: {...})`, возвращать `balance_after`.
+     - `unlockFloor(floorNumber,idempotencyKey)` → `rpc('gp_floor_unlock', params: {...})`.
+     - `claimBonus(ruleKey)` → `rpc('gp_bonus_claim', params: {...})`.
+  2) Сохранить: экспоненциальный retry без `refreshSession()` внутри; Hive‑кеш; конверсию ошибок в `GpFailure('Недостаточно GP')/другое`.
+  3) Оставить без изменений: `initPurchase/verifyPurchase` (остаются Edge, как есть).
+- Критерии приёмки: сборка проходит; 401/Invalid JWT на `/functions/v1/gp-*` больше не возникают; кэш/инвалидации работают.
+
+### Задача 39.16: Интеграция Leo/Башня — использовать RPC через GpService
+- Файлы: `lib/services/leo_service.dart`, `lib/screens/tower/tower_tiles.dart` (или текущие точки вызова `unlockFloor`).
+- Что сделать:
+  1) `LeoService.sendMessage/sendMessageWithRAG` продолжает вызывать `gp.spend(...)` (теперь RPC); `skipSpend` в мини‑кейсах оставить без изменений.
+  2) В башне `unlockFloor` остаётся через `GpService` (теперь RPC) с тем же `idempotencyKey`.
+- Критерии приёмки: списание 1 GP перед сообщением стабильно; «Недостаточно GP» обрабатывается корректно; открытие этажа — без регрессий.
+
+### Задача 39.17: Провайдеры/кеш — валидация работы с RPC
+- Файлы: `lib/providers/gp_providers.dart`, `lib/widgets/user_info_bar.dart`, `lib/screens/biz_tower_screen.dart`, `lib/screens/profile_screen.dart`.
+- Что сделать:
+  1) Убедиться, что гейт по `currentSession` сохранён; провайдеры не делают `refreshSession()`.
+  2) Баланс читается из `gpBalanceProvider` (RPC), кеш Hive сохраняется; фоновые рефетчи не инициируют редиректы.
+- Критерии приёмки: ранние 401 отсутствуют; баланс обновляется и показывается в AppBar/Профиле.
+
+### Задача 39.18: Тесты GP для RPC
+- Файлы: `test/services/gp_service_test.dart`, `test/screens/leo_dialog_screen_test.dart`, `test/screens/tower_unlock_test.dart` (или существующие аналогичные).
+- Что сделать:
+  1) Юнит‑тесты GpService с моками `SupabaseClient.rpc` (успех/ошибки/идемпотентность).
+  2) Виджет‑тесты: чат (списание/insufficient) и башня (unlock→инвалидации баланса/узлов).
+- Критерии приёмки: тесты зелёные локально и в CI.
+
+### Задача 39.19: Роллаут‑страховка (dev) — временный fallback на Edge
+- Файлы: `lib/services/gp_service.dart` (только dev/debug).
+- Что сделать:
+  1) Если `rpc('gp_*')` даёт `function not found`/`PGRST...`, логировать в Sentry и один раз попробовать прежний Edge‑вызов (только в debug); в prod fallback отключён.
+- Критерии приёмки: на dev возможно параллельное тестирование до полной доставки миграций; в prod — только RPC.
+
+### Задача 39.20: Advisors/Security — проверка функций и индексов
+- Файлы: `supabase/migrations/`.
+- Что сделать:
+  1) Запустить advisors (security/performance); проверить `SECURITY DEFINER`, `search_path = public`, гранты, индексы.
+  2) Устранить замечания (без изменения контрактов RPC).
+- Критерии приёмки: критичных предупреждений нет.
+
+### Задача 39.21: Сверка балансов и консистентность
+- Файлы: `supabase/migrations/` (опц. SQL‑скрипт), внутренние процедуры.
+- Что сделать:
+  1) Выполнить сверку `gp_wallets.balance` vs сумма `gp_ledger.amount` по `user_id`; логировать расхождения.
+  2) При расхождении — корректирующая транзакция (INSERT в `gp_ledger` с `type='adjustment'` и объяснением) + пересчёт `gp_wallets`.
+- Критерии приёмки: расхождений нет либо исправлены атомарно.
+
+### Задача 39.22: Документация/чистка Edge‑маршрутов
+- Файлы: `README.md`, (опц.) `supabase/functions/*`.
+- Что сделать:
+  1) Пометить `/gp-balance`, `/gp-spend`, `/gp-floor-unlock`, `/gp-bonus-claim` как deprecated (переведены в RPC). Оставить Edge только для `/gp-purchase-*`.
+  2) Обновить раздел GP: идемпотентность через `idempotency_key`, список типов, коды ошибок.
+- Критерии приёмки: документация актуальна; команда следует новому флоу.
+
+### Задача 39.23: Наблюдаемость (Sentry) для RPC‑пути
+- Файлы: `lib/services/gp_service.dart`, `lib/services/leo_service.dart`.
+- Что сделать:
+  1) Добавить breadcrumbs без PII: `gp_balance_loaded`, `gp_spent`, `gp_insufficient`, `gp_floor_unlocked`, `gp_bonus_granted`.
+  2) Проверить, что в логи не попадает JWT/личные данные.
+- Критерии приёмки: события видны в Sentry; новых критичных ошибок нет.
