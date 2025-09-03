@@ -53,3 +53,4 @@ venv/
 scripts/local_build.sh
 scripts/local_build.ps1
 android/app/google-services.json
+google_keys/
