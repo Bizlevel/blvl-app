@@ -169,7 +169,8 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
                       );
                     },
                   ),
-                const SizedBox(height: 10),
+                // Нижний блок с кнопкой в SafeArea: учёт клавиатуры/индикаторов
+                const SizedBox(height: 6),
                 if ((widget.levelNumber ?? -1) != 0)
                   ElevatedButton.icon(
                     onPressed: _isLevelCompleted(lessons)
@@ -205,7 +206,9 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
                           }
                         : null,
                     icon: const Icon(Icons.check),
-                    label: const Text('Завершить уровень'),
+                    label: Text((widget.levelNumber ?? -1) == 1
+                        ? 'Перейти к Цели'
+                        : 'Завершить уровень'),
                     style: ElevatedButton.styleFrom(
                         backgroundColor: AppColor.primary),
                   ),
@@ -661,7 +664,7 @@ class _ProfileFormBlock extends _PageBlock {
             mainAxisSpacing: AppSpacing.medium,
             crossAxisSpacing: AppSpacing.medium,
           ),
-          itemCount: 7,
+          itemCount: 12,
           itemBuilder: (_, index) {
             final id = index + 1;
             final asset = 'assets/images/avatars/avatar_${id}.png';
@@ -895,21 +898,82 @@ class _IntroBlock extends _PageBlock {
         ? 'Привет! 👋\nЯ Leo, ваш персональный AI-ментор по бизнесу.\nЗа следующие пару минут Вы:\n- Узнаете, как получить максимум от BizLevel\n- Настроите свой профиль, чтобы я мог давать Вам персонализированные советы и рекомендации.\nГотовы начать свой путь в бизнесе?'
         : 'Проходите уроки по порядку и выполняйте тесты, чтобы продвигаться дальше.';
 
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: LayoutBuilder(builder: (context, constraints) {
+        final String assetPath = 'assets/images/lvls/level_${levelNumber}.png';
+        final double imageHeight = constraints.maxHeight * 0.45;
+        return Stack(
           children: [
-            Text(title,
-                textAlign: TextAlign.center,
-                style:
-                    const TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 16),
-            Text(description, textAlign: TextAlign.center),
+            // Кнопка «Назад к башне» в левом верхнем углу
+            SafeArea(
+              child: Align(
+                alignment: Alignment.topLeft,
+                child: IconButton(
+                  icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                  tooltip: 'К башне',
+                  onPressed: () {
+                    try {
+                      if (levelNumber > 0) {
+                        GoRouter.of(context).go('/tower?scrollTo=$levelNumber');
+                      } else {
+                        GoRouter.of(context).go('/tower');
+                      }
+                    } catch (_) {}
+                  },
+                ),
+              ),
+            ),
+
+            // Основной контент по центру
+            Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 900),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    // Картинка уровня (для уровня 0 изображения может не быть)
+                    if (!isFirstStep)
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: SizedBox(
+                          width: double.infinity,
+                          height: imageHeight.clamp(160, 360),
+                          child: Image.asset(
+                            assetPath,
+                            fit: BoxFit.cover,
+                            alignment: Alignment.center,
+                            errorBuilder: (context, error, stack) =>
+                                const SizedBox.shrink(),
+                          ),
+                        ),
+                      ),
+                    if (!isFirstStep) const SizedBox(height: 16),
+                    Text(
+                      title,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: Text(
+                        description,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 16),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ],
-        ),
-      ),
+        );
+      }),
     );
   }
 }

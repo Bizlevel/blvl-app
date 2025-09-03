@@ -49,7 +49,8 @@ List<_Placed> _placeItems({
         kSidePadding + colIndex * columnWidth + (columnWidth - size) / 2;
     final double centerY = canvasHeight - (i + 0.5) * rowHeight;
     final double squareTop = centerY - size / 2;
-    final double widgetTop = squareTop - kLabelHeight; // подпись над квадратом
+    final double widgetTop =
+        squareTop - kLabelHeight; // подпись над квадратом (до 3 строк)
     placed.add(_Placed(
       item: item,
       row: i,
@@ -91,13 +92,15 @@ List<_GridSegment> _buildSegments(List<_Placed> placed) {
       final bool isCompleted = data['isCompleted'] == true;
       final bool isCurrent = data['isCurrent'] == true;
       final bool isLocked = data['isLocked'] == true;
-      color = isCompleted
-          ? AppColor.success
-          : (isCurrent
-              ? AppColor.info
-              : (isLocked
-                  ? Colors.grey.withValues(alpha: 0.6)
-                  : AppColor.info));
+      if (isCompleted) {
+        color = AppColor.success; // завершённый — зелёный
+      } else if (isCurrent) {
+        color = AppColor.info; // активный — основной цвет
+      } else if (isLocked) {
+        color = Colors.grey.withValues(alpha: 0.6); // заблокирован — серый ≈60%
+      } else {
+        color = AppColor.info;
+      }
     } else if (aType == 'mini_case' || aType == 'goal_checkpoint') {
       final bool done = a.item['isCompleted'] as bool? ?? false;
       color = done ? AppColor.success : AppColor.info;

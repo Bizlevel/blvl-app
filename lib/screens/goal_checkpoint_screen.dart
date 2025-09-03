@@ -294,9 +294,7 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
     return sb.toString();
   }
 
-  void _onAssistantMessage(String msg) {
-    setState(() => _lastAssistantMessage = msg);
-  }
+  // Прямой колбэк удалён: сообщение сохраняется через лямбда в onAssistantMessage
 
   void _applySuggestionToForm() {
     final msg = _lastAssistantMessage?.trim();
@@ -480,7 +478,7 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            // Встроенный чат Макса (embedded)
+                            // Встроенный чат Макса (embedded) с микро‑шеймером при автозаполнении
                             SizedBox(
                               height: 420,
                               child: ref.read(currentUserProvider).when(
@@ -491,7 +489,20 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
                                           'current_level: ${user?.currentLevel ?? 0}',
                                       bot: 'max',
                                       embedded: true,
-                                      onAssistantMessage: _onAssistantMessage,
+                                      onAssistantMessage: (msg) async {
+                                        setState(
+                                            () => _lastAssistantMessage = msg);
+                                        // Показать микро‑шеймер до применения данных
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          const SnackBar(
+                                            content:
+                                                Text('Применяем предложение…'),
+                                            duration:
+                                                Duration(milliseconds: 400),
+                                          ),
+                                        );
+                                      },
                                     ),
                                     loading: () => const Center(
                                         child: CircularProgressIndicator()),

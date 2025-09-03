@@ -63,7 +63,7 @@ class _OnboardingVideoScreenState extends ConsumerState<OnboardingVideoScreen> {
         );
       }
 
-      // переход на RootApp после окончания
+      // DEPRECATED: ранее был переход на RootApp; теперь основной поток через GoRouter/AppShell
       _videoController!.addListener(() {
         if (_videoController!.value.position >=
             _videoController!.value.duration) {

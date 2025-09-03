@@ -148,6 +148,13 @@ class MyApp extends ConsumerWidget {
             seedColor: AppColor.primary,
             brightness: Brightness.light,
           ),
+          appBarTheme: const AppBarTheme(
+            centerTitle: true,
+            titleTextStyle: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           elevatedButtonTheme: ElevatedButtonThemeData(
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColor.primary,

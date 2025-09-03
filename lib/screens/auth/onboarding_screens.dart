@@ -85,7 +85,7 @@ class _OnboardingProfileScreenState
             mainAxisSpacing: AppSpacing.medium,
             crossAxisSpacing: AppSpacing.medium,
           ),
-          itemCount: 7,
+          itemCount: 12,
           itemBuilder: (_, index) {
             final id = index + 1;
             final asset = 'assets/images/avatars/avatar_$id.png';

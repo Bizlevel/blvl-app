@@ -70,6 +70,15 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
     return Scaffold(
       appBar: AppBar(
         centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
+          tooltip: 'Главная улица',
+          onPressed: () {
+            try {
+              GoRouter.of(context).go('/home');
+            } catch (_) {}
+          },
+        ),
         title: const Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -77,7 +86,8 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
             SizedBox(height: 2),
             Text(
               'Этаж 1: База предпринимательства',
-              style: TextStyle(fontSize: 12, color: Color.fromARGB(137, 42, 42, 42)),
+              style: TextStyle(
+                  fontSize: 12, color: Color.fromARGB(137, 42, 42, 42)),
             ),
           ],
         ),

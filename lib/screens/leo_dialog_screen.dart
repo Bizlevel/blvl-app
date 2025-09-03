@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:bizlevel/providers/leo_service_provider.dart';
 import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/widgets/leo_message_bubble.dart';
+import 'package:bizlevel/widgets/typing_indicator.dart';
 import 'package:bizlevel/services/leo_service.dart';
 import 'package:bizlevel/providers/gp_providers.dart';
 
@@ -16,7 +17,7 @@ class LeoDialogScreen extends ConsumerStatefulWidget {
   final String? chatId;
   final String? userContext;
   final String? levelContext;
-  final String bot; // 'leo' | 'alex'
+  final String bot; // 'leo' | 'max'
   final bool caseMode; // режим мини‑кейса: не тратим лимиты, не сохраняем чаты
   final String? systemPrompt; // опц. системный промпт (для кейса)
   final bool
@@ -58,7 +59,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
   bool _hasMore =
       false; // включаем пагинацию только после реальной загрузки из БД
   int _page = 0; // 0-based page counter
-  int _remaining = -1; // −1 unknown (лимиты отключены)
+  // int _remaining = -1; // −1 unknown (лимиты отключены)
 
   late final LeoService _leo;
 
@@ -72,20 +73,17 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
     _leo = ref.read(leoServiceProvider);
     // Лимиты сообщений отключены (этап 39.1)
     _chatId = widget.chatId;
-    print('🔧 DEBUG: Инициализация chatId: $_chatId');
-    print('🔧 DEBUG: widget.chatId: ${widget.chatId}');
-    print('🔧 DEBUG: Тип widget.chatId: ${widget.chatId.runtimeType}');
     // Автоприветствие: кейс → задание; иначе Алекс.
     if (widget.caseMode && _chatId == null && _messages.isEmpty) {
       _messages.add({
         'role': 'assistant',
         'content': 'Начнём с короткого задания. Ответьте в 2–3 предложениях.',
       });
-    } else if (widget.bot == 'alex' && _chatId == null && _messages.isEmpty) {
+    } else if (widget.bot == 'max' && _chatId == null && _messages.isEmpty) {
       _messages.add({
         'role': 'assistant',
         'content':
-            'Я — Алекс, трекер цели BizLevel. Помогаю кристаллизовать цель и держать темп 28 дней. Напишите, чего хотите добиться — предложу ближайший шаг.',
+            'Я — Макс, трекер цели BizLevel. Помогаю кристаллизовать цель и держать темп 28 дней. Напишите, чего хотите добиться — предложу ближайший шаг.',
       });
     }
     if (_chatId != null) {
@@ -162,10 +160,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
       });
 
   Future<void> _sendMessage() async {
-    print('🔧 DEBUG: _sendMessage вызван');
-    print('🔧 DEBUG: text = "${_inputController.text.trim()}"');
-    print('🔧 DEBUG: _isSending = $_isSending');
-    print('🔧 DEBUG: _remaining = $_remaining');
+    // debug prints removed
 
     // Лимиты отключены — не блокируем отправку
 
@@ -208,21 +203,16 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
       String assistantMsg;
 
       // Фильтруем строки "null" и пустые значения
-      final cleanUserContext = (widget.userContext == 'null' || widget.userContext?.isEmpty == true) ? '' : (widget.userContext ?? '');
-      final cleanLevelContext = (widget.levelContext == 'null' || widget.levelContext?.isEmpty == true) ? '' : (widget.levelContext ?? '');
-      
-      print('🔧 DEBUG: userContext = "${widget.userContext}"');
-      print('🔧 DEBUG: levelContext = "${widget.levelContext}"');
-      print('🔧 DEBUG: cleanUserContext = "$cleanUserContext"');
-      print('🔧 DEBUG: cleanLevelContext = "$cleanLevelContext"');
-      print('🔧 DEBUG: userContext.isNotEmpty = ${cleanUserContext.isNotEmpty}');
-      print('🔧 DEBUG: levelContext.isNotEmpty = ${cleanLevelContext.isNotEmpty}');
+      final cleanUserContext =
+          (widget.userContext == 'null' || widget.userContext?.isEmpty == true)
+              ? ''
+              : (widget.userContext ?? '');
+      final cleanLevelContext = (widget.levelContext == 'null' ||
+              widget.levelContext?.isEmpty == true)
+          ? ''
+          : (widget.levelContext ?? '');
 
       // Единый вызов: сервер выполнит RAG + персонализацию при необходимости
-      print('🔧 DEBUG: Отправляем запрос к sendMessageWithRAG...');
-      print('🔧 DEBUG: messages count: ${_buildChatContext().length}');
-      print('🔧 DEBUG: bot: ${widget.bot}');
-      
       final response = await _leo.sendMessageWithRAG(
         messages: _buildChatContext(),
         userContext: cleanUserContext,
@@ -230,11 +220,8 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
         bot: widget.bot,
         skipSpend: widget.caseMode,
       );
-      
-      print('🔧 DEBUG: Получен ответ от sendMessageWithRAG');
-      print('🔧 DEBUG: response keys: ${response.keys.toList()}');
+
       assistantMsg = response['message']['content'] as String? ?? '';
-      print('🔧 DEBUG: assistantMsg length: ${assistantMsg.length}');
 
       if (!widget.caseMode) {
         await _leo.saveConversation(
@@ -256,8 +243,6 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
       } catch (_) {}
       _scrollToBottom();
     } catch (e) {
-      print('🔧 DEBUG: ОШИБКА при отправке сообщения: $e');
-      print('🔧 DEBUG: Тип ошибки: ${e.runtimeType}');
       if (!mounted) return;
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text('Ошибка: $e')));
@@ -328,8 +313,9 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
       child: ListView.builder(
         controller: _scrollController,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        itemCount: _messages.length + (_hasMore ? 1 : 0),
+        itemCount: _messages.length + (_hasMore ? 1 : 0) + (_isSending ? 1 : 0),
         itemBuilder: (context, index) {
+          // 1) Плашка загрузки предыдущих сообщений
           if (_hasMore && index == 0) {
             return Center(
               child: _isLoadingMore
@@ -340,7 +326,30 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
                       onPressed: _loadMore, child: const Text('Загрузить ещё')),
             );
           }
-          final msgIndex = _hasMore ? index - 1 : index;
+          final offset = _hasMore ? 1 : 0;
+          final msgIndex = index - offset;
+          // 2) Последний элемент — индикатор набора, если ждём ответ
+          if (_isSending && msgIndex == _messages.length) {
+            return Align(
+              alignment: Alignment.centerLeft,
+              child: Container(
+                margin: const EdgeInsets.symmetric(vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                constraints: BoxConstraints(
+                    maxWidth: MediaQuery.of(context).size.width * 0.8),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade200,
+                  borderRadius: BorderRadius.circular(12).copyWith(
+                    topLeft: const Radius.circular(0),
+                    topRight: const Radius.circular(12),
+                  ),
+                ),
+                child: const TypingIndicator.small(),
+              ),
+            );
+          }
+          // 3) Обычные сообщения
           final msg = _messages[msgIndex];
           final isUser = msg['role'] == 'user';
           return LeoMessageBubble(

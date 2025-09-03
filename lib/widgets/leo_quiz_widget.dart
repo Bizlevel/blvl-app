@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:bizlevel/providers/leo_service_provider.dart';
 import 'package:bizlevel/widgets/leo_message_bubble.dart';
+import 'package:bizlevel/widgets/typing_indicator.dart';
 import 'package:bizlevel/theme/color.dart';
 
 class LeoQuizWidget extends ConsumerStatefulWidget {
@@ -221,6 +222,14 @@ class _LeoQuizWidgetState extends ConsumerState<LeoQuizWidget> {
               }),
               const SizedBox(height: 8),
               // Не дублируем выбранный ответ отдельным сообщением — он остаётся подсвеченной карточкой справа
+              if (_isSending)
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 8),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: TypingIndicator.small(),
+                  ),
+                ),
               if (_assistantMessage != null)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),

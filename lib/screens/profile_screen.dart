@@ -143,9 +143,7 @@ class ProfileScreen extends ConsumerWidget {
   }
 
   Widget _buildProfileContent(
-      BuildContext context, WidgetRef ref, UserModel user,
-      {bool? isPremiumOverride}) {
-    final isPremium = isPremiumOverride ?? user.isPremium;
+      BuildContext context, WidgetRef ref, UserModel user) {
     final gp = ref.watch(gpBalanceProvider).value?['balance'] ?? 0;
 
     final levelsAsync = ref.watch(levelsProvider);
@@ -192,6 +190,29 @@ class ProfileScreen extends ConsumerWidget {
                 ),
               ),
               actions: [
+                // Мини‑баланс GP в шапке профиля
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: InkWell(
+                    onTap: () {
+                      try {
+                        if (context.mounted) context.go('/gp-store');
+                      } catch (_) {}
+                    },
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SvgPicture.asset('assets/images/gp_coin.svg',
+                            width: 28, height: 28),
+                        const SizedBox(width: 6),
+                        Text('$gp',
+                            style: const TextStyle(
+                                fontSize: 18, fontWeight: FontWeight.w600)),
+                        const SizedBox(width: 6),
+                      ],
+                    ),
+                  ),
+                ),
                 PopupMenuButton<String>(
                   icon: const Icon(Icons.settings, color: Colors.grey),
                   onSelected: (value) async {
@@ -293,7 +314,6 @@ class ProfileScreen extends ConsumerWidget {
                 currentLevel: user.currentLevel,
                 messagesLeft: gp,
                 artifactsCount: artifactsCount,
-                isPremium: isPremium,
                 artifacts: artifacts,
               ),
             ),
@@ -311,7 +331,6 @@ class _Body extends ConsumerStatefulWidget {
     required this.currentLevel,
     required this.messagesLeft,
     required this.artifactsCount,
-    required this.isPremium,
     required this.artifacts,
   });
 
@@ -320,7 +339,6 @@ class _Body extends ConsumerStatefulWidget {
   final int currentLevel;
   final int messagesLeft;
   final int artifactsCount;
-  final bool isPremium;
   final List<Map<String, dynamic>> artifacts;
 
   @override
@@ -383,8 +401,36 @@ class _BodyState extends ConsumerState<_Body> {
   Future<void> _openArtifactsModal() async {
     if (widget.artifacts.isEmpty) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('У вас пока нет артефактов')),
+      await showModalBottomSheet<void>(
+        context: context,
+        backgroundColor: Colors.white,
+        builder: (ctx) {
+          return SizedBox(
+            height: 260,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.inventory_2_outlined,
+                      size: 48, color: Colors.grey),
+                  const SizedBox(height: 8),
+                  const Text('Артефактов пока нет',
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 4),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 24),
+                    child: Text(
+                      'Проходите уровни, чтобы открывать полезные материалы и шаблоны.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                  )
+                ],
+              ),
+            ),
+          );
+        },
       );
       return;
     }
@@ -508,7 +554,7 @@ class _BodyState extends ConsumerState<_Body> {
             mainAxisSpacing: AppSpacing.medium,
             crossAxisSpacing: AppSpacing.medium,
           ),
-          itemCount: 7,
+          itemCount: 12,
           itemBuilder: (_, index) {
             final id = index + 1;
             final asset = 'assets/images/avatars/avatar_${id}.png';
@@ -697,20 +743,6 @@ class _BodyState extends ConsumerState<_Body> {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  const SizedBox(width: AppSpacing.small),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.small,
-                        vertical: AppSpacing.small / 2),
-                    decoration: BoxDecoration(
-                      color: widget.isPremium ? AppColor.primary : Colors.grey,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      widget.isPremium ? 'Premium' : 'Free',
-                      style: const TextStyle(fontSize: 12, color: Colors.white),
-                    ),
-                  ),
                 ],
               ),
               const SizedBox(height: AppSpacing.small),
@@ -739,48 +771,6 @@ class _BodyState extends ConsumerState<_Body> {
           ),
         ),
         const SizedBox(width: AppSpacing.small),
-        Expanded(
-          child: InkWell(
-            borderRadius: BorderRadius.circular(12),
-            onTap: () {
-              try {
-                if (context.mounted) context.go('/gp-store');
-              } catch (_) {}
-            },
-            child: Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColor.shadowColor.withValues(alpha: 0.1),
-                    spreadRadius: 1,
-                    blurRadius: 3,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  SvgPicture.asset('assets/images/gp_coin.svg',
-                      width: 40, height: 40),
-                  const SizedBox(width: 12),
-                  Text(
-                    '${widget.messagesLeft}',
-                    style: const TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.w600,
-                      color: AppColor.primary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
         const SizedBox(width: AppSpacing.small),
         Expanded(
           child: InkWell(

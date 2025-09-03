@@ -18,6 +18,36 @@ class GpStoreScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          // Короткий вводный блок «Что такое GP»
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 6,
+                  offset: const Offset(0, 3),
+                )
+              ],
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                SvgPicture.asset('assets/images/gp_coin.svg',
+                    width: 36, height: 36),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text(
+                    'GP — внутренняя валюта BizLevel. Сообщения Лео/Максу стоят 1 GP, а также GP открывают доступ к новым этажам.',
+                    style: TextStyle(fontSize: 14),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
           _GpPlanCard(
             title: 'СТАРТ:',
             gpLabel: '300',
@@ -69,10 +99,9 @@ class GpStoreScreen extends ConsumerWidget {
                   final lastId = (box.get('last_purchase_id') as String?) ?? '';
                   if (lastId.isEmpty) {
                     if (!context.mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                          content: Text('Нет активной покупки для проверки')),
-                    );
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                        content: Text(
+                            'Нет активной покупки для проверки. Выберите пакет и оформите оплату.')));
                     return;
                   }
                   await Sentry.addBreadcrumb(Breadcrumb(
@@ -93,11 +122,13 @@ class GpStoreScreen extends ConsumerWidget {
                   );
                   final container = ProviderScope.containerOf(context);
                   container.invalidate(gpBalanceProvider);
-                } catch (_) {
+                } catch (e) {
                   if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Не удалось подтвердить')),
-                  );
+                  final msg = e.toString().contains('gp_purchase_not_found')
+                      ? 'Покупка не найдена. Завершите оплату и попробуйте снова.'
+                      : 'Не удалось подтвердить. Проверьте интернет или попробуйте позже.';
+                  ScaffoldMessenger.of(context)
+                      .showSnackBar(SnackBar(content: Text(msg)));
                 }
               },
               icon: const Icon(Icons.verified),

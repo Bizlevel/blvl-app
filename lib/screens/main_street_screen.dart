@@ -285,16 +285,21 @@ class _TopBarGp extends ConsumerWidget {
           GoRouter.of(context).go('/gp-store');
         } catch (_) {}
       },
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SvgPicture.asset('assets/images/gp_coin.svg', width: 36, height: 36),
-          const SizedBox(width: 8),
-          Text(
-            '$balance',
-            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 28),
-          ),
-        ],
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 44),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SvgPicture.asset('assets/images/gp_coin.svg',
+                width: 36, height: 36),
+            const SizedBox(width: 8),
+            Text(
+              '$balance',
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 28),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -346,38 +351,80 @@ class _MainActionCard extends StatelessWidget {
             onTap: onTap,
             child: Stack(
               children: [
-                // Иконка на весь доступный размер
+                // Иконка на весь доступный размер (пониженная насыщенность для "Скоро")
                 Positioned.fill(
                   child: Center(
                     child: FractionallySizedBox(
                       widthFactor: 0.9, // -10%
                       heightFactor: 0.9, // -10%
-                      child: svgAsset != null
-                          ? SvgPicture.asset(
-                              svgAsset!,
-                              fit: BoxFit.contain,
-                            )
-                          : Icon(
-                              icon,
-                              size: 64,
-                              color: foreground,
-                            ),
+                      child: Opacity(
+                        opacity: isSoon ? 0.45 : 1.0,
+                        child: svgAsset != null
+                            ? SvgPicture.asset(
+                                svgAsset!,
+                                fit: BoxFit.contain,
+                              )
+                            : Icon(
+                                icon,
+                                size: 64,
+                                color: foreground,
+                              ),
+                      ),
                     ),
                   ),
                 ),
-                // Заголовок в левом верхнем углу внутри карточки
+                // Заголовок над пиктограммой, по центру, с лёгкой тенью для читаемости
                 Positioned(
                   top: 8,
-                  left: 8,
+                  left: 0,
+                  right: 0,
                   child: Text(
                     title,
+                    textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.titleMedium!.copyWith(
-                          color: const Color(0xFF757575),
-                          fontWeight: FontWeight.w600,
-                          fontSize: 16,
+                      color: Colors.black87,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 16,
+                      shadows: [
+                        Shadow(
+                          color: Colors.black.withValues(alpha: 0.15),
+                          blurRadius: 4,
+                          offset: const Offset(0, 1),
                         ),
+                      ],
+                    ),
                   ),
                 ),
+                // Lock‑чип в правом верхнем углу для состояния "Скоро"
+                if (isSoon)
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.9),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.black12),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Icon(Icons.lock, size: 12, color: Colors.black54),
+                          SizedBox(width: 4),
+                          Text(
+                            'Скоро',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.black54,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
