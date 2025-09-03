@@ -1,9 +1,12 @@
 import 'dart:developer';
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb; // Import kIsWeb
+import 'dart:html' as html; // Import dart:html for window.location.origin
 
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bizlevel/services/gp_service.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 // No longer importing SupabaseService directly to enable dependency injection.
 
@@ -66,6 +69,64 @@ class AuthService {
       }
       return response;
     }, unknownErrorMessage: 'Неизвестная ошибка входа');
+  }
+
+  /// Signs in a user with Google.
+  Future<AuthResponse> signInWithGoogle() async {
+    return _handleAuthCall(() async {
+      // Web and mobile platforms have different redirect behaviors.
+      // For web, we use the signInWithOAuth method directly.
+      // For mobile, we use google_sign_in package to get an ID token,
+      // then sign in with Supabase using that token.
+      if (kIsWeb) {
+        final String redirectToUrl = html.window.location.origin;
+        log('Google Sign-In: Initiating web OAuth flow with redirectTo: $redirectToUrl');
+        await _client.auth.signInWithOAuth(
+          OAuthProvider.google,
+          redirectTo: redirectToUrl, // Dynamically set redirect for web
+        );
+        // For web, signInWithOAuth initiates a redirect, the actual session
+        // will be picked up by the onAuthStateChange listener.
+        // We return a dummy AuthResponse here to satisfy the return type.
+        return AuthResponse(session: null, user: null);
+      } else if (Platform.isAndroid || Platform.isIOS) {
+        final GoogleSignIn googleSignIn = GoogleSignIn(
+          serverClientId: '1094397921402-a0c2i2t5i4kkpodl710i934lp9am2u5l.apps.googleusercontent.com', // Your Web application Client ID
+        );
+        log('Google Sign-In: Attempting to sign in with Google...');
+        final googleUser = await googleSignIn.signIn();
+
+        if (googleUser == null) {
+          log('Google Sign-In: User cancelled or failed to sign in with Google.');
+          throw AuthFailure('Google Sign-In: User cancelled or failed to sign in.');
+        }
+
+        log('Google Sign-In: Google user obtained: ${googleUser.email}');
+        final googleAuth = await googleUser.authentication;
+        final accessToken = googleAuth.accessToken;
+        final idToken = googleAuth.idToken;
+
+        log('Google Sign-In: accessToken = $accessToken');
+        log('Google Sign-In: idToken = $idToken');
+
+        if (accessToken == null) {
+          throw AuthFailure('Google Sign-In: No access token found.');
+        }
+        if (idToken == null) {
+          throw AuthFailure('Google Sign-In: No ID token found.');
+        }
+
+        log('Google Sign-In: Signing in with Supabase using ID token...');
+        final response = await _client.auth.signInWithIdToken(
+          provider: OAuthProvider.google,
+          idToken: idToken,
+          accessToken: accessToken,
+        );
+        log('Google Sign-In: Supabase sign-in response: ${response.user?.email}');
+        return response;
+      }
+      throw AuthFailure('Unsupported platform for Google Sign-In.');
+    }, unknownErrorMessage: 'Неизвестная ошибка входа через Google');
   }
 
   /// Registers a new user with email & password.

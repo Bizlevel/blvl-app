@@ -195,6 +195,37 @@ class LoginScreen extends HookConsumerWidget {
                         ),
                       ),
                       const SizedBox(height: 16),
+                      // Кнопка входа через Google
+                      ElevatedButton.icon(
+                        onPressed: isLoading
+                            ? null
+                            : () async {
+                                await ref
+                                    .read(loginControllerProvider.notifier)
+                                    .signInWithGoogle();
+                              },
+                        icon: SvgPicture.asset(
+                          'assets/icons/google.svg', // Assuming you have a Google SVG icon
+                          height: 24,
+                          width: 24,
+                        ),
+                        label: const Text('Войти через Google'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: Colors.black87,
+                          minimumSize: const Size(double.infinity, 48),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: BorderSide(color: Colors.grey.shade300),
+                          ),
+                          elevation: 1,
+                          textStyle: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
                       TextButton(
                         onPressed: () => context.go('/register'),
                         child: const Text('Нет аккаунта? Зарегистрироваться'),
