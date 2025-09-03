@@ -1,12 +1,13 @@
 import 'dart:developer';
 import 'dart:io';
-import 'package:flutter/foundation.dart' show kIsWeb; // Import kIsWeb
-import 'dart:html' as html; // Import dart:html for window.location.origin
+import 'package:flutter/foundation.dart' show kIsWeb; // Import kIsWeb directly
+import 'package:bizlevel/utils/platform_html_stub.dart' if (dart.library.html) 'package:bizlevel/utils/platform_html_web.dart'; // Correct conditional import
 
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bizlevel/services/gp_service.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import '../utils/env_helper.dart'; // Import EnvHelper
 
 // No longer importing SupabaseService directly to enable dependency injection.
 
@@ -78,12 +79,19 @@ class AuthService {
       // For web, we use the signInWithOAuth method directly.
       // For mobile, we use google_sign_in package to get an ID token,
       // then sign in with Supabase using that token.
-      if (kIsWeb) {
-        final String redirectToUrl = html.window.location.origin;
-        log('Google Sign-In: Initiating web OAuth flow with redirectTo: $redirectToUrl');
+      if (kIsWeb) { // Use kIsWeb for platform detection
+        final String? redirectToUrl = PlatformHtml.locationOrigin;
+        if (redirectToUrl == null) {
+          throw AuthFailure('Web platform: Could not determine redirect URL.');
+        }
+        log('Supabase URL: ${envOrDefine('SUPABASE_URL')}');
+        log('Supabase Anon Key: ${envOrDefine('SUPABASE_ANON_KEY')}');
+        final String supabaseCallbackUrl = '${envOrDefine('SUPABASE_URL')}/auth/v1/callback';
+        final String finalRedirectTo = '$supabaseCallbackUrl?next=${PlatformHtml.locationOrigin}';
+        log('Google Sign-In: Initiating web OAuth flow with redirectTo: $finalRedirectTo');
         await _client.auth.signInWithOAuth(
           OAuthProvider.google,
-          redirectTo: redirectToUrl, // Dynamically set redirect for web
+          redirectTo: finalRedirectTo, // Use Supabase callback with next parameter
         );
         // For web, signInWithOAuth initiates a redirect, the actual session
         // will be picked up by the onAuthStateChange listener.
