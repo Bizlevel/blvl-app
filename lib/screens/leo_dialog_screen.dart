@@ -20,6 +20,12 @@ class LeoDialogScreen extends ConsumerStatefulWidget {
   final String bot; // 'leo' | 'max'
   final bool caseMode; // режим мини‑кейса: не тратим лимиты, не сохраняем чаты
   final String? systemPrompt; // опц. системный промпт (для кейса)
+  final String? firstPrompt; // опц. первый ассистентский промпт (для кейса)
+  final List<String>? casePrompts; // весь список промптов кейса (Q1..Qn)
+  final List<String>? caseContexts; // контексты для Q2..Qn (по индексам)
+  final String?
+      casePreface; // вступление перед первым заданием (например, список дел)
+  final String? finalStory; // развёрнутый финальный текст кейса
   final bool
       embedded; // когда true — рендер без Scaffold/AppBar (встраиваемый вид)
   final ValueChanged<String>?
@@ -35,9 +41,14 @@ class LeoDialogScreen extends ConsumerStatefulWidget {
     this.bot = 'leo',
     this.caseMode = false,
     this.systemPrompt,
+    this.firstPrompt,
+    this.casePrompts,
+    this.caseContexts,
     this.embedded = false,
     this.onAssistantMessage,
     this.recommendedChips,
+    this.casePreface,
+    this.finalStory,
   });
 
   @override
@@ -62,6 +73,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
   // int _remaining = -1; // −1 unknown (лимиты отключены)
 
   late final LeoService _leo;
+  int _caseStepIndex = -1; // -1 когда не в сценарии или не начато
 
   // Добавляем debounce для предотвращения дублей
   Timer? _debounceTimer;
@@ -73,12 +85,17 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
     _leo = ref.read(leoServiceProvider);
     // Лимиты сообщений отключены (этап 39.1)
     _chatId = widget.chatId;
-    // Автоприветствие: кейс → задание; иначе Алекс.
+    // Автоприветствие: кейс → первый промпт задания; иначе Макс приветствие
     if (widget.caseMode && _chatId == null && _messages.isEmpty) {
-      _messages.add({
-        'role': 'assistant',
-        'content': 'Начнём с короткого задания. Ответьте в 2–3 предложениях.',
-      });
+      final String start = (widget.firstPrompt?.trim().isNotEmpty == true)
+          ? widget.firstPrompt!.trim()
+          : 'Задание 1: Ответьте в 2–3 предложениях.';
+      final preface = widget.casePreface?.trim();
+      if (preface != null && preface.isNotEmpty) {
+        _messages.add({'role': 'assistant', 'content': preface});
+      }
+      _messages.add({'role': 'assistant', 'content': start});
+      _caseStepIndex = 0;
     } else if (widget.bot == 'max' && _chatId == null && _messages.isEmpty) {
       _messages.add({
         'role': 'assistant',
@@ -218,7 +235,8 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
         userContext: cleanUserContext,
         levelContext: cleanLevelContext,
         bot: widget.bot,
-        skipSpend: widget.caseMode,
+        // В режиме кейса теперь тоже списываем GP
+        skipSpend: false,
       );
 
       assistantMsg = response['message']['content'] as String? ?? '';
@@ -229,9 +247,109 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
       }
 
       if (!mounted) return;
+      // Скрываем служебные маркеры и префикс "Оценка:" для пользователя
+      String displayMsg = assistantMsg
+          .replaceAll(RegExp(r"\[CASE:(NEXT|RETRY|FINAL)\]"), '')
+          .replaceFirst(RegExp(r"^\s*Оценка\s*:\s*", caseSensitive: false), '')
+          .replaceFirst(
+              RegExp(
+                  r"^(EXCELLENT|GOOD|ACCEPTABLE|WEAK|INVALID)\s*[\.|\-–:]?\s*",
+                  caseSensitive: true),
+              '')
+          .replaceFirst(
+              RegExp(
+                  r"^(Excellent|Good|Acceptable|Weak|Invalid)\s*[\.|\-–:]?\s*",
+                  caseSensitive: false),
+              '')
+          .trim();
       setState(() {
-        _messages.add({'role': 'assistant', 'content': assistantMsg});
+        _messages.add({'role': 'assistant', 'content': displayMsg});
       });
+      // Реакция на маркеры сценария (после отображения очищенного текста)
+      if (widget.caseMode && widget.casePrompts != null) {
+        if (assistantMsg.contains('[CASE:NEXT]')) {
+          // Перейти к следующему заданию
+          final nextIndex = (_caseStepIndex >= 0) ? _caseStepIndex + 1 : 1;
+          if (nextIndex < (widget.casePrompts!.length)) {
+            _caseStepIndex = nextIndex;
+            // Показать контекст следующего вопроса, если имеется
+            final ctx = (widget.caseContexts != null &&
+                    nextIndex < widget.caseContexts!.length)
+                ? widget.caseContexts![nextIndex]
+                : '';
+            if (ctx.trim().isNotEmpty) {
+              setState(() {
+                _messages.add({'role': 'assistant', 'content': ctx.trim()});
+              });
+            }
+            // Показать следующий вопрос как ассистентское сообщение
+            final q = widget.casePrompts![nextIndex].trim();
+            if (q.isNotEmpty) {
+              setState(() {
+                _messages.add({'role': 'assistant', 'content': q});
+              });
+              _scrollToBottom();
+            }
+          }
+        } else if (assistantMsg.contains('[CASE:FINAL]')) {
+          // Показать финальную историю (если задана), затем CTA на возврат
+          final fs = widget.finalStory?.trim();
+          if (fs != null && fs.isNotEmpty) {
+            setState(() {
+              _messages.add({'role': 'assistant', 'content': fs});
+            });
+            _scrollToBottom();
+          }
+          if (!mounted) return;
+          // Кнопка в нижнем листе
+          // ignore: use_build_context_synchronously
+          await showModalBottomSheet(
+            context: context,
+            showDragHandle: true,
+            builder: (ctx) => SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.of(ctx).pop();
+                      Navigator.of(context).pop('case_final');
+                    },
+                    child: const Text('Вернуться в Башню'),
+                  ),
+                ),
+              ),
+            ),
+          );
+          return;
+        }
+      }
+      // Если ассистент сообщил о финале кейса — предложим вернуться в башню
+      if (assistantMsg.contains('[CASE:FINAL]')) {
+        if (!mounted) return;
+        final goBack = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Кейс завершён'),
+            content: const Text('Отличная работа! Перейти обратно на Башню?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('Остаться'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: const Text('Вернуться в Башню'),
+              ),
+            ],
+          ),
+        );
+        if (goBack == true && mounted) {
+          Navigator.of(context).pop('case_final');
+          return;
+        }
+      }
       // После успешного ответа обновим баланс GP в фоне
       try {
         // ignore: unused_result
