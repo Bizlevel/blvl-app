@@ -1,4 +1,4 @@
-/// Helper to get env value safely
+// Helper to get env value safely
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 String envOrDefine(String key, {String defaultValue = ''}) {
@@ -8,8 +8,9 @@ String envOrDefine(String key, {String defaultValue = ''}) {
 
     // Fallback: поддерживаем переменные в нижнем регистре (например, sentry_dsn)
     final lowerCaseValue = dotenv.env[key.toLowerCase()];
-    if (lowerCaseValue != null && lowerCaseValue.isNotEmpty)
+    if (lowerCaseValue != null && lowerCaseValue.isNotEmpty) {
       return lowerCaseValue;
+    }
   }
 
   switch (key) {

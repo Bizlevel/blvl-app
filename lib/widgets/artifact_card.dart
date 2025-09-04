@@ -20,11 +20,9 @@ class ArtifactCard extends StatelessWidget {
   Future<void> _download() async {
     String link = url;
     if (!link.startsWith('http')) {
-      // Подписываем URL через Supabase
+      // Подписываем URL через Supabase (реализация добавляется в репозитории уровней)
       try {
-        // lazy import to avoid heavy dep
-        // ignore: avoid_dynamic_calls
-        final supaUrl = await Future<dynamic>.microtask(() => null);
+        await Future<dynamic>.microtask(() => null);
       } catch (_) {}
     }
     final uri = Uri.parse(link);

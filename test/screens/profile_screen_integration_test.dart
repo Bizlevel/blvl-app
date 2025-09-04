@@ -2,7 +2,6 @@ import 'package:bizlevel/models/user_model.dart';
 import 'package:bizlevel/models/user_skill_model.dart';
 import 'package:bizlevel/providers/auth_provider.dart';
 import 'package:bizlevel/providers/levels_provider.dart';
-import 'package:bizlevel/providers/subscription_provider.dart';
 import 'package:bizlevel/repositories/user_repository.dart';
 import 'package:bizlevel/screens/profile_screen.dart';
 import 'package:flutter/material.dart';
@@ -66,7 +65,7 @@ void main() {
           authStateProvider.overrideWith((ref) => Stream.value(authState)),
           userRepositoryProvider.overrideWithValue(mockUserRepository),
           levelsProvider.overrideWith((ref) => Future.value([])),
-          subscriptionProvider.overrideWith((ref) => Stream.value('free')),
+          // подписки удалены; провайдер больше не используется
         ],
         child: const MaterialApp(
           home: ProfileScreen(),

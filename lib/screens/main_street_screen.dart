@@ -7,6 +7,7 @@ import 'package:bizlevel/providers/levels_provider.dart';
 import 'package:bizlevel/utils/formatters.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:bizlevel/providers/gp_providers.dart';
 
 class MainStreetScreen extends ConsumerWidget {
   const MainStreetScreen({super.key});
@@ -23,13 +24,21 @@ class MainStreetScreen extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Top bar with avatar/name/progress
+                // Top bar: аватар/имя слева, GP справа
                 Padding(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: Row(
                     children: const [
-                      Expanded(child: UserInfoBar()),
+                      // Левая часть — аватар/имя/уровень
+                      Expanded(
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: UserInfoBar(showGp: false),
+                        ),
+                      ),
+                      // Правая часть — только GP с кликом в /gp-store
+                      _TopBarGp(),
                     ],
                   ),
                 ),
@@ -59,8 +68,6 @@ class MainStreetScreen extends ConsumerWidget {
                             final int floorId = next['floorId'] as int? ?? 1;
                             final int levelNumber =
                                 next['levelNumber'] as int? ?? 0;
-                            final bool requiresPremium =
-                                next['requiresPremium'] as bool? ?? false;
                             final levelCode =
                                 formatLevelCode(floorId, levelNumber);
                             return SizedBox(
@@ -68,21 +75,17 @@ class MainStreetScreen extends ConsumerWidget {
                               child: ElevatedButton(
                                 onPressed: () {
                                   try {
-                                    if (requiresPremium) {
-                                      context.go('/premium');
+                                    final int? gver =
+                                        next['goalCheckpointVersion'] as int?;
+                                    if (gver != null) {
+                                      context.go('/goal-checkpoint/$gver');
                                     } else {
-                                      final int? gver =
-                                          next['goalCheckpointVersion'] as int?;
-                                      if (gver != null) {
-                                        context.go('/goal-checkpoint/$gver');
-                                      } else {
-                                        final levelNumber =
-                                            next['levelNumber'] as int? ?? 0;
-                                        final levelId =
-                                            next['levelId'] as int? ?? 0;
-                                        context.go(
-                                            '/levels/$levelId?num=$levelNumber');
-                                      }
+                                      final levelNumber =
+                                          next['levelNumber'] as int? ?? 0;
+                                      final levelId =
+                                          next['levelId'] as int? ?? 0;
+                                      context.go(
+                                          '/levels/$levelId?num=$levelNumber');
                                     }
                                   } catch (e, st) {
                                     Sentry.captureException(e, stackTrace: st);
@@ -265,6 +268,35 @@ class _MainActionsGrid extends ConsumerWidget {
         ],
       );
     });
+  }
+}
+
+class _TopBarGp extends ConsumerWidget {
+  const _TopBarGp();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final gpAsync = ref.watch(gpBalanceProvider);
+    final balance = gpAsync.value?['balance'];
+    if (balance == null) return const SizedBox.shrink();
+    return InkWell(
+      onTap: () {
+        try {
+          GoRouter.of(context).go('/gp-store');
+        } catch (_) {}
+      },
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SvgPicture.asset('assets/images/gp_coin.svg', width: 36, height: 36),
+          const SizedBox(width: 8),
+          Text(
+            '$balance',
+            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 28),
+          ),
+        ],
+      ),
+    );
   }
 }
 
