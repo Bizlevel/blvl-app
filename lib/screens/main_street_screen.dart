@@ -179,8 +179,18 @@ class _MainActionsGrid extends ConsumerWidget {
                     title: 'Библиотека',
                     icon: Icons.menu_book,
                     svgAsset: 'assets/images/street/library.svg',
-                    state: _CardState.soon,
-                    onTap: () => _showSoonSnackBar(context),
+                    state: _CardState.active,
+                    onTap: () {
+                      try {
+                        context.go('/library');
+                      } catch (e, st) {
+                        Sentry.captureException(e, stackTrace: st);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                              content: Text('Не удалось открыть страницу')),
+                        );
+                      }
+                    },
                   ),
                 ),
                 const SizedBox(width: gap),

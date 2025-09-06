@@ -17,6 +17,8 @@ import '../screens/goal_screen.dart';
 import '../screens/mini_case_screen.dart';
 import '../screens/goal_checkpoint_screen.dart';
 import '../screens/gp_store_screen.dart';
+import '../screens/library/library_screen.dart';
+import '../screens/library/library_section_screen.dart';
 
 /// Riverpod provider that exposes the [GoRouter] instance used across the app.
 ///
@@ -85,6 +87,17 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/gp-store',
         builder: (context, state) => const GpStoreScreen(),
+      ),
+      GoRoute(
+        path: '/library',
+        builder: (context, state) => const LibraryScreen(),
+      ),
+      GoRoute(
+        path: '/library/:type',
+        builder: (context, state) {
+          final type = state.pathParameters['type'] ?? 'courses';
+          return LibrarySectionScreen(type: type);
+        },
       ),
     ],
   );
