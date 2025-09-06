@@ -17,6 +17,7 @@ import 'package:bizlevel/screens/goal/widgets/crystallization_section.dart';
 import 'package:bizlevel/screens/goal/widgets/progress_widget.dart';
 import 'package:bizlevel/screens/goal/widgets/sprint_section.dart';
 import 'package:bizlevel/screens/goal/controller/goal_screen_controller.dart';
+import 'package:bizlevel/utils/constant.dart';
 
 class GoalScreen extends ConsumerStatefulWidget {
   const GoalScreen({super.key});
@@ -71,6 +72,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
   bool _consultedLeo = false;
   bool _appliedTechniques = false;
   final TextEditingController _keyInsightCtrl = TextEditingController();
+  // Краткие данные по неделям удалены — аккордеон получает summary из провайдера
   // details for weekly progress
   final TextEditingController _artifactsDetailsCtrl = TextEditingController();
   final TextEditingController _consultedBenefitCtrl = TextEditingController();
@@ -90,6 +92,13 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
       await ref.read(goalScreenControllerProvider.notifier).loadVersions();
       final st = ref.read(goalScreenControllerProvider);
       _fillControllersFor(st.selectedVersion, st.versions);
+      // Если есть v4 — выбираем текущую неделю по дате старта
+      final hasV4 = st.versions.containsKey(4);
+      if (hasV4) {
+        final currentWeek =
+            ref.read(goalScreenControllerProvider.notifier).currentWeekNumber();
+        _selectedSprint = currentWeek;
+      }
       if (mounted) setState(() {});
     });
 
@@ -326,6 +335,64 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                             metricActual:
                                 double.tryParse(_metricActualCtrl.text.trim()),
                           ),
+                          const SizedBox(height: 8),
+                          // Прогресс по версиям и подсказка «что дальше»
+                          Builder(builder: (context) {
+                            final hasV1 = gs.versions.containsKey(1);
+                            final hasV2 = gs.versions.containsKey(2);
+                            final hasV3 = gs.versions.containsKey(3);
+                            final hasV4 = gs.versions.containsKey(4);
+                            final int percent = hasV4
+                                ? 100
+                                : (hasV3
+                                    ? 75
+                                    : (hasV2 ? 50 : (hasV1 ? 25 : 0)));
+                            String nextHint;
+                            VoidCallback? onCta;
+                            if (hasV4) {
+                              nextHint = 'Все этапы цели заполнены';
+                            } else if (hasV3) {
+                              nextHint = 'Заполните v4 «Финал» на чекпоинте';
+                              onCta = () => Navigator.of(context)
+                                  .pushNamed('/goal-checkpoint/4');
+                            } else if (hasV2) {
+                              nextHint = 'Заполните v3 «SMART» на чекпоинте';
+                              onCta = () => Navigator.of(context)
+                                  .pushNamed('/goal-checkpoint/3');
+                            } else if (hasV1) {
+                              nextHint = 'Заполните v2 «Метрики» на чекпоинте';
+                              onCta = () => Navigator.of(context)
+                                  .pushNamed('/goal-checkpoint/2');
+                            } else {
+                              nextHint = 'Создайте v1 «Семя цели» на Уровне 1';
+                            }
+                            return Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: AppColor.primary
+                                        .withValues(alpha: 0.08),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text('Прогресс: $percent%'),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(nextHint,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall),
+                                ),
+                                if (onCta != null)
+                                  TextButton(
+                                    onPressed: onCta,
+                                    child: const Text('Что дальше'),
+                                  ),
+                              ],
+                            );
+                          }),
                           const SizedBox(height: 16),
                           CrystallizationSection(
                             versions: gs.versions,
@@ -505,6 +572,23 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
   Future<void> _onSaveSprint() async {
     try {
       final repo = ref.read(goalsRepositoryProvider);
+      // Валидации 43.30: длина week_result ≤100, metric_value число (если указано)
+      if (_achievementCtrl.text.trim().length > 100) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Главное за неделю: максимум 100 символов')),
+        );
+        return;
+      }
+      if (_metricActualCtrl.text.trim().isNotEmpty &&
+          double.tryParse(_metricActualCtrl.text.trim()) == null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Метрика: введите число')),
+        );
+        return;
+      }
       // Собираем чекбоксы в текст деталей техник (минимальная интеграция без DDL)
       final List<String> checks = [];
       if (_chkEisenhower) checks.add('Матрица Эйзенхауэра');
@@ -542,10 +626,29 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
         techniquesDetails: techniquesSummary.isEmpty ? null : techniquesSummary,
       );
       if (!mounted) return;
+      Sentry.addBreadcrumb(Breadcrumb(
+        category: 'goal',
+        type: 'info',
+        message: 'weekly_checkin_saved',
+        data: {
+          'week': _selectedSprint,
+          'has_metric': _metricActualCtrl.text.trim().isNotEmpty,
+        },
+        level: SentryLevel.info,
+      ));
       setState(() => _sprintSaved = true);
       ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Итоги спринта сохранены')));
-      _openChatWithMax();
+      if (kEnableClientWeeklyReaction) {
+        Sentry.addBreadcrumb(Breadcrumb(
+          category: 'goal',
+          type: 'info',
+          message: 'weekly_reaction_requested_client',
+          data: {'week': _selectedSprint},
+          level: SentryLevel.info,
+        ));
+        _openChatWithMax();
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -576,6 +679,16 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                 ),
                 levelContext: 'current_level: ${user?.currentLevel ?? 0}',
                 bot: 'max',
+                // После сохранения чек‑ина отправляем тонкую реакцию Макса
+                autoUserMessage: _sprintSaved
+                    ? 'weekly_checkin: Неделя ${_selectedSprint}; Итог: ' +
+                        _achievementCtrl.text.trim() +
+                        '; Метрика: ' +
+                        _metricActualCtrl.text.trim()
+                    : null,
+                skipSpend: _sprintSaved,
+                recommendedChips:
+                    _sprintSaved ? _weeklyRecommendedChips() : null,
               ),
               loading: () => const Scaffold(
                   body: Center(child: CircularProgressIndicator())),
@@ -584,5 +697,17 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
             ),
       ),
     );
+  }
+
+  List<String> _weeklyRecommendedChips() {
+    final List<String> chips = [];
+    chips.add('План на следующую неделю');
+    if (_metricActualCtrl.text.trim().isNotEmpty) {
+      chips.add('Как ускорить рост метрики');
+    } else {
+      chips.add('Выбрать метрику для фокуса');
+    }
+    chips.add('Что мешает, как убрать препятствия');
+    return chips;
   }
 }

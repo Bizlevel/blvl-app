@@ -10,6 +10,8 @@ class SprintSection extends StatelessWidget {
     required this.versions,
     required this.selectedSprint,
     required this.onSelectSprint,
+    this.weekSummaries = const <int, Map<String, dynamic>>{},
+    this.currentWeek = 1,
     required this.achievementCtrl,
     required this.metricActualCtrl,
     required this.keyInsightCtrl,
@@ -31,6 +33,8 @@ class SprintSection extends StatelessWidget {
   final Map<int, Map<String, dynamic>> versions;
   final int selectedSprint;
   final ValueChanged<int> onSelectSprint;
+  final Map<int, Map<String, dynamic>> weekSummaries;
+  final int currentWeek;
   final TextEditingController achievementCtrl;
   final TextEditingController metricActualCtrl;
   final TextEditingController keyInsightCtrl;
@@ -141,6 +145,53 @@ class SprintSection extends StatelessWidget {
             onSelectSprint: onSelectSprint,
           ),
           const SizedBox(height: 12),
+          // Краткие карточки недель (аккордеон): текущая открыта, прошлые свернуты
+          Column(
+            children: List.generate(4, (i) {
+              final w = i + 1;
+              final summary = weekSummaries[w] ?? const <String, dynamic>{};
+              final bool isCurrent = w == selectedSprint;
+              final String title = 'Неделя $w';
+              final String subtitle = (summary['achievement'] ??
+                      summary['key_insight'] ??
+                      '') as String? ??
+                  '';
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColor.shadowColor.withValues(alpha: 0.06),
+                      blurRadius: 3,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
+                ),
+                child: ListTile(
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  leading: Icon(
+                    isCurrent
+                        ? Icons.radio_button_checked
+                        : Icons.radio_button_unchecked,
+                    color: isCurrent ? AppColor.primary : Colors.grey,
+                  ),
+                  title: Text(title),
+                  subtitle: subtitle.isNotEmpty
+                      ? Text(subtitle,
+                          maxLines: 1, overflow: TextOverflow.ellipsis)
+                      : null,
+                  trailing: w > currentWeek
+                      ? const Icon(Icons.lock_outline,
+                          size: 18, color: Colors.grey)
+                      : const Icon(Icons.chevron_right),
+                  onTap: () => onSelectSprint(w),
+                ),
+              );
+            }),
+          ),
           const SizedBox(height: 12),
           CheckInForm(
             achievementCtrl: achievementCtrl,
@@ -164,4 +215,3 @@ class SprintSection extends StatelessWidget {
     );
   }
 }
-

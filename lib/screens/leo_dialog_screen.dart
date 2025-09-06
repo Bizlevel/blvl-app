@@ -32,6 +32,9 @@ class LeoDialogScreen extends ConsumerStatefulWidget {
       onAssistantMessage; // колбэк для получения ответа ассистента
   final List<String>?
       recommendedChips; // опц. серверные подсказки (fallback на клиенте)
+  final String?
+      autoUserMessage; // при передаче — автоматически отправить это сообщение
+  final bool skipSpend; // пропуск списаний GP для тонкой реакции
 
   const LeoDialogScreen({
     super.key,
@@ -49,6 +52,8 @@ class LeoDialogScreen extends ConsumerStatefulWidget {
     this.recommendedChips,
     this.casePreface,
     this.finalStory,
+    this.autoUserMessage,
+    this.skipSpend = false,
   });
 
   @override
@@ -97,14 +102,23 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
       _messages.add({'role': 'assistant', 'content': start});
       _caseStepIndex = 0;
     } else if (widget.bot == 'max' && _chatId == null && _messages.isEmpty) {
-      _messages.add({
-        'role': 'assistant',
-        'content':
-            'Я — Макс, трекер цели BizLevel. Помогаю кристаллизовать цель и держать темп 28 дней. Напишите, чего хотите добиться — предложу ближайший шаг.',
-      });
+      final String greeting = (widget.firstPrompt?.trim().isNotEmpty == true)
+          ? widget.firstPrompt!.trim()
+          : 'Я — Макс, трекер цели BizLevel. Помогаю кристаллизовать цель и держать темп 28 дней. Напишите, чего хотите добиться — предложу ближайший шаг.';
+      _messages.add({'role': 'assistant', 'content': greeting});
     }
     if (_chatId != null) {
       _loadMessages();
+    }
+
+    // Автоматическая отправка пользовательского сообщения (тонкая реакция)
+    if (widget.autoUserMessage != null &&
+        widget.autoUserMessage!.trim().isNotEmpty) {
+      // Отправляем асинхронно после первого кадра, чтобы не мешать построению
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (!mounted) return;
+        await _sendMessageInternal(widget.autoUserMessage!.trim());
+      });
     }
   }
 
@@ -235,8 +249,8 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
         userContext: cleanUserContext,
         levelContext: cleanLevelContext,
         bot: widget.bot,
-        // В режиме кейса теперь тоже списываем GP
-        skipSpend: false,
+        // Тонкая реакция: можно пропустить списания GP
+        skipSpend: widget.skipSpend,
       );
 
       assistantMsg = response['message']['content'] as String? ?? '';
