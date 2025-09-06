@@ -138,3 +138,90 @@
   2) Sentry.captureException на критических путях; без логирования PII/JWT.
   3) Semantics(label, button) на интерактивах; минимальные размеры ≥44 px.
 - Критерии приёмки: отсутствуют RenderFlex overflow; ошибки логируются в Sentry без утечек.
+
+\
+
+# Этап 45 — UX/UI консолидация и дизайн‑система (на основе design-optimization(after_st44).md)
+
+### Задача 45.1: Дизайн‑токены и базовая тема
+- Файлы: `lib/theme/typography.dart` (новый), `lib/theme/spacing.dart` (новый), `lib/theme/color.dart` (обновить), `lib/main.dart` (подключить тему).
+- Что сделать:
+  1) `typography.dart`: определить базовый `TextTheme` (display/headline/title/body/label, h1–h6, caption, button) с размерами и межстрочными интервалами.
+  2) `spacing.dart`: токены `xs=4, sm=8, md=12, lg=16, xl=24, 2xl=32, 3xl=48` + утилиты `insets(all,h,v)` и `gap(height|width)`.
+  3) `color.dart`: ввести семантические роли (`primary/success/warning/error/info/surface/onSurface/border/divider/shadow`), убрать прямые `Colors.*`, устранить дубли (warning=premium), централизовать `withOpacity/withValues`.
+  4) Подключить `ThemeData` в `main.dart` (или существующем месте) и настроить `ElevatedButtonTheme`, `TextButtonTheme`, `InputDecorationTheme`, `SnackBarThemeData`.
+- Критерии приёмки: сборка без регрессий, отсутствие прямых `Colors.*` в теме, линтеры чистые.
+
+### Задача 45.2: Стандартизация кнопок (BizLevelButton)
+- Файлы: `lib/widgets/common/bizlevel_button.dart` (новый), замены в: `lib/screens/level_detail_screen.dart`, `lib/screens/leo_dialog_screen.dart`, `lib/screens/gp_store_screen.dart`, `lib/screens/profile_screen.dart`.
+- Что сделать:
+  1) Создать `BizLevelButton` c вариантами `primary | secondary | outline | text | danger | link`, размерами `sm | md | lg` и токенами отступов.
+  2) Заменить inline `ElevatedButton.styleFrom(...)` и прямые цвета на `BizLevelButton` в перечисленных файлах (CTA «Завершить уровень», «Обсудить с Лео», «Проверить покупку», кнопки профиля).
+- Критерии приёмки: визуальный паритет, единые размеры/отступы, без дублирования стилей.
+
+### Задача 45.3: Карточки (BizLevelCard)
+- Файлы: `lib/widgets/common/bizlevel_card.dart` (новый), замены в: `lib/screens/library/library_screen.dart`, `lib/screens/gp_store_screen.dart`, `lib/screens/profile_screen.dart`, `lib/screens/levels_map_screen.dart`, `lib/screens/main_street_screen.dart`.
+- Что сделать:
+  1) Создать `BizLevelCard` с преднастройками: radius, elevation, padding, тени по токенам.
+  2) Заменить повторяющиеся `Container/Card` с одинаковыми стилями в указанных экранах.
+- Критерии приёмки: визуальный паритет, снижение дублирования стилей.
+
+### Задача 45.4: Единые состояния (Loading/Error/Empty)
+- Файлы: `lib/widgets/common/bizlevel_loading.dart` (новый), `lib/widgets/common/bizlevel_error.dart` (новый), `lib/widgets/common/bizlevel_empty.dart` (новый);
+  рефактор: `lib/screens/profile_screen.dart`, `lib/screens/levels_map_screen.dart`, `lib/screens/library/library_section_screen.dart`, `lib/screens/library/library_screen.dart`, `lib/screens/main_street_screen.dart`, `lib/screens/goal_checkpoint_screen.dart`, `lib/screens/leo_dialog_screen.dart`, `lib/screens/mini_case_screen.dart`.
+- Что сделать:
+  1) Ввести стандартные виджеты состояний: inline/fullscreen/sliver варианты загрузки; error с title/message/retry; empty с icon/title/subtitle/CTA.
+  2) Заменить `.when(loading|error)` и `CircularProgressIndicator` на унифицированные компоненты.
+- Критерии приёмки: единый стиль состояний, присутствует retry там, где есть загрузка из сети.
+
+### Задача 45.5: Производительность списков (ListView.builder)
+- Файлы: `lib/screens/library/library_screen.dart:202`, `lib/screens/gp_store_screen.dart:18`, `lib/widgets/leo_quiz_widget.dart:157`.
+- Что сделать:
+  1) Заменить `ListView(` → `ListView.builder` для потенциально длинных списков; исключение: короткие списки допускаются, но желательно унифицировать.
+  2) Исключить изменения в auto‑generated файлах (`lib/models/lesson_model.freezed.dart`).
+- Критерии приёмки: без регрессий скролла, нет лишних перерисовок.
+
+### Задача 45.6: Accessibility и тестируемость (Semantics + Keys)
+- Файлы: `lib/screens/levels_map_screen.dart`, `lib/screens/biz_tower_screen.dart`, `lib/screens/profile_screen.dart`, `lib/screens/leo_dialog_screen.dart` и ключевые карточки/CTA.
+- Что сделать:
+  1) Добавить `Semantics`/`semanticsLabel` для карточек уровней, узлов башни (как кнопок), аватара/артефактов/GP‑баланса, кнопок чата.
+  2) Добавить `Key(...)` для критичных элементов (корневые экраны, карточки, CTA‑кнопки) для тестов.
+- Критерии приёмки: a11y‑аудит без явных пропусков, виджеты доступны по ключам в тестах.
+
+### Задача 45.7: Навигация и breadcrumbs
+- Файлы: `lib/widgets/common/breadcrumb.dart` (новый), интеграция: `lib/screens/level_detail_screen.dart`, `lib/screens/library/library_section_screen.dart`.
+- Что сделать:
+  1) Добавить простой `Breadcrumb` (root → раздел → текущая страница) и вывести его на глубинных экранах.
+  2) Стандартизировать поведение back (AppBar/gesture) через утилиту/mixin.
+  3) Валидация deep links в `utils/deep_link.dart` (unit‑тесты на корректную нормализацию).
+- Критерии приёмки: breadcrumb отображается корректно, back‑UX консистентен, тесты для deep‑links проходят.
+
+### Задача 45.8: Mobile‑first и адаптивность
+- Файлы: `lib/utils/responsive.dart` (новый), правки: 
+  `lib/screens/library/library_section_screen.dart` (width 120/180 → адаптивные),
+  `lib/screens/goal/widgets/weeks_timeline_row.dart` (width 120 → адаптивно),
+  `lib/screens/goal/widgets/motivation_card.dart` (width 120),
+  `lib/screens/goal/widgets/crystallization_section.dart` (width 180),
+  `lib/widgets/user_info_bar.dart` (width 120),
+  `lib/widgets/recommend_item.dart` (width 300),
+  а также фиксированные height 290/420/180/190 (заменить на зависимые от размеров экрана/constraints).
+- Что сделать:
+  1) Ввести helpers: `isMobile/tablet/desktop`, breakpoints (напр. 600/1024/1400).
+  2) Перевести фиксированные размеры на расчетные (проценты/ограничения).
+- Критерии приёмки: отсутствие overflow, читабельность на мобайл/таблет/десктоп.
+
+### Задача 45.9: Башня — консолидация темы
+- Файлы: `lib/screens/biz_tower_screen.dart`, `lib/screens/tower/tower_grid.dart`, `lib/screens/tower/tower_painters.dart`, `lib/screens/tower/tower_tiles.dart`, `lib/screens/tower/tower_floor_widgets.dart`, `lib/screens/tower/tower_constants.dart`.
+- Что сделать:
+  1) Централизовать цвета путей/точек/стен через `AppColor`/локальный `TowerTheme`.
+  2) Связать `kPathStroke/kCornerRadius/kPathAlpha` с токенами темы; убедиться в `RepaintBoundary` там, где нужно.
+  3) Добавить `const` к статичным узлам/текстам.
+- Критерии приёмки: визуальный паритет, отсутствие лишних перерисовок.
+
+### Задача 45.10: Метрики, документация и тесты
+- Файлы: `docs/status.md`, тесты `test/**` (screens/widgets/routing).
+- Что сделать:
+  1) После внедрения — обновить метрики (Color(0x..)/Colors./TextStyle/EdgeInsets/Semantics) в `design-optimization(after_st44).md`.
+  2) Добавить запись в `docs/status.md` «Задача 45: UX/UI консолидация…» (≤5 строк, формат проекта).
+  3) Тесты: smoke на `/library`, `/levels/:id`, состояния Loading/Error/Empty, breadcrumb рендер; unit на deep‑links.
+- Критерии приёмки: тесты зелёные локально/CI, метрики улучшаются согласно целям.
