@@ -14,28 +14,16 @@ class MotivationCard extends ConsumerStatefulWidget {
 }
 
 class _MotivationCardState extends ConsumerState<MotivationCard> {
-  bool _collapsed = false;
-
-  @override
-  void initState() {
-    super.initState();
-    Future.delayed(const Duration(seconds: 5), () {
-      if (!mounted) return;
-      setState(() => _collapsed = true);
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     final quoteAsync = ref.watch(dailyQuoteProvider);
-    final double targetHeight = _collapsed ? 80 : 120;
+    const double targetHeight = 120;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 250),
       curve: Curves.easeInOut,
       height: targetHeight,
       child: InkWell(
-        onTap: () => setState(() => _collapsed = !_collapsed),
         borderRadius: BorderRadius.circular(12),
         child: Container(
           width: double.infinity,
@@ -134,9 +122,7 @@ class _MotivationCardState extends ConsumerState<MotivationCard> {
                             overflow: TextOverflow.ellipsis,
                           ),
                           AppSpacing.gapH(4),
-                          if (!_collapsed &&
-                              author != null &&
-                              author.isNotEmpty)
+                          if (author != null && author.isNotEmpty)
                             Text(
                               '— $author',
                               style: Theme.of(context)

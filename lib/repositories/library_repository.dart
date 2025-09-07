@@ -11,6 +11,25 @@ class LibraryRepository {
 
   Future<Box> _openBox() => Hive.openBox('library');
 
+  // === Общие хелперы кеша/логирования ===
+  Future<void> _capture(Object error, StackTrace st) async {
+    await Sentry.captureException(error, stackTrace: st);
+  }
+
+  List<Map<String, dynamic>>? _readCached(Box box, String cacheKey) {
+    final cached = box.get(cacheKey);
+    if (cached == null) return null;
+    return List<Map<String, dynamic>>.from(cached as List);
+  }
+
+  Future<void> _saveCached(
+    Box box,
+    String cacheKey,
+    List<Map<String, dynamic>> data,
+  ) async {
+    await box.put(cacheKey, data);
+  }
+
   Future<List<Map<String, dynamic>>> _fetchListSWR({
     required String cacheKey,
     required Future<List<dynamic>> Function() fetch,
@@ -20,82 +39,70 @@ class LibraryRepository {
       final rows = await fetch();
       final data =
           rows.map((e) => Map<String, dynamic>.from(e as Map)).toList();
-      await box.put(cacheKey, data);
+      await _saveCached(box, cacheKey, data);
       return data;
-    } on PostgrestException catch (e, st) {
-      await Sentry.captureException(e, stackTrace: st);
-      final cached = box.get(cacheKey);
-      if (cached != null) {
-        return List<Map<String, dynamic>>.from(cached as List);
-      }
-      rethrow;
-    } on SocketException {
-      final cached = box.get(cacheKey);
-      if (cached != null) {
-        return List<Map<String, dynamic>>.from(cached as List);
-      }
-      rethrow;
     } catch (e, st) {
-      await Sentry.captureException(e, stackTrace: st);
-      final cached = box.get(cacheKey);
-      if (cached != null) {
-        return List<Map<String, dynamic>>.from(cached as List);
-      }
+      await _capture(e, st);
+      final cached = _readCached(box, cacheKey);
+      if (cached != null) return cached;
       rethrow;
     }
   }
 
-  Future<List<Map<String, dynamic>>> fetchCourses({String? category}) async {
-    final cacheKey = 'courses.v2:${category ?? '_all'}';
-    const cols =
-        'id,title,platform,url,description,category,sort_order,is_active';
+  // === Унификация выборок разделов ===
+  Future<List<Map<String, dynamic>>> _swrSelectList({
+    required String cacheKey,
+    required String table,
+    required String columns,
+    required String orderBy,
+    String? category,
+  }) async {
     return _fetchListSWR(
       cacheKey: cacheKey,
       fetch: () async {
-        var q =
-            _client.from('library_courses').select(cols).eq('is_active', true);
+        var q = _client.from(table).select(columns).eq('is_active', true);
         if (category != null && category.isNotEmpty) {
           q = q.eq('category', category);
         }
-        return await q.order('sort_order') as List<dynamic>;
+        return await q.order(orderBy) as List<dynamic>;
       },
     );
   }
 
-  Future<List<Map<String, dynamic>>> fetchGrants({String? category}) async {
-    final cacheKey = 'grants.v2:${category ?? '_all'}';
+  Future<List<Map<String, dynamic>>> fetchCourses({String? category}) async {
     const cols =
-        'id,title,organizer,url,description,category,sort_order,is_active';
-    return _fetchListSWR(
-      cacheKey: cacheKey,
-      fetch: () async {
-        var q =
-            _client.from('library_grants').select(cols).eq('is_active', true);
-        if (category != null && category.isNotEmpty) {
-          q = q.eq('category', category);
-        }
-        return await q.order('sort_order') as List<dynamic>;
-      },
+        'id,title,platform,url,description,category,sort_order,is_active,target_audience,language,duration';
+    return _swrSelectList(
+      cacheKey: 'courses.v3:${category ?? '_all'}',
+      table: 'library_courses',
+      columns: cols,
+      orderBy: 'sort_order',
+      category: category,
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> fetchGrants({String? category}) async {
+    const cols =
+        'id,title,organizer,url,description,category,sort_order,is_active,support_type,amount,deadline,target_audience';
+    return _swrSelectList(
+      cacheKey: 'grants.v3:${category ?? '_all'}',
+      table: 'library_grants',
+      columns: cols,
+      orderBy: 'sort_order',
+      category: category,
     );
   }
 
   Future<List<Map<String, dynamic>>> fetchAccelerators(
       {String? category}) async {
-    final cacheKey = 'accelerators.v2:${category ?? '_all'}';
     const cols =
-        'id,title,organizer,url,description,category,sort_order,is_active';
-    return _fetchListSWR(
-      cacheKey: cacheKey,
-      fetch: () async {
-        var q = _client
-            .from('library_accelerators')
-            .select(cols)
-            .eq('is_active', true);
-        if (category != null && category.isNotEmpty) {
-          q = q.eq('category', category);
-        }
-        return await q.order('sort_order') as List<dynamic>;
-      },
+        'id,title,organizer,url,description,category,sort_order,is_active,format,duration,language,benefits,requirements,target_audience';
+    return _swrSelectList(
+      cacheKey: 'accelerators.v3:${category ?? '_all'}',
+      table: 'library_accelerators',
+      columns: cols,
+      orderBy: 'sort_order',
+      category: category,
     );
   }
 
@@ -187,43 +194,12 @@ class LibraryRepository {
     }
 
     try {
-      final favRows = await _client
-          .from('library_favorites')
-          .select('id, resource_type, resource_id, created_at')
-          .order('created_at', ascending: false) as List<dynamic>;
+      final favorites = await _loadFavoritesRows();
+      final ids = _splitFavoriteIds(favorites);
 
-      final favorites =
-          favRows.map((e) => Map<String, dynamic>.from(e as Map)).toList();
-
-      final courseIds = favorites
-          .where((f) => f['resource_type'] == 'course')
-          .map((f) => f['resource_id'] as String)
-          .toList();
-      final grantIds = favorites
-          .where((f) => f['resource_type'] == 'grant')
-          .map((f) => f['resource_id'] as String)
-          .toList();
-      final accelIds = favorites
-          .where((f) => f['resource_type'] == 'accelerator')
-          .map((f) => f['resource_id'] as String)
-          .toList();
-
-      Future<List<Map<String, dynamic>>> fetchBy(
-        String table,
-        List<String> ids, {
-        List<String> columns = const ['id', 'title', 'url'],
-      }) async {
-        if (ids.isEmpty) return <Map<String, dynamic>>[];
-        final rows = await _client
-            .from(table)
-            .select(columns.join(','))
-            .inFilter('id', ids) as List<dynamic>;
-        return rows.map((e) => Map<String, dynamic>.from(e as Map)).toList();
-      }
-
-      final courses = await fetchBy(
-        'library_courses',
-        courseIds,
+      final courses = await _fetchByIds(
+        table: 'library_courses',
+        ids: ids.courseIds,
         columns: const [
           'id',
           'title',
@@ -235,9 +211,9 @@ class LibraryRepository {
           'url'
         ],
       );
-      final grants = await fetchBy(
-        'library_grants',
-        grantIds,
+      final grants = await _fetchByIds(
+        table: 'library_grants',
+        ids: ids.grantIds,
         columns: const [
           'id',
           'title',
@@ -250,9 +226,9 @@ class LibraryRepository {
           'url'
         ],
       );
-      final accels = await fetchBy(
-        'library_accelerators',
-        accelIds,
+      final accels = await _fetchByIds(
+        table: 'library_accelerators',
+        ids: ids.accelIds,
         columns: const [
           'id',
           'title',
@@ -274,14 +250,70 @@ class LibraryRepository {
         'accelerators': accels,
       };
     } on PostgrestException catch (e, st) {
-      await Sentry.captureException(e, stackTrace: st);
-      // Для детализированного избранного офлайн-кеш не реализуем (MVP)
+      await _capture(e, st);
       rethrow;
     } on SocketException {
       rethrow;
     } catch (e, st) {
-      await Sentry.captureException(e, stackTrace: st);
+      await _capture(e, st);
       rethrow;
     }
   }
+
+  // === Хелперы для избранного ===
+  Future<List<Map<String, dynamic>>> _loadFavoritesRows() async {
+    final rows = await _client
+        .from('library_favorites')
+        .select('id, resource_type, resource_id, created_at')
+        .order('created_at', ascending: false) as List<dynamic>;
+    return rows.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
+
+  _FavoriteIdGroups _splitFavoriteIds(List<Map<String, dynamic>> favorites) {
+    final courseIds = <String>[];
+    final grantIds = <String>[];
+    final accelIds = <String>[];
+
+    for (final f in favorites) {
+      final type = f['resource_type']?.toString();
+      final id = f['resource_id']?.toString();
+      if (id == null || id.isEmpty) continue;
+      if (type == 'course') {
+        courseIds.add(id);
+      } else if (type == 'grant') {
+        grantIds.add(id);
+      } else if (type == 'accelerator') {
+        accelIds.add(id);
+      }
+    }
+    return _FavoriteIdGroups(
+      courseIds: courseIds,
+      grantIds: grantIds,
+      accelIds: accelIds,
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchByIds({
+    required String table,
+    required List<String> ids,
+    required List<String> columns,
+  }) async {
+    if (ids.isEmpty) return <Map<String, dynamic>>[];
+    final rows = await _client
+        .from(table)
+        .select(columns.join(','))
+        .inFilter('id', ids) as List<dynamic>;
+    return rows.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
+}
+
+class _FavoriteIdGroups {
+  final List<String> courseIds;
+  final List<String> grantIds;
+  final List<String> accelIds;
+  const _FavoriteIdGroups({
+    required this.courseIds,
+    required this.grantIds,
+    required this.accelIds,
+  });
 }

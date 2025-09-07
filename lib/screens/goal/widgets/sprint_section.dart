@@ -145,53 +145,7 @@ class SprintSection extends StatelessWidget {
             selectedSprint: selectedSprint,
             onSelectSprint: onSelectSprint,
           ),
-          AppSpacing.gapH(12),
-          // Краткие карточки недель (аккордеон): текущая открыта, прошлые свернуты
-          Column(
-            children: List.generate(4, (i) {
-              final w = i + 1;
-              final summary = weekSummaries[w] ?? const <String, dynamic>{};
-              final bool isCurrent = w == selectedSprint;
-              final String title = 'Неделя $w';
-              final String subtitle = (summary['achievement'] ??
-                      summary['key_insight'] ??
-                      '') as String? ??
-                  '';
-              return Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                decoration: BoxDecoration(
-                  color: AppColor.surface,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColor.shadowColor.withValues(alpha: 0.06),
-                      blurRadius: 3,
-                      offset: const Offset(0, 1),
-                    ),
-                  ],
-                ),
-                child: ListTile(
-                  contentPadding: AppSpacing.insetsSymmetric(h: 12, v: 6),
-                  leading: Icon(
-                    isCurrent
-                        ? Icons.radio_button_checked
-                        : Icons.radio_button_unchecked,
-                    color: isCurrent ? AppColor.primary : AppColor.labelColor,
-                  ),
-                  title: Text(title),
-                  subtitle: subtitle.isNotEmpty
-                      ? Text(subtitle,
-                          maxLines: 1, overflow: TextOverflow.ellipsis)
-                      : null,
-                  trailing: w > currentWeek
-                      ? const Icon(Icons.lock_outline,
-                          size: 18, color: AppColor.labelColor)
-                      : const Icon(Icons.chevron_right),
-                  onTap: () => onSelectSprint(w),
-                ),
-              );
-            }),
-          ),
+          // Вертикальный список недель скрыт по требованию (оставлена только горизонтальная лента)
           AppSpacing.gapH(12),
           CheckInForm(
             achievementCtrl: achievementCtrl,
