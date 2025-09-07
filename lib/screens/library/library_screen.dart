@@ -4,6 +4,10 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:bizlevel/providers/library_providers.dart';
+import 'package:bizlevel/widgets/common/bizlevel_card.dart';
+import 'package:bizlevel/widgets/common/bizlevel_empty.dart';
+import 'package:bizlevel/widgets/common/bizlevel_error.dart';
+import 'package:bizlevel/widgets/common/bizlevel_loading.dart';
 
 class LibraryScreen extends ConsumerWidget {
   const LibraryScreen({super.key});
@@ -140,47 +144,36 @@ class _SectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Semantics(
-            button: true,
-            label: title,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(minHeight: 44),
-              child: Row(
+    return BizLevelCard(
+      onTap: onTap,
+      padding: const EdgeInsets.all(16),
+      semanticsLabel: title,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 44),
+        child: Row(
+          children: [
+            Icon(icon, size: 32),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(icon, size: 32),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          title,
-                          style:
-                              Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                  Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          subtitle,
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                      ],
-                    ),
                   ),
-                  const Icon(Icons.chevron_right),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
                 ],
               ),
             ),
-          ),
+            const Icon(Icons.chevron_right),
+          ],
         ),
       ),
     );
@@ -197,64 +190,76 @@ class _FavoritesTab extends ConsumerWidget {
         final grants = rows['grants'] ?? const <Map<String, dynamic>>[];
         final accels = rows['accelerators'] ?? const <Map<String, dynamic>>[];
         if (courses.isEmpty && grants.isEmpty && accels.isEmpty) {
-          return const Center(child: Text('В избранном пока пусто'));
+          return const BizLevelEmpty(
+            icon: Icons.star_border,
+            title: 'В избранном пока пусто',
+            subtitle: 'Добавляйте ресурсы, чтобы быстро вернуться к ним позже',
+          );
         }
-        return ListView(
+        final sections = <Widget>[];
+        if (courses.isNotEmpty) {
+          sections.addAll([
+            Semantics(
+              header: true,
+              child:
+                  Text('Курсы', style: TextStyle(fontWeight: FontWeight.w600)),
+            ),
+            const SizedBox(height: 8),
+            ...courses.map((r) => ListTile(
+                  leading: const Icon(Icons.menu_book),
+                  title: Text((r['title'] ?? '').toString()),
+                  subtitle: Text((r['platform'] ?? '').toString()),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => _openExternal(context, r['url']?.toString()),
+                )),
+            const SizedBox(height: 16),
+          ]);
+        }
+        if (grants.isNotEmpty) {
+          sections.addAll([
+            Semantics(
+              header: true,
+              child: Text('Гранты и поддержка',
+                  style: TextStyle(fontWeight: FontWeight.w600)),
+            ),
+            const SizedBox(height: 8),
+            ...grants.map((r) => ListTile(
+                  leading: const Icon(Icons.volunteer_activism),
+                  title: Text((r['title'] ?? '').toString()),
+                  subtitle: Text((r['organizer'] ?? '').toString()),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => _openExternal(context, r['url']?.toString()),
+                )),
+            const SizedBox(height: 16),
+          ]);
+        }
+        if (accels.isNotEmpty) {
+          sections.addAll([
+            Semantics(
+              header: true,
+              child: Text('Акселераторы',
+                  style: TextStyle(fontWeight: FontWeight.w600)),
+            ),
+            const SizedBox(height: 8),
+            ...accels.map((r) => ListTile(
+                  leading: const Icon(Icons.rocket_launch),
+                  title: Text((r['title'] ?? '').toString()),
+                  subtitle: Text((r['organizer'] ?? '').toString()),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => _openExternal(context, r['url']?.toString()),
+                )),
+          ]);
+        }
+        return ListView.builder(
           padding: const EdgeInsets.all(16),
-          children: [
-            if (courses.isNotEmpty) ...[
-              Semantics(
-                header: true,
-                child: Text('Курсы',
-                    style: TextStyle(fontWeight: FontWeight.w600)),
-              ),
-              const SizedBox(height: 8),
-              ...courses.map((r) => ListTile(
-                    leading: const Icon(Icons.menu_book),
-                    title: Text((r['title'] ?? '').toString()),
-                    subtitle: Text((r['platform'] ?? '').toString()),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () => _openExternal(context, r['url']?.toString()),
-                  )),
-              const SizedBox(height: 16),
-            ],
-            if (grants.isNotEmpty) ...[
-              Semantics(
-                header: true,
-                child: Text('Гранты и поддержка',
-                    style: TextStyle(fontWeight: FontWeight.w600)),
-              ),
-              const SizedBox(height: 8),
-              ...grants.map((r) => ListTile(
-                    leading: const Icon(Icons.volunteer_activism),
-                    title: Text((r['title'] ?? '').toString()),
-                    subtitle: Text((r['organizer'] ?? '').toString()),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () => _openExternal(context, r['url']?.toString()),
-                  )),
-              const SizedBox(height: 16),
-            ],
-            if (accels.isNotEmpty) ...[
-              Semantics(
-                header: true,
-                child: Text('Акселераторы',
-                    style: TextStyle(fontWeight: FontWeight.w600)),
-              ),
-              const SizedBox(height: 8),
-              ...accels.map((r) => ListTile(
-                    leading: const Icon(Icons.rocket_launch),
-                    title: Text((r['title'] ?? '').toString()),
-                    subtitle: Text((r['organizer'] ?? '').toString()),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () => _openExternal(context, r['url']?.toString()),
-                  )),
-            ],
-          ],
+          itemCount: sections.length,
+          itemBuilder: (context, index) => sections[index],
         );
       },
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(
-        child: Text('Ошибка загрузки избранного'),
+      loading: () => BizLevelLoading.fullscreen(),
+      error: (e, _) => const BizLevelError(
+        title: 'Ошибка загрузки избранного',
+        fullscreen: true,
       ),
     );
   }

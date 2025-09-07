@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:sentry_flutter/sentry_flutter.dart';
+import 'package:sentry_flutter/sentry_flutter.dart' hide Breadcrumb;
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:bizlevel/providers/library_providers.dart';
+import 'package:bizlevel/widgets/common/breadcrumb.dart';
 
 class LibrarySectionScreen extends ConsumerStatefulWidget {
   final String type; // 'courses' | 'grants' | 'accelerators'
@@ -50,6 +51,25 @@ class _LibrarySectionScreenState extends ConsumerState<LibrarySectionScreen> {
       ),
       body: Column(
         children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Breadcrumb(
+              items: [
+                BreadcrumbItem(
+                  label: 'Главная',
+                  onTap: () => context.go('/home'),
+                ),
+                BreadcrumbItem(
+                  label: 'Библиотека',
+                  onTap: () => context.go('/library'),
+                ),
+                BreadcrumbItem(
+                  label: _titleForType(widget.type),
+                  isCurrent: true,
+                ),
+              ],
+            ),
+          ),
           _CategoryFilter(
             onSelected: (c) => setState(() => _category = c),
           ),
@@ -240,15 +260,6 @@ class _ResourceCard extends StatelessWidget {
     final title = (data['title'] ?? '').toString();
     final platform = (data['platform'] ?? data['organizer'] ?? '').toString();
     final description = (data['description'] ?? '').toString();
-    final targetAudience = (data['target_audience'] ?? '').toString();
-    final language = (data['language'] ?? '').toString();
-    final duration = (data['duration'] ?? '').toString();
-    final supportType = (data['support_type'] ?? '').toString();
-    final amount = (data['amount'] ?? '').toString();
-    final deadline = (data['deadline'] ?? '').toString();
-    final format = (data['format'] ?? '').toString();
-    final benefits = (data['benefits'] ?? '').toString();
-    final requirements = (data['requirements'] ?? '').toString();
     final url = (data['url'] ?? '').toString();
 
     return Card(
@@ -342,7 +353,9 @@ class _DynamicInfo extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         SizedBox(
-                          width: isNarrow ? 120 : 180,
+                          width: isNarrow
+                              ? (constraints.maxWidth * 0.36).clamp(100, 160)
+                              : (constraints.maxWidth * 0.28).clamp(140, 220),
                           child: Text(r[0], style: textStyleLabel),
                         ),
                         Expanded(child: Text(r[1], style: textStyleValue)),

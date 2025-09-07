@@ -10,14 +10,16 @@ const double kSidePadding = 24.0; // боковые отступы внутри 
 const double kCornerRadius = 20.0; // радиус скругления углов линий
 const double kPathStroke = 8.0; // толщина путей
 const double kPathAlpha = 0.6; // прозрачность путей
+const double kDotAlpha = 0.06; // прозрачность точек фона
 
 // Общие константы стилей для плиток
 const double kTileRadius = 12.0;
-const BorderSide kTileBorderSide = BorderSide(color: Colors.black26, width: 4);
+const BorderSide kTileBorderSide =
+    BorderSide(color: AppColor.borderColor, width: 4);
 const List<BoxShadow> kTileShadows = [
-  BoxShadow(color: Color(0x11000000), blurRadius: 8, offset: Offset(0, 4)),
+  BoxShadow(color: AppColor.shadowColor, blurRadius: 8, offset: Offset(0, 4)),
   BoxShadow(
-      color: Color(0x24000000),
+      color: AppColor.shadowColor,
       blurRadius: 14,
       spreadRadius: 1,
       offset: Offset(0, 6)),

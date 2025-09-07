@@ -55,8 +55,8 @@ class _OnboardingVideoScreenState extends ConsumerState<OnboardingVideoScreen> {
           materialProgressColors: ChewieProgressColors(
             playedColor: AppColor.primary,
             handleColor: AppColor.primary,
-            backgroundColor: Colors.grey.shade300,
-            bufferedColor: Colors.grey.shade400,
+            backgroundColor: AppColor.dividerColor,
+            bufferedColor: AppColor.labelColor,
           ),
           autoInitialize: true,
           showControls: true,
@@ -137,7 +137,7 @@ class _OnboardingVideoScreenState extends ConsumerState<OnboardingVideoScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: AppColor.textColor,
       body: SafeArea(
         child: Stack(
           children: [
@@ -154,14 +154,15 @@ class _OnboardingVideoScreenState extends ConsumerState<OnboardingVideoScreen> {
                               if (!_videoController!.value.isPlaying)
                                 IconButton(
                                   iconSize: 64,
-                                  color: Colors.white,
+                                  color: AppColor.onPrimary,
                                   icon: const Icon(Icons.play_arrow),
                                   onPressed: () => _videoController!.play(),
                                 ),
                             ],
                           ),
                         )
-                      : const CircularProgressIndicator(color: Colors.white))
+                      : const CircularProgressIndicator(
+                          color: AppColor.onPrimary))
                   : (_chewieController != null &&
                           _chewieController!
                               .videoPlayerController.value.isInitialized
@@ -169,7 +170,8 @@ class _OnboardingVideoScreenState extends ConsumerState<OnboardingVideoScreen> {
                           aspectRatio: 9 / 16,
                           child: Chewie(controller: _chewieController!),
                         )
-                      : const CircularProgressIndicator(color: Colors.white)),
+                      : const CircularProgressIndicator(
+                          color: AppColor.onPrimary)),
             ),
             Positioned(
               right: 16,
@@ -179,7 +181,7 @@ class _OnboardingVideoScreenState extends ConsumerState<OnboardingVideoScreen> {
                 child: Text(
                   'Пропустить',
                   style: TextStyle(
-                    color: _canSkip ? Colors.white : Colors.white54,
+                    color: _canSkip ? AppColor.onPrimary : AppColor.labelColor,
                     fontSize: 16,
                   ),
                 ),

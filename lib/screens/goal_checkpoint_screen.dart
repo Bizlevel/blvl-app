@@ -10,6 +10,8 @@ import 'package:bizlevel/widgets/goal_version_form.dart';
 import 'package:bizlevel/screens/leo_dialog_screen.dart';
 // removed unused AppColor import after intro block removal
 import 'package:bizlevel/utils/constant.dart';
+import 'package:bizlevel/theme/color.dart';
+import 'package:bizlevel/widgets/common/bizlevel_button.dart';
 
 class GoalCheckpointScreen extends ConsumerStatefulWidget {
   final int version;
@@ -835,11 +837,11 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: AppColor.surface,
                         borderRadius: BorderRadius.circular(12),
                         boxShadow: const [
                           BoxShadow(
-                              color: Color(0x11000000),
+                              color: AppColor.shadowColor,
                               blurRadius: 8,
                               offset: Offset(0, 4))
                         ],
@@ -852,10 +854,14 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
                               style: TextStyle(
                                   fontSize: 16, fontWeight: FontWeight.w600)),
                           const SizedBox(height: 8),
-                          ElevatedButton.icon(
-                            onPressed: _loadAndFill,
-                            icon: const Icon(Icons.refresh),
-                            label: const Text('Повторить'),
+                          SizedBox(
+                            height: 44,
+                            child: BizLevelButton(
+                              label: 'Повторить',
+                              onPressed: _loadAndFill,
+                              variant: BizLevelButtonVariant.primary,
+                              size: BizLevelButtonSize.md,
+                            ),
                           )
                         ],
                       ),
@@ -867,15 +873,15 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Colors.orange.withValues(alpha: 0.08),
+                          color: AppColor.warning.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                              color: Colors.orange.withValues(alpha: 0.5)),
+                              color: AppColor.warning.withValues(alpha: 0.5)),
                         ),
                         child: Row(
                           children: [
                             const Icon(Icons.info_outline,
-                                color: Colors.orange),
+                                color: AppColor.warning),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
@@ -912,13 +918,15 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
                       return Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Colors.grey.withValues(alpha: 0.08),
+                          color: AppColor.labelColor.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                              color: Colors.grey.withValues(alpha: 0.4)),
+                              color:
+                                  AppColor.labelColor.withValues(alpha: 0.4)),
                         ),
                         child: Row(children: [
-                          const Icon(Icons.lock_outline, color: Colors.grey),
+                          const Icon(Icons.lock_outline,
+                              color: AppColor.labelColor),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
@@ -935,11 +943,11 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: AppColor.surface,
                           borderRadius: BorderRadius.circular(12),
                           boxShadow: const [
                             BoxShadow(
-                                color: Color(0x11000000),
+                                color: AppColor.shadowColor,
                                 blurRadius: 8,
                                 offset: Offset(0, 4))
                           ],
@@ -1034,11 +1042,13 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
                                   ),
                                 SizedBox(
                                   height: 44,
-                                  child: OutlinedButton(
+                                  child: BizLevelButton(
+                                    label: 'Сохранить шаг →',
                                     onPressed: widget.version != _latestVersion
                                         ? null
                                         : _saveActiveField,
-                                    child: const Text('Сохранить шаг →'),
+                                    variant: BizLevelButtonVariant.secondary,
+                                    size: BizLevelButtonSize.md,
                                   ),
                                 ),
                                 const Spacer(),
@@ -1047,19 +1057,14 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
                                     _totalFields > 0)
                                   SizedBox(
                                     height: 44,
-                                    child: ElevatedButton(
+                                    child: BizLevelButton(
+                                      label: 'Готово → к Башне',
                                       onPressed: (_saving ||
                                               widget.version != _latestVersion)
                                           ? null
                                           : _save,
-                                      child: _saving
-                                          ? const SizedBox(
-                                              width: 18,
-                                              height: 18,
-                                              child: CircularProgressIndicator(
-                                                  strokeWidth: 2,
-                                                  color: Colors.white))
-                                          : const Text('Готово → к Башне'),
+                                      variant: BizLevelButtonVariant.primary,
+                                      size: BizLevelButtonSize.md,
                                     ),
                                   ),
                               ],

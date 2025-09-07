@@ -10,19 +10,31 @@ class AppColor {
   static const warning = Color(0xFFF59E0B);
 
   static const darker = Color(0xFF475569);
-  static const cardColor = Colors.white;
+  // Семантические роли поверхности/текста/границ
+  static const surface = Color(0xFFFFFFFF);
   static const appBgColor = Color(0xFFFAFBFC);
   static const appBarColor = Color(0xFFF1F5F9);
-  static const bottomBarColor = Colors.white;
-  static const inActiveColor = Colors.grey;
-  static const shadowColor = Colors.black12;
-  static const textBoxColor = Colors.white;
+  static const cardColor = surface;
+  static const bottomBarColor = surface;
+  static const inActiveColor = Color(0xFF9CA3AF);
+  static const shadowColor = Color(0x1F000000);
+  static const textBoxColor = surface;
   static const textColor = Color(0xFF0F172A);
-  static const glassTextColor = Colors.white;
+  static const glassTextColor = Color(0xFFFFFFFF);
   static const labelColor = Color(0xFF94A3B8);
-  static const glassLabelColor = Colors.white;
+  static const glassLabelColor = Color(0xFFFFFFFF);
   static const borderColor = Color(0xFFCBD5E1);
   static const dividerColor = Color(0xFFE2E8F0);
+
+  // Доп. семантические алиасы для удобства
+  static const onSurface = textColor;
+  static const onSurfaceSubtle = labelColor;
+  static const onPrimary = Color(0xFFFFFFFF);
+  static const appBackground = appBgColor;
+  static const card = cardColor;
+  static const border = borderColor;
+  static const divider = dividerColor;
+  static const shadow = shadowColor;
 
   // Градиент фона приложения (базовый)
   static const bgGradient = LinearGradient(

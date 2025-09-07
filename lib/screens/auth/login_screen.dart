@@ -6,8 +6,9 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../providers/login_controller.dart';
 import '../../services/auth_service.dart';
-import '../../theme/color.dart';
+import '../../theme/color.dart' show AppColor;
 import '../../widgets/custom_textfield.dart';
+import '../../theme/spacing.dart';
 
 class LoginScreen extends HookConsumerWidget {
   const LoginScreen({super.key});
@@ -62,7 +63,7 @@ class LoginScreen extends HookConsumerWidget {
         ),
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
+            padding: AppSpacing.insetsSymmetric(h: 24, v: 48),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -71,21 +72,23 @@ class LoginScreen extends HookConsumerWidget {
                   Container(
                     width: double.infinity,
                     margin: const EdgeInsets.only(bottom: 16),
-                    padding: const EdgeInsets.all(16),
+                    padding: AppSpacing.insetsAll(16),
                     decoration: BoxDecoration(
-                      color: Colors.green.withValues(alpha: 0.1),
+                      color: AppColor.success.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+                      border: Border.all(
+                          color: AppColor.success.withValues(alpha: 0.3)),
                     ),
                     child: const Row(
                       children: [
-                        Icon(Icons.check_circle, color: Colors.green, size: 24),
+                        Icon(Icons.check_circle,
+                            color: AppColor.success, size: 24),
                         SizedBox(width: 12),
                         Expanded(
                           child: Text(
                             'Вы успешно зарегистрировались!',
                             style: TextStyle(
-                              color: Colors.green,
+                              color: AppColor.success,
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
                             ),
@@ -106,14 +109,13 @@ class LoginScreen extends HookConsumerWidget {
                     }
                     return 420.0;
                   }(),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                  padding: AppSpacing.insetsSymmetric(h: 24, v: 32),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: AppColor.surface,
                     borderRadius: BorderRadius.circular(24),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.05),
+                        color: AppColor.textColor.withValues(alpha: 0.05),
                         blurRadius: 12,
                         offset: const Offset(0, 4),
                       ),
@@ -125,10 +127,10 @@ class LoginScreen extends HookConsumerWidget {
                         width: 96,
                         height: 96,
                         decoration: const BoxDecoration(
-                          color: Color(0xFFf0f0f0),
+                          color: AppColor.dividerColor,
                           shape: BoxShape.circle,
                         ),
-                        padding: const EdgeInsets.all(8),
+                        padding: AppSpacing.insetsAll(8),
                         child: SvgPicture.asset(
                           'assets/images/logo_light.svg',
                           width: 80,
@@ -136,14 +138,14 @@ class LoginScreen extends HookConsumerWidget {
                           fit: BoxFit.contain,
                         ),
                       ),
-                      const SizedBox(height: 32),
+                      AppSpacing.gapH(32),
                       CustomTextBox(
                         key: const ValueKey('email_field'),
                         hint: 'Email',
                         prefix: const Icon(Icons.email_outlined),
                         controller: emailController,
                       ),
-                      const SizedBox(height: 16),
+                      AppSpacing.gapH(16),
                       // поле пароля с глазом
                       CustomTextBox(
                         key: const ValueKey('password_field'),
@@ -159,7 +161,7 @@ class LoginScreen extends HookConsumerWidget {
                               obscurePassword.value = !obscurePassword.value,
                         ),
                       ),
-                      const SizedBox(height: 24),
+                      AppSpacing.gapH(24),
                       // Градиентная кнопка
                       GestureDetector(
                         onTap: isLoading ? null : submit,
@@ -168,7 +170,7 @@ class LoginScreen extends HookConsumerWidget {
                           width: double.infinity,
                           decoration: BoxDecoration(
                             gradient: const LinearGradient(
-                              colors: [AppColor.primary, Color(0xFF1273C4)],
+                              colors: [AppColor.primary, AppColor.info],
                               begin: Alignment.centerLeft,
                               end: Alignment.centerRight,
                             ),
@@ -180,21 +182,21 @@ class LoginScreen extends HookConsumerWidget {
                                   width: 22,
                                   height: 22,
                                   child: CircularProgressIndicator(
-                                    color: Colors.white,
+                                    color: AppColor.onPrimary,
                                     strokeWidth: 3,
                                   ),
                                 )
                               : const Text(
                                   'Войти',
                                   style: TextStyle(
-                                    color: Colors.white,
+                                    color: AppColor.onPrimary,
                                     fontSize: 16,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      AppSpacing.gapH(16),
                       TextButton(
                         onPressed: () => context.go('/register'),
                         child: const Text('Нет аккаунта? Зарегистрироваться'),

@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 
-import 'package:bizlevel/theme/color.dart';
+import 'package:bizlevel/theme/color.dart' show AppColor;
 import 'package:bizlevel/screens/goal/widgets/weeks_timeline_row.dart';
 import 'package:bizlevel/screens/goal/widgets/checkin_form.dart';
+import 'package:bizlevel/theme/spacing.dart';
 
 class SprintSection extends StatelessWidget {
   const SprintSection({
@@ -58,9 +59,9 @@ class SprintSection extends StatelessWidget {
     if (!hasV4) {
       return Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(16),
+        padding: AppSpacing.insetsAll(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColor.surface,
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
@@ -72,8 +73,8 @@ class SprintSection extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Icon(Icons.lock_outline, color: Colors.grey.shade400, size: 28),
-            const SizedBox(width: 12),
+            Icon(Icons.lock_outline, color: AppColor.labelColor, size: 28),
+            AppSpacing.gapW(12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -81,15 +82,15 @@ class SprintSection extends StatelessWidget {
                   Text(
                     '🔒 Путь к цели заблокирован',
                     style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          color: Colors.grey.shade700,
+                          color: AppColor.textColor,
                           fontWeight: FontWeight.w600,
                         ),
                   ),
-                  const SizedBox(height: 4),
+                  AppSpacing.gapH(4),
                   Text(
                     'Завершите версию v4 для разблокировки 28-дневного пути к цели',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.grey.shade600,
+                          color: AppColor.labelColor,
                           height: 1.3,
                         ),
                   ),
@@ -104,9 +105,9 @@ class SprintSection extends StatelessWidget {
     return Container(
       key: sectionKey,
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: AppSpacing.insetsAll(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColor.surface,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
@@ -138,13 +139,13 @@ class SprintSection extends StatelessWidget {
               );
             },
           ),
-          const SizedBox(height: 16),
+          AppSpacing.gapH(16),
           WeeksTimelineRow(
             versions: versions,
             selectedSprint: selectedSprint,
             onSelectSprint: onSelectSprint,
           ),
-          const SizedBox(height: 12),
+          AppSpacing.gapH(12),
           // Краткие карточки недель (аккордеон): текущая открыта, прошлые свернуты
           Column(
             children: List.generate(4, (i) {
@@ -159,7 +160,7 @@ class SprintSection extends StatelessWidget {
               return Container(
                 margin: const EdgeInsets.only(bottom: 8),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: AppColor.surface,
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
@@ -170,13 +171,12 @@ class SprintSection extends StatelessWidget {
                   ],
                 ),
                 child: ListTile(
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  contentPadding: AppSpacing.insetsSymmetric(h: 12, v: 6),
                   leading: Icon(
                     isCurrent
                         ? Icons.radio_button_checked
                         : Icons.radio_button_unchecked,
-                    color: isCurrent ? AppColor.primary : Colors.grey,
+                    color: isCurrent ? AppColor.primary : AppColor.labelColor,
                   ),
                   title: Text(title),
                   subtitle: subtitle.isNotEmpty
@@ -185,14 +185,14 @@ class SprintSection extends StatelessWidget {
                       : null,
                   trailing: w > currentWeek
                       ? const Icon(Icons.lock_outline,
-                          size: 18, color: Colors.grey)
+                          size: 18, color: AppColor.labelColor)
                       : const Icon(Icons.chevron_right),
                   onTap: () => onSelectSprint(w),
                 ),
               );
             }),
           ),
-          const SizedBox(height: 12),
+          AppSpacing.gapH(12),
           CheckInForm(
             achievementCtrl: achievementCtrl,
             metricActualCtrl: metricActualCtrl,

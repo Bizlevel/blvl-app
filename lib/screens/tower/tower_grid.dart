@@ -97,7 +97,8 @@ List<_GridSegment> _buildSegments(List<_Placed> placed) {
       } else if (isCurrent) {
         color = AppColor.info; // активный — основной цвет
       } else if (isLocked) {
-        color = Colors.grey.withValues(alpha: 0.6); // заблокирован — серый ≈60%
+        color = AppColor.labelColor
+            .withValues(alpha: 0.6); // заблокирован — серый ≈60%
       } else {
         color = AppColor.info;
       }
@@ -163,7 +164,7 @@ class _TowerGrid extends StatelessWidget {
                     painter: _DotGridPainter(
                         spacing: 120,
                         radius: 3,
-                        color: Colors.black.withValues(alpha: 0.06)),
+                        color: AppColor.textColor.withValues(alpha: kDotAlpha)),
                   ),
                 ),
               ),

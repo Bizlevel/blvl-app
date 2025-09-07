@@ -8,6 +8,8 @@ import 'package:bizlevel/providers/gp_providers.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bizlevel/services/gp_service.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:bizlevel/widgets/common/bizlevel_modal.dart';
+import 'package:bizlevel/theme/ui_strings.dart';
 
 part 'tower/tower_constants.dart';
 part 'tower/tower_helpers.dart';
@@ -23,7 +25,8 @@ part 'tower/tower_floor_widgets.dart';
 /// Внешний API/поведение не меняем; внутренняя структура упрощена.
 class BizTowerScreen extends ConsumerStatefulWidget {
   final int? scrollTo;
-  const BizTowerScreen({super.key, this.scrollTo});
+  const BizTowerScreen(
+      {super.key = const Key('biz_tower_screen'), this.scrollTo});
 
   @override
   ConsumerState<BizTowerScreen> createState() => _BizTowerScreenState();
@@ -86,8 +89,7 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
             SizedBox(height: 2),
             Text(
               'Этаж 1: База предпринимательства',
-              style: TextStyle(
-                  fontSize: 12, color: Color.fromARGB(137, 42, 42, 42)),
+              style: TextStyle(fontSize: 12, color: AppColor.labelColor),
             ),
           ],
         ),
@@ -174,9 +176,9 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
                   right: 24,
                   child: Row(
                     children: [
-                      Container(width: 3, color: Colors.black26),
+                      Container(width: 3, color: AppColor.dividerColor),
                       const Spacer(),
-                      Container(width: 3, color: Colors.black26),
+                      Container(width: 3, color: AppColor.dividerColor),
                     ],
                   ),
                 ),
@@ -246,7 +248,7 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
                     const SizedBox(height: 8),
                     Text(e.toString(),
                         textAlign: TextAlign.center,
-                        style: const TextStyle(color: Colors.black54)),
+                        style: const TextStyle(color: AppColor.labelColor)),
                     const SizedBox(height: 16),
                     ElevatedButton.icon(
                       onPressed: () {

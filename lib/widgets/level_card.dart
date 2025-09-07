@@ -65,7 +65,7 @@ class _LevelCardState extends State<LevelCard> {
               border: Border.all(
                 color: _isCurrent
                     ? AppColor.info
-                    : Colors.grey.withValues(alpha: 0.3),
+                    : AppColor.labelColor.withValues(alpha: 0.3),
                 width: _isCurrent ? 2 : 1,
               ),
               borderRadius: BorderRadius.circular(20),
@@ -141,7 +141,7 @@ class _LevelCardState extends State<LevelCard> {
       child: Container(
         padding: const EdgeInsets.all(6),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.8),
+          color: AppColor.surface.withValues(alpha: 0.8),
           shape: BoxShape.circle,
         ),
         child: const Icon(Icons.check, color: AppColor.success, size: 20),
@@ -164,7 +164,7 @@ class _LevelCardState extends State<LevelCard> {
         child: Container(
           padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.9),
+            color: AppColor.surface.withValues(alpha: 0.9),
             shape: BoxShape.circle,
           ),
           child: const Icon(Icons.star, color: AppColor.premium, size: 20),
@@ -177,11 +177,11 @@ class _LevelCardState extends State<LevelCard> {
     return Positioned.fill(
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.grey.withValues(alpha: 0.6),
+          color: AppColor.labelColor.withValues(alpha: 0.6),
           borderRadius: BorderRadius.circular(20),
         ),
         child: const Center(
-          child: Icon(Icons.lock, color: Colors.white, size: 48),
+          child: Icon(Icons.lock, color: AppColor.onPrimary, size: 48),
         ),
       ),
     );
@@ -239,7 +239,7 @@ class _LevelCardState extends State<LevelCard> {
       child: Text(
         label,
         style: const TextStyle(
-          color: Colors.white,
+          color: AppColor.surface,
           fontWeight: FontWeight.w600,
           fontSize: 12,
         ),

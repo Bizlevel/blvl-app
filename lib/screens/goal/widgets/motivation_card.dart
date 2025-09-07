@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:bizlevel/providers/goals_providers.dart';
-import 'package:bizlevel/theme/color.dart';
+import 'package:bizlevel/theme/color.dart' show AppColor;
+import 'package:bizlevel/theme/spacing.dart';
 
 /// Карточка «Мотивация от Макса» с автосворачиванием и кликом для разворота
 class MotivationCard extends ConsumerStatefulWidget {
@@ -38,12 +39,12 @@ class _MotivationCardState extends ConsumerState<MotivationCard> {
         borderRadius: BorderRadius.circular(12),
         child: Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(20),
+          padding: AppSpacing.insetsAll(20),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [Color(0xFFF8FAFC), Color(0xFFE0F2FE)],
+              colors: [AppColor.appBgColor, AppColor.appBarColor],
             ),
             borderRadius: BorderRadius.circular(12),
             boxShadow: [
@@ -67,13 +68,13 @@ class _MotivationCardState extends ConsumerState<MotivationCard> {
                             AssetImage('assets/images/avatars/avatar_max.png'),
                         backgroundColor: Colors.transparent,
                       ),
-                      const SizedBox(width: 16),
+                      AppSpacing.gapW(16),
                       Expanded(
                         child: Text(
                           'Цитата недоступна',
                           style:
                               Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                    color: Colors.grey.shade600,
+                                    color: AppColor.labelColor,
                                     height: 1.4,
                                   ),
                         ),
@@ -92,7 +93,7 @@ class _MotivationCardState extends ConsumerState<MotivationCard> {
                           AssetImage('assets/images/avatars/avatar_max.png'),
                       backgroundColor: Colors.transparent,
                     ),
-                    const SizedBox(width: 16),
+                    AppSpacing.gapW(16),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -119,7 +120,7 @@ class _MotivationCardState extends ConsumerState<MotivationCard> {
                               );
                             },
                           ),
-                          const SizedBox(height: 8),
+                          AppSpacing.gapH(8),
                           Text(
                             '"$text"',
                             style: Theme.of(context)
@@ -132,7 +133,7 @@ class _MotivationCardState extends ConsumerState<MotivationCard> {
                             maxLines: 3,
                             overflow: TextOverflow.ellipsis,
                           ),
-                          const SizedBox(height: 4),
+                          AppSpacing.gapH(4),
                           if (!_collapsed &&
                               author != null &&
                               author.isNotEmpty)
@@ -159,11 +160,11 @@ class _MotivationCardState extends ConsumerState<MotivationCard> {
                     width: 56,
                     height: 56,
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade300,
+                      color: AppColor.dividerColor,
                       shape: BoxShape.circle,
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  AppSpacing.gapW(16),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -172,34 +173,34 @@ class _MotivationCardState extends ConsumerState<MotivationCard> {
                           width: double.infinity,
                           height: 20,
                           decoration: BoxDecoration(
-                            color: Colors.grey.shade300,
+                            color: AppColor.dividerColor,
                             borderRadius: BorderRadius.circular(4),
                           ),
                         ),
-                        const SizedBox(height: 12),
+                        AppSpacing.gapH(12),
                         Container(
                           width: double.infinity,
                           height: 16,
                           decoration: BoxDecoration(
-                            color: Colors.grey.shade300,
+                            color: AppColor.dividerColor,
                             borderRadius: BorderRadius.circular(4),
                           ),
                         ),
-                        const SizedBox(height: 8),
+                        AppSpacing.gapH(8),
                         Container(
                           width: 120,
                           height: 16,
                           decoration: BoxDecoration(
-                            color: Colors.grey.shade300,
+                            color: AppColor.dividerColor,
                             borderRadius: BorderRadius.circular(4),
                           ),
                         ),
-                        const SizedBox(height: 8),
+                        AppSpacing.gapH(8),
                         Container(
                           width: 80,
                           height: 14,
                           decoration: BoxDecoration(
-                            color: Colors.grey.shade300,
+                            color: AppColor.dividerColor,
                             borderRadius: BorderRadius.circular(4),
                           ),
                         ),
@@ -217,12 +218,12 @@ class _MotivationCardState extends ConsumerState<MotivationCard> {
                         AssetImage('assets/images/avatars/avatar_max.png'),
                     backgroundColor: Colors.transparent,
                   ),
-                  const SizedBox(width: 16),
+                  AppSpacing.gapW(16),
                   Expanded(
                     child: Text(
                       'Цитата недоступна',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Colors.grey.shade600,
+                            color: AppColor.labelColor,
                             height: 1.4,
                           ),
                     ),

@@ -19,6 +19,7 @@ import 'routing/app_router.dart';
 import 'package:go_router/go_router.dart';
 import 'services/supabase_service.dart';
 import 'theme/color.dart';
+import 'theme/typography.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:bizlevel/services/notifications_service.dart';
 import 'package:timezone/data/latest.dart' as tz;
@@ -148,8 +149,12 @@ class MyApp extends ConsumerWidget {
             seedColor: AppColor.primary,
             brightness: Brightness.light,
           ),
+          textTheme: AppTypography.textTheme,
+          scaffoldBackgroundColor: Colors.transparent,
           appBarTheme: const AppBarTheme(
             centerTitle: true,
+            backgroundColor: Colors.transparent,
+            elevation: 0,
             titleTextStyle: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w600,
@@ -158,16 +163,31 @@ class MyApp extends ConsumerWidget {
           elevatedButtonTheme: ElevatedButtonThemeData(
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColor.primary,
-              foregroundColor: Colors.white,
+              foregroundColor: AppColor.onPrimary,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
+              minimumSize: const Size(40, 48),
             ),
+          ),
+          textButtonTheme: TextButtonThemeData(
+            style: TextButton.styleFrom(
+              foregroundColor: AppColor.primary,
+              minimumSize: const Size(40, 44),
+            ),
+          ),
+          inputDecorationTheme: const InputDecorationTheme(
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.all(Radius.circular(8)),
+            ),
+            isDense: true,
+            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           ),
           snackBarTheme: const SnackBarThemeData(
             backgroundColor: AppColor.primary,
             contentTextStyle: TextStyle(color: Colors.white),
             actionTextColor: AppColor.premium,
+            behavior: SnackBarBehavior.floating,
           ),
         ),
         // Навигатор теперь управляется GoRouter; SentryObserver добавлен в конфигурацию роутера

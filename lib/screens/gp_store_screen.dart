@@ -7,6 +7,8 @@ import 'package:bizlevel/services/gp_service.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:bizlevel/widgets/common/bizlevel_card.dart';
+import 'package:bizlevel/widgets/common/bizlevel_button.dart';
 
 class GpStoreScreen extends ConsumerWidget {
   const GpStoreScreen({super.key});
@@ -15,127 +17,140 @@ class GpStoreScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       appBar: AppBar(title: const Text('Магазин GP')),
-      body: ListView(
+      body: ListView.builder(
+        itemCount: 1,
         padding: const EdgeInsets.all(16),
-        children: [
-          // Короткий вводный блок «Что такое GP»
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 6,
-                  offset: const Offset(0, 3),
-                )
-              ],
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                SvgPicture.asset('assets/images/gp_coin.svg',
-                    width: 36, height: 36),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Text(
-                    'GP — внутренняя валюта BizLevel. Сообщения Лео/Максу стоят 1 GP, а также GP открывают доступ к новым этажам.',
-                    style: TextStyle(fontSize: 14),
+        itemBuilder: (context, _) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Короткий вводный блок «Что такое GP»
+              BizLevelCard(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    SvgPicture.asset('assets/images/gp_coin.svg',
+                        width: 36, height: 36),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'GP — внутренняя валюта BizLevel. Сообщения Лео/Максу стоят 1 GP, а также GP открывают доступ к новым этажам.',
+                        style: TextStyle(fontSize: 14),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              Semantics(
+                  label: 'План СТАРТ, 300 GP',
+                  child: _GpPlanCard(
+                    title: 'СТАРТ:',
+                    gpLabel: '300',
+                    descriptionTitle: 'Идеально для:',
+                    bullets: const [
+                      'Обдумать идеи',
+                      'Быстрых консультаций',
+                      'Получить второе мнение',
+                    ],
+                    italicNote:
+                        'Каждый успешный бизнес начинался с первого шага',
+                    priceLabel: '₸3 000',
+                    onSelect: () =>
+                        _startPurchase(context, ref, 'gp_300', 3000),
+                  )),
+              const SizedBox(height: 12),
+              Semantics(
+                  label: 'План РАЗГОН, 1400 GP',
+                  child: _GpPlanCard(
+                    title: 'РАЗГОН:',
+                    gpLabel: '1000 + 400 бонус',
+                    descriptionTitle: 'Достаточно чтобы:',
+                    bullets: const [
+                      'Поставить и достичь цели за 28 дней',
+                      '400+ персональных советов',
+                      'Открыть новые горизонты',
+                    ],
+                    italicNote: 'Выбор 80% предпринимателей',
+                    priceLabel: '₸9 960',
+                    highlight: true,
+                    onSelect: () =>
+                        _startPurchase(context, ref, 'gp_1400', 9960),
+                  )),
+              const SizedBox(height: 12),
+              Semantics(
+                  label: 'План ТРАНСФОРМАЦИЯ, 3000 GP',
+                  child: _GpPlanCard(
+                    title: 'ТРАНСФОРМАЦИЯ:',
+                    gpLabel: '2000 + 1000 бонус',
+                    descriptionTitle: 'Полная перезагрузка',
+                    bullets: const [
+                      'От хаоса к системе',
+                      'От идеи к масштабу',
+                      'От мечты к результату',
+                    ],
+                    italicNote: 'Для тех, кто настроен серьезно',
+                    priceLabel: '₸19 960',
+                    onSelect: () =>
+                        _startPurchase(context, ref, 'gp_3000', 19960),
+                  )),
+              const SizedBox(height: 24),
+              Center(
+                child: Semantics(
+                  label: 'Проверить покупку',
+                  button: true,
+                  child: BizLevelButton(
+                    label: 'Проверить покупку',
+                    icon: const Icon(Icons.verified),
+                    onPressed: () async {
+                      try {
+                        final box = Hive.box('gp');
+                        final lastId =
+                            (box.get('last_purchase_id') as String?) ?? '';
+                        if (lastId.isEmpty) {
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                              content: Text(
+                                  'Нет активной покупки для проверки. Выберите пакет и оформите оплату.')));
+                          return;
+                        }
+                        await Sentry.addBreadcrumb(Breadcrumb(
+                          message: 'gp_purchase_verify_click',
+                          level: SentryLevel.info,
+                          data: {
+                            'purchase_id':
+                                lastId.substring(0, lastId.length.clamp(0, 8))
+                          },
+                        ));
+                        final gp = GpService(Supabase.instance.client);
+                        final balance =
+                            await gp.verifyPurchase(purchaseId: lastId);
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                              content: Text(
+                                  'Покупка подтверждена, баланс: $balance')),
+                        );
+                        final container = ProviderScope.containerOf(context);
+                        container.invalidate(gpBalanceProvider);
+                      } catch (e) {
+                        if (!context.mounted) return;
+                        final msg = e
+                                .toString()
+                                .contains('gp_purchase_not_found')
+                            ? 'Покупка не найдена. Завершите оплату и попробуйте снова.'
+                            : 'Не удалось подтвердить. Проверьте интернет или попробуйте позже.';
+                        ScaffoldMessenger.of(context)
+                            .showSnackBar(SnackBar(content: Text(msg)));
+                      }
+                    },
                   ),
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          _GpPlanCard(
-            title: 'СТАРТ:',
-            gpLabel: '300',
-            descriptionTitle: 'Идеально для:',
-            bullets: const [
-              'Обдумать идеи',
-              'Быстрых консультаций',
-              'Получить второе мнение',
+              ),
             ],
-            italicNote: 'Каждый успешный бизнес начинался с первого шага',
-            priceLabel: '₸3 000',
-            onSelect: () => _startPurchase(context, ref, 'gp_300', 3000),
-          ),
-          const SizedBox(height: 12),
-          _GpPlanCard(
-            title: 'РАЗГОН:',
-            gpLabel: '1000 + 400 бонус',
-            descriptionTitle: 'Достаточно чтобы:',
-            bullets: const [
-              'Поставить и достичь цели за 28 дней',
-              '400+ персональных советов',
-              'Открыть новые горизонты',
-            ],
-            italicNote: 'Выбор 80% предпринимателей',
-            priceLabel: '₸9 960',
-            highlight: true,
-            onSelect: () => _startPurchase(context, ref, 'gp_1400', 9960),
-          ),
-          const SizedBox(height: 12),
-          _GpPlanCard(
-            title: 'ТРАНСФОРМАЦИЯ:',
-            gpLabel: '2000 + 1000 бонус',
-            descriptionTitle: 'Полная перезагрузка',
-            bullets: const [
-              'От хаоса к системе',
-              'От идеи к масштабу',
-              'От мечты к результату',
-            ],
-            italicNote: 'Для тех, кто настроен серьезно',
-            priceLabel: '₸19 960',
-            onSelect: () => _startPurchase(context, ref, 'gp_3000', 19960),
-          ),
-          const SizedBox(height: 24),
-          Center(
-            child: ElevatedButton.icon(
-              onPressed: () async {
-                try {
-                  final box = Hive.box('gp');
-                  final lastId = (box.get('last_purchase_id') as String?) ?? '';
-                  if (lastId.isEmpty) {
-                    if (!context.mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                        content: Text(
-                            'Нет активной покупки для проверки. Выберите пакет и оформите оплату.')));
-                    return;
-                  }
-                  await Sentry.addBreadcrumb(Breadcrumb(
-                    message: 'gp_purchase_verify_click',
-                    level: SentryLevel.info,
-                    data: {
-                      'purchase_id':
-                          lastId.substring(0, lastId.length.clamp(0, 8))
-                    },
-                  ));
-                  final gp = GpService(Supabase.instance.client);
-                  final balance = await gp.verifyPurchase(purchaseId: lastId);
-                  if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                        content:
-                            Text('Покупка подтверждена, баланс: $balance')),
-                  );
-                  final container = ProviderScope.containerOf(context);
-                  container.invalidate(gpBalanceProvider);
-                } catch (e) {
-                  if (!context.mounted) return;
-                  final msg = e.toString().contains('gp_purchase_not_found')
-                      ? 'Покупка не найдена. Завершите оплату и попробуйте снова.'
-                      : 'Не удалось подтвердить. Проверьте интернет или попробуйте позже.';
-                  ScaffoldMessenger.of(context)
-                      .showSnackBar(SnackBar(content: Text(msg)));
-                }
-              },
-              icon: const Icon(Icons.verified),
-              label: const Text('Проверить покупку'),
-            ),
-          ),
-        ],
+          );
+        },
       ),
     );
   }

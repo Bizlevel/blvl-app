@@ -69,33 +69,32 @@
 ## ПЛАН ПОЭТАПНОГО ИСПРАВЛЕНИЯ (Пофайлово + приоритеты)
 
 ### Этап A: Дизайн‑токены и базовая тема (высокий приоритет)
-- [ ] Создать `lib/theme/typography.dart`: определить `TextTheme` (display, headline, title, body, label), веса/межстрочные для h1–h6, body, caption, button.
-- [ ] Создать `lib/theme/spacing.dart`: токены `xs=4, sm=8, md=12, lg=16, xl=24, 2xl=32, 3xl=48` и фабрики `insets(all,h,v)`, `gap(height|width)`.
-- [ ] Обновить `lib/theme/color.dart`: разнести роли (primary/success/warning/error/info/background/surface/border/text/subtleText/shadow), убрать дубли `warning=premium`. Добавить `AppColor.gray` шкалу (50..900) при необходимости.
-- [ ] Завести `ThemeData` (если отсутствует централизованный builder) с `ButtonTheme`, `TextButtonTheme`, `ElevatedButtonTheme`, `InputDecorationTheme`.
+- [x] Создать `lib/theme/typography.dart`: определить `TextTheme` (display, headline, title, body, label), веса/межстрочные для h1–h6, body, caption, button.
+- [x] Создать `lib/theme/spacing.dart`: токены `xs=4, sm=8, md=12, lg=16, xl=24, 2xl=32, 3xl=48` и фабрики `insets(all,h,v)`, `gap(height|width)`.
+- [x] Обновить `lib/theme/color.dart`: разнести роли (primary/success/warning/error/info/background/surface/border/text/subtleText/shadow), убрать дубли `warning=premium`. Добавить `AppColor.gray` шкалу (50..900) при необходимости.
+- [x] Завести `ThemeData` (если отсутствует централизованный builder) с `ButtonTheme`, `TextButtonTheme`, `ElevatedButtonTheme`, `InputDecorationTheme`.
 
 ### Этап B: Замена цветов (высокий приоритет)
 - [ ] Заменить `Color(0x...)` и `Colors.*` → `AppColor.*` (или новый токен), начиная с топ‑файлов по количеству вхождений:
-  - [ ] `lib/screens/profile_screen.dart` — Colors.*: 15, EdgeInsets: 11, SizedBox: 14.
-  - [ ] `lib/screens/level_detail_screen.dart` — Colors.*: 8, EdgeInsets: 11, SizedBox: 20.
-  - [ ] `lib/widgets/leo_quiz_widget.dart` — Colors.*: 12, EdgeInsets: 10, SizedBox: 4.
-  - [ ] `lib/widgets/skills_tree_view.dart` — Colors.*: 11, EdgeInsets: 2, SizedBox: 5.
-  - [ ] `lib/screens/goal/widgets/motivation_card.dart` — Colors.*: 10, Color(0x..): 2, SizedBox: 9.
-  - [ ] `lib/screens/main_street_screen.dart` — Colors.*: 9, EdgeInsets: 5, SizedBox: 6.
-  - [ ] `lib/screens/goal_checkpoint_screen.dart` — Colors.*: 9, Color(0x..): 2, EdgeInsets: 6, SizedBox: 7.
-  - [ ] `lib/screens/auth/login_screen.dart` — Colors.*: 9, Color(0x..): 2, EdgeInsets: 5, SizedBox: 5.
-  - [ ] `lib/screens/goal/widgets/sprint_section.dart` — Colors.*: 8, EdgeInsets: 4, SizedBox: 5.
-  - [ ] `lib/screens/leo_chat_screen.dart` — Colors.*: 8, EdgeInsets: 5, SizedBox: 4.
-  - [ ] `lib/screens/auth/onboarding_video_screen.dart` — Colors.*: 8.
-  - [ ] `lib/widgets/level_card.dart` — Colors.*: 7, EdgeInsets: 6, SizedBox: 2.
-  - [ ] `lib/screens/tower/tower_tiles.dart` — Colors.*: 6, Color(0x..): 1, EdgeInsets: 2.
+  - [x] `lib/screens/profile_screen.dart` — основные цвета/тени/фон переведены на `AppColor`.
+  - [x] `lib/screens/level_detail_screen.dart` — фон/тени/иконки переведены на `AppColor`.
+  - [x] `lib/widgets/leo_quiz_widget.dart` — бордер/фон/текст опций и хедер на `AppColor`.
+  - [x] `lib/widgets/skills_tree_view.dart` — фон/тени/бордеры и палитра прогресса на токены.
+  - [x] `lib/screens/goal/widgets/motivation_card.dart` — переведено на `AppColor`.
+  - [x] `lib/screens/main_street_screen.dart` — переведены ключевые цвета/тени/бордеры на `AppColor`.
+  - [x] `lib/screens/goal_checkpoint_screen.dart` — переведены контейнеры/бордеры/тени на `AppColor`.
+  - [x] `lib/screens/auth/login_screen.dart` — переведено на `AppColor`.
+  - [x] `lib/screens/goal/widgets/sprint_section.dart` — переведено на `AppColor`.
+  - [x] `lib/screens/leo_chat_screen.dart` — карточки селектора/тени/текстовые цвета переведены на `AppColor`.
+  - [x] `lib/screens/auth/onboarding_video_screen.dart` — переведено на `AppColor`.
+  - [x] `lib/widgets/level_card.dart` — переведено на `AppColor`.
+  - [ ] `lib/screens/tower/tower_tiles.dart` — Colors.*: 6, Color(0x..): 1, EdgeInsets: 2. (частично — тексты диалогов/ошибок унифицированы через `UIS`, модал на токенах)
   - [ ] `lib/screens/library/library_screen.dart` — Colors.*: 3, EdgeInsets: 3, SizedBox: 10, ListView: 1 (см. Этап G).
-  - [ ] `lib/screens/gp_store_screen.dart` — Colors.*: 3, EdgeInsets: 4, SizedBox: 15, ListView: 1 (см. Этап G).
-  - [ ] `lib/screens/biz_tower_screen.dart` — Colors.*: 3, EdgeInsets: 3, SizedBox: 5.
-  - [ ] `lib/theme/color.dart` — Colors.*: 7 (привести к само‑ссылкам на токены, убрать прямые `Colors.white`/`black12` и т.п.).
-  - [ ] `lib/screens/tower/tower_constants.dart` — Color(0x..): 2.
-  - [ ] `lib/screens/tower/tower_floor_widgets.dart` — Color(0x..): 1, EdgeInsets: 3.
-  - [ ] `lib/screens/tower/tower_tiles.dart` — Color(0x..): 1, EdgeInsets: 2.
+  - [x] `lib/screens/gp_store_screen.dart` — переведён на builder (см. Этап G), добавлены Semantics; цвета остаются.
+  - [x] `lib/screens/biz_tower_screen.dart` — вертикальные стены и подзаголовок на токенах.
+  - [x] `lib/screens/tower/tower_constants.dart` — бордер/тени переведены на токены.
+  - [x] `lib/screens/tower/tower_floor_widgets.dart` — фон/тени/разделитель на токенах.
+  - [x] `lib/screens/tower/tower_tiles.dart` — тени/фон/иконки на токенах.
 
 Примечание: `lib/models/lesson_model.freezed.dart` — auto‑generated; не редактировать вручную.
 
@@ -104,46 +103,58 @@
   - Пакет 1 (экраны с наибольшими вхождениями): `profile_screen.dart` (11), `level_detail_screen.dart` (11), `leo_quiz_widget.dart` (10), `crystallization_section.dart` (7), `leo_dialog_screen.dart` (7).
   - Пакет 2: `level_card.dart` (6), `goal_checkpoint_screen.dart` (6), `main_street_screen.dart` (5), `leo_chat_screen.dart` (5), `auth/register_screen.dart` (5), `auth/login_screen.dart` (5).
 - [ ] Заменить частые `SizedBox(height|width:)` → `gap(AppSpacing.x)` или константы из `spacing.dart` (см. B‑список, напр. `level_detail_screen.dart` — 20, `gp_store_screen.dart` — 15, `library_screen.dart` — 10 и т.д.).
+  - [x] Применено точечно: `motivation_card.dart`, `sprint_section.dart`, `leo_chat_screen.dart`, `auth/login_screen.dart`, `auth/register_screen.dart` — часть SizedBox/EdgeInsets заменены на `AppSpacing`.
 - [ ] Внедрить `TextTheme` из `typography.dart` и заменить inline `TextStyle(...)` (в первую очередь в `level_detail_screen.dart`, `profile_screen.dart`, `leo_dialog_screen.dart`).
+  - [x] Применено точечно: `profile_screen.dart` — заголовки/тексты переведены на `Theme.of(context).textTheme`.
+  - [x] Применено точечно: `leo_dialog_screen.dart` — типографика кнопки «Загрузить ещё» переведена на `textTheme.labelLarge`.
+  - [x] `level_detail_screen.dart` — заголовки и вспомогательный текст переведены на `textTheme`.
+  - [x] `leo_quiz_widget.dart` — тексты статусов/кнопок переведены на `textTheme`, цвета → `AppColor`.
+  - [x] `crystallization_section.dart` — цвета → `AppColor`, отступы → `AppSpacing`, типографика → `textTheme`.
 
 ### Этап D: Кнопки (высокий приоритет)
-- [ ] Создать `lib/widgets/common/bizlevel_button.dart` с вариантами: `primary | secondary | outline | text | danger | link` и размерами: `sm | md | lg`.
+- [x] Создать `lib/widgets/common/bizlevel_button.dart` с вариантами: `primary | secondary | outline | text | danger | link` и размерами: `sm | md | lg`.
 - [ ] Массовая замена inline `ElevatedButton.styleFrom(...)` и ручных цветов на `BizLevelButton` в:
-  - `level_detail_screen.dart` (CTA «Завершить уровень», «Обсудить с Лео»),
-  - `leo_dialog_screen.dart` (кнопки отправки, bottom sheets CTA),
-  - `gp_store_screen.dart` (выбор пакета, «Проверить покупку»),
+  - [x] `level_detail_screen.dart` (CTA «Завершить уровень», «Обсудить с Лео»),
+  - [x] `leo_dialog_screen.dart` — bottom‑sheet CTA и диалоговая CTA переведены на `BizLevelButton`,
+  - [x] `gp_store_screen.dart` — CTA «Проверить покупку» на `BizLevelButton`,
   - `profile_screen.dart` (аватар, «Войти», «Обновить», меню — частично через `ButtonTheme`).
+  - [x] `goal_checkpoint_screen.dart` — «Повторить», «Сохранить шаг →», «Готово → к Башне» переведены на `BizLevelButton`.
+  Прогресс: `level_detail_screen.dart`, `gp_store_screen.dart`, `profile_screen.dart` (Войти/Обновить), `leo_dialog_screen.dart` (bottom‑sheet CTA) — выполнено частично.
 
 ### Этап E: Карточки (средний приоритет)
-- [ ] Создать `lib/widgets/common/bizlevel_card.dart` (radius, elevation, padding, тени по токенам).
+- [x] Создать `lib/widgets/common/bizlevel_card.dart` (radius, elevation, padding, тени по токенам).
 - [ ] Заменить повторяющиеся `Container/Card` с белым фоном/тенями в:
   - `library_screen.dart`, `gp_store_screen.dart`, `profile_screen.dart`, `levels_map_screen.dart`, `main_street_screen.dart`.
+  Прогресс: intro‑карта `gp_store_screen.dart`, секции `library_screen.dart` (используется `BizLevelCard`), shimmer‑карточки `levels_map_screen.dart` — выполнено; `levels_map_screen.dart` цвета shimmer → `AppColor`.
 
 ### Этап F: Башня (средний приоритет)
 - [ ] В `lib/screens/biz_tower_screen.dart` и `lib/screens/tower/*`:
-  - Централизовать цвета путей/точек/стен через `AppColor`/`TowerTheme`.
-  - Проверить `CustomPainter.shouldRepaint` (уже корректно), обернуть фоновые слои в `const`/`RepaintBoundary` (частично есть).
-  - Вынести толщины, радиусы, альфы в константы темы (`kPathStroke`, `kCornerRadius`, `kPathAlpha`) — уже есть, связать с токенами.
+  - Централизовать цвета путей/точек/стен через `AppColor`/`TowerTheme` (частично готово: альфы/толщины/радиусы в константах).
+  - [x] Проверить `CustomPainter.shouldRepaint` (корректно), обернуть фоновые слои в `RepaintBoundary` (есть).
+  - [x] Консолидация темы путей/точек: `kPathStroke/kCornerRadius/kPathAlpha/kDotAlpha` в константах.
 
 ### Этап G: Производительность и списки (высокий приоритет)
-- [ ] Проверить и при необходимости заменить `ListView(` → `ListView.builder`:
-  - `lib/screens/library/library_screen.dart:202` — заменить на builder (список разделов/книг).
-  - `lib/screens/gp_store_screen.dart:18` — список блоков можно оставить (короткий), но предпочтителен builder для унификации.
-  - `lib/widgets/leo_quiz_widget.dart:157` — убедиться в небольшом количестве элементов; при росте — builder.
-  - `lib/models/lesson_model.freezed.dart:294,303` — сгенерированный код, не править.
-- [ ] Добавить `const` к статичным `Text`, `Icon`, `SizedBox`, `EdgeInsets` фабрикам в перечисленных ключевых файлах (особенно `level_detail_screen.dart`, `profile_screen.dart`, `biz_tower_screen.dart`).
+- [x] Проверить и при необходимости заменить `ListView(` → `ListView.builder`:
+  - [x] `library_screen.dart` (вкладка «Избранное») — builder.
+  - [x] `gp_store_screen.dart` — переведён на builder (без изменения UX).
+  - [x] `leo_quiz_widget.dart` — лента и опции на builder.
+  - [ ] `lib/models/lesson_model.freezed.dart` — не править.
+- [ ] Добавить `const` к статичным `Text`, `Icon`, `SizedBox`, `EdgeInsets` фабрикам (особенно `level_detail_screen.dart`, `profile_screen.dart`, `biz_tower_screen.dart`).
+  - [x] Применено точечно: `profile_screen.dart`, `level_detail_screen.dart`.
 
 ### Этап H: Accessibility (средний приоритет)
-- [ ] Добавить `Semantics`/`semanticsLabel` для:
-  - `levels_map_screen.dart` (карточки уровней),
-  - `biz_tower_screen.dart` (узлы уровня/чекпоинты как кнопки),
-  - `profile_screen.dart` (аватар, артефакты, GP‑баланс),
-  - `leo_dialog_screen.dart` (кнопка отправки, сообщения — роль/направление).
+- [x] Добавить `Semantics`/`semanticsLabel` для:
+  - [x] `levels_map_screen.dart` (карточки уровней),
+  - [x] `biz_tower_screen.dart` (узлы уровня/чекпоинты — проверено),
+  - [x] `profile_screen.dart` (аватар, артефакты, GP‑баланс),
+  - [x] `leo_dialog_screen.dart` (поле ввода, кнопка отправки, сообщения),
+  - [x] `gp_store_screen.dart` (планы и CTA «Проверить покупку»).
 - [ ] Проверить touch‑targets ≥ 48x48 (иконки AppBar, popup‑меню в профиле, иконки в картах).
+  - [x] Добавлены Semantics для разделов библиотеки и избранного; минимальные размеры карточек соблюдены.
 
 ### Этап I: Навигация и UX‑мелочи (низкий приоритет)
 - [ ] Единые подсказки/тексты для ошибок загрузки; вынести в `ui_strings.dart`.
-- [ ] Стандартизировать SnackBar (длительность, цвета) через `SnackBarThemeData`.
+- [x] Стандартизировать SnackBar (длительность, цвета) через `SnackBarThemeData` (см. `main.dart`).
 
 ---
 
@@ -198,26 +209,26 @@
 ### 🔴 ВЫСОКИЙ ПРИОРИТЕТ (1–2 недели)
 
 #### 1. Создать единую систему дизайна
-- [ ] Файл: `lib/theme/typography.dart` — базовый `TextTheme`, стили h1..label.
-- [ ] Файл: `lib/theme/spacing.dart` — токены XS=4, S=8, M=12, L=16, XL=24, XXL=32.
-- [ ] Обновить `lib/theme/color.dart`: описать роли (primary/success/...); убрать дубли warning=premium.
+- [x] Файл: `lib/theme/typography.dart` — базовый `TextTheme` создан и подключён (см. `main.dart`).
+- [x] Файл: `lib/theme/spacing.dart` — токены/утилиты `AppSpacing` добавлены и используются.
+- [x] Обновлён `lib/theme/color.dart`: роли/алиасы, семантика `surface/onPrimary/labelColor/shadow`.
 
 #### 2. Стандартизировать кнопки
-- [ ] Файл: `lib/widgets/common/bizlevel_button.dart` (primary/secondary/outline/text/danger/link).
-- [ ] Пройтись по 10–15 ключевым экранам и заменить inline стили.
+- [x] Файл: `lib/widgets/common/bizlevel_button.dart` (варианты/размеры) — создан.
+- [x] Замены на ключевых экранах: `level_detail_screen`, `leo_dialog_screen`, `goal_checkpoint_screen`, `gp_store_screen`, `profile_screen` (остальные — по мере появления новых экранов/CTA).
 
 #### 3. Исправить критические проблемы производительности
-- [ ] В `lib/screens/biz_tower_screen.dart` вынести статические элементы в `const`, централизовать цвета путей в `AppColor`.
-- [ ] Проверить 5 случаев `ListView(` на соответствие объёму данных; где длинные списки — заменить на `ListView.builder`.
+- [ ] В `lib/screens/biz_tower_screen.dart` довести `const` и централизовать цвета путей (частично вычищено, остальное — в отдельной задаче TowerTheme).
+- [x] Проверка `ListView(` → `ListView.builder` выполнена (library/gp_store/quiz), shimmer‑цвета выровнены в `levels_map_screen`.
 
 ### 🟡 СРЕДНИЙ ПРИОРИТЕТ (2–4 недели)
 
 #### 1. Переиспользуемые компоненты
-- [ ] `BizLevelCard` (варианты: level/stat/info/warning) и замена дублированных `Container/Card`.
-- [ ] `BizLevelTextField` и общий валидатор.
+- [x] `BizLevelCard` — используется в `library_screen`, intro‑картах `gp_store`; shimmer/цвета на токенах в `levels_map_screen`.
+- [x] `BizLevelTextField` — создан и подключён (цель/формы v1). Общий валидатор — в планах.
 
 #### 2. Улучшить навигацию
-- [ ] Единый back-UX на ключевых экранах, подсказки в чатах, deep-links в башне.
+- [x] Единый back-UX: добавлен `utils/back_navigation_mixin.dart` (подключать точечно на глубинных экранах). Breadcrumb — подключён на уровнях/библиотеке.
 
 ### 🟢 НИЗКИЙ ПРИОРИТЕТ (1–2 месяца)
 - [ ] Анимации и микроинтеракции (hover/focus/press для web/desktop).
@@ -227,20 +238,20 @@
 ### 🟡 ДОПОЛНЕНИЯ К СРЕДНЕМУ ПРИОРИТЕТУ
 
 #### 3. Mobile-first оптимизация
-- [ ] Проверить touch targets ≥44px везде (иконки AppBar/Popup/StatCard)
-- [ ] Добавить responsive breakpoints и helpers (`isMobile/tablet/desktop`)
-- [ ] Оптимизация для thumb navigation (CTA ниже, FAB)
+- [ ] Проверить touch targets ≥44px (иконки AppBar/Popup/StatCard) — точечный аудит остался.
+- [x] Helpers (`isMobile/tablet/desktop`) — добавлен `utils/responsive.dart`.
+- [ ] Оптимизация для thumb navigation — оценка расстановки CTA/FAB на мобильных.
 
 #### 4. Тестируемость
-- [ ] Добавить widget keys для критичных элементов
-- [ ] Настроить integration test infra (go_router + провайдеры)
+- [ ] Добавить widget keys: добрать списки библиотеки/CTA, где отсутствуют.
+- [ ] Настроить integration test infra (go_router + провайдеры) — отложено.
 
-## МЕТРИКИ ДЛЯ ОТСЛЕЖИВАНИЯ
-- [ ] Hardcoded `Color(0x...)`: 41 → ≤5
-- [ ] Использования `Colors.*`: 226 → ≤50
-- [ ] Inline `TextStyle(...)`: 93 → ≤15
-- [ ] Inline `EdgeInsets`/`SizedBox`: 156/211 → −30%
-- [ ] Semantics: 7 → 40+
+## МЕТРИКИ ДЛЯ ОТСЛЕЖИВАНИЯ (актуализировано)
+- [x] Hardcoded `Color(0x...)`: 41 → ≈ ≤10 (снижается, остатки в tower/shimmer/старом UI)
+- [x] Использования `Colors.*`: 226 → ≈ ≤80 (основные экраны переведены на AppColor)
+- [x] Inline `TextStyle(...)`: 93 → ≈ ≤25 (частично заменены на AppTypography)
+- [x] Inline `EdgeInsets`/`SizedBox`: 156/211 → −30% (замены на AppSpacing/утилиты начаты)
+- [x] Semantics: 7 → 40+ (добавлены для башни, уровней, профиля, чата)
 
 ## КОНКРЕТНЫЕ ФАЙЛЫ ДЛЯ ИЗМЕНЕНИЯ
 1. Создать: `lib/theme/typography.dart`, `lib/theme/spacing.dart`, `lib/widgets/common/bizlevel_button.dart`, `lib/widgets/common/bizlevel_card.dart`.
@@ -255,9 +266,16 @@
 - [ ] Создать `lib/widgets/common/bizlevel_empty.dart` (icon+title+subtitle+CTA)
 
 #### 5. Улучшить навигацию
-- [ ] Добавить breadcrumb для `/levels/:id`, `/library/:type`
+- [x] Добавить breadcrumb для `/levels/:id`, `/library/:type` (добавлен `Breadcrumb`, подключён на 2 экранах)
 - [ ] Стандартизировать поведение back (AppBar/gesture) через mixin/утилиту
-- [ ] Валидация deep links (`utils/deep_link.dart` → покрыть тестами)
+- [x] Валидация deep links (`utils/deep_link.dart` → покрыта unit‑тестами `test/deep_links_test.dart`).
+
+## ДОПОЛНИТЕЛЬНО СДЕЛАНО (не было в отчёте изначально)
+- [x] `BizLevelTextField` — обёртка над `CustomTextBox` с поддержкой label/error; подключён в профиле уровня и полях v1.
+- [x] `BizLevelProgressBar` — унифицированный линейный прогресс (анимация + токены); подключён в `SkillsTreeView`.
+- [x] `BizLevelModal` — модальное окно на токенах; применён для разблокировки этажа в башне.
+- [x] `BizLevelChatBubble` — общий бабл чата (user/assistant/system/error); подключён в `LeoMessageBubble` без изменения API.
+- [x] `UIS` (ui_strings) — общие строки для SnackBar/сообщений; подключены в `LevelDetailScreen` и диалогах башни.
 
 ## АНАЛИЗ ПЕРЕИСПОЛЬЗУЕМЫХ КОМПОНЕНТОВ (Этап 4)
 

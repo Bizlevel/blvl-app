@@ -19,6 +19,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:io';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:bizlevel/providers/gp_providers.dart';
+import 'package:bizlevel/widgets/common/bizlevel_error.dart';
+import 'package:bizlevel/widgets/common/bizlevel_loading.dart';
+import 'package:bizlevel/widgets/common/bizlevel_button.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -43,12 +46,12 @@ class ProfileScreen extends ConsumerWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Text('Не авторизован'),
-                  ElevatedButton(
+                  BizLevelButton(
+                    label: 'Войти',
                     onPressed: () {
                       // Перенаправление через GoRouter
                       context.go('/login');
                     },
-                    child: const Text('Войти'),
                   ),
                 ],
               ),
@@ -74,11 +77,11 @@ class ProfileScreen extends ConsumerWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const Text('Профиль не найден'),
-                      ElevatedButton(
+                      BizLevelButton(
+                        label: 'Обновить',
                         onPressed: () {
                           ref.invalidate(currentUserProvider);
                         },
-                        child: const Text('Обновить'),
                       ),
                     ],
                   ),
@@ -89,54 +92,28 @@ class ProfileScreen extends ConsumerWidget {
             // Премиум отключён; используем только поле БД (будет удалено позже)
             return _buildProfileContent(context, ref, user);
           },
-          loading: () => const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          ),
+          loading: () => BizLevelLoading.fullscreen(),
           error: (error, stackTrace) {
             if (kDebugMode) {
               debugPrint('ProfileScreen: currentUser error = $error');
             }
-            return Scaffold(
-              body: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Text('Ошибка загрузки профиля'),
-                    ElevatedButton(
-                      onPressed: () {
-                        ref.invalidate(currentUserProvider);
-                      },
-                      child: const Text('Повторить'),
-                    ),
-                  ],
-                ),
-              ),
+            return BizLevelError(
+              title: 'Ошибка загрузки профиля',
+              fullscreen: true,
+              onRetry: () => ref.invalidate(currentUserProvider),
             );
           },
         );
       },
-      loading: () => const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      ),
+      loading: () => BizLevelLoading.fullscreen(),
       error: (error, stackTrace) {
         if (kDebugMode) {
           debugPrint('ProfileScreen: authState error = $error');
         }
-        return Scaffold(
-          body: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text('Ошибка авторизации'),
-                ElevatedButton(
-                  onPressed: () {
-                    ref.invalidate(authStateProvider);
-                  },
-                  child: const Text('Повторить'),
-                ),
-              ],
-            ),
-          ),
+        return BizLevelError(
+          title: 'Ошибка авторизации',
+          fullscreen: true,
+          onRetry: () => ref.invalidate(authStateProvider),
         );
       },
     );
@@ -149,8 +126,9 @@ class ProfileScreen extends ConsumerWidget {
     final levelsAsync = ref.watch(levelsProvider);
 
     return levelsAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, s) => const Center(child: Text('Ошибка уровней')),
+      loading: () => BizLevelLoading.fullscreen(),
+      error: (e, s) =>
+          const BizLevelError(title: 'Ошибка уровней', fullscreen: true),
       data: (levelsData) {
         final completedLevels = levelsData.where((lvl) {
           final levelNum = lvl['level'] as int;
@@ -181,13 +159,12 @@ class ProfileScreen extends ConsumerWidget {
               pinned: true,
               snap: true,
               floating: true,
-              title: const Text(
+              title: Text(
                 'Профиль',
-                style: TextStyle(
-                  color: AppColor.textColor,
-                  fontSize: 24,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: Theme.of(context)
+                    .textTheme
+                    .headlineLarge
+                    ?.copyWith(color: AppColor.textColor),
               ),
               actions: [
                 // Мини‑баланс GP в шапке профиля
@@ -214,7 +191,8 @@ class ProfileScreen extends ConsumerWidget {
                   ),
                 ),
                 PopupMenuButton<String>(
-                  icon: const Icon(Icons.settings, color: Colors.grey),
+                  icon: const Icon(Icons.settings,
+                      color: AppColor.onSurfaceSubtle),
                   onSelected: (value) async {
                     switch (value) {
                       case 'settings':
@@ -249,7 +227,7 @@ class ProfileScreen extends ConsumerWidget {
                             ),
                             child: SvgPicture.asset(
                               'assets/icons/setting.svg',
-                              color: Colors.white,
+                              color: AppColor.onPrimary,
                               width: 18,
                               height: 18,
                             ),
@@ -271,7 +249,7 @@ class ProfileScreen extends ConsumerWidget {
                             ),
                             child: SvgPicture.asset(
                               'assets/icons/wallet.svg',
-                              color: Colors.white,
+                              color: AppColor.onPrimary,
                               width: 18,
                               height: 18,
                             ),
@@ -293,7 +271,7 @@ class ProfileScreen extends ConsumerWidget {
                             ),
                             child: SvgPicture.asset(
                               'assets/icons/logout.svg',
-                              color: Colors.white,
+                              color: AppColor.onPrimary,
                               width: 18,
                               height: 18,
                             ),
@@ -403,7 +381,7 @@ class _BodyState extends ConsumerState<_Body> {
       if (!mounted) return;
       await showModalBottomSheet<void>(
         context: context,
-        backgroundColor: Colors.white,
+        backgroundColor: AppColor.surface,
         builder: (ctx) {
           return SizedBox(
             height: 260,
@@ -412,18 +390,23 @@ class _BodyState extends ConsumerState<_Body> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Icon(Icons.inventory_2_outlined,
-                      size: 48, color: Colors.grey),
+                      size: 48, color: AppColor.onSurfaceSubtle),
                   const SizedBox(height: 8),
-                  const Text('Артефактов пока нет',
-                      style:
-                          TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                  Text('Артефактов пока нет',
+                      style: Theme.of(ctx)
+                          .textTheme
+                          .titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w600)),
                   const SizedBox(height: 4),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 24),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
                     child: Text(
                       'Проходите уровни, чтобы открывать полезные материалы и шаблоны.',
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.grey),
+                      style: Theme.of(ctx)
+                          .textTheme
+                          .bodyMedium
+                          ?.copyWith(color: AppColor.onSurfaceSubtle),
                     ),
                   )
                 ],
@@ -437,7 +420,7 @@ class _BodyState extends ConsumerState<_Body> {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: AppColor.surface,
       builder: (ctx) {
         return DraggableScrollableSheet(
           expand: false,
@@ -514,7 +497,10 @@ class _BodyState extends ConsumerState<_Body> {
                           title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontWeight: FontWeight.w600),
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w600),
                         ),
                         subtitle: subtitleLine.isEmpty
                             ? null
@@ -522,7 +508,8 @@ class _BodyState extends ConsumerState<_Body> {
                                 subtitleLine,
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(color: Colors.grey),
+                                style:
+                                    const TextStyle(color: AppColor.labelColor),
                               ),
                         trailing: IconButton(
                           icon: const Icon(Icons.download),
@@ -545,7 +532,7 @@ class _BodyState extends ConsumerState<_Body> {
   Future<void> _showAvatarPicker() async {
     final selectedId = await showModalBottomSheet<int>(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: AppColor.surface,
       builder: (ctx) {
         return GridView.builder(
           padding: const EdgeInsets.all(AppSpacing.medium),
@@ -684,121 +671,126 @@ class _BodyState extends ConsumerState<_Body> {
         ? 'assets/images/avatars/avatar_${widget.avatarId}.png'
         : '';
 
-    return Row(
-      children: [
-        Stack(
-          alignment: Alignment.bottomRight,
+    return Semantics(
+        label: 'Аватар пользователя',
+        button: true,
+        child: Row(
           children: [
-            GestureDetector(
-              onTap: _showAvatarPicker,
-              child: CustomImage(
-                (localAsset.isNotEmpty
-                    ? localAsset
-                    : "https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=800&q=60"),
-                width: 80,
-                height: 80,
-                radius: 40,
-                isNetwork: localAsset.isEmpty,
-              ),
-            ),
-            Positioned(
-              bottom: 0,
-              right: 0,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.1),
-                      blurRadius: 2,
-                    ),
-                  ],
-                ),
-                child: const Padding(
-                  padding: EdgeInsets.all(4.0),
-                  child: Icon(
-                    Icons.camera_alt,
-                    size: 16,
-                    color: AppColor.primary,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(width: AppSpacing.medium),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Wrap(
-                alignment: WrapAlignment.center,
-                runSpacing: 8,
-                children: [
-                  Text(
-                    widget.userName,
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.small),
-              const Text(
-                "BizLevel",
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildRecord() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Expanded(
-          child: StatCard(
-            title: "${widget.currentLevel} Уровень",
-            icon: Icons.work,
-          ),
-        ),
-        const SizedBox(width: AppSpacing.small),
-        const SizedBox(width: AppSpacing.small),
-        Expanded(
-          child: InkWell(
-            borderRadius: BorderRadius.circular(12),
-            onTap: _openArtifactsModal,
-            child: Stack(
+            Stack(
+              alignment: Alignment.bottomRight,
               children: [
-                // Stack будет принимать размер по ненапозиционированному ребёнку
-                StatCard(
-                  title:
-                      "${widget.artifactsCount} ${_pluralizeArtifacts(widget.artifactsCount)}",
-                  icon: Icons.inventory_2_outlined,
+                GestureDetector(
+                  onTap: _showAvatarPicker,
+                  child: CustomImage(
+                    (localAsset.isNotEmpty
+                        ? localAsset
+                        : "https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=800&q=60"),
+                    width: 80,
+                    height: 80,
+                    radius: 40,
+                    isNetwork: localAsset.isEmpty,
+                  ),
                 ),
                 Positioned(
-                  right: 8,
-                  top: 8,
-                  child: Icon(
-                    Icons.expand_more,
-                    size: 16,
-                    color: Colors.grey.withValues(alpha: 0.9),
+                  bottom: 0,
+                  right: 0,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: AppColor.surface,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColor.shadow,
+                          blurRadius: 2,
+                        ),
+                      ],
+                    ),
+                    child: const Padding(
+                      padding: EdgeInsets.all(4.0),
+                      child: Icon(
+                        Icons.camera_alt,
+                        size: 16,
+                        color: AppColor.primary,
+                      ),
+                    ),
                   ),
                 ),
               ],
             ),
-          ),
-        ),
-      ],
-    );
+            const SizedBox(width: AppSpacing.medium),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    runSpacing: 8,
+                    children: [
+                      Text(
+                        widget.userName,
+                        style: Theme.of(context)
+                            .textTheme
+                            .headlineMedium
+                            ?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.small),
+                  Text(
+                    "BizLevel",
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodySmall
+                        ?.copyWith(color: AppColor.onSurfaceSubtle),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ));
+  }
+
+  Widget _buildRecord() {
+    return Semantics(
+        label: 'Статистика профиля',
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: StatCard(
+                title: "${widget.currentLevel} Уровень",
+                icon: Icons.work,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.small),
+            const SizedBox(width: AppSpacing.small),
+            Expanded(
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: _openArtifactsModal,
+                child: Stack(
+                  children: [
+                    // Stack будет принимать размер по ненапозиционированному ребёнку
+                    StatCard(
+                      title:
+                          "${widget.artifactsCount} ${_pluralizeArtifacts(widget.artifactsCount)}",
+                      icon: Icons.inventory_2_outlined,
+                    ),
+                    Positioned(
+                      right: 8,
+                      top: 8,
+                      child: Icon(
+                        Icons.expand_more,
+                        size: 16,
+                        color: AppColor.labelColor.withValues(alpha: 0.9),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ));
   }
 
   // Premium кнопка удалена (этап 39.1)
@@ -817,7 +809,7 @@ class DividerWrapper extends StatelessWidget {
       padding: const EdgeInsets.only(left: 45),
       child: Divider(
         height: 0,
-        color: Colors.grey.withValues(alpha: 0.8),
+        color: AppColor.onSurfaceSubtle,
       ),
     );
   }

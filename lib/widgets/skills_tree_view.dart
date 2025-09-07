@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:bizlevel/theme/color.dart';
+import 'package:bizlevel/widgets/common/bizlevel_progress_bar.dart';
 import 'package:bizlevel/models/user_skill_model.dart';
 
 /// Виджет блока «Шкала навыков» в профиле.
@@ -15,11 +17,11 @@ class SkillsTreeView extends StatelessWidget {
 
   // Цвета прогресса по id навыка.
   static const Map<int, Color> _skillColors = {
-    1: Colors.purple, // Фокус лидера
-    2: Colors.amber, // Денежный контроль
-    3: Colors.orange, // Магнит клиентов
-    4: Colors.blue, // Система действий
-    5: Colors.green, // Скорость роста
+    1: Color(0xFF7C3AED), // purple
+    2: Color(0xFFF59E0B), // amber
+    3: Color(0xFFFB923C), // orange
+    4: Color(0xFF3B82F6), // blue
+    5: Color(0xFF10B981), // green
   };
 
   // Подбор иконок (можно заменить на кастомные изображения при желании).
@@ -48,11 +50,11 @@ class SkillsTreeView extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColor.surface,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: AppColor.shadow,
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
@@ -68,7 +70,7 @@ class SkillsTreeView extends StatelessWidget {
           const SizedBox(height: 12),
           ..._buildSkillRows(),
           const SizedBox(height: 12),
-          Divider(color: Colors.grey.shade300),
+          Divider(color: AppColor.divider),
           const SizedBox(height: 8),
           if (nextSkill == null)
             const Text(
@@ -82,7 +84,7 @@ class SkillsTreeView extends StatelessWidget {
             ),
             Text(
               'Уровень $currentLevel: +1 навык',
-              style: const TextStyle(color: Colors.grey),
+              style: const TextStyle(color: AppColor.onSurfaceSubtle),
             ),
           ],
         ],
@@ -94,11 +96,11 @@ class SkillsTreeView extends StatelessWidget {
     final List<Widget> rows = [];
     for (var i = 0; i < skills.length; i++) {
       final skill = skills[i];
-      final color = _skillColors[skill.skillId] ?? Colors.blue;
+      final color = _skillColors[skill.skillId] ?? AppColor.info;
       final icon = _skillIcons[skill.skillId] ?? Icons.star_border;
       rows.add(_SkillRow(skill: skill, color: color, icon: icon));
       if (i != skills.length - 1) {
-        rows.add(Divider(color: Colors.grey.shade300));
+        rows.add(Divider(color: AppColor.divider));
       }
     }
     return rows;
@@ -137,18 +139,7 @@ class _SkillRow extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 6),
-          TweenAnimationBuilder<double>(
-            tween: Tween(begin: 0, end: progress),
-            duration: const Duration(milliseconds: 600),
-            builder: (context, value, _) {
-              return LinearProgressIndicator(
-                value: value,
-                minHeight: 6,
-                backgroundColor: color.withValues(alpha: 0.2),
-                valueColor: AlwaysStoppedAnimation<Color>(color),
-              );
-            },
-          ),
+          BizLevelProgressBar(value: progress, color: color),
         ],
       ),
     );

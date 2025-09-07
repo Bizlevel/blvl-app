@@ -7,6 +7,7 @@ import 'package:bizlevel/providers/leo_service_provider.dart';
 import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/widgets/leo_message_bubble.dart';
 import 'package:bizlevel/widgets/typing_indicator.dart';
+import 'package:bizlevel/widgets/common/bizlevel_button.dart';
 import 'package:bizlevel/services/leo_service.dart';
 import 'package:bizlevel/providers/gp_providers.dart';
 
@@ -325,12 +326,12 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
                 padding: const EdgeInsets.all(16),
                 child: SizedBox(
                   width: double.infinity,
-                  child: ElevatedButton(
+                  child: BizLevelButton(
+                    label: 'Вернуться в Башню',
                     onPressed: () {
                       Navigator.of(ctx).pop();
                       Navigator.of(context).pop('case_final');
                     },
-                    child: const Text('Вернуться в Башню'),
                   ),
                 ),
               ),
@@ -352,9 +353,11 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
                 onPressed: () => Navigator.of(ctx).pop(false),
                 child: const Text('Остаться'),
               ),
-              FilledButton(
+              BizLevelButton(
+                label: 'Вернуться в Башню',
                 onPressed: () => Navigator.of(ctx).pop(true),
-                child: const Text('Вернуться в Башню'),
+                variant: BizLevelButtonVariant.primary,
+                size: BizLevelButtonSize.md,
               ),
             ],
           ),
@@ -455,7 +458,15 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
                       padding: EdgeInsets.all(8.0),
                       child: CircularProgressIndicator())
                   : TextButton(
-                      onPressed: _loadMore, child: const Text('Загрузить ещё')),
+                      onPressed: _loadMore,
+                      child: Text(
+                        'Загрузить ещё',
+                        style: Theme.of(context)
+                            .textTheme
+                            .labelLarge
+                            ?.copyWith(color: AppColor.primary),
+                      ),
+                    ),
             );
           }
           final offset = _hasMore ? 1 : 0;
@@ -503,21 +514,24 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
             Row(
               children: [
                 Expanded(
-                  child: TextField(
-                    controller: _inputController,
-                    focusNode: _inputFocus,
-                    minLines: 1,
-                    maxLines: 4,
-                    decoration: const InputDecoration(
-                      hintText: 'Введите сообщение...',
-                      border: OutlineInputBorder(),
+                  child: Semantics(
+                    label: 'Поле ввода сообщения',
+                    child: TextField(
+                      controller: _inputController,
+                      focusNode: _inputFocus,
+                      minLines: 1,
+                      maxLines: 4,
+                      decoration: const InputDecoration(
+                        hintText: 'Введите сообщение...',
+                        border: OutlineInputBorder(),
+                      ),
+                      // Отправка по Enter
+                      onSubmitted: (text) {
+                        if (text.trim().isNotEmpty && !_isSending) {
+                          _sendMessage();
+                        }
+                      },
                     ),
-                    // Отправка по Enter
-                    onSubmitted: (text) {
-                      if (text.trim().isNotEmpty && !_isSending) {
-                        _sendMessage();
-                      }
-                    },
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -526,10 +540,15 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
                         width: 24,
                         height: 24,
                         child: CircularProgressIndicator())
-                    : IconButton(
-                        icon: const Icon(Icons.send),
-                        color: AppColor.primary,
-                        onPressed: _sendMessage,
+                    : Semantics(
+                        label: 'Отправить сообщение',
+                        button: true,
+                        child: IconButton(
+                          key: const Key('chat_send_button'),
+                          icon: const Icon(Icons.send),
+                          color: AppColor.primary,
+                          onPressed: _sendMessage,
+                        ),
                       ),
               ],
             ),

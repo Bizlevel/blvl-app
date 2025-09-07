@@ -63,22 +63,26 @@ class LevelsMapScreen extends ConsumerWidget {
             delegate: SliverChildBuilderDelegate(
               (context, index) {
                 final levelData = levels[index];
-                return LevelCard(
-                  data: levelData,
-                  width: double.infinity,
-                  compact: true,
-                  onTap: () {
-                    try {
-                      final num = levelData['level'] as int;
-                      context.go('/tower?scrollTo=$num');
-                    } catch (e, st) {
-                      Sentry.captureException(e, stackTrace: st);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                            content: Text('Не удалось открыть башню')),
-                      );
-                    }
-                  },
+                return Semantics(
+                  label: 'Карточка уровня ${levelData['level']}',
+                  button: true,
+                  child: LevelCard(
+                    data: levelData,
+                    width: double.infinity,
+                    compact: true,
+                    onTap: () {
+                      try {
+                        final num = levelData['level'] as int;
+                        context.go('/tower?scrollTo=$num');
+                      } catch (e, st) {
+                        Sentry.captureException(e, stackTrace: st);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                              content: Text('Не удалось открыть башню')),
+                        );
+                      }
+                    },
+                  ),
                 );
               },
               childCount: levels.length,
@@ -100,15 +104,14 @@ class LevelsMapScreen extends ConsumerWidget {
           ),
           delegate: SliverChildBuilderDelegate(
             (context, index) => Shimmer.fromColors(
-              baseColor: Colors.grey.shade300,
-              highlightColor: Colors.grey.shade100,
-              child: Container(
-                width: double.infinity,
-                height: 290,
-                decoration: BoxDecoration(
-                  color: Colors.white,
+              baseColor: AppColor.divider,
+              highlightColor: AppColor.labelColor.withValues(alpha: 0.2),
+              child: Card(
+                elevation: 1,
+                shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(20),
                 ),
+                child: const SizedBox.expand(),
               ),
             ),
             childCount: 4,
@@ -118,7 +121,17 @@ class LevelsMapScreen extends ConsumerWidget {
       error: (error, _) => SliverFillRemaining(
         hasScrollBody: false,
         child: Center(
-          child: Text('Ошибка: ${error.toString()}'),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Ошибка загрузки уровней'),
+              const SizedBox(height: 8),
+              ElevatedButton(
+                onPressed: () => ref.invalidate(levelsProvider),
+                child: const Text('Повторить'),
+              ),
+            ],
+          ),
         ),
       ),
     );

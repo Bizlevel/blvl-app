@@ -6,8 +6,9 @@ import 'package:bizlevel/providers/leo_service_provider.dart';
 import 'package:bizlevel/widgets/chat_item.dart';
 import 'package:bizlevel/screens/leo_dialog_screen.dart';
 
-import 'package:bizlevel/theme/color.dart';
+import 'package:bizlevel/theme/color.dart' show AppColor;
 import 'package:bizlevel/providers/auth_provider.dart';
+import 'package:bizlevel/theme/spacing.dart';
 
 class LeoChatScreen extends ConsumerStatefulWidget {
   const LeoChatScreen({super.key});
@@ -92,20 +93,20 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
         ),
         label: Text(
           _activeBot == 'max' ? 'Новый чат с Максом' : 'Новый чат с Лео',
-          style:
-              const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+          style: const TextStyle(
+              color: AppColor.onPrimary, fontWeight: FontWeight.w600),
         ),
       ),
       body: FutureBuilder<void>(
         future: _loadFuture,
         builder: (context, snapshot) {
           return SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+            padding: AppSpacing.insetsSymmetric(h: 15, v: 8),
             child: Column(
               children: [
-                const SizedBox(height: 4),
+                AppSpacing.gapH(4),
                 _buildBotSelectorCards(),
-                const SizedBox(height: 10),
+                AppSpacing.gapH(10),
                 _buildChats(),
               ],
             ),
@@ -191,18 +192,18 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
             _loadData();
           },
           child: Container(
-            padding: const EdgeInsets.all(12),
-            margin: const EdgeInsets.symmetric(horizontal: 6),
+            padding: AppSpacing.insetsAll(12),
+            margin: AppSpacing.insetsSymmetric(h: 6),
             constraints: const BoxConstraints(minHeight: 100),
             decoration: BoxDecoration(
-              color: active ? Colors.white : Colors.white,
+              color: active ? AppColor.surface : AppColor.surface,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                   color: active ? AppColor.primary : Colors.grey.shade300,
                   width: active ? 2 : 1),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.04),
+                  color: AppColor.shadowColor,
                   blurRadius: 6,
                   offset: const Offset(0, 3),
                 )
@@ -216,7 +217,7 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
                   backgroundImage: AssetImage(avatar),
                   backgroundColor: Colors.transparent,
                 ),
-                const SizedBox(width: 12),
+                AppSpacing.gapW(12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -224,14 +225,14 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
                       Text(name,
                           style: const TextStyle(
                               fontSize: 18, fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 2),
+                      AppSpacing.gapH(2),
                       Text(
                         subtitle,
                         maxLines: 2,
                         softWrap: true,
                         overflow: TextOverflow.ellipsis,
-                        style:
-                            const TextStyle(fontSize: 12, color: Colors.grey),
+                        style: const TextStyle(
+                            fontSize: 12, color: AppColor.labelColor),
                       ),
                     ],
                   ),
