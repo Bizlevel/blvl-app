@@ -24,6 +24,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:bizlevel/services/notifications_service.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
+import 'package:flutter/scheduler.dart';
 
 Future<void> main() async {
   // КРИТИЧНО для web: Все инициализации должны быть в одной зоне
@@ -99,6 +100,12 @@ class MyApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final GoRouter router = ref.watch(goRouterProvider);
+    // Простая эвристика low-end устройства: низкий DPR или отключённая анимация ОС
+    final bool lowDpr = MediaQuery.of(context).devicePixelRatio < 2.0;
+    final bool disableAnimations = SchedulerBinding
+        .instance.window.accessibilityFeatures.disableAnimations;
+    final bool isLowEndDevice =
+        lowDpr || disableAnimations; // reserved for global gating
 
     return _LinkListener(
       router: router,
@@ -137,6 +144,13 @@ class MyApp extends ConsumerWidget {
               data: Theme.of(context).copyWith(
                 textTheme: scaledTextTheme,
                 scaffoldBackgroundColor: Colors.transparent,
+                // Глобально уменьшаем длительность анимаций на low-end
+                pageTransitionsTheme: PageTransitionsTheme(builders: {
+                  for (final platform in TargetPlatform.values)
+                    platform: isLowEndDevice
+                        ? const ZoomPageTransitionsBuilder()
+                        : const FadeUpwardsPageTransitionsBuilder(),
+                }),
               ),
               child: wrapped,
             ),

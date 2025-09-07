@@ -25,6 +25,7 @@ import 'package:go_router/go_router.dart';
 import 'package:bizlevel/widgets/common/breadcrumb.dart';
 import 'package:bizlevel/widgets/common/bizlevel_button.dart';
 import 'package:bizlevel/theme/ui_strings.dart';
+import 'package:bizlevel/theme/spacing.dart';
 
 /// Shows a level as full-screen blocks (Intro → Lesson → Quiz → …).
 class LevelDetailScreen extends ConsumerStatefulWidget {

@@ -7,7 +7,8 @@ import 'package:go_router/go_router.dart';
 import 'package:bizlevel/providers/gp_providers.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bizlevel/services/gp_service.dart';
-import 'package:flutter_svg/flutter_svg.dart';
+// import 'package:flutter_svg/flutter_svg.dart';
+import 'package:bizlevel/widgets/common/gp_balance_widget.dart';
 import 'package:bizlevel/widgets/common/bizlevel_modal.dart';
 import 'package:bizlevel/theme/ui_strings.dart';
 
@@ -57,7 +58,7 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
         if (!mounted) return;
         await Scrollable.ensureVisible(key!.currentContext!,
             duration: const Duration(milliseconds: 500),
-            curve: Curves.easeInOut,
+            curve: Curves.easeInOutCubic,
             alignment: 0.3);
         _logBreadcrumb('tower_autoscroll_done level=$levelNumber');
       }
@@ -93,37 +94,11 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
             ),
           ],
         ),
-        actions: [
-          Consumer(builder: (context, ref, _) {
-            final gpAsync = ref.watch(gpBalanceProvider);
-            final balance = gpAsync.value?['balance'];
-            if (balance == null) return const SizedBox.shrink();
-            return Padding(
-              padding: const EdgeInsets.only(right: 12),
-              child: Center(
-                child: InkWell(
-                  onTap: () {
-                    // Переход в магазин GP (маршрут добавим в 39.8)
-                    try {
-                      GoRouter.of(context).go('/gp-store');
-                    } catch (_) {}
-                  },
-                  child: Row(
-                    children: [
-                      SvgPicture.asset('assets/images/gp_coin.svg',
-                          width: 36, height: 36),
-                      const SizedBox(width: 8),
-                      Text('$balance',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 28,
-                          )),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          })
+        actions: const [
+          Padding(
+            padding: EdgeInsets.only(right: 12),
+            child: Center(child: GpBalanceWidget()),
+          )
         ],
         backgroundColor: AppColor.appBarColor,
       ),

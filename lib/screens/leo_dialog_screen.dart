@@ -495,8 +495,29 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
           // 3) Обычные сообщения
           final msg = _messages[msgIndex];
           final isUser = msg['role'] == 'user';
-          return LeoMessageBubble(
-              text: msg['content'] as String? ?? '', isUser: isUser);
+          final bubble = LeoMessageBubble(
+            text: msg['content'] as String? ?? '',
+            isUser: isUser,
+          );
+          // Лёгкая анимация появления только для последних 6 элементов,
+          // чтобы избежать нагрузки на длинные списки
+          final bool animate = index >=
+              ((_hasMore ? 1 : 0) + (_isSending ? 1 : 0) + _messages.length - 6)
+                  .clamp(0, _messages.length + 2);
+          if (!animate) return bubble;
+          return TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0.0, end: 1.0),
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+            builder: (context, v, child) => Opacity(
+              opacity: v,
+              child: Transform.translate(
+                offset: Offset(0, (1 - v) * 20),
+                child: child,
+              ),
+            ),
+            child: bubble,
+          );
         },
       ),
     );
@@ -568,9 +589,12 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
         runSpacing: 8,
         children: [
           for (final text in chips)
-            ActionChip(
-              label: Text(text, overflow: TextOverflow.ellipsis),
-              onPressed: () {
+            _SuggestionCard(
+              text: text,
+              icon: text.contains('?')
+                  ? Icons.help_outline
+                  : Icons.lightbulb_outline,
+              onTap: () {
                 _inputController.text = text;
                 _inputController.selection = TextSelection.fromPosition(
                     TextPosition(offset: _inputController.text.length));
@@ -619,5 +643,52 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
       }
     }
     return const [];
+  }
+}
+
+class _SuggestionCard extends StatelessWidget {
+  const _SuggestionCard({
+    required this.text,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final String text;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: AppColor.surface,
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: [
+            BoxShadow(
+              color: AppColor.shadowColor.withValues(alpha: 0.06),
+              blurRadius: 3,
+              offset: const Offset(0, 1),
+            )
+          ],
+          border: Border.all(color: AppColor.borderColor),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: AppColor.labelColor),
+            const SizedBox(width: 8),
+            Text(
+              text,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

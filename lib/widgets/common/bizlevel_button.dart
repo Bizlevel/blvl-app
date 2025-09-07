@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:bizlevel/theme/color.dart';
+import 'package:flutter/services.dart';
 
 enum BizLevelButtonVariant { primary, secondary, outline, text, danger, link }
 
@@ -13,6 +14,7 @@ class BizLevelButton extends StatelessWidget {
   final Widget? icon;
   final bool fullWidth;
   final Key? buttonKey;
+  final bool enableHaptic;
 
   const BizLevelButton({
     super.key,
@@ -23,12 +25,13 @@ class BizLevelButton extends StatelessWidget {
     this.icon,
     this.fullWidth = false,
     this.buttonKey,
+    this.enableHaptic = true,
   });
 
   Size get _minSize {
     switch (size) {
       case BizLevelButtonSize.sm:
-        return const Size(40, 40);
+        return const Size(44, 44);
       case BizLevelButtonSize.md:
         return const Size(48, 48);
       case BizLevelButtonSize.lg:
@@ -49,6 +52,15 @@ class BizLevelButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    void _safeHapticTap() {
+      if (enableHaptic) {
+        try {
+          HapticFeedback.lightImpact();
+        } catch (_) {}
+      }
+      onPressed?.call();
+    }
+
     final child = icon == null
         ? Text(label)
         : Row(
@@ -65,7 +77,7 @@ class BizLevelButton extends StatelessWidget {
       case BizLevelButtonVariant.primary:
         button = ElevatedButton(
           key: buttonKey,
-          onPressed: onPressed,
+          onPressed: onPressed == null ? null : _safeHapticTap,
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColor.primary,
             foregroundColor: AppColor.onPrimary,
@@ -81,7 +93,7 @@ class BizLevelButton extends StatelessWidget {
       case BizLevelButtonVariant.danger:
         button = ElevatedButton(
           key: buttonKey,
-          onPressed: onPressed,
+          onPressed: onPressed == null ? null : _safeHapticTap,
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColor.error,
             foregroundColor: AppColor.onPrimary,
@@ -97,7 +109,7 @@ class BizLevelButton extends StatelessWidget {
       case BizLevelButtonVariant.outline:
         button = OutlinedButton(
           key: buttonKey,
-          onPressed: onPressed,
+          onPressed: onPressed == null ? null : _safeHapticTap,
           style: OutlinedButton.styleFrom(
             minimumSize: _minSize,
             padding: _padding,
@@ -113,7 +125,7 @@ class BizLevelButton extends StatelessWidget {
       case BizLevelButtonVariant.text:
         button = TextButton(
           key: buttonKey,
-          onPressed: onPressed,
+          onPressed: onPressed == null ? null : _safeHapticTap,
           style: TextButton.styleFrom(
             minimumSize: _minSize,
             padding: _padding,
@@ -125,7 +137,7 @@ class BizLevelButton extends StatelessWidget {
       case BizLevelButtonVariant.link:
         button = TextButton(
           key: buttonKey,
-          onPressed: onPressed,
+          onPressed: onPressed == null ? null : _safeHapticTap,
           style: TextButton.styleFrom(
             minimumSize: _minSize,
             padding: _padding,
@@ -138,7 +150,7 @@ class BizLevelButton extends StatelessWidget {
       case BizLevelButtonVariant.secondary:
         button = OutlinedButton(
           key: buttonKey,
-          onPressed: onPressed,
+          onPressed: onPressed == null ? null : _safeHapticTap,
           style: OutlinedButton.styleFrom(
             minimumSize: _minSize,
             padding: _padding,

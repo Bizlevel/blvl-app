@@ -35,11 +35,13 @@ class BizLevelChatBubble extends StatelessWidget {
       children: [
         Container(
           margin: const EdgeInsets.symmetric(vertical: 4),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           constraints:
               BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.8),
           decoration: BoxDecoration(
-            color: bg,
+            color: role == ChatBubbleRole.assistant
+                ? bg.withValues(alpha: 0.98)
+                : bg,
             borderRadius: BorderRadius.circular(12).copyWith(
               topLeft: Radius.circular(isUser ? 12 : 0),
               topRight: Radius.circular(isUser ? 0 : 12),

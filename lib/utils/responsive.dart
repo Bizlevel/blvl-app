@@ -16,7 +16,6 @@ class Responsive {
       MediaQuery.of(context).size.width >= 1024;
 }
 
-import 'package:flutter/widgets.dart';
 
 class ResponsiveBreakpoints {
   static const double mobile = 600;

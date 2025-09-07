@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 
 import 'package:bizlevel/providers/auth_provider.dart';
 import 'package:bizlevel/theme/color.dart';
+import 'package:bizlevel/theme/spacing.dart';
 import 'package:bizlevel/widgets/custom_image.dart';
 import 'package:bizlevel/widgets/stat_card.dart';
 // import 'package:bizlevel/widgets/setting_item.dart';
@@ -22,6 +23,7 @@ import 'package:bizlevel/providers/gp_providers.dart';
 import 'package:bizlevel/widgets/common/bizlevel_error.dart';
 import 'package:bizlevel/widgets/common/bizlevel_loading.dart';
 import 'package:bizlevel/widgets/common/bizlevel_button.dart';
+import 'package:bizlevel/widgets/common/gp_balance_widget.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -167,26 +169,21 @@ class ProfileScreen extends ConsumerWidget {
                     ?.copyWith(color: AppColor.textColor),
               ),
               actions: [
-                // Мини‑баланс GP в шапке профиля
+                // Мини‑баланс GP в шапке профиля (общий виджет)
                 Padding(
                   padding: const EdgeInsets.only(right: 8),
-                  child: InkWell(
-                    onTap: () {
-                      try {
-                        if (context.mounted) context.go('/gp-store');
-                      } catch (_) {}
-                    },
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        SvgPicture.asset('assets/images/gp_coin.svg',
-                            width: 28, height: 28),
-                        const SizedBox(width: 6),
-                        Text('$gp',
-                            style: const TextStyle(
-                                fontSize: 18, fontWeight: FontWeight.w600)),
-                        const SizedBox(width: 6),
-                      ],
+                  child: SizedBox(
+                    width: 90,
+                    child: Builder(
+                      builder: (context) {
+                        // Лёгкая замена: используем общий виджет
+                        return const SizedBox(
+                          child: Align(
+                            alignment: Alignment.centerRight,
+                            child: _ProfileGpBalanceSlot(),
+                          ),
+                        );
+                      },
                     ),
                   ),
                 ),
@@ -299,6 +296,15 @@ class ProfileScreen extends ConsumerWidget {
         );
       },
     );
+  }
+}
+
+// Локальный слот, чтобы не ломать существующую структуру AppBar
+class _ProfileGpBalanceSlot extends StatelessWidget {
+  const _ProfileGpBalanceSlot();
+  @override
+  Widget build(BuildContext context) {
+    return const GpBalanceWidget();
   }
 }
 

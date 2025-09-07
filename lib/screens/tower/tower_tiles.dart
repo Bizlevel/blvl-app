@@ -167,14 +167,10 @@ Widget _buildLevelCoreTile({
           ),
         ),
         if (isCurrent)
-          const Positioned(
+          Positioned(
             top: 6,
             right: 6,
-            child: Icon(
-              Icons.star,
-              color: AppColor.premium,
-              size: 20,
-            ),
+            child: _PulsingStar(),
           ),
       ],
     ),
@@ -332,6 +328,44 @@ class _LevelNodeTile extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _PulsingStar extends StatefulWidget {
+  @override
+  State<_PulsingStar> createState() => _PulsingStarState();
+}
+
+class _PulsingStarState extends State<_PulsingStar>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c;
+  late final Animation<double> _t;
+
+  @override
+  void initState() {
+    super.initState();
+    _c = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 900))
+      ..repeat(reverse: true);
+    _t = CurvedAnimation(parent: _c, curve: Curves.easeInOutCubic);
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _t,
+      builder: (context, child) => Transform.scale(
+        scale: 0.9 + (_t.value * 0.1),
+        child: child,
+      ),
+      child: const Icon(Icons.star, color: AppColor.premium, size: 20),
     );
   }
 }

@@ -13,6 +13,11 @@ class AppSpacing {
   static const double x2l = 32; // 2xl (без дефиса для стиля имен)
   static const double x3l = 48; // 3xl
 
+  // Backward-compatibility aliases (medium/small/large)
+  static const double small = sm; // 8
+  static const double medium = lg; // 16
+  static const double large = xl; // 24
+
   // Шорткаты отступов
   static EdgeInsets insetsAll(double value) => EdgeInsets.all(value);
   static EdgeInsets insetsSymmetric({double h = 0, double v = 0}) =>

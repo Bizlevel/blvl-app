@@ -5,6 +5,7 @@ import 'package:bizlevel/providers/levels_provider.dart';
 import 'package:bizlevel/widgets/level_card.dart';
 import 'package:bizlevel/widgets/user_info_bar.dart';
 import 'package:bizlevel/widgets/notification_box.dart';
+import 'package:bizlevel/theme/spacing.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:go_router/go_router.dart';

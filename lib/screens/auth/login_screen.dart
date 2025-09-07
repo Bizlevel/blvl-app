@@ -8,6 +8,7 @@ import '../../providers/login_controller.dart';
 import '../../services/auth_service.dart';
 import '../../theme/color.dart' show AppColor;
 import '../../widgets/custom_textfield.dart';
+import '../../widgets/common/animated_button.dart';
 import '../../theme/spacing.dart';
 
 class LoginScreen extends HookConsumerWidget {
@@ -57,158 +58,203 @@ class LoginScreen extends HookConsumerWidget {
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: AppColor.bgGradient,
-        ),
-        child: Center(
-          child: SingleChildScrollView(
-            padding: AppSpacing.insetsSymmetric(h: 24, v: 48),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Баннер успешной регистрации
-                if (registered) ...[
-                  Container(
-                    width: double.infinity,
-                    margin: const EdgeInsets.only(bottom: 16),
-                    padding: AppSpacing.insetsAll(16),
-                    decoration: BoxDecoration(
-                      color: AppColor.success.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                          color: AppColor.success.withValues(alpha: 0.3)),
-                    ),
-                    child: const Row(
-                      children: [
-                        Icon(Icons.check_circle,
-                            color: AppColor.success, size: 24),
-                        SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            'Вы успешно зарегистрировались!',
-                            style: TextStyle(
-                              color: AppColor.success,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
+      body: Stack(
+        children: [
+          // Анимированный фон (медленная ротация градиента, лёгкая)
+          const _AnimatedGradientBackground(),
+          Center(
+            child: SingleChildScrollView(
+              padding: AppSpacing.insetsSymmetric(h: 24, v: 48),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Баннер успешной регистрации
+                  if (registered) ...[
+                    Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.only(bottom: 16),
+                      padding: AppSpacing.insetsAll(16),
+                      decoration: BoxDecoration(
+                        color: AppColor.success.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                            color: AppColor.success.withValues(alpha: 0.3)),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.check_circle,
+                              color: AppColor.success, size: 24),
+                          SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Вы успешно зарегистрировались!',
+                              style: TextStyle(
+                                color: AppColor.success,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  // белая карта формы
+                  Container(
+                    key: const Key('login_form'),
+                    // adaptive width
+                    width: () {
+                      final w = MediaQuery.of(context).size.width;
+                      if (w >= 600 && w < 1024) {
+                        return 480.0;
+                      }
+                      return 420.0;
+                    }(),
+                    padding: AppSpacing.insetsSymmetric(h: 24, v: 32),
+                    decoration: BoxDecoration(
+                      color: AppColor.surface,
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColor.textColor.withValues(alpha: 0.05),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      children: [
+                        Container(
+                          width: 96,
+                          height: 96,
+                          decoration: const BoxDecoration(
+                            color: AppColor.dividerColor,
+                            shape: BoxShape.circle,
+                          ),
+                          padding: AppSpacing.insetsAll(8),
+                          child: SvgPicture.asset(
+                            'assets/images/logo_light.svg',
+                            width: 80,
+                            height: 80,
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+                        AppSpacing.gapH(32),
+                        CustomTextBox(
+                          key: const ValueKey('email_field'),
+                          hint: 'Email',
+                          prefix: const Icon(Icons.email_outlined),
+                          controller: emailController,
+                        ),
+                        AppSpacing.gapH(16),
+                        // поле пароля с глазом
+                        CustomTextBox(
+                          key: const ValueKey('password_field'),
+                          hint: 'Пароль',
+                          prefix: const Icon(Icons.lock_outline),
+                          controller: passwordController,
+                          obscureText: obscurePassword.value,
+                          suffix: IconButton(
+                            icon: Icon(obscurePassword.value
+                                ? Icons.visibility_off
+                                : Icons.visibility),
+                            onPressed: () =>
+                                obscurePassword.value = !obscurePassword.value,
+                          ),
+                        ),
+                        AppSpacing.gapH(24),
+                        AnimatedButton(
+                          label: 'Войти',
+                          onPressed: isLoading ? null : submit,
+                          loading: isLoading,
+                        ),
+                        AppSpacing.gapH(16),
+                        // Social proof (лёгкий блок
+                        const _SocialProofBlock(),
+                        AppSpacing.gapH(8),
+                        TextButton(
+                          onPressed: () => context.go('/register'),
+                          child: const Text('Нет аккаунта? Зарегистрироваться'),
                         ),
                       ],
                     ),
                   ),
                 ],
-                // белая карта формы
-                Container(
-                  key: const Key('login_form'),
-                  // adaptive width
-                  width: () {
-                    final w = MediaQuery.of(context).size.width;
-                    if (w >= 600 && w < 1024) {
-                      return 480.0;
-                    }
-                    return 420.0;
-                  }(),
-                  padding: AppSpacing.insetsSymmetric(h: 24, v: 32),
-                  decoration: BoxDecoration(
-                    color: AppColor.surface,
-                    borderRadius: BorderRadius.circular(24),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColor.textColor.withValues(alpha: 0.05),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    children: [
-                      Container(
-                        width: 96,
-                        height: 96,
-                        decoration: const BoxDecoration(
-                          color: AppColor.dividerColor,
-                          shape: BoxShape.circle,
-                        ),
-                        padding: AppSpacing.insetsAll(8),
-                        child: SvgPicture.asset(
-                          'assets/images/logo_light.svg',
-                          width: 80,
-                          height: 80,
-                          fit: BoxFit.contain,
-                        ),
-                      ),
-                      AppSpacing.gapH(32),
-                      CustomTextBox(
-                        key: const ValueKey('email_field'),
-                        hint: 'Email',
-                        prefix: const Icon(Icons.email_outlined),
-                        controller: emailController,
-                      ),
-                      AppSpacing.gapH(16),
-                      // поле пароля с глазом
-                      CustomTextBox(
-                        key: const ValueKey('password_field'),
-                        hint: 'Пароль',
-                        prefix: const Icon(Icons.lock_outline),
-                        controller: passwordController,
-                        obscureText: obscurePassword.value,
-                        suffix: IconButton(
-                          icon: Icon(obscurePassword.value
-                              ? Icons.visibility_off
-                              : Icons.visibility),
-                          onPressed: () =>
-                              obscurePassword.value = !obscurePassword.value,
-                        ),
-                      ),
-                      AppSpacing.gapH(24),
-                      // Градиентная кнопка
-                      GestureDetector(
-                        onTap: isLoading ? null : submit,
-                        child: Container(
-                          height: 48,
-                          width: double.infinity,
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [AppColor.primary, AppColor.info],
-                              begin: Alignment.centerLeft,
-                              end: Alignment.centerRight,
-                            ),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          alignment: Alignment.center,
-                          child: isLoading
-                              ? const SizedBox(
-                                  width: 22,
-                                  height: 22,
-                                  child: CircularProgressIndicator(
-                                    color: AppColor.onPrimary,
-                                    strokeWidth: 3,
-                                  ),
-                                )
-                              : const Text(
-                                  'Войти',
-                                  style: TextStyle(
-                                    color: AppColor.onPrimary,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                        ),
-                      ),
-                      AppSpacing.gapH(16),
-                      TextButton(
-                        onPressed: () => context.go('/register'),
-                        child: const Text('Нет аккаунта? Зарегистрироваться'),
-                      ),
-                    ],
-                  ),
-                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AnimatedGradientBackground extends StatefulWidget {
+  const _AnimatedGradientBackground();
+  @override
+  State<_AnimatedGradientBackground> createState() =>
+      _AnimatedGradientBackgroundState();
+}
+
+class _AnimatedGradientBackgroundState
+    extends State<_AnimatedGradientBackground>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  @override
+  void initState() {
+    super.initState();
+    final dpr = MediaQueryData.fromView(
+            WidgetsBinding.instance.platformDispatcher.views.first)
+        .devicePixelRatio;
+    final isLowEnd = dpr < 2.0;
+    _controller = AnimationController(
+        vsync: this, duration: Duration(seconds: isLowEnd ? 18 : 30))
+      ..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        final t = _controller.value;
+        return Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Color.lerp(
+                    const Color(0xFFF0F4FF), const Color(0xFFDDE8FF), t * 0.6)!,
+                Color.lerp(
+                    const Color(0xFFE0F2FE), const Color(0xFFEDE9FE), t * 0.6)!,
               ],
             ),
           ),
+        );
+      },
+    );
+  }
+}
+
+class _SocialProofBlock extends StatelessWidget {
+  const _SocialProofBlock();
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: const [
+        Text(
+          'С BizLevel учатся предприниматели по всему СНГ',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: AppColor.onSurfaceSubtle),
         ),
-      ),
+      ],
     );
   }
 }
