@@ -7,7 +7,7 @@ import 'package:bizlevel/providers/levels_provider.dart';
 import 'package:bizlevel/utils/formatters.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:bizlevel/providers/gp_providers.dart';
+import 'package:bizlevel/widgets/common/gp_balance_widget.dart';
 
 class MainStreetScreen extends ConsumerWidget {
   const MainStreetScreen({super.key});
@@ -37,8 +37,8 @@ class MainStreetScreen extends ConsumerWidget {
                           child: UserInfoBar(showGp: false),
                         ),
                       ),
-                      // Правая часть — только GP с кликом в /gp-store
-                      _TopBarGp(),
+                      // Правая часть — общий виджет баланса GP (как в Профиле/Башне)
+                      GpBalanceWidget(),
                     ],
                   ),
                 ),
@@ -278,40 +278,6 @@ class _MainActionsGrid extends ConsumerWidget {
         ],
       );
     });
-  }
-}
-
-class _TopBarGp extends ConsumerWidget {
-  const _TopBarGp();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final gpAsync = ref.watch(gpBalanceProvider);
-    final balance = gpAsync.value?['balance'];
-    if (balance == null) return const SizedBox.shrink();
-    return InkWell(
-      onTap: () {
-        try {
-          GoRouter.of(context).go('/gp-store');
-        } catch (_) {}
-      },
-      child: Container(
-        constraints: const BoxConstraints(minHeight: 44),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SvgPicture.asset('assets/images/gp_coin.svg',
-                width: 36, height: 36),
-            const SizedBox(width: 8),
-            Text(
-              '$balance',
-              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 28),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }
 
