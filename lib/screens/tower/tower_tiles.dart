@@ -14,7 +14,7 @@ Future<void> _unlockFloor(BuildContext context,
         await gp.unlockFloor(floorNumber: floorNumber, idempotencyKey: idem);
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Этаж открыт')),
+      const SnackBar(content: Text(UIS.floorOpened)),
     );
     // Обновим баланс и узлы башни
     try {
@@ -31,7 +31,7 @@ Future<void> _unlockFloor(BuildContext context,
     if (e.message.contains('Недостаточно GP')) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Недостаточно GP'),
+          content: const Text(UIS.notEnoughGp),
           action: SnackBarAction(
             label: 'Купить GP',
             onPressed: () {
@@ -49,7 +49,7 @@ Future<void> _unlockFloor(BuildContext context,
     _captureError(e, st);
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Не удалось открыть этаж')),
+      const SnackBar(content: Text(UIS.floorOpenFailed)),
     );
   }
 }
@@ -58,18 +58,14 @@ void _showUnlockFloorDialog(BuildContext context, {required int floorNumber}) {
   showDialog(
     context: context,
     builder: (ctx) {
-      return AlertDialog(
-        title: const Text('Открыть этаж'),
-        content: Text('Стоимость: $_kFloorUnlockCost GP. Открыть доступ?'),
-        actions: [
-          FilledButton(
-            onPressed: () async {
-              Navigator.of(ctx).pop();
-              await _unlockFloor(context, floorNumber: floorNumber);
-            },
-            child: Text('$_kFloorUnlockCost GP'),
-          ),
-        ],
+      return BizLevelModal(
+        title: 'Открыть этаж',
+        subtitle: 'Стоимость: $_kFloorUnlockCost GP. Открыть доступ?',
+        primaryLabel: '$_kFloorUnlockCost GP',
+        icon: Icons.lock_open,
+        onPrimary: () async {
+          await _unlockFloor(context, floorNumber: floorNumber);
+        },
       );
     },
   );
@@ -145,9 +141,9 @@ Widget _buildLevelCoreTile({
       border: Border.all(color: _darker(AppColor.info, 0.2), width: 4),
       boxShadow: [
         const BoxShadow(
-            color: Color(0x22000000), blurRadius: 10, offset: Offset(0, 6)),
+            color: AppColor.shadowColor, blurRadius: 10, offset: Offset(0, 6)),
         BoxShadow(
-            color: Colors.black.withValues(alpha: 0.18),
+            color: AppColor.shadowColor,
             blurRadius: 16,
             spreadRadius: 2,
             offset: const Offset(0, 8)),
@@ -166,19 +162,15 @@ Widget _buildLevelCoreTile({
             isCompleted
                 ? Icons.check
                 : (isLocked && !isCompleted ? Icons.lock : Icons.circle),
-            color: Colors.white,
+            color: AppColor.onPrimary,
             size: kNodeSize * 0.7,
           ),
         ),
         if (isCurrent)
-          const Positioned(
+          Positioned(
             top: 6,
             right: 6,
-            child: Icon(
-              Icons.star,
-              color: AppColor.premium,
-              size: 20,
-            ),
+            child: _PulsingStar(),
           ),
       ],
     ),
@@ -230,7 +222,7 @@ class _CheckpointNodeTile extends StatelessWidget {
                 width: size,
                 height: size,
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: AppColor.surface,
                   borderRadius: BorderRadius.circular(kTileRadius),
                   border: const Border.fromBorderSide(kTileBorderSide),
                   boxShadow: kTileShadows,
@@ -246,7 +238,7 @@ class _CheckpointNodeTile extends StatelessWidget {
                         ? AppColor.info
                         : (type == 'goal_checkpoint'
                             ? (isCompleted ? AppColor.success : AppColor.info)
-                            : Colors.black54),
+                            : AppColor.labelColor),
                     size: size * 0.7,
                   ),
                 ),
@@ -336,6 +328,44 @@ class _LevelNodeTile extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _PulsingStar extends StatefulWidget {
+  @override
+  State<_PulsingStar> createState() => _PulsingStarState();
+}
+
+class _PulsingStarState extends State<_PulsingStar>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c;
+  late final Animation<double> _t;
+
+  @override
+  void initState() {
+    super.initState();
+    _c = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 900))
+      ..repeat(reverse: true);
+    _t = CurvedAnimation(parent: _c, curve: Curves.easeInOutCubic);
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _t,
+      builder: (context, child) => Transform.scale(
+        scale: 0.9 + (_t.value * 0.1),
+        child: child,
+      ),
+      child: const Icon(Icons.star, color: AppColor.premium, size: 20),
     );
   }
 }

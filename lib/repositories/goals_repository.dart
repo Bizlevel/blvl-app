@@ -106,6 +106,71 @@ class GoalsRepository {
     return Map<String, dynamic>.from(updated);
   }
 
+  /// Partial update of a single field in core_goals.version_data via RPC.
+  /// Server ensures editing only latest version and merges JSONB atomically.
+  Future<Map<String, dynamic>> upsertGoalField({
+    required int version,
+    required String field,
+    required dynamic value,
+  }) async {
+    return _withRetry<Map<String, dynamic>>(() async {
+      final result = await _client.rpc(
+        'upsert_goal_field',
+        params: {
+          'p_version': version,
+          'p_field': field,
+          'p_value': value,
+        },
+      );
+      if (result is Map<String, dynamic>) {
+        return result;
+      }
+      return Map<String, dynamic>.from(result as Map);
+    });
+  }
+
+  /// Собирает прогресс заполнения полей версии цели:
+  /// - completedFields: список имён полей из goal_checkpoint_progress
+  /// - versionData: текущий jsonb core_goals.version_data (если есть)
+  Future<Map<String, dynamic>> fetchGoalProgress(int version) async {
+    // Получаем version_data для указанной версии (если есть запись)
+    Map<String, dynamic> versionRow = {};
+    try {
+      final data = await _client
+          .from('core_goals')
+          .select('version, version_data')
+          .eq('version', version)
+          .order('updated_at', ascending: false)
+          .limit(1)
+          .maybeSingle();
+      if (data != null) {
+        versionRow = Map<String, dynamic>.from(data);
+      }
+    } catch (_) {}
+
+    // Поля прогресса из goal_checkpoint_progress (RLS owner-only)
+    List<String> completed = <String>[];
+    try {
+      final rows = await _client
+          .from('goal_checkpoint_progress')
+          .select('field_name')
+          .eq('version', version);
+      // rows уже List по контракту PostgREST; лишняя проверка типа не нужна
+      completed = (rows as List)
+          .map((e) => (e as Map)['field_name'])
+          .whereType<String>()
+          .toList();
+    } catch (_) {}
+
+    return {
+      'version': version,
+      'versionData': (versionRow['version_data'] is Map)
+          ? Map<String, dynamic>.from(versionRow['version_data'] as Map)
+          : const <String, dynamic>{},
+      'completedFields': completed,
+    };
+  }
+
   // ============================
   // Weekly Progress (weekly_progress)
   // ============================
@@ -181,9 +246,14 @@ class GoalsRepository {
       if (techniquesDetails != null) 'techniques_details': techniquesDetails,
     };
 
-    final inserted =
-        await _client.from('weekly_progress').insert(payload).select().single();
-    return Map<String, dynamic>.from(inserted);
+    return _withRetry<Map<String, dynamic>>(() async {
+      final inserted = await _client
+          .from('weekly_progress')
+          .insert(payload)
+          .select()
+          .single();
+      return Map<String, dynamic>.from(inserted);
+    });
   }
 
   Future<Map<String, dynamic>> updateWeek({
@@ -225,13 +295,15 @@ class GoalsRepository {
       if (techniquesDetails != null) 'techniques_details': techniquesDetails,
     };
 
-    final updated = await _client
-        .from('weekly_progress')
-        .update(payload)
-        .eq('id', id)
-        .select()
-        .single();
-    return Map<String, dynamic>.from(updated);
+    return _withRetry<Map<String, dynamic>>(() async {
+      final updated = await _client
+          .from('weekly_progress')
+          .update(payload)
+          .eq('id', id)
+          .select()
+          .single();
+      return Map<String, dynamic>.from(updated);
+    });
   }
 
   // Deprecated wrappers for backward compatibility
@@ -346,5 +418,27 @@ class GoalsRepository {
         DateTime.now().toUtc().difference(DateTime.utc(1970)).inDays;
     final int pick = dayIndex % active.length;
     return active[pick];
+  }
+}
+
+extension on GoalsRepository {
+  Future<T> _withRetry<T>(Future<T> Function() op) async {
+    final List<Duration> delays = <Duration>[
+      const Duration(milliseconds: 300),
+      const Duration(milliseconds: 1000),
+      const Duration(milliseconds: 2500),
+    ];
+    int attempt = 0;
+    while (true) {
+      try {
+        return await op();
+      } on SocketException {
+        if (attempt >= delays.length) rethrow;
+      } on PostgrestException {
+        if (attempt >= delays.length) rethrow;
+      }
+      await Future.delayed(delays[attempt]);
+      attempt += 1;
+    }
   }
 }

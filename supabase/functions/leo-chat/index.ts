@@ -150,20 +150,10 @@ const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-// Initialize Supabase admin client once (service role key required)
-const supabaseAdmin = createClient(
-  Deno.env.get("SUPABASE_URL")!,
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-);
-
-// Alternative client for JWT validation (with anon key)
-const supabaseAuth = createClient(
-  Deno.env.get("SUPABASE_URL")!,
-  Deno.env.get("SUPABASE_ANON_KEY")!,
-);
-
-// Initialize OpenAI client (API key is taken from OPENAI_API_KEY env var)
-const openai = new OpenAI();
+// Lazy init clients to avoid module-load failures if secrets are missing
+let supabaseAdmin: ReturnType<typeof createClient> | null = null;
+let supabaseAuth: ReturnType<typeof createClient> | null = null;
+let openai: OpenAI | null = null;
 
 serve(async (req: Request): Promise<Response> => {
   // Handle CORS pre-flight
@@ -212,6 +202,16 @@ serve(async (req: Request): Promise<Response> => {
   }
 
   try {
+    // Initialize clients lazily after env validation
+    if (!supabaseAdmin) {
+      supabaseAdmin = createClient(supabaseUrl!, supabaseServiceKey!);
+    }
+    if (!supabaseAuth) {
+      supabaseAuth = createClient(supabaseUrl!, supabaseAnonKey!);
+    }
+    if (!openai) {
+      openai = new OpenAI();
+    }
     // Read request body once to support additional parameters
     const body = await req.json();
     console.log('🔧 DEBUG: Request body parsed successfully');
@@ -245,6 +245,8 @@ serve(async (req: Request): Promise<Response> => {
 
     // Добавляем логирование chatId
     console.log('🔧 DEBUG: chatId из запроса:', chatId);
+    // Предварительное объявление userId, чтобы избежать TDZ при обращении в режимах выше по коду
+    let userId: string | null = null;
     
     // Логируем входящие параметры для отладки
     console.log('🔧 DEBUG: Входящие параметры:', {
@@ -273,6 +275,179 @@ serve(async (req: Request): Promise<Response> => {
       userContextIsStringNull: userContext === 'null',
       levelContextIsStringNull: levelContext === 'null',
     });
+
+    // ==============================
+    // GOAL_COMMENT MODE (short reply to field save, no RAG, no GP spend)
+    // Disabled by default via feature flag
+    // ==============================
+    if (mode === 'goal_comment') {
+      const goalCommentFlag = (Deno.env.get('ENABLE_GOAL_COMMENT') || 'false').toLowerCase();
+      if (goalCommentFlag !== 'true') {
+        return new Response(null, { status: 204, headers: corsHeaders });
+      }
+      try {
+        // Вебхук приходит из БД-триггера с заголовком Authorization: Bearer <CRON_SECRET>
+        const cronSecret = (Deno.env.get('CRON_SECRET') || '').trim();
+        const authHeader = req.headers.get('authorization') || '';
+        const bearerOk = cronSecret && authHeader.startsWith('Bearer ') && authHeader.replace('Bearer ', '').trim() === cronSecret;
+        if (!bearerOk) {
+          return new Response(
+            JSON.stringify({ error: 'unauthorized_webhook' }),
+            { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+          );
+        }
+
+        // Данные события: версия и поле
+        const version: number = Number.isFinite(body?.version) ? Number(body.version) : Number(body?.goalVersion);
+        const fieldName: string = typeof body?.field_name === 'string' ? body.field_name : (typeof body?.fieldName === 'string' ? body.fieldName : '');
+        const fieldValue: any = body?.field_value ?? body?.fieldValue ?? null;
+        const allFields: any = body?.all_fields ?? body?.allFields ?? {};
+
+        // Системный промпт (короткий стиль Макса)
+        const basePrompt = `Ты - Макс, трекер целей BizLevel. Отвечай по-русски, кратко (2–3 предложения), без вводных фраз.
+КОНТЕКСТ: пользователь заполняет версию цели v${version}. Сейчас заполнено поле "${fieldName}".
+СТИЛЬ: простые слова, локальный контекст (Казахстан, тенге), на «ты». Структура ответа: 1) короткий комментарий к введённому значению; 2) подсказка или вопрос к следующему шагу; 3) (опционально) микро-совет.
+ЗАПРЕЩЕНО: общие фразы «отлично/молодец/правильно», вопросы «чем помочь?», лишние вводные.`;
+
+        // Пользовательское сообщение для модели
+        const userParts: string[] = [];
+        if (fieldName) userParts.push(`Поле: ${fieldName}`);
+        if (fieldValue !== null && fieldValue !== undefined) userParts.push(`Значение: ${typeof fieldValue === 'string' ? fieldValue : JSON.stringify(fieldValue)}`);
+        if (allFields && typeof allFields === 'object') userParts.push(`Все поля версии: ${JSON.stringify(allFields)}`);
+
+        // Рекомендованные чипы (по версии/следующим шагам)
+        let recommended_chips: string[] | undefined;
+        if (version === 1) {
+          // v1: concrete_result → main_pain → first_action
+          if (fieldName === 'concrete_result') recommended_chips = ['Главная проблема', 'Что мешает сейчас?'];
+          else if (fieldName === 'main_pain') recommended_chips = ['Действие на завтра', 'Начну с …'];
+          else recommended_chips = ['Уточнить результат', 'Добавить цифру в цель'];
+        } else if (version === 2) {
+          if (fieldName === 'metric_type') recommended_chips = ['Сколько сейчас?', 'Текущее значение'];
+          else if (fieldName === 'metric_current') recommended_chips = ['Целевое значение', 'Хочу к концу месяца …'];
+          else recommended_chips = ['Пересчитать % роста'];
+        } else if (version === 3) {
+          recommended_chips = ['Неделя 1: фокус', 'Неделя 2: фокус', 'Неделя 3: фокус', 'Неделя 4: фокус'];
+        } else if (version === 4) {
+          if (fieldName === 'readiness_score') recommended_chips = ['Дата старта', 'Начать в понедельник'];
+          else if (fieldName === 'start_date') recommended_chips = ['Кому расскажу', 'Никому'];
+          else if (fieldName === 'accountability_person') recommended_chips = ['План на 3 дня'];
+          else recommended_chips = ['Готовность 7/10'];
+        }
+
+        const apiKey = Deno.env.get('OPENAI_API_KEY');
+        if (!apiKey || apiKey.trim().length < 20) {
+          return new Response(
+            JSON.stringify({ error: 'openai_config_error' }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+          );
+        }
+
+        const completion = await openai.chat.completions.create({
+          model: Deno.env.get('OPENAI_MODEL') || 'gpt-4.1-mini',
+          temperature: 0.3,
+          max_tokens: 120,
+          messages: [
+            { role: 'system', content: basePrompt },
+            { role: 'user', content: userParts.join('\n') || 'Новое поле сохранено' },
+          ],
+        });
+
+        const assistantMessage = completion.choices[0].message;
+        const usage = completion.usage;
+
+        // Breadcrumbs (без PII)
+        console.log('BR goal_comment_done', { version, fieldName, hasAllFields: Boolean(allFields) });
+        return new Response(
+          JSON.stringify({ message: assistantMessage, usage, ...(recommended_chips ? { recommended_chips } : {}) }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      } catch (e: any) {
+        const short = (e?.message || String(e)).slice(0, 240);
+        console.error('BR goal_comment_error', { details: short.slice(0, 120) });
+        return new Response(
+          JSON.stringify({ error: 'goal_comment_error', details: short }),
+          { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
+    }
+
+    // ==============================
+    // WEEKLY_CHECKIN MODE (short reaction to weekly check-in, no RAG/GP)
+    // Disabled by default via feature flag
+    // ==============================
+    if (mode === 'weekly_checkin') {
+      // Feature flag: allow disabling weekly reaction quickly (default OFF)
+      const flag = (Deno.env.get('ENABLE_WEEKLY_REACTION') || 'false').toLowerCase();
+      if (flag !== 'true') {
+        return new Response(null, { status: 204, headers: corsHeaders });
+      }
+      try {
+        // Webhook: Authorization: Bearer <CRON_SECRET>
+        const cronSecret = (Deno.env.get('CRON_SECRET') || '').trim();
+        const authHeader = req.headers.get('authorization') || '';
+        const bearerOk = cronSecret && authHeader.startsWith('Bearer ') && authHeader.replace('Bearer ', '').trim() === cronSecret;
+        if (!bearerOk) {
+          return new Response(
+            JSON.stringify({ error: 'unauthorized_webhook' }),
+            { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+          );
+        }
+
+        const weekNumber: number = Number.isFinite(body?.week_number) ? Number(body.week_number) : -1;
+        const weekResult: string = typeof body?.week_result === 'string' ? body.week_result : '';
+        const metricValue: number | null = (typeof body?.metric_value === 'number') ? body.metric_value : (Number.isFinite(body?.metric_value) ? Number(body.metric_value) : null);
+        const usedTools: string[] = Array.isArray(body?.used_tools) ? body.used_tools.map((x: any) => String(x)) : [];
+
+        const basePrompt = `Ты — Макс, трекер целей BizLevel. Отвечай кратко (2–3 предложения), по-русски.
+КОНТЕКСТ: недельный чек-ин пользователя (Неделя ${weekNumber > 0 ? weekNumber : '?'}).
+СТИЛЬ: простые слова, локальный контекст (Казахстан, тенге), на «ты». Структура: 1) короткая реакция на результат недели/метрику; 2) подсказка к следующему шагу; 3) (опц.) микро-совет.
+ЗАПРЕЩЕНО: общие фразы «отлично/молодец/правильно», вопросы «чем помочь?», лишние вводные.`;
+
+        const parts: string[] = [];
+        if (weekResult) parts.push(`Итог недели: ${weekResult}`);
+        if (metricValue !== null) parts.push(`Метрика (факт): ${metricValue}`);
+        if (usedTools.length) parts.push(`Инструменты: ${usedTools.join(', ')}`);
+
+        // Recommended chips: next-week focus
+        const recommended_chips = ['Фокус следующей недели', 'Как усилить результат', 'Что мешает сейчас?'];
+
+        const apiKey = Deno.env.get('OPENAI_API_KEY');
+        if (!apiKey || apiKey.trim().length < 20) {
+          return new Response(
+            JSON.stringify({ error: 'openai_config_error' }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+          );
+        }
+
+        const completion = await openai.chat.completions.create({
+          model: Deno.env.get('OPENAI_MODEL') || 'gpt-4.1-mini',
+          temperature: 0.3,
+          max_tokens: 120,
+          messages: [
+            { role: 'system', content: basePrompt },
+            { role: 'user', content: parts.join('\n') || 'Чек-ин сохранён' },
+          ],
+        });
+
+        const assistantMessage = completion.choices[0].message;
+        const usage = completion.usage;
+
+        // Breadcrumbs (без PII)
+        console.log('BR weekly_checkin_done', { weekNumber, hasTools: usedTools.length > 0 });
+        return new Response(
+          JSON.stringify({ message: assistantMessage, usage, recommended_chips }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      } catch (e: any) {
+        const short = (e?.message || String(e)).slice(0, 240);
+        console.error('BR weekly_checkin_error', { details: short.slice(0, 120) });
+        return new Response(
+          JSON.stringify({ error: 'weekly_checkin_error', details: short }),
+          { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
+    }
 
     // ==============================
     // QUIZ MODE (short reply, no RAG)
@@ -356,7 +531,6 @@ serve(async (req: Request): Promise<Response> => {
     let userContextText = "";
     let profileText = ""; // формируем отдельно, чтобы при отсутствии JWT всё равно использовать client userContext
     let personaSummary = "";
-    let userId: string | null = null;
     let maxCompletedLevel = 0; // Максимальный пройденный уровень пользователя
 
     // No PII: do not log tokens, only presence
@@ -383,18 +557,18 @@ serve(async (req: Request): Promise<Response> => {
       }
 
       try {
+        // Do not log JWT or any part of it
         console.log('INFO processing_jwt', {
           jwtLength: jwt.length,
-          jwtPrefix: jwt.substring(0, 30),
           hasSupabaseUrl: Boolean(Deno.env.get("SUPABASE_URL")),
           hasServiceKey: Boolean(Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"))
         });
 
         // Try with auth client first (anon key), fallback to admin client
-        let authResult = await supabaseAuth.auth.getUser(jwt);
+        let authResult = await (supabaseAuth as any).auth.getUser(jwt);
         if (authResult.error) {
           console.log('WARN auth_client_failed, trying admin client');
-          authResult = await supabaseAdmin.auth.getUser(jwt);
+          authResult = await (supabaseAdmin as any).auth.getUser(jwt);
         }
         const { data: { user }, error } = authResult as any;
         console.log('INFO auth_get_user', { ok: !error, user: user?.id ? 'present' : 'absent' });
@@ -426,7 +600,7 @@ serve(async (req: Request): Promise<Response> => {
 
           // Получаем максимальный пройденный уровень пользователя
           try {
-            const { data: maxLevelData, error: maxLevelError } = await supabaseAdmin
+            const { data: maxLevelData, error: maxLevelError } = await (supabaseAdmin as any)
               .from('user_progress')
               .select('level_id')
               .eq('user_id', user.id)
@@ -465,7 +639,7 @@ serve(async (req: Request): Promise<Response> => {
           // (Опционально) Получаем current_level из users
           let currentLevel = null;
           try {
-            const { data: userData, error: userError } = await supabaseAdmin
+            const { data: userData, error: userError } = await (supabaseAdmin as any)
               .from('users')
               .select('current_level')
               .eq('id', user.id)
@@ -480,7 +654,7 @@ serve(async (req: Request): Promise<Response> => {
             console.error('ERR current_level_exception', { message: String(e).slice(0, 200) });
           }
 
-          const { data: profile } = await supabaseAdmin
+          const { data: profile } = await (supabaseAdmin as any)
             .from("users")
             .select("name, about, goal, business_area, experience_level, persona_summary")
             .eq("id", user.id)
@@ -524,7 +698,7 @@ serve(async (req: Request): Promise<Response> => {
       : '';
 
     // Встроенный RAG: эмбеддинг + match_documents (с кешем)
-    // Для Alex (бот-трекер) RAG отключаем полностью
+    // Для Max (бот-трекер) RAG отключаем полностью
     let ragContext = '';
     if (!isMax && typeof lastUserMessage === 'string' && lastUserMessage.trim().length > 0) {
       console.log('🔧 DEBUG: RAG включен для бота:', bot, 'последнее сообщение:', lastUserMessage.substring(0, 100));
@@ -582,7 +756,7 @@ serve(async (req: Request): Promise<Response> => {
               }
             } catch (_) {}
 
-            const { data: results, error: matchError } = await supabaseAdmin.rpc('match_documents', {
+            const { data: results, error: matchError } = await (supabaseAdmin as any).rpc('match_documents', {
               query_embedding: queryEmbedding,
               match_threshold: matchThreshold,
               match_count: matchCount,
@@ -670,7 +844,7 @@ serve(async (req: Request): Promise<Response> => {
       lastUserMessage: Array.isArray(messages) ? [...messages].reverse().find((m: any) => m?.role === 'user')?.content?.substring(0, 100) : 'none',
     });
     
-    // Extra goal/sprint/reminders/quote context for Alex (tracker)
+    // Extra goal/sprint/reminders/quote context for Max (tracker)
     let goalBlock = '';
     let sprintBlock = '';
     let remindersBlock = '';
@@ -822,7 +996,7 @@ ${ragContext ? `\n## RAG контекст (база знаний):\n${ragContext
 ${userContextText ? `\n## ПЕРСОНАЛИЗАЦИЯ ДЛЯ ПОЛЬЗОВАТЕЛЯ:\n${userContextText}` : ''}
 ${levelContext && levelContext !== 'null' ? `\n## КОНТЕКСТ УРОКА:\n${levelContext}` : ''}`;
 
-    // Alex (goal tracker) prompt — коротко, конкретно, приоритет цели/спринтов
+    // Max (goal tracker) prompt — коротко, конкретно, приоритет цели/спринтов
     const systemPromptAlex = `## Твоя роль и тон:
 Ты — Макс, трекер цели BizLevel. 
 Твоя задача — помогать пользователю кристаллизовать и достигать его цели, строго следуя правилам ниже.

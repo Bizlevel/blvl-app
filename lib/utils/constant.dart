@@ -4,3 +4,10 @@ const bool kUseLeoQuiz =
 // Фича-флаг аварийного отключения списаний GP в чате (rollback режим)
 // При true: отправка сообщений не списывает GP, показываем «Временно бесплатно»
 const bool kDisableGpSpendInChat = false;
+// Фича-флаг реакций Макса на weekly check-in (server-side webhook)
+const bool kEnableWeeklyReaction = true;
+// Фича-флаг показа recommended chips в чатах Макса
+const bool kEnableGoalChips = true;
+// Фича-флаги клиентских реакций (тонкий режим)
+const bool kEnableClientGoalReactions = true;
+const bool kEnableClientWeeklyReaction = true;

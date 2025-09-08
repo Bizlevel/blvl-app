@@ -27,9 +27,9 @@ Widget _buildNodeLabel(String label, {TextAlign textAlign = TextAlign.center}) {
     child: Text(
       label,
       textAlign: textAlign,
-      maxLines: 2,
+      maxLines: 3,
       softWrap: true,
-      overflow: TextOverflow.visible,
+      overflow: TextOverflow.ellipsis,
       style: kNodeLabelStyle,
     ),
   );

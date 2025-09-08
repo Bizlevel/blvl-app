@@ -116,8 +116,8 @@ class AuthService {
 
     await _handleAuthCall(() async {
       // Формируем payload динамически, добавляя только переданные поля
+      // Для избегания 23502 (NOT NULL name) используем UPDATE по id вместо UPSERT.
       final Map<String, dynamic> payload = {
-        'id': user.id,
         'updated_at': DateTime.now().toIso8601String(),
       };
 
@@ -135,7 +135,7 @@ class AuthService {
         payload['onboarding_completed'] = onboardingCompleted;
       }
 
-      await _client.from('users').upsert(payload);
+      await _client.from('users').update(payload).eq('id', user.id);
       // Попытка выдать бонус за заполненный профиль (идемпотентно)
       try {
         final row = await _client
@@ -160,7 +160,7 @@ class AuthService {
     }, unknownErrorMessage: 'Не удалось сохранить профиль');
   }
 
-  /// Updates the avatar id (1..7) for current user.
+  /// Updates the avatar id (1..12) for current user.
   /// Deprecated: Use updateProfile(avatarId: id) instead.
   Future<void> updateAvatar(int avatarId) async {
     await updateProfile(avatarId: avatarId);

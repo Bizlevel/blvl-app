@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-import 'package:bizlevel/theme/color.dart';
+import 'package:bizlevel/theme/color.dart' show AppColor;
+import 'package:bizlevel/theme/spacing.dart';
 
 class CrystallizationSection extends StatelessWidget {
   const CrystallizationSection({
@@ -36,7 +37,7 @@ class CrystallizationSection extends StatelessWidget {
                 fontWeight: FontWeight.w700,
               ),
         ),
-        const SizedBox(height: 12),
+        AppSpacing.gapH(AppSpacing.md),
         if (latest >= 4)
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -64,7 +65,7 @@ class CrystallizationSection extends StatelessWidget {
                 .bodyMedium
                 ?.copyWith(fontWeight: FontWeight.w600),
           ),
-          const SizedBox(height: 8),
+          AppSpacing.gapH(AppSpacing.sm),
           Row(
             children: List.generate(4, (i) {
               final s = i + 1;
@@ -74,7 +75,7 @@ class CrystallizationSection extends StatelessWidget {
                   height: 8,
                   margin: EdgeInsets.only(right: i < 3 ? 6 : 0),
                   decoration: BoxDecoration(
-                    color: filled ? AppColor.primary : Colors.grey.shade300,
+                    color: filled ? AppColor.primary : AppColor.divider,
                     borderRadius: BorderRadius.circular(4),
                   ),
                 ),
@@ -82,7 +83,7 @@ class CrystallizationSection extends StatelessWidget {
             }),
           )
         ],
-        const SizedBox(height: 12),
+        AppSpacing.gapH(AppSpacing.md),
         if (latest >= 4)
           (historyExpanded
               ? _HistoryTimeline(versions: versions)
@@ -94,7 +95,7 @@ class CrystallizationSection extends StatelessWidget {
             allowedMaxVersion: allowedMaxVersion,
             onSelect: onSelectVersion,
           ),
-          const SizedBox(height: 12),
+          AppSpacing.gapH(AppSpacing.md),
           _VersionTable(versions: versions, version: selectedVersion),
         ],
       ],
@@ -152,7 +153,7 @@ class _VersionChips extends StatelessWidget {
           label: Text(labelText, overflow: TextOverflow.ellipsis),
           selected: isSelected,
           selectedColor: AppColor.premium.withValues(alpha: 0.18),
-          backgroundColor: Colors.white,
+          backgroundColor: AppColor.surface,
           shape: StadiumBorder(
             side: BorderSide(
               color: isSelected ? AppColor.premium : AppColor.borderColor,
@@ -360,9 +361,9 @@ class _HistoryTimeline extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: AppSpacing.insetsAll(AppSpacing.lg),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColor.surface,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
@@ -382,11 +383,10 @@ class _HistoryTimeline extends StatelessWidget {
                 .titleSmall
                 ?.copyWith(fontWeight: FontWeight.w600),
           ),
-          const SizedBox(height: 8),
+          AppSpacing.gapH(AppSpacing.sm),
           ...items,
         ],
       ),
     );
   }
 }
-
