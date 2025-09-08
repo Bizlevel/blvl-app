@@ -103,22 +103,45 @@ class LeoService {
           rethrow;
         }
 
-        final response = await _edgeDio.post(
-          '/leo-chat',
-          data: jsonEncode({'messages': messages, 'bot': bot}),
-          options: Options(headers: {
-            'Authorization': 'Bearer ${envOrDefine('SUPABASE_ANON_KEY')}',
-            'apikey': envOrDefine('SUPABASE_ANON_KEY'),
-            'x-user-jwt': session.accessToken,
-            'Authorization': 'Bearer ${envOrDefine('SUPABASE_ANON_KEY')}',
-            'apikey': envOrDefine('SUPABASE_ANON_KEY'),
-            'x-user-jwt': session.accessToken,
-            'Content-Type': 'application/json',
-          }),
-        );
+        Response response;
+        try {
+          response = await _edgeDio.post(
+            '/leo-chat',
+            data: jsonEncode({'messages': messages, 'bot': bot}),
+            options: Options(headers: {
+              'Authorization': 'Bearer ${envOrDefine('SUPABASE_ANON_KEY')}',
+              'apikey': envOrDefine('SUPABASE_ANON_KEY'),
+              'x-user-jwt': _client.auth.currentSession?.accessToken,
+              'Content-Type': 'application/json',
+            }),
+          );
+        } on DioException catch (e) {
+          // Единоразовый ретрай при 401/Invalid JWT
+          final status = e.response?.statusCode ?? 0;
+          final body = e.response?.data;
+          final msg = body is Map
+              ? (body['error'] ?? body['message'])?.toString()
+              : null;
+          if (status == 401 || (msg != null && msg.contains('Invalid JWT'))) {
+            try {
+              await _client.auth.refreshSession();
+            } catch (_) {}
+            response = await _edgeDio.post(
+              '/leo-chat',
+              data: jsonEncode({'messages': messages, 'bot': bot}),
+              options: Options(headers: {
+                'Authorization': 'Bearer ${envOrDefine('SUPABASE_ANON_KEY')}',
+                'apikey': envOrDefine('SUPABASE_ANON_KEY'),
+                'x-user-jwt': _client.auth.currentSession?.accessToken,
+                'Content-Type': 'application/json',
+              }),
+            );
+          } else {
+            rethrow;
+          }
+        }
 
-        print('🔧 DEBUG: Response status: ${response.statusCode}');
-        print('🔧 DEBUG: Response data: ${response.data}');
+        // Resp handled below
 
         if (response.statusCode == 200 &&
             response.data is Map<String, dynamic>) {
@@ -134,16 +157,7 @@ class LeoService {
       } on DioException catch (e) {
         try {
           await Sentry.captureException(e);
-        } catch (_) {
-          // Sentry не настроен, просто логируем в консоль
-          print('DEBUG: Exception (Sentry not configured): $e');
-        }
-        try {
-          await Sentry.captureException(e);
-        } catch (_) {
-          // Sentry не настроен, просто логируем в консоль
-          print('DEBUG: Exception (Sentry not configured): $e');
-        }
+        } catch (_) {}
         if (e.error is SocketException) {
           throw LeoFailure('Нет соединения с интернетом');
         }
@@ -191,9 +205,7 @@ class LeoService {
 
     print('🔧 DEBUG: sendMessageWithRAG начался');
     print('🔧 DEBUG: session.user.id = ${session.user.id}');
-    print('🔧 DEBUG: JWT длина = ${session.accessToken.length}');
-    print(
-        '🔧 DEBUG: JWT начинается с = ${session.accessToken.substring(0, 20)}...');
+    // JWT/PII не логируем
     print('🔧 DEBUG: chatId = $chatId'); // Добавляем логирование chatId
 
     // Списываем 1 GP за сообщение (идемпотентно), если не включён аварийный флаг
@@ -262,33 +274,53 @@ class LeoService {
                 ? null
                 : levelContext;
 
-        print('🔧 DEBUG: Отправляем POST запрос к /leo-chat');
-        print('🔧 DEBUG: payload size = ${jsonEncode({
-              'messages': messages,
-              'userContext': cleanUserContext,
-              'levelContext': cleanLevelContext,
-              'bot': bot,
-              'chatId': chatId, // Добавляем chatId в payload
-            }).length} символов');
+        // send request
 
-        final response = await _edgeDio.post(
-          '/leo-chat',
-          data: jsonEncode({
-            'messages': messages,
-            'userContext': cleanUserContext,
-            'levelContext': cleanLevelContext,
-            'bot': bot,
-            'chatId': chatId, // Добавляем chatId в payload
-          }),
-          options: Options(headers: {
-            'Authorization': 'Bearer ${envOrDefine('SUPABASE_ANON_KEY')}',
-            'apikey': envOrDefine('SUPABASE_ANON_KEY'),
-            'x-user-jwt': session.accessToken,
-            'Content-Type': 'application/json',
-          }),
-        );
+        Response response;
+        final payload = jsonEncode({
+          'messages': messages,
+          'userContext': cleanUserContext,
+          'levelContext': cleanLevelContext,
+          'bot': bot,
+          'chatId': chatId,
+        });
+        try {
+          response = await _edgeDio.post(
+            '/leo-chat',
+            data: payload,
+            options: Options(headers: {
+              'Authorization': 'Bearer ${envOrDefine('SUPABASE_ANON_KEY')}',
+              'apikey': envOrDefine('SUPABASE_ANON_KEY'),
+              'x-user-jwt': _client.auth.currentSession?.accessToken,
+              'Content-Type': 'application/json',
+            }),
+          );
+        } on DioException catch (e) {
+          final status = e.response?.statusCode ?? 0;
+          final body = e.response?.data;
+          final msg = body is Map
+              ? (body['error'] ?? body['message'])?.toString()
+              : null;
+          if (status == 401 || (msg != null && msg.contains('Invalid JWT'))) {
+            try {
+              await _client.auth.refreshSession();
+            } catch (_) {}
+            response = await _edgeDio.post(
+              '/leo-chat',
+              data: payload,
+              options: Options(headers: {
+                'Authorization': 'Bearer ${envOrDefine('SUPABASE_ANON_KEY')}',
+                'apikey': envOrDefine('SUPABASE_ANON_KEY'),
+                'x-user-jwt': _client.auth.currentSession?.accessToken,
+                'Content-Type': 'application/json',
+              }),
+            );
+          } else {
+            rethrow;
+          }
+        }
 
-        print('🔧 DEBUG: Получен HTTP ответ: ${response.statusCode}');
+        // response handled below
 
         if (response.statusCode == 200 &&
             response.data is Map<String, dynamic>) {
@@ -372,16 +404,43 @@ class LeoService {
 
     return _withRetry(() async {
       try {
-        final response = await _edgeDio.post(
-          '/leo-chat',
-          data: jsonEncode(payload),
-          options: Options(headers: {
-            'Authorization': 'Bearer ${envOrDefine('SUPABASE_ANON_KEY')}',
-            'apikey': envOrDefine('SUPABASE_ANON_KEY'),
-            'x-user-jwt': session.accessToken,
-            'Content-Type': 'application/json',
-          }),
-        );
+        Response response;
+        final dataStr = jsonEncode(payload);
+        try {
+          response = await _edgeDio.post(
+            '/leo-chat',
+            data: dataStr,
+            options: Options(headers: {
+              'Authorization': 'Bearer ${envOrDefine('SUPABASE_ANON_KEY')}',
+              'apikey': envOrDefine('SUPABASE_ANON_KEY'),
+              'x-user-jwt': _client.auth.currentSession?.accessToken,
+              'Content-Type': 'application/json',
+            }),
+          );
+        } on DioException catch (e) {
+          final status = e.response?.statusCode ?? 0;
+          final body = e.response?.data;
+          final msg = body is Map
+              ? (body['error'] ?? body['message'])?.toString()
+              : null;
+          if (status == 401 || (msg != null && msg.contains('Invalid JWT'))) {
+            try {
+              await _client.auth.refreshSession();
+            } catch (_) {}
+            response = await _edgeDio.post(
+              '/leo-chat',
+              data: dataStr,
+              options: Options(headers: {
+                'Authorization': 'Bearer ${envOrDefine('SUPABASE_ANON_KEY')}',
+                'apikey': envOrDefine('SUPABASE_ANON_KEY'),
+                'x-user-jwt': _client.auth.currentSession?.accessToken,
+                'Content-Type': 'application/json',
+              }),
+            );
+          } else {
+            rethrow;
+          }
+        }
 
         if (response.statusCode == 200 &&
             response.data is Map<String, dynamic>) {

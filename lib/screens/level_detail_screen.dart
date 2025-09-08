@@ -16,12 +16,16 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:bizlevel/providers/levels_provider.dart';
 import 'package:bizlevel/providers/levels_repository_provider.dart';
 import 'package:bizlevel/providers/auth_provider.dart';
-import 'package:bizlevel/widgets/custom_textfield.dart';
+import 'package:bizlevel/widgets/common/bizlevel_text_field.dart';
 import 'package:bizlevel/services/auth_service.dart';
 import 'package:bizlevel/providers/user_skills_provider.dart';
 import 'package:bizlevel/providers/goals_repository_provider.dart';
 import 'package:bizlevel/providers/goals_providers.dart';
 import 'package:go_router/go_router.dart';
+import 'package:bizlevel/widgets/common/breadcrumb.dart';
+import 'package:bizlevel/widgets/common/bizlevel_button.dart';
+import 'package:bizlevel/theme/ui_strings.dart';
+import 'package:bizlevel/theme/spacing.dart';
 
 /// Shows a level as full-screen blocks (Intro → Lesson → Quiz → …).
 class LevelDetailScreen extends ConsumerStatefulWidget {
@@ -160,7 +164,7 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
                       showModalBottomSheet(
                         context: context,
                         isScrollControlled: true,
-                        backgroundColor: Colors.white,
+                        backgroundColor: AppColor.surface,
                         barrierColor: Colors.black54,
                         builder: (_) => FractionallySizedBox(
                           heightFactor: 0.9,
@@ -169,9 +173,14 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
                       );
                     },
                   ),
-                const SizedBox(height: 10),
+                // Нижний блок с кнопкой в SafeArea: учёт клавиатуры/индикаторов
+                const SizedBox(height: 6),
                 if ((widget.levelNumber ?? -1) != 0)
-                  ElevatedButton.icon(
+                  BizLevelButton(
+                    label: (widget.levelNumber ?? -1) == 1
+                        ? 'Перейти к Цели'
+                        : 'Завершить уровень',
+                    icon: const Icon(Icons.check, size: 20),
                     onPressed: _isLevelCompleted(lessons)
                         ? () async {
                             try {
@@ -185,7 +194,7 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
-                                      content: Text('Уровень завершён!')),
+                                      content: Text(UIS.levelCompleted)),
                                 );
                                 if ((widget.levelNumber ?? -1) == 1) {
                                   if (context.mounted) {
@@ -204,10 +213,7 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
                             }
                           }
                         : null,
-                    icon: const Icon(Icons.check),
-                    label: const Text('Завершить уровень'),
-                    style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColor.primary),
+                    fullWidth: false,
                   ),
               ],
             ),
@@ -450,14 +456,20 @@ class _ArtifactBlock extends _PageBlock {
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Text(title,
-                  style: const TextStyle(
-                      fontSize: 20, fontWeight: FontWeight.bold)),
+              Text(
+                title,
+                style: Theme.of(context)
+                    .textTheme
+                    .titleLarge
+                    ?.copyWith(fontWeight: FontWeight.w700),
+              ),
               const SizedBox(height: 12),
               if (description.isNotEmpty)
                 Text(description, textAlign: TextAlign.center),
               const SizedBox(height: 24),
-              ElevatedButton.icon(
+              BizLevelButton(
+                label: 'Скачать',
+                icon: const Icon(Icons.download),
                 onPressed: () async {
                   final repo = ProviderScope.containerOf(context, listen: false)
                       .read(levelsRepositoryProvider);
@@ -468,12 +480,10 @@ class _ArtifactBlock extends _PageBlock {
                   } else {
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                          content: Text('Не удалось открыть артефакт')));
+                          content: Text(UIS.openArtifactFailed)));
                     }
                   }
                 },
-                icon: const Icon(Icons.download),
-                label: const Text('Скачать'),
               ),
             ],
           ),
@@ -572,49 +582,46 @@ class _GoalV1Block extends _PageBlock {
                 Center(
                   child: Text(
                     'Набросок цели',
-                    style: const TextStyle(
-                        fontSize: 22, fontWeight: FontWeight.bold),
+                    style: Theme.of(context)
+                        .textTheme
+                        .headlineSmall
+                        ?.copyWith(fontWeight: FontWeight.w700),
                   ),
                 ),
                 const SizedBox(height: 16),
                 const Text('Основная цель'),
                 const SizedBox(height: 6),
-                CustomTextBox(
-                  controller: goalInitialCtrl,
+                BizLevelTextField(
                   hint: 'Чего хочу достичь за 28 дней',
+                  controller: goalInitialCtrl,
                 ),
                 const SizedBox(height: 16),
                 const Text('Почему сейчас'),
                 const SizedBox(height: 6),
-                CustomTextBox(
-                  controller: goalWhyCtrl,
+                BizLevelTextField(
                   hint: 'Почему это важно именно сейчас*',
+                  controller: goalWhyCtrl,
                 ),
                 const SizedBox(height: 16),
                 const Text('Препятствие'),
                 const SizedBox(height: 6),
-                CustomTextBox(
-                  controller: mainObstacleCtrl,
+                BizLevelTextField(
                   hint: 'Главное препятствие*',
+                  controller: mainObstacleCtrl,
                 ),
                 const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColor.primary),
-                    onPressed: save,
-                    child: const Text(
-                      'Сохранить Набросок цели',
-                      style: TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                  ),
+                BizLevelButton(
+                  label: 'Сохранить Набросок цели',
+                  onPressed: save,
+                  fullWidth: true,
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'После сохранения вы сможете завершить уровень и редактировать Набросок на странице «Цель».',
-                  style: TextStyle(color: Colors.grey),
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodySmall
+                      ?.copyWith(color: AppColor.labelColor),
                 ),
               ],
             ),
@@ -661,7 +668,7 @@ class _ProfileFormBlock extends _PageBlock {
             mainAxisSpacing: AppSpacing.medium,
             crossAxisSpacing: AppSpacing.medium,
           ),
-          itemCount: 7,
+          itemCount: 12,
           itemBuilder: (_, index) {
             final id = index + 1;
             final asset = 'assets/images/avatars/avatar_${id}.png';
@@ -704,8 +711,7 @@ class _ProfileFormBlock extends _PageBlock {
         final sessionUser = svc.getCurrentUser();
         if (sessionUser?.email == null) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-                content: Text('Подтвердите e-mail, прежде чем продолжить')),
+            const SnackBar(content: Text(UIS.confirmEmailFirst)),
           );
           return;
         }
@@ -715,7 +721,7 @@ class _ProfileFormBlock extends _PageBlock {
         final goal = goalController.text.trim();
         if (name.isEmpty || about.isEmpty || goal.isEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Пожалуйста, заполните все поля')),
+            const SnackBar(content: Text(UIS.pleaseFillAllFields)),
           );
           return;
         }
@@ -731,7 +737,7 @@ class _ProfileFormBlock extends _PageBlock {
           // onSaved будет вызван кнопкой ниже, с передачей целевого индекса
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Профиль сохранён')),
+              const SnackBar(content: Text(UIS.profileSaved)),
             );
           }
           onSaved();
@@ -744,7 +750,7 @@ class _ProfileFormBlock extends _PageBlock {
         } catch (_) {
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Ошибка сохранения профиля')),
+              const SnackBar(content: Text(UIS.saveErrorGeneric)),
             );
           }
         }
@@ -760,7 +766,7 @@ class _ProfileFormBlock extends _PageBlock {
               Align(
                 alignment: Alignment.topRight,
                 child: IconButton(
-                  icon: const Icon(Icons.edit, color: Colors.grey),
+                  icon: const Icon(Icons.edit, color: AppColor.onSurfaceSubtle),
                   onPressed: isEditing ? null : onEdit,
                   tooltip: 'Редактировать',
                 ),
@@ -785,11 +791,11 @@ class _ProfileFormBlock extends _PageBlock {
                         width: 28,
                         height: 28,
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: AppColor.surface,
                           borderRadius: BorderRadius.circular(14),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.1),
+                              color: AppColor.shadow,
                               blurRadius: 2,
                             ),
                           ],
@@ -805,37 +811,24 @@ class _ProfileFormBlock extends _PageBlock {
                 ),
               ),
               const SizedBox(height: 24),
-              const Align(
-                alignment: Alignment.centerLeft,
-                child: Text('Как к вам обращаться?',
-                    style: TextStyle(fontWeight: FontWeight.w600)),
-              ),
-              const SizedBox(height: 8),
-              CustomTextBox(
+              BizLevelTextField(
+                label: 'Как к вам обращаться?',
                 hint: 'Имя',
                 controller: nameController,
                 readOnly: !isEditing,
                 prefix: const Icon(Icons.person_outline),
               ),
               const SizedBox(height: 16),
-              const Align(
-                alignment: Alignment.centerLeft,
-                child: Text('Кратко о себе'),
-              ),
-              const SizedBox(height: 8),
-              CustomTextBox(
+              BizLevelTextField(
+                label: 'Кратко о себе',
                 hint: 'О себе',
                 controller: aboutController,
                 readOnly: !isEditing,
                 prefix: const Icon(Icons.info_outline),
               ),
               const SizedBox(height: 16),
-              const Align(
-                alignment: Alignment.centerLeft,
-                child: Text('Ваша цель обучения'),
-              ),
-              const SizedBox(height: 8),
-              CustomTextBox(
+              BizLevelTextField(
+                label: 'Ваша цель обучения',
                 hint: 'Цель',
                 controller: goalController,
                 readOnly: !isEditing,
@@ -845,9 +838,8 @@ class _ProfileFormBlock extends _PageBlock {
               SizedBox(
                 width: double.infinity,
                 height: 48,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColor.primary),
+                child: BizLevelButton(
+                  label: 'Перейти на Уровень 1',
                   onPressed: () async {
                     await save();
                     try {
@@ -857,7 +849,7 @@ class _ProfileFormBlock extends _PageBlock {
                       ref.invalidate(userSkillsProvider);
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Первый шаг завершён!')),
+                          const SnackBar(content: Text(UIS.firstStepDone)),
                         );
                         Navigator.of(context).pop();
                       }
@@ -869,7 +861,6 @@ class _ProfileFormBlock extends _PageBlock {
                       }
                     }
                   },
-                  child: const Text('Перейти на Уровень 1'),
                 ),
               ),
             ],
@@ -895,21 +886,107 @@ class _IntroBlock extends _PageBlock {
         ? 'Привет! 👋\nЯ Leo, ваш персональный AI-ментор по бизнесу.\nЗа следующие пару минут Вы:\n- Узнаете, как получить максимум от BizLevel\n- Настроите свой профиль, чтобы я мог давать Вам персонализированные советы и рекомендации.\nГотовы начать свой путь в бизнесе?'
         : 'Проходите уроки по порядку и выполняйте тесты, чтобы продвигаться дальше.';
 
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: LayoutBuilder(builder: (context, constraints) {
+        final String assetPath = 'assets/images/lvls/level_${levelNumber}.png';
+        final double imageHeight = constraints.maxHeight * 0.45;
+        return Stack(
           children: [
-            Text(title,
-                textAlign: TextAlign.center,
-                style:
-                    const TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 16),
-            Text(description, textAlign: TextAlign.center),
+            // Хлебные крошки
+            SafeArea(
+              child: Align(
+                alignment: Alignment.topCenter,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Breadcrumb(
+                    items: [
+                      BreadcrumbItem(
+                        label: 'Главная',
+                        onTap: () => context.go('/home'),
+                      ),
+                      BreadcrumbItem(
+                        label: 'Башня',
+                        onTap: () => context.go('/tower?scrollTo=$levelNumber'),
+                      ),
+                      BreadcrumbItem(
+                        label: 'Уровень $levelNumber',
+                        isCurrent: true,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            // Кнопка «Назад к башне» в левом верхнем углу
+            SafeArea(
+              child: Align(
+                alignment: Alignment.topLeft,
+                child: IconButton(
+                  icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                  tooltip: 'К башне',
+                  onPressed: () {
+                    try {
+                      if (levelNumber > 0) {
+                        GoRouter.of(context).go('/tower?scrollTo=$levelNumber');
+                      } else {
+                        GoRouter.of(context).go('/tower');
+                      }
+                    } catch (_) {}
+                  },
+                ),
+              ),
+            ),
+
+            // Основной контент по центру
+            Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 900),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    // Картинка уровня (для уровня 0 изображения может не быть)
+                    if (!isFirstStep)
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: SizedBox(
+                          width: double.infinity,
+                          height: imageHeight.clamp(160, 360),
+                          child: Image.asset(
+                            assetPath,
+                            fit: BoxFit.cover,
+                            alignment: Alignment.center,
+                            errorBuilder: (context, error, stack) =>
+                                const SizedBox.shrink(),
+                          ),
+                        ),
+                      ),
+                    if (!isFirstStep) const SizedBox(height: 16),
+                    Text(
+                      title,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: Text(
+                        description,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 16),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ],
-        ),
-      ),
+        );
+      }),
     );
   }
 }
@@ -1050,23 +1127,24 @@ class _NavBar extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          ElevatedButton(
+          BizLevelButton(
+            label: 'Назад',
             onPressed: canBack ? onBack : null,
-            style: ElevatedButton.styleFrom(backgroundColor: AppColor.primary),
-            child: const Text('Назад'),
+            variant: BizLevelButtonVariant.primary,
+            size: BizLevelButtonSize.md,
           ),
           if (showDiscuss)
-            ElevatedButton(
+            BizLevelButton(
+              label: 'Обсудить с Лео',
               onPressed: onDiscuss,
-              style:
-                  ElevatedButton.styleFrom(backgroundColor: AppColor.primary),
-              child: const Text('Обсудить с Лео',
-                  style: TextStyle(fontWeight: FontWeight.w600)),
+              variant: BizLevelButtonVariant.primary,
+              size: BizLevelButtonSize.md,
             ),
-          ElevatedButton(
+          BizLevelButton(
+            label: 'Далее',
             onPressed: canNext ? onNext : null,
-            style: ElevatedButton.styleFrom(backgroundColor: AppColor.primary),
-            child: const Text('Далее'),
+            variant: BizLevelButtonVariant.primary,
+            size: BizLevelButtonSize.md,
           ),
         ],
       ),

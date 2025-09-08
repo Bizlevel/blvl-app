@@ -4,12 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../theme/color.dart';
+import '../../theme/color.dart' show AppColor;
 import '../../services/auth_service.dart';
 
 import '../../providers/auth_provider.dart';
 import '../../widgets/custom_textfield.dart';
 import '../../widgets/custom_image.dart';
+import '../../theme/spacing.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -87,7 +88,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         decoration: const BoxDecoration(gradient: AppColor.bgGradient),
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
+            padding:
+                AppSpacing.insetsSymmetric(h: AppSpacing.xl, v: AppSpacing.x3l),
             child: Container(
               key: const Key('register_form'),
               // adaptive width
@@ -98,7 +100,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 }
                 return 420.0;
               }(),
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+              padding: AppSpacing.insetsSymmetric(
+                  h: AppSpacing.xl, v: AppSpacing.xl),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(24),
@@ -130,7 +133,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             color: Colors.white,
             borderRadius: BorderRadius.circular(24),
           ),
-          padding: const EdgeInsets.all(8),
+          padding: AppSpacing.insetsAll(AppSpacing.sm),
           child: const CustomImage(
             'assets/images/logo_light.png',
             width: 80,
@@ -139,14 +142,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             fit: BoxFit.contain,
           ),
         ),
-        const SizedBox(height: 32),
+        AppSpacing.gapH(AppSpacing.xl),
         CustomTextBox(
           key: const Key('email_field'),
           hint: 'Email',
           prefix: const Icon(Icons.email_outlined),
           controller: _emailController,
         ),
-        const SizedBox(height: 16),
+        AppSpacing.gapH(AppSpacing.lg),
         CustomTextBox(
           key: const Key('password_field'),
           hint: 'Пароль',
@@ -160,7 +163,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 setState(() => _obscurePassword = !_obscurePassword),
           ),
         ),
-        const SizedBox(height: 16),
+        AppSpacing.gapH(AppSpacing.lg),
         CustomTextBox(
           key: const Key('confirm_password_field'),
           hint: 'Подтвердите пароль',
@@ -173,7 +176,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
           ),
         ),
-        const SizedBox(height: 24),
+        AppSpacing.gapH(AppSpacing.xl),
         GestureDetector(
           onTap: _isLoading ? null : _submit,
           child: Container(
@@ -207,7 +210,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   ),
           ),
         ),
-        const SizedBox(height: 16),
+        AppSpacing.gapH(AppSpacing.lg),
         TextButton(
           onPressed: () => context.go('/login'),
           child: const Text('Уже есть аккаунт? Войти'),
@@ -226,7 +229,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             color: Colors.white,
             borderRadius: BorderRadius.circular(24),
           ),
-          padding: const EdgeInsets.all(8),
+          padding: AppSpacing.insetsAll(AppSpacing.sm),
           child: const CustomImage(
             'assets/images/logo_light.png',
             width: 80,
@@ -235,9 +238,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             fit: BoxFit.contain,
           ),
         ),
-        const SizedBox(height: 32),
+        AppSpacing.gapH(AppSpacing.xl),
         Container(
-          padding: const EdgeInsets.all(16),
+          padding: AppSpacing.insetsAll(AppSpacing.lg),
           decoration: BoxDecoration(
             color: Colors.green.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
@@ -260,27 +263,25 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             ],
           ),
         ),
-        const SizedBox(height: 24),
+        AppSpacing.gapH(AppSpacing.xl),
         const Text(
           'Проверьте почту для подтверждения аккаунта',
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w500,
-            color: Colors.black87,
           ),
           textAlign: TextAlign.center,
         ),
-        const SizedBox(height: 16),
+        AppSpacing.gapH(AppSpacing.lg),
         const Text(
           'Мы отправили вам письмо со ссылкой для подтверждения. Перейдите по ссылке, а затем войдите в приложение.',
           style: TextStyle(
             fontSize: 14,
-            color: Colors.black54,
             height: 1.4,
           ),
           textAlign: TextAlign.center,
         ),
-        const SizedBox(height: 32),
+        AppSpacing.gapH(AppSpacing.xl),
         GestureDetector(
           onTap: () => context.go('/login?registered=true'),
           child: Container(
@@ -305,7 +306,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             ),
           ),
         ),
-        const SizedBox(height: 16),
+        AppSpacing.gapH(AppSpacing.lg),
         TextButton(
           onPressed: () => setState(() => _registrationSuccess = false),
           child: const Text('← Назад к регистрации'),

@@ -7,7 +7,10 @@ import 'package:go_router/go_router.dart';
 import 'package:bizlevel/providers/gp_providers.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bizlevel/services/gp_service.dart';
-import 'package:flutter_svg/flutter_svg.dart';
+// import 'package:flutter_svg/flutter_svg.dart';
+import 'package:bizlevel/widgets/common/gp_balance_widget.dart';
+import 'package:bizlevel/widgets/common/bizlevel_modal.dart';
+import 'package:bizlevel/theme/ui_strings.dart';
 
 part 'tower/tower_constants.dart';
 part 'tower/tower_helpers.dart';
@@ -23,7 +26,8 @@ part 'tower/tower_floor_widgets.dart';
 /// Внешний API/поведение не меняем; внутренняя структура упрощена.
 class BizTowerScreen extends ConsumerStatefulWidget {
   final int? scrollTo;
-  const BizTowerScreen({super.key, this.scrollTo});
+  const BizTowerScreen(
+      {super.key = const Key('biz_tower_screen'), this.scrollTo});
 
   @override
   ConsumerState<BizTowerScreen> createState() => _BizTowerScreenState();
@@ -54,7 +58,7 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
         if (!mounted) return;
         await Scrollable.ensureVisible(key!.currentContext!,
             duration: const Duration(milliseconds: 500),
-            curve: Curves.easeInOut,
+            curve: Curves.easeInOutCubic,
             alignment: 0.3);
         _logBreadcrumb('tower_autoscroll_done level=$levelNumber');
       }
@@ -70,6 +74,15 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
     return Scaffold(
       appBar: AppBar(
         centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
+          tooltip: 'Главная улица',
+          onPressed: () {
+            try {
+              GoRouter.of(context).go('/home');
+            } catch (_) {}
+          },
+        ),
         title: const Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -77,41 +90,15 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
             SizedBox(height: 2),
             Text(
               'Этаж 1: База предпринимательства',
-              style: TextStyle(fontSize: 12, color: Color.fromARGB(137, 42, 42, 42)),
+              style: TextStyle(fontSize: 12, color: AppColor.labelColor),
             ),
           ],
         ),
-        actions: [
-          Consumer(builder: (context, ref, _) {
-            final gpAsync = ref.watch(gpBalanceProvider);
-            final balance = gpAsync.value?['balance'];
-            if (balance == null) return const SizedBox.shrink();
-            return Padding(
-              padding: const EdgeInsets.only(right: 12),
-              child: Center(
-                child: InkWell(
-                  onTap: () {
-                    // Переход в магазин GP (маршрут добавим в 39.8)
-                    try {
-                      GoRouter.of(context).go('/gp-store');
-                    } catch (_) {}
-                  },
-                  child: Row(
-                    children: [
-                      SvgPicture.asset('assets/images/gp_coin.svg',
-                          width: 36, height: 36),
-                      const SizedBox(width: 8),
-                      Text('$balance',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 28,
-                          )),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          })
+        actions: const [
+          Padding(
+            padding: EdgeInsets.only(right: 12),
+            child: Center(child: GpBalanceWidget()),
+          )
         ],
         backgroundColor: AppColor.appBarColor,
       ),
@@ -164,9 +151,9 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
                   right: 24,
                   child: Row(
                     children: [
-                      Container(width: 3, color: Colors.black26),
+                      Container(width: 3, color: AppColor.dividerColor),
                       const Spacer(),
-                      Container(width: 3, color: Colors.black26),
+                      Container(width: 3, color: AppColor.dividerColor),
                     ],
                   ),
                 ),
@@ -236,7 +223,7 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
                     const SizedBox(height: 8),
                     Text(e.toString(),
                         textAlign: TextAlign.center,
-                        style: const TextStyle(color: Colors.black54)),
+                        style: const TextStyle(color: AppColor.labelColor)),
                     const SizedBox(height: 16),
                     ElevatedButton.icon(
                       onPressed: () {
