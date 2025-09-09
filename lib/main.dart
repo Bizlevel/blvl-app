@@ -19,10 +19,14 @@ import 'routing/app_router.dart';
 import 'package:go_router/go_router.dart';
 import 'services/supabase_service.dart';
 import 'theme/color.dart';
+import 'theme/typography.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:bizlevel/services/notifications_service.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
+import 'package:flutter_native_timezone/flutter_native_timezone.dart';
+import 'package:flutter/scheduler.dart';
+import 'services/push_service.dart';
 
 Future<void> main() async {
   // КРИТИЧНО для web: Все инициализации должны быть в одной зоне
@@ -50,12 +54,20 @@ Future<void> main() async {
   await Hive.openBox('quotes');
   await Hive.openBox('gp');
 
-  // Инициализация таймзон и локальных уведомлений (MVP)
+  // Инициализация таймзон и локальных уведомлений (M0)
   try {
     tz.initializeTimeZones();
-    tz.setLocalLocation(tz.getLocation(DateTime.now().timeZoneName));
+    final String timeZoneName = await FlutterNativeTimezone.getLocalTimezone();
+    tz.setLocalLocation(tz.getLocation(timeZoneName));
     await NotificationsService.instance.initialize();
     await NotificationsService.instance.scheduleWeeklyPlan();
+    // Открываем лог уведомлений
+    await Hive.openBox('notifications');
+  } catch (_) {}
+
+  // Инициализация FCM (если доступно). Ошибки не фейлят запуск.
+  try {
+    await PushService.instance.initialize();
   } catch (_) {}
 
   final dsn = envOrDefine('SENTRY_DSN');
@@ -98,6 +110,12 @@ class MyApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final GoRouter router = ref.watch(goRouterProvider);
+    // Простая эвристика low-end устройства: низкий DPR или отключённая анимация ОС
+    final bool lowDpr = MediaQuery.of(context).devicePixelRatio < 2.0;
+    final bool disableAnimations = SchedulerBinding
+        .instance.window.accessibilityFeatures.disableAnimations;
+    final bool isLowEndDevice =
+        lowDpr || disableAnimations; // reserved for global gating
 
     return _LinkListener(
       router: router,
@@ -136,8 +154,29 @@ class MyApp extends ConsumerWidget {
               data: Theme.of(context).copyWith(
                 textTheme: scaledTextTheme,
                 scaffoldBackgroundColor: Colors.transparent,
+                // Глобально уменьшаем длительность анимаций на low-end
+                pageTransitionsTheme: PageTransitionsTheme(builders: {
+                  for (final platform in TargetPlatform.values)
+                    platform: isLowEndDevice
+                        ? const ZoomPageTransitionsBuilder()
+                        : const FadeUpwardsPageTransitionsBuilder(),
+                }),
               ),
-              child: wrapped,
+              child: FutureBuilder<String?>(
+                future: NotificationsService.instance.getLaunchRoute(),
+                builder: (context, snap) {
+                  if (snap.connectionState == ConnectionState.done &&
+                      snap.data != null &&
+                      snap.data!.isNotEmpty) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      try {
+                        router.go(snap.data!);
+                      } catch (_) {}
+                    });
+                  }
+                  return wrapped;
+                },
+              ),
             ),
           );
         },
@@ -148,19 +187,45 @@ class MyApp extends ConsumerWidget {
             seedColor: AppColor.primary,
             brightness: Brightness.light,
           ),
+          textTheme: AppTypography.textTheme,
+          scaffoldBackgroundColor: Colors.transparent,
+          appBarTheme: const AppBarTheme(
+            centerTitle: true,
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            titleTextStyle: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           elevatedButtonTheme: ElevatedButtonThemeData(
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColor.primary,
-              foregroundColor: Colors.white,
+              foregroundColor: AppColor.onPrimary,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
+              minimumSize: const Size(40, 48),
             ),
+          ),
+          textButtonTheme: TextButtonThemeData(
+            style: TextButton.styleFrom(
+              foregroundColor: AppColor.primary,
+              minimumSize: const Size(40, 44),
+            ),
+          ),
+          inputDecorationTheme: const InputDecorationTheme(
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.all(Radius.circular(8)),
+            ),
+            isDense: true,
+            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           ),
           snackBarTheme: const SnackBarThemeData(
             backgroundColor: AppColor.primary,
             contentTextStyle: TextStyle(color: Colors.white),
             actionTextColor: AppColor.premium,
+            behavior: SnackBarBehavior.floating,
           ),
         ),
         // Навигатор теперь управляется GoRouter; SentryObserver добавлен в конфигурацию роутера

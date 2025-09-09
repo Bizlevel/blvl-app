@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:bizlevel/providers/leo_service_provider.dart';
 import 'package:bizlevel/widgets/leo_message_bubble.dart';
+import 'package:bizlevel/widgets/typing_indicator.dart';
 import 'package:bizlevel/theme/color.dart';
 
 class LeoQuizWidget extends ConsumerStatefulWidget {
@@ -153,23 +154,39 @@ class _LeoQuizWidgetState extends ConsumerState<LeoQuizWidget> {
         ),
         const SizedBox(height: 8),
         Expanded(
-          child: ListView(
+          child: ListView.builder(
             controller: _scrollController,
             padding: const EdgeInsets.only(bottom: 12),
-            children: [
-              // Лента сообщений в стиле чата: приветствие → вопрос
-              LeoMessageBubble(text: _initialMessage, isUser: false),
-              LeoMessageBubble(text: question, isUser: false),
-              const SizedBox(height: 12),
-              // Варианты ответа — карточки (не кнопки), прижаты вправо
-              ...List.generate(options.length, (i) {
+            itemCount: 1 /* header */ +
+                options.length /* options */ +
+                1 /* spacing */ +
+                (_isSending ? 1 : 0) +
+                (_assistantMessage != null ? 1 : 0) +
+                ((_assistantMessage != null && _isCorrect) ? 1 : 0) +
+                ((_assistantMessage != null && !_isCorrect) ? 1 : 0) +
+                (_checked ? 1 : 0),
+            itemBuilder: (context, idx) {
+              int cursor = 0;
+              if (idx == cursor) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    LeoMessageBubble(text: _initialMessage, isUser: false),
+                    LeoMessageBubble(text: question, isUser: false),
+                    const SizedBox(height: 12),
+                  ],
+                );
+              }
+              cursor += 1;
+              if (idx < cursor + options.length) {
+                final i = idx - cursor;
                 final bool isSelected = _selectedIndex == i;
                 final Color borderColor =
-                    isSelected ? Colors.transparent : Colors.grey.shade300;
+                    isSelected ? Colors.transparent : AppColor.divider;
                 final Color bgColor =
-                    isSelected ? AppColor.primary : Colors.white;
+                    isSelected ? AppColor.primary : AppColor.surface;
                 final Color textColor =
-                    isSelected ? Colors.white : Colors.black87;
+                    isSelected ? AppColor.onPrimary : AppColor.onSurface;
                 return Padding(
                   padding: const EdgeInsets.symmetric(vertical: 6),
                   child: Align(
@@ -209,7 +226,7 @@ class _LeoQuizWidgetState extends ConsumerState<LeoQuizWidget> {
                                 const Padding(
                                   padding: EdgeInsets.only(left: 8.0),
                                   child: Icon(Icons.check_circle,
-                                      size: 20, color: Colors.white),
+                                      size: 20, color: AppColor.onPrimary),
                                 ),
                             ],
                           ),
@@ -218,23 +235,40 @@ class _LeoQuizWidgetState extends ConsumerState<LeoQuizWidget> {
                     ),
                   ),
                 );
-              }),
-              const SizedBox(height: 8),
-              // Не дублируем выбранный ответ отдельным сообщением — он остаётся подсвеченной карточкой справа
-              if (_assistantMessage != null)
-                Padding(
+              }
+              cursor += options.length;
+              if (idx == cursor) {
+                return const SizedBox(height: 8);
+              }
+              cursor += 1;
+              if (_isSending && idx == cursor) {
+                return const Padding(
+                  padding: EdgeInsets.only(bottom: 8),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: TypingIndicator.small(),
+                  ),
+                );
+              }
+              if (_isSending) cursor += 1;
+              if (_assistantMessage != null && idx == cursor) {
+                return Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child:
                       LeoMessageBubble(text: _assistantMessage!, isUser: false),
-                ),
-              if (_assistantMessage != null && _isCorrect)
-                const LeoMessageBubble(
+                );
+              }
+              if (_assistantMessage != null) cursor += 1;
+              if (_assistantMessage != null && _isCorrect && idx == cursor) {
+                return const LeoMessageBubble(
                   text:
                       'Если хочешь обсудить более подробно, нажми на кнопку ниже «Обсудить с Лео».',
                   isUser: false,
-                ),
-              if (_assistantMessage != null && !_isCorrect)
-                Align(
+                );
+              }
+              if (_assistantMessage != null && _isCorrect) cursor += 1;
+              if (_assistantMessage != null && !_isCorrect && idx == cursor) {
+                return Align(
                   alignment: Alignment.centerRight,
                   child: InkWell(
                     onTap: () {
@@ -253,27 +287,33 @@ class _LeoQuizWidgetState extends ConsumerState<LeoQuizWidget> {
                         color: AppColor.primary,
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Text(
+                      child: Text(
                         'Попробовать снова',
-                        style: TextStyle(color: Colors.white),
+                        style: Theme.of(context)
+                            .textTheme
+                            .labelLarge
+                            ?.copyWith(color: AppColor.onPrimary),
                       ),
                     ),
                   ),
-                ),
-              if (_checked) ...[
-                if (_isCorrect)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 4),
+                );
+              }
+              if (_assistantMessage != null && !_isCorrect) cursor += 1;
+              if (_checked && idx == cursor) {
+                if (_isCorrect) {
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 4),
                     child: Text(
                       'Тест пройден ✅',
-                      style: TextStyle(
-                          color: Colors.green, fontWeight: FontWeight.w600),
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: AppColor.success, fontWeight: FontWeight.w600),
                     ),
-                  )
-                else
-                  const SizedBox.shrink(),
-              ],
-            ],
+                  );
+                }
+                return const SizedBox.shrink();
+              }
+              return const SizedBox.shrink();
+            },
           ),
         ),
       ],
@@ -305,25 +345,25 @@ class _Header extends StatelessWidget {
           const CircleAvatar(
             radius: 16,
             backgroundImage: AssetImage('assets/images/avatars/avatar_leo.png'),
-            backgroundColor: Colors.white,
+            backgroundColor: AppColor.onPrimary,
           ),
           const SizedBox(width: 8),
-          const Text(
+          Text(
             'Лео',
-            style: TextStyle(
-                fontWeight: FontWeight.w600, fontSize: 16, color: Colors.white),
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600, color: AppColor.onPrimary),
           ),
           const Spacer(),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: AppColor.surface,
               borderRadius: BorderRadius.circular(16),
             ),
             child: Text(
               chipText,
               style: const TextStyle(
-                color: Colors.black87,
+                color: AppColor.onSurface,
                 fontWeight: FontWeight.w600,
                 fontSize: 12,
               ),

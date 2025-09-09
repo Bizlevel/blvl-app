@@ -7,7 +7,7 @@ import 'package:bizlevel/providers/levels_provider.dart';
 import 'package:bizlevel/utils/formatters.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:bizlevel/providers/gp_providers.dart';
+import 'package:bizlevel/widgets/common/gp_balance_widget.dart';
 
 class MainStreetScreen extends ConsumerWidget {
   const MainStreetScreen({super.key});
@@ -37,8 +37,8 @@ class MainStreetScreen extends ConsumerWidget {
                           child: UserInfoBar(showGp: false),
                         ),
                       ),
-                      // Правая часть — только GP с кликом в /gp-store
-                      _TopBarGp(),
+                      // Правая часть — общий виджет баланса GP (как в Профиле/Башне)
+                      GpBalanceWidget(),
                     ],
                   ),
                 ),
@@ -179,8 +179,18 @@ class _MainActionsGrid extends ConsumerWidget {
                     title: 'Библиотека',
                     icon: Icons.menu_book,
                     svgAsset: 'assets/images/street/library.svg',
-                    state: _CardState.soon,
-                    onTap: () => _showSoonSnackBar(context),
+                    state: _CardState.active,
+                    onTap: () {
+                      try {
+                        context.go('/library');
+                      } catch (e, st) {
+                        Sentry.captureException(e, stackTrace: st);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                              content: Text('Не удалось открыть страницу')),
+                        );
+                      }
+                    },
                   ),
                 ),
                 const SizedBox(width: gap),
@@ -271,35 +281,6 @@ class _MainActionsGrid extends ConsumerWidget {
   }
 }
 
-class _TopBarGp extends ConsumerWidget {
-  const _TopBarGp();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final gpAsync = ref.watch(gpBalanceProvider);
-    final balance = gpAsync.value?['balance'];
-    if (balance == null) return const SizedBox.shrink();
-    return InkWell(
-      onTap: () {
-        try {
-          GoRouter.of(context).go('/gp-store');
-        } catch (_) {}
-      },
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SvgPicture.asset('assets/images/gp_coin.svg', width: 36, height: 36),
-          const SizedBox(width: 8),
-          Text(
-            '$balance',
-            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 28),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 enum _CardState { active, soon }
 
 class _MainActionCard extends StatelessWidget {
@@ -324,7 +305,7 @@ class _MainActionCard extends StatelessWidget {
     final Color foreground = isSoon
         ? Theme.of(context).textTheme.bodyMedium!.color!.withValues(alpha: 0.6)
         : Theme.of(context).textTheme.bodyMedium!.color!;
-    final Color border = Colors.grey.withValues(alpha: 0.25);
+    final Color border = AppColor.borderColor.withValues(alpha: 0.25);
 
     return Semantics(
       label: title,
@@ -332,11 +313,10 @@ class _MainActionCard extends StatelessWidget {
       child: AspectRatio(
         aspectRatio: 1,
         child: Card(
-          color: const Color.fromARGB(
-              255, 212, 212, 212), // фон карточки = фон иконок
+          color: AppColor.surface,
           elevation: 6, // более выраженная тень
-          shadowColor: Colors.black.withValues(alpha: 0.15),
-          surfaceTintColor: Colors.white,
+          shadowColor: AppColor.shadowColor,
+          surfaceTintColor: AppColor.surface,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
             side: BorderSide(color: border),
@@ -346,38 +326,81 @@ class _MainActionCard extends StatelessWidget {
             onTap: onTap,
             child: Stack(
               children: [
-                // Иконка на весь доступный размер
+                // Иконка на весь доступный размер (пониженная насыщенность для "Скоро")
                 Positioned.fill(
                   child: Center(
                     child: FractionallySizedBox(
                       widthFactor: 0.9, // -10%
                       heightFactor: 0.9, // -10%
-                      child: svgAsset != null
-                          ? SvgPicture.asset(
-                              svgAsset!,
-                              fit: BoxFit.contain,
-                            )
-                          : Icon(
-                              icon,
-                              size: 64,
-                              color: foreground,
-                            ),
+                      child: Opacity(
+                        opacity: isSoon ? 0.45 : 1.0,
+                        child: svgAsset != null
+                            ? SvgPicture.asset(
+                                svgAsset!,
+                                fit: BoxFit.contain,
+                              )
+                            : Icon(
+                                icon,
+                                size: 64,
+                                color: foreground,
+                              ),
+                      ),
                     ),
                   ),
                 ),
-                // Заголовок в левом верхнем углу внутри карточки
+                // Заголовок над пиктограммой, по центру, с лёгкой тенью для читаемости
                 Positioned(
                   top: 8,
-                  left: 8,
+                  left: 0,
+                  right: 0,
                   child: Text(
                     title,
+                    textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.titleMedium!.copyWith(
-                          color: const Color(0xFF757575),
-                          fontWeight: FontWeight.w600,
-                          fontSize: 16,
+                      color: AppColor.textColor,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 16,
+                      shadows: [
+                        Shadow(
+                          color: AppColor.shadowColor,
+                          blurRadius: 4,
+                          offset: const Offset(0, 1),
                         ),
+                      ],
+                    ),
                   ),
                 ),
+                // Lock‑чип в правом верхнем углу для состояния "Скоро"
+                if (isSoon)
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColor.surface.withValues(alpha: 0.9),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColor.borderColor),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Icon(Icons.lock,
+                              size: 12, color: AppColor.labelColor),
+                          SizedBox(width: 4),
+                          Text(
+                            'Скоро',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: AppColor.labelColor,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),

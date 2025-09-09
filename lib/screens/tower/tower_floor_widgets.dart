@@ -12,11 +12,13 @@ class _LockedFloorTile extends StatelessWidget {
       borderRadius: BorderRadius.circular(12),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColor.surface,
           borderRadius: BorderRadius.circular(12),
           boxShadow: const [
             BoxShadow(
-                color: Color(0x11000000), blurRadius: 8, offset: Offset(0, 4)),
+                color: AppColor.shadowColor,
+                blurRadius: 8,
+                offset: Offset(0, 4)),
           ],
         ),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -38,7 +40,7 @@ class _FloorDivider extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
         height: 2,
-        color: Colors.black12,
+        color: AppColor.dividerColor,
         margin: const EdgeInsets.symmetric(vertical: 6));
   }
 }

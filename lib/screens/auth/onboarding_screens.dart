@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../services/auth_service.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/color.dart';
+import '../../theme/spacing.dart';
 import '../../widgets/custom_textfield.dart';
 
 // DEPRECATED: OnboardingProfileScreen оставлен для совместимости. Маршруты удалены.
@@ -85,7 +86,7 @@ class _OnboardingProfileScreenState
             mainAxisSpacing: AppSpacing.medium,
             crossAxisSpacing: AppSpacing.medium,
           ),
-          itemCount: 7,
+          itemCount: 12,
           itemBuilder: (_, index) {
             final id = index + 1;
             final asset = 'assets/images/avatars/avatar_$id.png';

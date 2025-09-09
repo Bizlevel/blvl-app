@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:bizlevel/widgets/custom_textfield.dart';
+import 'package:bizlevel/providers/goals_providers.dart';
 
 class CheckInForm extends StatelessWidget {
   const CheckInForm({
@@ -58,14 +60,23 @@ class CheckInForm extends StatelessWidget {
             if (isDesktop)
               Row(children: [
                 Expanded(
-                  child: _LabeledField(
-                    label: 'Ключевая метрика (факт)',
-                    child: CustomTextBox(
-                      controller: metricActualCtrl,
-                      keyboardType: TextInputType.number,
-                      hint: 'Фактическое значение',
-                    ),
-                  ),
+                  child: Consumer(builder: (context, ref, _) {
+                    final metricAsync = ref.watch(metricLabelProvider);
+                    final String dynamicLabel = metricAsync.maybeWhen(
+                      data: (s) => (s == null || s.isEmpty)
+                          ? 'Ключевая метрика (факт)'
+                          : 'Ключевая метрика — ' + s + ' (факт)',
+                      orElse: () => 'Ключевая метрика (факт)',
+                    );
+                    return _LabeledField(
+                      label: dynamicLabel,
+                      child: CustomTextBox(
+                        controller: metricActualCtrl,
+                        keyboardType: TextInputType.number,
+                        hint: 'Фактическое значение',
+                      ),
+                    );
+                  }),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -80,14 +91,23 @@ class CheckInForm extends StatelessWidget {
               ])
             else
               Column(children: [
-                _LabeledField(
-                  label: 'Ключевая метрика (факт)',
-                  child: CustomTextBox(
-                    controller: metricActualCtrl,
-                    keyboardType: TextInputType.number,
-                    hint: 'Фактическое значение',
-                  ),
-                ),
+                Consumer(builder: (context, ref, _) {
+                  final metricAsync = ref.watch(metricLabelProvider);
+                  final String dynamicLabel = metricAsync.maybeWhen(
+                    data: (s) => (s == null || s.isEmpty)
+                        ? 'Ключевая метрика (факт)'
+                        : 'Ключевая метрика — ' + s + ' (факт)',
+                    orElse: () => 'Ключевая метрика (факт)',
+                  );
+                  return _LabeledField(
+                    label: dynamicLabel,
+                    child: CustomTextBox(
+                      controller: metricActualCtrl,
+                      keyboardType: TextInputType.number,
+                      hint: 'Фактическое значение',
+                    ),
+                  );
+                }),
                 const SizedBox(height: 12),
                 _LabeledField(
                   label: 'Главный инсайт недели',
@@ -128,9 +148,39 @@ class CheckInForm extends StatelessWidget {
             const SizedBox(height: 12),
             _LabeledField(
               label: 'Другое',
-              child: CustomTextBox(
-                controller: techOtherCtrl,
-                hint: 'Что ещё применяли из уроков',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  CustomTextBox(
+                    controller: techOtherCtrl,
+                    hint: 'Что ещё применяли из уроков',
+                  ),
+                  const SizedBox(height: 8),
+                  Consumer(builder: (context, ref, _) {
+                    final optionsAsync = ref.watch(usedToolsOptionsProvider);
+                    return optionsAsync.maybeWhen(
+                      data: (opts) {
+                        if (opts.isEmpty) return const SizedBox.shrink();
+                        return Wrap(
+                          spacing: 8,
+                          runSpacing: 6,
+                          children: opts.map((o) {
+                            return InputChip(
+                              label: Text(o),
+                              onPressed: () {
+                                final current = techOtherCtrl.text.trim();
+                                if (current.contains(o)) return;
+                                techOtherCtrl.text =
+                                    current.isEmpty ? o : current + ', ' + o;
+                              },
+                            );
+                          }).toList(),
+                        );
+                      },
+                      orElse: () => const SizedBox.shrink(),
+                    );
+                  }),
+                ],
               ),
             ),
             const SizedBox(height: 16),
@@ -201,4 +251,3 @@ class _GroupHeader extends StatelessWidget {
     );
   }
 }
-
