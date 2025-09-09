@@ -24,7 +24,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:bizlevel/services/notifications_service.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
-import 'package:flutter_native_timezone/flutter_native_timezone.dart';
+import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:flutter/scheduler.dart';
 import 'services/push_service.dart';
 
@@ -57,7 +57,7 @@ Future<void> main() async {
   // Инициализация таймзон и локальных уведомлений (M0)
   try {
     tz.initializeTimeZones();
-    final String timeZoneName = await FlutterNativeTimezone.getLocalTimezone();
+    final String timeZoneName = await FlutterTimezone.getLocalTimezone();
     tz.setLocalLocation(tz.getLocation(timeZoneName));
     await NotificationsService.instance.initialize();
     await NotificationsService.instance.scheduleWeeklyPlan();
