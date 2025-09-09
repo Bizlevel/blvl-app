@@ -1,7 +1,10 @@
 import 'dart:developer';
 import 'dart:io';
-import 'package:flutter/foundation.dart' show kIsWeb; // Import kIsWeb
-import 'dart:html' as html; // Import dart:html for window.location.origin
+import 'package:flutter/foundation.dart' show kIsWeb;
+
+// Conditional import for platform-specific redirect URL
+import 'auth_service_stub.dart'
+    if (dart.library.html) 'auth_service_web.dart';
 
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -79,7 +82,7 @@ class AuthService {
       // For mobile, we use google_sign_in package to get an ID token,
       // then sign in with Supabase using that token.
       if (kIsWeb) {
-        final String redirectToUrl = html.window.location.origin;
+        final String redirectToUrl = getRedirectUrl();
         log('Google Sign-In: Initiating web OAuth flow with redirectTo: $redirectToUrl');
         await _client.auth.signInWithOAuth(
           OAuthProvider.google,
