@@ -4,7 +4,7 @@ part of '../biz_tower_screen.dart';
 void _showBlockedSnackBar(BuildContext context, {bool premium = false}) {
   final String text =
       premium ? 'Доступно в Премиум' : 'Завершите предыдущий уровень';
-  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  NotificationCenter.showWarn(context, text);
 }
 
 void _logBreadcrumb(String message, {String category = 'tower'}) {

@@ -24,7 +24,9 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:bizlevel/services/notifications_service.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
+import 'package:flutter_native_timezone/flutter_native_timezone.dart';
 import 'package:flutter/scheduler.dart';
+import 'services/push_service.dart';
 
 Future<void> main() async {
   // КРИТИЧНО для web: Все инициализации должны быть в одной зоне
@@ -52,12 +54,20 @@ Future<void> main() async {
   await Hive.openBox('quotes');
   await Hive.openBox('gp');
 
-  // Инициализация таймзон и локальных уведомлений (MVP)
+  // Инициализация таймзон и локальных уведомлений (M0)
   try {
     tz.initializeTimeZones();
-    tz.setLocalLocation(tz.getLocation(DateTime.now().timeZoneName));
+    final String timeZoneName = await FlutterNativeTimezone.getLocalTimezone();
+    tz.setLocalLocation(tz.getLocation(timeZoneName));
     await NotificationsService.instance.initialize();
     await NotificationsService.instance.scheduleWeeklyPlan();
+    // Открываем лог уведомлений
+    await Hive.openBox('notifications');
+  } catch (_) {}
+
+  // Инициализация FCM (если доступно). Ошибки не фейлят запуск.
+  try {
+    await PushService.instance.initialize();
   } catch (_) {}
 
   final dsn = envOrDefine('SENTRY_DSN');
@@ -152,7 +162,21 @@ class MyApp extends ConsumerWidget {
                         : const FadeUpwardsPageTransitionsBuilder(),
                 }),
               ),
-              child: wrapped,
+              child: FutureBuilder<String?>(
+                future: NotificationsService.instance.getLaunchRoute(),
+                builder: (context, snap) {
+                  if (snap.connectionState == ConnectionState.done &&
+                      snap.data != null &&
+                      snap.data!.isNotEmpty) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      try {
+                        router.go(snap.data!);
+                      } catch (_) {}
+                    });
+                  }
+                  return wrapped;
+                },
+              ),
             ),
           );
         },

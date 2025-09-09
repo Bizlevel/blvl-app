@@ -13,9 +13,15 @@ Future<void> _unlockFloor(BuildContext context,
     final _ =
         await gp.unlockFloor(floorNumber: floorNumber, idempotencyKey: idem);
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text(UIS.floorOpened)),
-    );
+    NotificationCenter.showSuccess(context, UIS.floorOpened);
+    try {
+      await NotificationLogService.instance.record(
+        kind: NotificationKind.success,
+        message: UIS.floorOpened,
+        route: '/tower',
+        category: 'tower',
+      );
+    } catch (_) {}
     // Обновим баланс и узлы башни
     try {
       final fresh = await gp.getBalance();
@@ -29,28 +35,41 @@ Future<void> _unlockFloor(BuildContext context,
   } on GpFailure catch (e) {
     if (!context.mounted) return;
     if (e.message.contains('Недостаточно GP')) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text(UIS.notEnoughGp),
-          action: SnackBarAction(
-            label: 'Купить GP',
-            onPressed: () {
-              context.push('/gp-store');
-            },
-          ),
-        ),
+      NotificationCenter.showWarn(
+        context,
+        UIS.notEnoughGp,
+        onAction: () => context.push('/gp-store'),
+        actionLabel: 'Купить GP',
       );
+      try {
+        await NotificationLogService.instance.record(
+          kind: NotificationKind.warn,
+          message: UIS.notEnoughGp,
+          route: '/gp-store',
+          category: 'gp',
+        );
+      } catch (_) {}
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message)),
-      );
+      NotificationCenter.showError(context, e.message);
+      try {
+        await NotificationLogService.instance.record(
+          kind: NotificationKind.error,
+          message: e.message,
+          category: 'tower',
+        );
+      } catch (_) {}
     }
   } catch (e, st) {
     _captureError(e, st);
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text(UIS.floorOpenFailed)),
-    );
+    NotificationCenter.showError(context, UIS.floorOpenFailed);
+    try {
+      await NotificationLogService.instance.record(
+        kind: NotificationKind.error,
+        message: UIS.floorOpenFailed,
+        category: 'tower',
+      );
+    } catch (_) {}
   }
 }
 
