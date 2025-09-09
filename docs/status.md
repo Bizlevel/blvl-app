@@ -380,3 +380,5 @@ TODO:
 Задача 47.9–47.10: Добавлены тесты NotificationCenter (баннер и action), создан `docs/notifications_setup.md` с инструкциями по Android/iOS/Firebase/Deeplink/handler и чек‑листом отладки. Код приложения не ломался.
 
 Задача 47.8 fix: Применена миграция `public.push_tokens` (RLS), добавлен каркас Edge Function `push-dispatch` (без секретов), интегрирован клиент FCM (инициализация, обработчики, deeplink). Обновлён `docs/notifications_setup.md` (пошаговые шаги по внешним сервисам). Линты без ошибок.
+
+Задача 240909-ios13 fix: Поднят iOS deployment target до 13.0 (Podfile/AppFrameworkInfo.plist/XcodeProj), переинициализированы Pods и `Runner.xcworkspace`. Устранено зависание `flutter clean` на этапе «Cleaning Xcode workspace…». Сборка/Pods устанавливаются стабильно.
