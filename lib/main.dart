@@ -123,14 +123,12 @@ class MyApp extends ConsumerWidget {
         routerConfig: router,
         builder: (context, child) {
           // создаём ResponsiveWrapper как обычно
-          final wrapped = ResponsiveWrapper.builder(
-            BouncingScrollWrapper.builder(context, child!),
-            minWidth: 320,
-            defaultScale: true,
-            breakpoints: const [
-              ResponsiveBreakpoint.resize(320, name: MOBILE),
-              ResponsiveBreakpoint.autoScale(600, name: TABLET),
-              ResponsiveBreakpoint.autoScale(1024, name: DESKTOP),
+          final wrapped = ResponsiveBreakpoints.builder(
+            child: BouncingScrollWrapper.builder(context, child!),
+            breakpoints: [
+              const Breakpoint(start: 0, end: 320, name: MOBILE),
+              const Breakpoint(start: 321, end: 600, name: TABLET),
+              const Breakpoint(start: 601, end: 1024, name: DESKTOP),
             ],
           );
 
