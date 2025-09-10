@@ -24,6 +24,8 @@ import 'package:bizlevel/widgets/common/bizlevel_error.dart';
 import 'package:bizlevel/widgets/common/bizlevel_loading.dart';
 import 'package:bizlevel/widgets/common/bizlevel_button.dart';
 import 'package:bizlevel/widgets/common/gp_balance_widget.dart';
+import 'package:bizlevel/widgets/common/bizlevel_card.dart';
+import 'package:bizlevel/widgets/common/bizlevel_text_field.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -311,6 +313,7 @@ class ProfileScreen extends ConsumerWidget {
             ),
             SliverToBoxAdapter(
               child: _Body(
+                user: user,
                 userName: user.name,
                 avatarId: user.avatarId,
                 currentLevel: user.currentLevel,
@@ -337,6 +340,7 @@ class _ProfileGpBalanceSlot extends StatelessWidget {
 
 class _Body extends ConsumerStatefulWidget {
   const _Body({
+    required this.user,
     required this.userName,
     required this.avatarId,
     required this.currentLevel,
@@ -345,6 +349,7 @@ class _Body extends ConsumerStatefulWidget {
     required this.artifacts,
   });
 
+  final UserModel user;
   final String userName;
   final int? avatarId;
   final int currentLevel;
@@ -552,6 +557,58 @@ class _BodyState extends ConsumerState<_Body> {
                         onTap: () => _openArtifactUrl(url),
                       );
                     },
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _openAboutMeModal() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColor.surface,
+      builder: (ctx) {
+        return DraggableScrollableSheet(
+          expand: false,
+          minChildSize: 0.4,
+          maxChildSize: 0.92,
+          initialChildSize: 0.66,
+          builder: (context, scrollController) {
+            return Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.medium,
+                    vertical: AppSpacing.small,
+                  ),
+                  child: Row(
+                    children: [
+                      const Text(
+                        'Информация обо мне',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.of(context).pop(),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                Expanded(
+                  child: SingleChildScrollView(
+                    controller: scrollController,
+                    padding: const EdgeInsets.all(AppSpacing.medium),
+                    child: _AboutMeCard(user: widget.user, showTitle: false),
                   ),
                 ),
               ],
@@ -796,6 +853,21 @@ class _BodyState extends ConsumerState<_Body> {
               ),
             ),
             const SizedBox(width: AppSpacing.small),
+            Expanded(
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: _openAboutMeModal,
+                child: Stack(
+                  children: [
+                    const StatCard(
+                      title: 'Информация обо мне',
+                      icon: Icons.info_outline,
+                      showChevron: true,
+                    ),
+                  ],
+                ),
+              ),
+            ),
             const SizedBox(width: AppSpacing.small),
             Expanded(
               child: InkWell(
@@ -808,15 +880,7 @@ class _BodyState extends ConsumerState<_Body> {
                       title:
                           "${widget.artifactsCount} ${_pluralizeArtifacts(widget.artifactsCount)}",
                       icon: Icons.inventory_2_outlined,
-                    ),
-                    Positioned(
-                      right: 8,
-                      top: 8,
-                      child: Icon(
-                        Icons.expand_more,
-                        size: 16,
-                        color: AppColor.labelColor.withValues(alpha: 0.9),
-                      ),
+                      showChevron: true,
                     ),
                   ],
                 ),
@@ -831,6 +895,403 @@ class _BodyState extends ConsumerState<_Body> {
   // Секции настроек/платежей/выхода перенесены в меню шестерёнки AppBar
 
   // Секция артефактов удалена согласно задаче 31.16 — используется модалка
+}
+
+class _AboutMeCard extends ConsumerStatefulWidget {
+  const _AboutMeCard({required this.user, this.showTitle = true});
+  final UserModel user;
+  final bool showTitle;
+
+  @override
+  ConsumerState<_AboutMeCard> createState() => _AboutMeCardState();
+}
+
+class _AboutMeCardState extends ConsumerState<_AboutMeCard> {
+  bool _editing = false;
+
+  late final TextEditingController _nameCtrl =
+      TextEditingController(text: widget.user.name);
+  late final TextEditingController _aboutCtrl =
+      TextEditingController(text: widget.user.about ?? '');
+  late final TextEditingController _goalCtrl =
+      TextEditingController(text: widget.user.goal ?? '');
+  late final TextEditingController _businessAreaCtrl =
+      TextEditingController(text: widget.user.businessArea ?? '');
+  late final TextEditingController _experienceLevelCtrl =
+      TextEditingController(text: widget.user.experienceLevel ?? '');
+  late final TextEditingController _businessSizeCtrl =
+      TextEditingController(text: widget.user.businessSize ?? '');
+  late final TextEditingController _learningStyleCtrl =
+      TextEditingController(text: widget.user.learningStyle ?? '');
+  late final TextEditingController _businessRegionCtrl =
+      TextEditingController(text: widget.user.businessRegion ?? '');
+
+  final Set<String> _keyChallenges = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _keyChallenges.addAll(widget.user.keyChallenges ?? const []);
+  }
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _aboutCtrl.dispose();
+    _goalCtrl.dispose();
+    _businessAreaCtrl.dispose();
+    _experienceLevelCtrl.dispose();
+    _businessSizeCtrl.dispose();
+    _learningStyleCtrl.dispose();
+    _businessRegionCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    try {
+      await ref.read(authServiceProvider).updateProfile(
+            name: _nameCtrl.text.trim().isEmpty ? null : _nameCtrl.text.trim(),
+            about:
+                _aboutCtrl.text.trim().isEmpty ? null : _aboutCtrl.text.trim(),
+            goal: _goalCtrl.text.trim().isEmpty ? null : _goalCtrl.text.trim(),
+            businessArea: _businessAreaCtrl.text.trim().isEmpty
+                ? null
+                : _businessAreaCtrl.text.trim(),
+            experienceLevel: _experienceLevelCtrl.text.trim().isEmpty
+                ? null
+                : _experienceLevelCtrl.text.trim(),
+            businessSize: _businessSizeCtrl.text.trim().isEmpty
+                ? null
+                : _businessSizeCtrl.text.trim(),
+            keyChallenges:
+                _keyChallenges.isEmpty ? null : _keyChallenges.toList(),
+            learningStyle: _learningStyleCtrl.text.trim().isEmpty
+                ? null
+                : _learningStyleCtrl.text.trim(),
+            businessRegion: _businessRegionCtrl.text.trim().isEmpty
+                ? null
+                : _businessRegionCtrl.text.trim(),
+          );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Профиль обновлён')),
+      );
+      ref.invalidate(currentUserProvider);
+      setState(() => _editing = false);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_editing) {
+      final chips = (widget.user.keyChallenges ?? const [])
+          .map((e) => Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                margin: const EdgeInsets.only(right: 6, bottom: 6),
+                decoration: BoxDecoration(
+                  color: AppColor.primary.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                      color: AppColor.primary.withValues(alpha: 0.2)),
+                ),
+                child: Text(e, style: const TextStyle(color: AppColor.primary)),
+              ))
+          .toList();
+
+      return BizLevelCard(
+        semanticsLabel: 'Информация обо мне',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                if (widget.showTitle)
+                  Expanded(
+                    child: Text('Информация обо мне',
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w600)),
+                  ),
+                IconButton(
+                  icon: const Icon(Icons.edit, color: AppColor.onSurfaceSubtle),
+                  onPressed: () => setState(() => _editing = true),
+                  tooltip: 'Редактировать',
+                )
+              ],
+            ),
+            const SizedBox(height: 8),
+            _kv('Как к вам обращаться', widget.user.name),
+            _kv('Кратко о себе', widget.user.about ?? '—'),
+            _kv('Цель обучения', widget.user.goal ?? '—'),
+            _kv('Сфера деятельности', widget.user.businessArea ?? '—'),
+            _kv('Уровень опыта', widget.user.experienceLevel ?? '—'),
+            _kv('Размер бизнеса', widget.user.businessSize ?? '—'),
+            _kv('Предпочитаемый стиль обучения',
+                widget.user.learningStyle ?? '—'),
+            _kv('Регион ведения бизнеса', widget.user.businessRegion ?? '—'),
+            if (chips.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Wrap(children: chips),
+            ],
+            const SizedBox(height: 8),
+            const Text(
+              'Чем подробнее вы заполните профиль, тем точнее советы Лео и Макса.',
+              style: TextStyle(color: AppColor.onSurfaceSubtle),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Режим редактирования
+    return BizLevelCard(
+      semanticsLabel: 'Редактирование профиля',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              if (widget.showTitle)
+                Expanded(
+                  child: Text('Информация обо мне',
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w600)),
+                ),
+              IconButton(
+                icon: const Icon(Icons.close, color: AppColor.onSurfaceSubtle),
+                onPressed: () => setState(() => _editing = false),
+                tooltip: 'Отмена',
+              )
+            ],
+          ),
+          const SizedBox(height: 8),
+          BizLevelTextField(
+              label: 'Как к вам обращаться', controller: _nameCtrl),
+          const SizedBox(height: 12),
+          BizLevelTextField(label: 'Кратко о себе', controller: _aboutCtrl),
+          const SizedBox(height: 12),
+          BizLevelTextField(label: 'Ваша цель обучения', controller: _goalCtrl),
+          const SizedBox(height: 12),
+          BizLevelTextField(
+              label: 'Сфера деятельности', controller: _businessAreaCtrl),
+          const SizedBox(height: 12),
+          BizLevelTextField(
+              label: 'Уровень опыта', controller: _experienceLevelCtrl),
+          const SizedBox(height: 12),
+          _DropdownLabeled(
+            label: 'Размер бизнеса',
+            value: _businessSizeCtrl.text.isNotEmpty
+                ? _businessSizeCtrl.text
+                : null,
+            options: const [
+              'Только планирую',
+              'до 5 сотрудников',
+              '5-50 сотрудников',
+              'более 50 сотрудников',
+            ],
+            onChanged: (v) {
+              if (v != null) _businessSizeCtrl.text = v;
+              setState(() {});
+            },
+          ),
+          const SizedBox(height: 12),
+          _ChallengesEditor(
+            initial: _keyChallenges,
+            onChanged: (set) => setState(() {
+              _keyChallenges
+                ..clear()
+                ..addAll(set);
+            }),
+          ),
+          const SizedBox(height: 12),
+          _DropdownLabeled(
+            label: 'Предпочитаемый стиль обучения',
+            value: _learningStyleCtrl.text.isNotEmpty
+                ? _learningStyleCtrl.text
+                : null,
+            options: const [
+              'Практические примеры',
+              'Теория с разбором',
+              'Пошаговые инструкции',
+            ],
+            onChanged: (v) {
+              if (v != null) _learningStyleCtrl.text = v;
+              setState(() {});
+            },
+          ),
+          const SizedBox(height: 12),
+          BizLevelTextField(
+              label: 'Регион ведения бизнеса', controller: _businessRegionCtrl),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: BizLevelButton(
+                  label: 'Сохранить',
+                  onPressed: _save,
+                ),
+              ),
+            ],
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _kv(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 180,
+            child: Text(label,
+                style: Theme.of(context)
+                    .textTheme
+                    .bodyMedium
+                    ?.copyWith(color: AppColor.onSurfaceSubtle)),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(value.isEmpty ? '—' : value,
+                style: Theme.of(context).textTheme.bodyMedium),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ChallengesEditor extends StatefulWidget {
+  const _ChallengesEditor({required this.initial, required this.onChanged});
+  final Set<String> initial;
+  final ValueChanged<Set<String>> onChanged;
+
+  @override
+  State<_ChallengesEditor> createState() => _ChallengesEditorState();
+}
+
+class _DropdownLabeled extends StatelessWidget {
+  const _DropdownLabeled({
+    required this.label,
+    required this.options,
+    required this.onChanged,
+    this.value,
+  });
+
+  final String label;
+  final List<String> options;
+  final String? value;
+  final ValueChanged<String?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: Theme.of(context)
+              .textTheme
+              .bodyMedium
+              ?.copyWith(fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 6),
+        DropdownButtonFormField<String>(
+          value: value,
+          items: options
+              .map((e) => DropdownMenuItem<String>(
+                    value: e,
+                    child: Text(e),
+                  ))
+              .toList(),
+          onChanged: onChanged,
+          decoration: const InputDecoration(
+            border: OutlineInputBorder(),
+            isDense: true,
+            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ChallengesEditorState extends State<_ChallengesEditor> {
+  static const _options = <String>[
+    'Поиск клиентов',
+    'Финансы',
+    'Команда',
+    'Конкуренты',
+    'Масштабирование',
+    'Другое',
+  ];
+
+  late final Set<String> _selected = {...widget.initial};
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Основные вызовы',
+            style: Theme.of(context)
+                .textTheme
+                .bodyMedium
+                ?.copyWith(fontWeight: FontWeight.w600)),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: _options.map((o) {
+            final isSelected = _selected.contains(o);
+            return GestureDetector(
+              onTap: () {
+                setState(() {
+                  if (isSelected) {
+                    _selected.remove(o);
+                  } else {
+                    _selected.add(o);
+                  }
+                });
+                widget.onChanged(_selected);
+              },
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? AppColor.primary.withValues(alpha: 0.1)
+                      : AppColor.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isSelected
+                        ? AppColor.primary
+                        : AppColor.onSurfaceSubtle.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Text(
+                  o,
+                  style: TextStyle(
+                    color: isSelected ? AppColor.primary : AppColor.textColor,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
 }
 
 class DividerWrapper extends StatelessWidget {

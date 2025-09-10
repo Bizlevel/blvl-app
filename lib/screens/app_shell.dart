@@ -6,10 +6,11 @@ import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/widgets/bottombar_item.dart';
 import 'package:bizlevel/widgets/desktop_nav_bar.dart';
 import 'package:bizlevel/screens/main_street_screen.dart';
-import 'package:bizlevel/screens/leo_chat_screen.dart';
 import 'package:bizlevel/screens/goal_screen.dart';
 import 'package:bizlevel/screens/profile_screen.dart';
 import 'package:bizlevel/providers/auth_provider.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:bizlevel/screens/leo_dialog_screen.dart';
 
 class AppShell extends ConsumerStatefulWidget {
   final Widget child;
@@ -20,10 +21,46 @@ class AppShell extends ConsumerStatefulWidget {
 }
 
 class _AppShellState extends ConsumerState<AppShell> {
-  static const _routes = ['/home', '/chat', '/goal', '/profile'];
+  static const _routes = ['/home', '/goal', '/profile'];
   PageController? _pageController;
   int _currentIndex = 0;
   bool _isSyncing = false;
+
+  String? _buildUserContext(WidgetRef ref) {
+    final user = ref.read(currentUserProvider).value;
+    if (user != null) {
+      final parts = <String>[];
+      if (user.goal?.isNotEmpty == true) parts.add('Цель: ${user.goal}');
+      if (user.about?.isNotEmpty == true) parts.add('О себе: ${user.about}');
+      if (user.businessArea?.isNotEmpty == true) {
+        parts.add('Сфера: ${user.businessArea}');
+      }
+      if (user.experienceLevel?.isNotEmpty == true) {
+        parts.add('Опыт: ${user.experienceLevel}');
+      }
+      if (user.businessSize?.isNotEmpty == true) {
+        parts.add('Размер бизнеса: ${user.businessSize}');
+      }
+      if ((user.keyChallenges ?? const []).isNotEmpty) {
+        parts.add('Вызовы: ${(user.keyChallenges!).join(', ')}');
+      }
+      if (user.learningStyle?.isNotEmpty == true) {
+        parts.add('Стиль: ${user.learningStyle}');
+      }
+      if (user.businessRegion?.isNotEmpty == true) {
+        parts.add('Регион: ${user.businessRegion}');
+      }
+      parts.add('Текущий уровень: ${user.currentLevel}');
+      return parts.isNotEmpty ? parts.join('. ') : null;
+    }
+    return null;
+  }
+
+  String? _buildLevelContext(WidgetRef ref) {
+    final user = ref.read(currentUserProvider).value;
+    if (user != null) return 'Уровень ${user.currentLevel}';
+    return null;
+  }
 
   int _locationToTab(String location) {
     for (int i = 0; i < _routes.length; i++) {
@@ -104,21 +141,49 @@ class _AppShellState extends ConsumerState<AppShell> {
                 padding: const EdgeInsets.only(left: 25, right: 25, bottom: 15),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: List.generate(_routes.length, (index) {
-                    final icon = index == 0
-                        ? Icons.map
-                        : index == 1
-                            ? Icons.chat_bubble
-                            : index == 2
-                                ? Icons.flag
-                                : Icons.person;
-                    return BottomBarItem(
-                      icon,
-                      isActive: activeTab == index,
-                      activeColor: AppColor.primary,
-                      onTap: () => _goTab(index),
-                    );
-                  }),
+                  children: [
+                    ...List.generate(_routes.length, (index) {
+                      final icon = index == 0
+                          ? Icons.map
+                          : index == 1
+                              ? Icons.flag
+                              : Icons.person;
+                      return BottomBarItem(
+                        icon,
+                        isActive: activeTab == index,
+                        activeColor: AppColor.primary,
+                        onTap: () => _goTab(index),
+                        iconWidget: index == 1
+                            ? Padding(
+                                padding: const EdgeInsets.only(top: 2),
+                                child:
+                                    _GoalSvgIcon(isActive: activeTab == index),
+                              )
+                            : null,
+                      );
+                    }),
+                    // Четвёртая кнопка: быстрый чат с Лео, наполовину торчит над баром
+                    if (!isDesktop && isBaseRoute)
+                      Transform.translate(
+                        offset: const Offset(0, -18),
+                        child: _LeoBottomActionButton(
+                          onTap: () {
+                            try {
+                              HapticFeedback.lightImpact();
+                            } catch (_) {}
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => LeoDialogScreen(
+                                  userContext: _buildUserContext(ref),
+                                  levelContext: _buildLevelContext(ref),
+                                  bot: 'leo',
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ),
@@ -128,7 +193,6 @@ class _AppShellState extends ConsumerState<AppShell> {
                 DesktopNavBar(
                   tabs: const [
                     {'icon': Icons.map, 'label': 'Главная'},
-                    {'icon': Icons.chat_bubble, 'label': 'База тренеров'},
                     {'icon': Icons.flag, 'label': 'Цель'},
                     {'icon': Icons.person, 'label': 'Профиль'},
                   ],
@@ -156,7 +220,6 @@ class _AppShellState extends ConsumerState<AppShell> {
                   },
                   children: [
                     const MainStreetScreen(key: PageStorageKey('tab_home')),
-                    const LeoChatScreen(key: PageStorageKey('tab_chat')),
                     _GoalTabGate(key: const PageStorageKey('tab_goal')),
                     const ProfileScreen(key: PageStorageKey('tab_profile')),
                   ],
@@ -191,5 +254,56 @@ class _GoalTabGate extends ConsumerWidget {
       );
     }
     return const GoalScreen();
+  }
+}
+
+class _GoalSvgIcon extends StatelessWidget {
+  const _GoalSvgIcon({required this.isActive});
+  final bool isActive;
+
+  @override
+  Widget build(BuildContext context) {
+    return SvgPicture.asset(
+      'assets/icons/goal.svg',
+      width: 26,
+      height: 26,
+      colorFilter: ColorFilter.mode(
+        isActive ? AppColor.primary : Colors.grey,
+        BlendMode.srcIn,
+      ),
+    );
+  }
+}
+
+class _LeoBottomActionButton extends StatelessWidget {
+  const _LeoBottomActionButton({required this.onTap});
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: 'Новый диалог с Лео',
+      button: true,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            color: AppColor.primary,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: AppColor.shadowColor.withValues(alpha: 0.2),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          alignment: Alignment.center,
+          child: const Icon(Icons.chat_bubble, color: AppColor.onPrimary),
+        ),
+      ),
+    );
   }
 }

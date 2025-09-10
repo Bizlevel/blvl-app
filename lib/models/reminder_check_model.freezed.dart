@@ -34,12 +34,8 @@ mixin _$ReminderCheckModel {
   @JsonKey(name: 'created_at')
   DateTime? get createdAt => throw _privateConstructorUsedError;
 
-  /// Serializes this ReminderCheckModel to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
-
-  /// Create a copy of ReminderCheckModel
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
+  @JsonKey(ignore: true)
   $ReminderCheckModelCopyWith<ReminderCheckModel> get copyWith =>
       throw _privateConstructorUsedError;
 }
@@ -70,8 +66,6 @@ class _$ReminderCheckModelCopyWithImpl<$Res, $Val extends ReminderCheckModel>
   // ignore: unused_field
   final $Res Function($Val) _then;
 
-  /// Create a copy of ReminderCheckModel
-  /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
   @override
   $Res call({
@@ -142,8 +136,6 @@ class __$$ReminderCheckModelImplCopyWithImpl<$Res>
       $Res Function(_$ReminderCheckModelImpl) _then)
       : super(_value, _then);
 
-  /// Create a copy of ReminderCheckModel
-  /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
   @override
   $Res call({
@@ -248,14 +240,12 @@ class _$ReminderCheckModelImpl implements _ReminderCheckModel {
                 other.createdAt == createdAt));
   }
 
-  @JsonKey(includeFromJson: false, includeToJson: false)
+  @JsonKey(ignore: true)
   @override
   int get hashCode => Object.hash(runtimeType, id, userId, dayNumber,
       reminderText, isCompleted, completedAt, createdAt);
 
-  /// Create a copy of ReminderCheckModel
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
+  @JsonKey(ignore: true)
   @override
   @pragma('vm:prefer-inline')
   _$$ReminderCheckModelImplCopyWith<_$ReminderCheckModelImpl> get copyWith =>
@@ -304,11 +294,8 @@ abstract class _ReminderCheckModel implements ReminderCheckModel {
   @override
   @JsonKey(name: 'created_at')
   DateTime? get createdAt;
-
-  /// Create a copy of ReminderCheckModel
-  /// with the given fields replaced by the non-null parameter values.
   @override
-  @JsonKey(includeFromJson: false, includeToJson: false)
+  @JsonKey(ignore: true)
   _$$ReminderCheckModelImplCopyWith<_$ReminderCheckModelImpl> get copyWith =>
       throw _privateConstructorUsedError;
 }

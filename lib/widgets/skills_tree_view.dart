@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:bizlevel/theme/color.dart';
-import 'package:bizlevel/widgets/common/bizlevel_progress_bar.dart';
 import 'package:bizlevel/models/user_skill_model.dart';
 
 /// Виджет блока «Дерево навыков» в профиле.
@@ -136,9 +135,8 @@ class _SkillsTreeViewState extends State<SkillsTreeView>
           const SizedBox(height: 12),
           LayoutBuilder(
             builder: (context, constraints) {
-              // 2 колонки на мобильных экранах
-              final isNarrow = constraints.maxWidth < 600;
-              final crossAxisCount = isNarrow ? 2 : 3;
+              // Один столбец: навыки расположены вертикально, один под другим
+              final crossAxisCount = 1;
               final spacing = 12.0;
               final totalSpacing = spacing * (crossAxisCount - 1);
               final tileWidth =
@@ -256,8 +254,12 @@ class _SkillsTreeViewState extends State<SkillsTreeView>
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
-                  const SizedBox(height: 4),
-                  BizLevelProgressBar(value: progress, color: color),
+                  const SizedBox(height: 6),
+                  _SegmentedProgressBar(
+                    total: SkillsTreeView._maxPoints,
+                    filled: skill.points,
+                    color: color,
+                  ),
                 ],
               ),
             ),
@@ -267,6 +269,38 @@ class _SkillsTreeViewState extends State<SkillsTreeView>
           ],
         ),
       ),
+    );
+  }
+}
+
+class _SegmentedProgressBar extends StatelessWidget {
+  const _SegmentedProgressBar({
+    required this.total,
+    required this.filled,
+    required this.color,
+  });
+
+  final int total;
+  final int filled;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final int clampedFilled = filled.clamp(0, total);
+    return Row(
+      children: [
+        for (int i = 0; i < total; i++)
+          Expanded(
+            child: Container(
+              height: 8,
+              margin: EdgeInsets.only(right: i == total - 1 ? 0 : 4),
+              decoration: BoxDecoration(
+                color: i < clampedFilled ? color : color.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(6),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

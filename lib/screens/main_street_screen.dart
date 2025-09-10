@@ -175,22 +175,12 @@ class _MainActionsGrid extends ConsumerWidget {
               children: [
                 Expanded(
                   child: _MainActionCard(
-                    key: const Key('ms_card_library'),
-                    title: 'Библиотека',
-                    icon: Icons.menu_book,
-                    svgAsset: 'assets/images/street/library.svg',
-                    state: _CardState.active,
-                    onTap: () {
-                      try {
-                        context.go('/library');
-                      } catch (e, st) {
-                        Sentry.captureException(e, stackTrace: st);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                              content: Text('Не удалось открыть страницу')),
-                        );
-                      }
-                    },
+                    key: const Key('ms_card_coworking'),
+                    title: 'Коворкинг',
+                    icon: Icons.workspaces_outline,
+                    svgAsset: 'assets/images/street/coworking.svg',
+                    state: _CardState.soon,
+                    onTap: () => _showSoonSnackBar(context),
                   ),
                 ),
                 const SizedBox(width: gap),
@@ -236,12 +226,22 @@ class _MainActionsGrid extends ConsumerWidget {
                 const SizedBox(width: gap),
                 Expanded(
                   child: _MainActionCard(
-                    key: const Key('ms_card_coworking'),
-                    title: 'Коворкинг',
-                    icon: Icons.workspaces_outline,
-                    svgAsset: 'assets/images/street/coworking.svg',
-                    state: _CardState.soon,
-                    onTap: () => _showSoonSnackBar(context),
+                    key: const Key('ms_card_library'),
+                    title: 'Библиотека',
+                    icon: Icons.menu_book,
+                    svgAsset: 'assets/images/street/library.svg',
+                    state: _CardState.active,
+                    onTap: () {
+                      try {
+                        context.go('/library');
+                      } catch (e, st) {
+                        Sentry.captureException(e, stackTrace: st);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                              content: Text('Не удалось открыть страницу')),
+                        );
+                      }
+                    },
                   ),
                 ),
               ],

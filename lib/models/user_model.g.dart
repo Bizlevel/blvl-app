@@ -31,6 +31,12 @@ _$UserModelImpl _$$UserModelImplFromJson(Map<String, dynamic> json) =>
       updatedAt: json['updated_at'] == null
           ? null
           : DateTime.parse(json['updated_at'] as String),
+      businessSize: json['business_size'] as String?,
+      keyChallenges: (json['key_challenges'] as List<dynamic>?)
+          ?.map((e) => e as String)
+          .toList(),
+      learningStyle: json['learning_style'] as String?,
+      businessRegion: json['business_region'] as String?,
     );
 
 Map<String, dynamic> _$$UserModelImplToJson(_$UserModelImpl instance) =>
@@ -52,4 +58,8 @@ Map<String, dynamic> _$$UserModelImplToJson(_$UserModelImpl instance) =>
       'onboarding_completed': instance.onboardingCompleted,
       'created_at': instance.createdAt?.toIso8601String(),
       'updated_at': instance.updatedAt?.toIso8601String(),
+      'business_size': instance.businessSize,
+      'key_challenges': instance.keyChallenges,
+      'learning_style': instance.learningStyle,
+      'business_region': instance.businessRegion,
     };
