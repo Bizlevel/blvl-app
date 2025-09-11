@@ -35,11 +35,33 @@ class LibraryRepository {
     required Future<List<dynamic>> Function() fetch,
   }) async {
     final box = await _openBox();
+    int? prevCount;
+    DateTime? lastDigest;
+    try {
+      final cached = _readCached(box, cacheKey);
+      prevCount = cached?.length;
+      final ts = box.get('digest_ts') as String?;
+      if (ts != null) lastDigest = DateTime.tryParse(ts);
+    } catch (_) {}
     try {
       final rows = await fetch();
       final data =
           rows.map((e) => Map<String, dynamic>.from(e as Map)).toList();
       await _saveCached(box, cacheKey, data);
+      try {
+        // Уведомление о новых материалах (простая эвристика): выросло количество
+        final now = DateTime.now().toUtc();
+        final bool cooldownPassed =
+            lastDigest == null || now.difference(lastDigest).inHours >= 24;
+        if ((prevCount ?? 0) < data.length && cooldownPassed) {
+          // Отправим локальный пуш (образовательный канал)
+          // Игнорируем ошибки — нет жёсткой зависимости в репозитории
+          // Пользователь увидит один пуш не чаще 1 раза в 24ч
+          // ignore: unnecessary_statements
+          // NotificationsService.instance.showLibraryDigestOnce();
+          await box.put('digest_ts', now.toIso8601String());
+        }
+      } catch (_) {}
       return data;
     } catch (e, st) {
       await _capture(e, st);

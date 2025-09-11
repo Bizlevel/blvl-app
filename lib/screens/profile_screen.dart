@@ -192,6 +192,11 @@ class ProfileScreen extends ConsumerWidget {
                       color: AppColor.onSurfaceSubtle),
                   onSelected: (value) async {
                     switch (value) {
+                      case 'notifications':
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Скоро: уведомления')),
+                        );
+                        break;
                       case 'settings':
                         // Пока отдельного экрана нет — подскажем пользователю
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -212,6 +217,28 @@ class ProfileScreen extends ConsumerWidget {
                     }
                   },
                   itemBuilder: (context) => [
+                    PopupMenuItem(
+                      value: 'notifications',
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: const BoxDecoration(
+                              color: AppColor.blue,
+                              shape: BoxShape.circle,
+                            ),
+                            child: SvgPicture.asset(
+                              'assets/icons/bell.svg',
+                              color: AppColor.onPrimary,
+                              width: 18,
+                              height: 18,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          const Text('Уведомления'),
+                        ],
+                      ),
+                    ),
                     PopupMenuItem(
                       value: 'settings',
                       child: Row(
