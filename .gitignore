@@ -61,3 +61,5 @@ ios/Runner/GoogleService-Info.plist
 ios/GoogleService-Info.plist
 **/GoogleService-Info.plist
 **/google-services.json
+google_keys/
+.gradle/

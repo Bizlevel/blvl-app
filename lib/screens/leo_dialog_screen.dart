@@ -617,7 +617,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
       final match = RegExp(r'goal_version:\s*(\d+)').firstMatch(ctx);
       final v = match != null ? int.tryParse(match.group(1) ?? '') : null;
       switch (v) {
-        case 2:
+        case 1:
           return const [
             '💰 Выручка',
             '👥 Кол-во клиентов',
@@ -625,14 +625,14 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
             '📊 Конверсия %',
             '✏️ Другое',
           ];
-        case 3:
+        case 2:
           return const [
             'Неделя 1: Подготовка',
             'Неделя 2: Запуск',
             'Неделя 3: Масштабирование',
             'Неделя 4: Оптимизация',
           ];
-        case 4:
+        case 3:
           return const [
             'Готовность 7/10',
             'Начать завтра',
