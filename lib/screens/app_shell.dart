@@ -92,7 +92,10 @@ class _AppShellState extends ConsumerState<AppShell> {
       }
     }
 
-    final bool isBaseRoute = _routes.any((r) => location.startsWith(r));
+    // Базовые табы только на точных путях '/home' | '/goal' | '/profile'.
+    // Вложенные маршруты (например, '/goal-checkpoint/:v') не должны попадать в PageView.
+    final bool isBaseRoute =
+        location == '/home' || location == '/goal' || location == '/profile';
 
     // Создаём/синхронизируем контроллер для PageView на базовых табах
     if (!isDesktop && isBaseRoute) {

@@ -128,6 +128,38 @@ class LibraryRepository {
     );
   }
 
+  // === Динамические категории per-type ===
+  Future<List<String>> fetchCategories(String type) async {
+    String table;
+    switch (type) {
+      case 'courses':
+        table = 'library_courses';
+        break;
+      case 'grants':
+        table = 'library_grants';
+        break;
+      default:
+        table = 'library_accelerators';
+        break;
+    }
+    try {
+      final rows = await _client
+          .from(table)
+          .select('category')
+          .eq('is_active', true) as List<dynamic>;
+      final set = <String>{};
+      for (final r in rows) {
+        final c = (r as Map)['category']?.toString() ?? '';
+        if (c.isNotEmpty) set.add(c);
+      }
+      final list = set.toList()..sort((a, b) => a.compareTo(b));
+      return list;
+    } catch (e, st) {
+      await _capture(e, st);
+      rethrow;
+    }
+  }
+
   Future<List<Map<String, dynamic>>> fetchFavorites() async {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) {
@@ -324,6 +356,7 @@ class LibraryRepository {
     final rows = await _client
         .from(table)
         .select(columns.join(','))
+        .eq('is_active', true)
         .inFilter('id', ids) as List<dynamic>;
     return rows.map((e) => Map<String, dynamic>.from(e as Map)).toList();
   }

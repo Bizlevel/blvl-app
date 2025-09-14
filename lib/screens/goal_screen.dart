@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
+import 'package:go_router/go_router.dart';
 
 import 'package:bizlevel/providers/goals_providers.dart';
 import 'package:bizlevel/screens/goal/widgets/motivation_card.dart';
@@ -353,16 +354,16 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                               nextHint = 'Все этапы цели заполнены';
                             } else if (hasV3) {
                               nextHint = 'Заполните v4 «Финал» на чекпоинте';
-                              onCta = () => Navigator.of(context)
-                                  .pushNamed('/goal-checkpoint/4');
+                              onCta = () => GoRouter.of(context)
+                                  .push('/goal-checkpoint/4');
                             } else if (hasV2) {
                               nextHint = 'Заполните v3 «SMART» на чекпоинте';
-                              onCta = () => Navigator.of(context)
-                                  .pushNamed('/goal-checkpoint/3');
+                              onCta = () => GoRouter.of(context)
+                                  .push('/goal-checkpoint/3');
                             } else if (hasV1) {
                               nextHint = 'Заполните v2 «Метрики» на чекпоинте';
-                              onCta = () => Navigator.of(context)
-                                  .pushNamed('/goal-checkpoint/2');
+                              onCta = () => GoRouter.of(context)
+                                  .push('/goal-checkpoint/2');
                             } else {
                               nextHint = 'Создайте v1 «Семя цели» на Уровне 1';
                             }
@@ -437,9 +438,11 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
 
                   const SizedBox(height: 20),
 
-                  // Путь к цели (28-дневный спринт)
+                  // Путь к цели (28-дневный спринт) — только после v4
                   Builder(builder: (context) {
                     final gs = ref.watch(goalScreenControllerProvider);
+                    final hasV4 = gs.versions.containsKey(4);
+                    if (!hasV4) return const SizedBox.shrink();
                     return SprintSection(
                       versions: gs.versions,
                       selectedSprint: _selectedSprint,
@@ -500,26 +503,27 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
     final vData = (versions[selectedVersion]?['version_data'] as Map?) ?? {};
     final sb = StringBuffer('goal_version: $selectedVersion\n');
     if (selectedVersion == 1) {
-      sb.writeln('goal_initial: ${vData['goal_initial'] ?? ''}');
-      sb.writeln('goal_why: ${vData['goal_why'] ?? ''}');
-      sb.writeln('main_obstacle: ${vData['main_obstacle'] ?? ''}');
+      sb.writeln('concrete_result: ${vData['concrete_result'] ?? ''}');
+      sb.writeln('main_pain: ${vData['main_pain'] ?? ''}');
+      sb.writeln('first_action: ${vData['first_action'] ?? ''}');
     } else if (selectedVersion == 2) {
-      sb.writeln('goal_refined: ${vData['goal_refined'] ?? ''}');
-      sb.writeln('metric: ${vData['metric_name'] ?? ''}');
+      sb.writeln('concrete_result: ${vData['concrete_result'] ?? ''}');
+      sb.writeln('metric_type: ${vData['metric_type'] ?? ''}');
       sb.writeln(
-          'from: ${vData['metric_from'] ?? ''} to: ${vData['metric_to'] ?? ''}');
+          'current: ${vData['metric_current'] ?? ''} target: ${vData['metric_target'] ?? ''}');
       sb.writeln('financial_goal: ${vData['financial_goal'] ?? ''}');
     } else if (selectedVersion == 3) {
       sb.writeln('goal_smart: ${vData['goal_smart'] ?? ''}');
-      sb.writeln('sprint1: ${vData['sprint1_goal'] ?? ''}');
-      sb.writeln('sprint2: ${vData['sprint2_goal'] ?? ''}');
-      sb.writeln('sprint3: ${vData['sprint3_goal'] ?? ''}');
-      sb.writeln('sprint4: ${vData['sprint4_goal'] ?? ''}');
+      sb.writeln('week1_focus: ${vData['week1_focus'] ?? ''}');
+      sb.writeln('week2_focus: ${vData['week2_focus'] ?? ''}');
+      sb.writeln('week3_focus: ${vData['week3_focus'] ?? ''}');
+      sb.writeln('week4_focus: ${vData['week4_focus'] ?? ''}');
     } else {
-      sb.writeln('final_what: ${vData['final_what'] ?? ''}');
-      sb.writeln('final_when: ${vData['final_when'] ?? ''}');
-      sb.writeln('final_how: ${vData['final_how'] ?? ''}');
-      sb.writeln('commitment: ${vData['commitment'] ?? false}');
+      sb.writeln('first_three_days: ${vData['first_three_days'] ?? ''}');
+      sb.writeln('start_date: ${vData['start_date'] ?? ''}');
+      sb.writeln(
+          'accountability_person: ${vData['accountability_person'] ?? ''}');
+      sb.writeln('readiness_score: ${vData['readiness_score'] ?? ''}');
     }
     // Последний чек-ин (если заполнен)
     if (_achievementCtrl.text.isNotEmpty ||

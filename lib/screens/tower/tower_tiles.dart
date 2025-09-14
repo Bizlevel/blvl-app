@@ -111,6 +111,7 @@ void _handleCheckpointTap(BuildContext context, Map<String, dynamic> node) {
       context.push('/case/$caseId');
     } else if (type == 'goal_checkpoint' && goalVersion != null) {
       if (!context.mounted) return;
+      // Разрешаем редактировать любую версию в любое время по требованию UX
       context.push('/goal-checkpoint/$goalVersion');
     }
   } catch (e, st) {

@@ -136,10 +136,12 @@ class GoalsRepository {
     // Получаем version_data для указанной версии (если есть запись)
     Map<String, dynamic> versionRow = {};
     try {
+      final String? userId = _client.auth.currentUser?.id;
       final data = await _client
           .from('core_goals')
-          .select('version, version_data')
+          .select('version, version_data, user_id')
           .eq('version', version)
+          .eq('user_id', userId as Object)
           .order('updated_at', ascending: false)
           .limit(1)
           .maybeSingle();
@@ -151,10 +153,12 @@ class GoalsRepository {
     // Поля прогресса из goal_checkpoint_progress (RLS owner-only)
     List<String> completed = <String>[];
     try {
+      final String? userId = _client.auth.currentUser?.id;
       final rows = await _client
           .from('goal_checkpoint_progress')
-          .select('field_name')
-          .eq('version', version);
+          .select('field_name, user_id')
+          .eq('version', version)
+          .eq('user_id', userId as Object);
       // rows уже List по контракту PostgREST; лишняя проверка типа не нужна
       completed = (rows as List)
           .map((e) => (e as Map)['field_name'])

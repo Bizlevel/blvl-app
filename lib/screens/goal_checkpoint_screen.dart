@@ -268,36 +268,49 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
       Map<String, dynamic> versionData;
       String goalText;
       if (widget.version == 2) {
+        // Новые ключи v2
+        final String concrete = _goalRefinedCtrl.text.trim();
+        final String metricType = _metricNameCtrl.text.trim();
+        final double? from = double.tryParse(_metricFromCtrl.text.trim());
+        final double? to = double.tryParse(_metricToCtrl.text.trim());
+        final double? fin = double.tryParse(_financialGoalCtrl.text.trim());
+        if (from == null || to == null || fin == null) {
+          throw 'Введите числа в полях метрик/фин. цели';
+        }
         versionData = {
-          'goal_refined': _goalRefinedCtrl.text.trim(),
-          'metric_name': _metricNameCtrl.text.trim(),
-          'metric_from': double.parse(_metricFromCtrl.text.trim()),
-          'metric_to': double.parse(_metricToCtrl.text.trim()),
-          'financial_goal': double.parse(_financialGoalCtrl.text.trim()),
+          'concrete_result': concrete,
+          'metric_type': metricType,
+          'metric_current': from,
+          'metric_target': to,
+          'financial_goal': fin,
         };
-        goalText = _goalRefinedCtrl.text.trim();
+        goalText = concrete;
       } else if (widget.version == 3) {
+        // Новые ключи v3
         versionData = {
           'goal_smart': _goalSmartCtrl.text.trim(),
-          'sprint1_goal': _s1Ctrl.text.trim(),
-          'sprint2_goal': _s2Ctrl.text.trim(),
-          'sprint3_goal': _s3Ctrl.text.trim(),
-          'sprint4_goal': _s4Ctrl.text.trim(),
+          'week1_focus': _s1Ctrl.text.trim(),
+          'week2_focus': _s2Ctrl.text.trim(),
+          'week3_focus': _s3Ctrl.text.trim(),
+          'week4_focus': _s4Ctrl.text.trim(),
         };
         goalText = _goalSmartCtrl.text.trim();
       } else if (widget.version == 4) {
+        // Новые ключи v4
+        final int readiness = _commitment ? 8 : 5; // мягкая проекция
         versionData = {
-          'final_what': _finalWhatCtrl.text.trim(),
-          'final_when': _finalWhenCtrl.text.trim(),
-          'final_how': _finalHowCtrl.text.trim(),
-          'commitment': _commitment,
+          'first_three_days': _finalWhatCtrl.text.trim(),
+          'start_date': _finalWhenCtrl.text.trim(),
+          'accountability_person': _finalHowCtrl.text.trim(),
+          'readiness_score': readiness,
         };
         goalText = _finalWhatCtrl.text.trim();
       } else {
+        // v1
         versionData = {
-          'goal_initial': _goalInitialCtrl.text.trim(),
-          'goal_why': _goalWhyCtrl.text.trim(),
-          'main_obstacle': _mainObstacleCtrl.text.trim(),
+          'concrete_result': _goalInitialCtrl.text.trim(),
+          'main_pain': _goalWhyCtrl.text.trim(),
+          'first_action': _mainObstacleCtrl.text.trim(),
         };
         goalText = _goalInitialCtrl.text.trim();
       }
@@ -1001,7 +1014,7 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
                             const SizedBox(height: 16),
                             GoalVersionForm(
                               version: widget.version,
-                              editing: widget.version == _latestVersion,
+                              editing: true,
                               editableFields:
                                   _activeField == null ? null : {_activeField!},
                               completedFields: _completedFields,
@@ -1044,9 +1057,7 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
                                   height: 44,
                                   child: BizLevelButton(
                                     label: 'Сохранить шаг →',
-                                    onPressed: widget.version != _latestVersion
-                                        ? null
-                                        : _saveActiveField,
+                                    onPressed: _saveActiveField,
                                     variant: BizLevelButtonVariant.secondary,
                                     size: BizLevelButtonSize.md,
                                   ),
@@ -1059,10 +1070,7 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
                                     height: 44,
                                     child: BizLevelButton(
                                       label: 'Готово → к Башне',
-                                      onPressed: (_saving ||
-                                              widget.version != _latestVersion)
-                                          ? null
-                                          : _save,
+                                      onPressed: _saving ? null : _save,
                                       variant: BizLevelButtonVariant.primary,
                                       size: BizLevelButtonSize.md,
                                     ),
