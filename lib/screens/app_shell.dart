@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:math' as math;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -289,24 +290,136 @@ class _LeoBottomActionButton extends StatelessWidget {
       button: true,
       child: GestureDetector(
         onTap: onTap,
-        child: Container(
+        child: SizedBox(
           width: 56,
           height: 56,
-          decoration: BoxDecoration(
-            color: AppColor.primary,
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: AppColor.shadowColor.withValues(alpha: 0.2),
-                blurRadius: 8,
-                offset: const Offset(0, 4),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // Shadow
+              CustomPaint(
+                size: const Size(56, 56),
+                painter: _HexagonPainter(
+                  color: AppColor.shadowColor.withValues(alpha: 0.2),
+                  cornerRadius: 4,
+                  padding: 2,
+                  offset: const Offset(0, 4),
+                  blurSigma: 8,
+                ),
               ),
+              // Fill
+              CustomPaint(
+                size: const Size(56, 56),
+                painter: _HexagonPainter(
+                  color: AppColor.primary,
+                  cornerRadius: 4,
+                  padding: 2,
+                ),
+              ),
+              const Icon(Icons.chat_bubble, color: AppColor.onPrimary),
             ],
           ),
-          alignment: Alignment.center,
-          child: const Icon(Icons.chat_bubble, color: AppColor.onPrimary),
         ),
       ),
     );
+  }
+}
+
+class _HexagonPainter extends CustomPainter {
+  _HexagonPainter({
+    required this.color,
+    required this.cornerRadius,
+    this.padding = 0,
+    this.offset = Offset.zero,
+    this.blurSigma,
+  });
+
+  final Color color;
+  final double cornerRadius; // закругление боковых углов
+  final double padding; // внутренний отступ от границ
+  final Offset offset; // смещение для тени
+  final double? blurSigma; // если задано — рисуем размытый слой (тень)
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final Paint paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+
+    if (blurSigma != null && blurSigma! > 0) {
+      paint.maskFilter = MaskFilter.blur(BlurStyle.normal, blurSigma!);
+    }
+
+    canvas.save();
+    canvas.translate(offset.dx, offset.dy);
+
+    final Path path = _roundedHexagonPath(size, padding, cornerRadius);
+    canvas.drawPath(path, paint);
+
+    canvas.restore();
+  }
+
+  Path _roundedHexagonPath(Size size, double pad, double rr) {
+    final double w = size.width;
+    final double h = size.height;
+    final double cx = w / 2;
+    final double cy = h / 2;
+    final double r = math.min(w, h) / 2 - pad;
+
+    // 6 вершин (pointy top): 0=top, 1=upper-right, 2=lower-right, 3=bottom, 4=lower-left, 5=upper-left
+    final List<Offset> v = List.generate(6, (i) {
+      final double ang = -math.pi / 2 + i * math.pi / 3;
+      return Offset(cx + r * math.cos(ang), cy + r * math.sin(ang));
+    });
+
+    // Какие вершины скругляем (оставляем острыми 0 и 3)
+    bool roundIndex(int i) => i != 0 && i != 3;
+
+    final Path p = Path();
+
+    Offset cutPoint(Offset a, Offset b, double dist) {
+      final dir = (b - a);
+      final len = dir.distance;
+      if (len == 0) return a;
+      final t = (dist / len).clamp(0.0, 0.5);
+      return a + dir * t;
+    }
+
+    for (int i = 0; i < 6; i++) {
+      final int prev = (i + 5) % 6;
+      final int next = (i + 1) % 6;
+      final Offset vi = v[i];
+      if (i == 0) {
+        // начинаем с верхней вершины
+        p.moveTo(vi.dx, vi.dy);
+        continue;
+      }
+      if (roundIndex(i)) {
+        final Offset a = v[prev];
+        final Offset b = v[next];
+        final Offset p1 = cutPoint(vi, a, rr);
+        final Offset p2 = cutPoint(vi, b, rr);
+        p.lineTo(p1.dx, p1.dy);
+        p.arcToPoint(
+          p2,
+          radius: Radius.circular(rr),
+          clockwise: true,
+        );
+      } else {
+        p.lineTo(vi.dx, vi.dy);
+      }
+    }
+    // замыкаем к верхней вершине с учётом, что последняя дуга уже учтена
+    p.close();
+    return p;
+  }
+
+  @override
+  bool shouldRepaint(covariant _HexagonPainter oldDelegate) {
+    return oldDelegate.color != color ||
+        oldDelegate.cornerRadius != cornerRadius ||
+        oldDelegate.padding != padding ||
+        oldDelegate.offset != offset ||
+        oldDelegate.blurSigma != blurSigma;
   }
 }
