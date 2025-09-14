@@ -212,10 +212,22 @@ class _VersionTable extends StatelessWidget {
       ];
     } else if (version == 2) {
       rows = [
-        ['Уточненная цель', (vData['goal_refined'] ?? '').toString()],
-        ['Метрика', (vData['metric_name'] ?? '').toString()],
-        ['Текущее значение', (vData['metric_from'] ?? '').toString()],
-        ['Целевое значение', (vData['metric_to'] ?? '').toString()],
+        [
+          'Уточненная цель',
+          (vData['concrete_result'] ?? vData['goal_refined'] ?? '').toString()
+        ],
+        [
+          'Метрика',
+          (vData['metric_type'] ?? vData['metric_name'] ?? '').toString()
+        ],
+        [
+          'Текущее значение',
+          (vData['metric_current'] ?? vData['metric_from'] ?? '').toString()
+        ],
+        [
+          'Целевое значение',
+          (vData['metric_target'] ?? vData['metric_to'] ?? '').toString()
+        ],
         ['Финансовая цель', (vData['financial_goal'] ?? '').toString()],
       ];
     } else if (version == 3) {
@@ -228,10 +240,25 @@ class _VersionTable extends StatelessWidget {
       ];
     } else {
       rows = [
-        ['Что достигну', (vData['final_what'] ?? '').toString()],
-        ['К какой дате', (vData['final_when'] ?? '').toString()],
-        ['Ключевые действия', (vData['final_how'] ?? '').toString()],
-        ['Готовность', ((vData['commitment'] ?? false) == true) ? 'Да' : 'Нет'],
+        [
+          'Что достигну',
+          (vData['first_three_days'] ?? vData['final_what'] ?? '').toString()
+        ],
+        [
+          'К какой дате',
+          (vData['start_date'] ?? vData['final_when'] ?? '').toString()
+        ],
+        [
+          'Ключевые действия',
+          (vData['accountability_person'] ?? vData['final_how'] ?? '')
+              .toString()
+        ],
+        [
+          'Готовность',
+          (vData['readiness_score'] ??
+                  ((vData['commitment'] ?? false) == true ? 8 : 5))
+              .toString()
+        ],
       ];
     }
 

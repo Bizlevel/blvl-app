@@ -62,6 +62,11 @@ class NotificationCenter {
       actions: [
         if (action != null)
           TextButton(onPressed: action.onPressed, child: Text(action.label))
+        else
+          TextButton(
+            onPressed: () => messenger.hideCurrentMaterialBanner(),
+            child: const Text('ОК'),
+          ),
       ],
     );
 

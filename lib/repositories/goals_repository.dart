@@ -94,12 +94,14 @@ class GoalsRepository {
     required String goalText,
     required Map<String, dynamic> versionData,
   }) async {
+    final Map<String, dynamic> payload = {
+      'goal_text': goalText,
+      // не перезаписываем version_data, если передан пустой объект
+      if (versionData.isNotEmpty) 'version_data': versionData,
+    };
     final updated = await _client
         .from('core_goals')
-        .update({
-          'goal_text': goalText,
-          'version_data': versionData,
-        })
+        .update(payload)
         .eq('id', id)
         .select()
         .single();
