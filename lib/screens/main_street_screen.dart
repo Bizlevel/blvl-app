@@ -65,28 +65,48 @@ class MainStreetScreen extends ConsumerWidget {
                             ref.watch(nextLevelToContinueProvider);
                         return nextAsync.when(
                           data: (next) {
-                            final int floorId = next['floorId'] as int? ?? 1;
-                            final int levelNumber =
-                                next['levelNumber'] as int? ?? 0;
-                            final levelCode =
-                                formatLevelCode(floorId, levelNumber);
+                            final String label = (next['label'] as String?) ??
+                                'Уровень ${formatLevelCode(
+                                  (next['floorId'] as int? ?? 1),
+                                  (next['levelNumber'] as int? ?? 0),
+                                )}';
+                            final bool isLocked =
+                                next['isLocked'] as bool? ?? false;
+                            final int targetScroll =
+                                next['targetScroll'] as int? ??
+                                    (next['levelNumber'] as int? ?? 0);
                             return SizedBox(
                               height: 48,
                               child: ElevatedButton(
                                 onPressed: () {
                                   try {
+                                    // Чекпоинт цели
                                     final int? gver =
                                         next['goalCheckpointVersion'] as int?;
                                     if (gver != null) {
                                       context.go('/goal-checkpoint/$gver');
-                                    } else {
-                                      final levelNumber =
-                                          next['levelNumber'] as int? ?? 0;
-                                      final levelId =
-                                          next['levelId'] as int? ?? 0;
-                                      context.go(
-                                          '/levels/$levelId?num=$levelNumber');
+                                      return;
                                     }
+                                    // Мини‑кейс
+                                    final int? miniCaseId =
+                                        next['miniCaseId'] as int?;
+                                    if (miniCaseId != null) {
+                                      context.go('/case/$miniCaseId');
+                                      return;
+                                    }
+                                    // Заблокирован уровень → открываем башню со скроллом
+                                    if (isLocked) {
+                                      context
+                                          .go('/tower?scrollTo=$targetScroll');
+                                      return;
+                                    }
+                                    // Иначе — прямой переход на уровень
+                                    final levelNumber =
+                                        next['levelNumber'] as int? ?? 0;
+                                    final levelId =
+                                        next['levelId'] as int? ?? 0;
+                                    context.go(
+                                        '/levels/$levelId?num=$levelNumber');
                                   } catch (e, st) {
                                     Sentry.captureException(e, stackTrace: st);
                                     ScaffoldMessenger.of(context).showSnackBar(
@@ -97,7 +117,7 @@ class MainStreetScreen extends ConsumerWidget {
                                     );
                                   }
                                 },
-                                child: Text('Продолжить: Уровень $levelCode'),
+                                child: Text('Продолжить: $label'),
                               ),
                             );
                           },
@@ -175,22 +195,12 @@ class _MainActionsGrid extends ConsumerWidget {
               children: [
                 Expanded(
                   child: _MainActionCard(
-                    key: const Key('ms_card_library'),
-                    title: 'Библиотека',
-                    icon: Icons.menu_book,
-                    svgAsset: 'assets/images/street/library.svg',
-                    state: _CardState.active,
-                    onTap: () {
-                      try {
-                        context.go('/library');
-                      } catch (e, st) {
-                        Sentry.captureException(e, stackTrace: st);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                              content: Text('Не удалось открыть страницу')),
-                        );
-                      }
-                    },
+                    key: const Key('ms_card_coworking'),
+                    title: 'Коворкинг',
+                    icon: Icons.workspaces_outline,
+                    svgAsset: 'assets/images/street/coworking.svg',
+                    state: _CardState.soon,
+                    onTap: () => _showSoonSnackBar(context),
                   ),
                 ),
                 const SizedBox(width: gap),
@@ -236,12 +246,22 @@ class _MainActionsGrid extends ConsumerWidget {
                 const SizedBox(width: gap),
                 Expanded(
                   child: _MainActionCard(
-                    key: const Key('ms_card_coworking'),
-                    title: 'Коворкинг',
-                    icon: Icons.workspaces_outline,
-                    svgAsset: 'assets/images/street/coworking.svg',
-                    state: _CardState.soon,
-                    onTap: () => _showSoonSnackBar(context),
+                    key: const Key('ms_card_library'),
+                    title: 'Библиотека',
+                    icon: Icons.menu_book,
+                    svgAsset: 'assets/images/street/library.svg',
+                    state: _CardState.active,
+                    onTap: () {
+                      try {
+                        context.go('/library');
+                      } catch (e, st) {
+                        Sentry.captureException(e, stackTrace: st);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                              content: Text('Не удалось открыть страницу')),
+                        );
+                      }
+                    },
                   ),
                 ),
               ],

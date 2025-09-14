@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
+import 'package:go_router/go_router.dart';
 
 import 'package:bizlevel/providers/goals_providers.dart';
 import 'package:bizlevel/screens/goal/widgets/motivation_card.dart';
@@ -188,30 +189,50 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
 
     if (version == 1) {
       final data = v(1) ?? {};
-      _goalInitialCtrl.text = (data['goal_initial'] ?? '') as String;
-      _goalWhyCtrl.text = (data['goal_why'] ?? '') as String;
-      _mainObstacleCtrl.text = (data['main_obstacle'] ?? '') as String;
+      // Новые ключи с fallback к старым
+      _goalInitialCtrl.text =
+          (data['concrete_result'] ?? data['goal_initial'] ?? '') as String;
+      _goalWhyCtrl.text =
+          (data['main_pain'] ?? data['goal_why'] ?? '') as String;
+      _mainObstacleCtrl.text =
+          (data['first_action'] ?? data['main_obstacle'] ?? '') as String;
     } else if (version == 2) {
       final data = v(2) ?? v(1) ?? {};
-      _goalRefinedCtrl.text =
-          (data['goal_refined'] ?? (v(1)?['goal_initial'] ?? '')) as String;
-      _metricNameCtrl.text = (data['metric_name'] ?? '') as String;
-      _metricFromCtrl.text = (data['metric_from']?.toString() ?? '');
-      _metricToCtrl.text = (data['metric_to']?.toString() ?? '');
+      _goalRefinedCtrl.text = (data['concrete_result'] ??
+          data['goal_refined'] ??
+          (v(1)?['goal_initial'] ?? '')) as String;
+      _metricNameCtrl.text =
+          (data['metric_type'] ?? data['metric_name'] ?? '') as String;
+      _metricFromCtrl.text =
+          ((data['metric_current'] ?? data['metric_from'])?.toString() ?? '');
+      _metricToCtrl.text =
+          ((data['metric_target'] ?? data['metric_to'])?.toString() ?? '');
       _financialGoalCtrl.text = (data['financial_goal']?.toString() ?? '');
     } else if (version == 3) {
       final data = v(3) ?? {};
       _goalSmartCtrl.text = (data['goal_smart'] ?? '') as String;
-      _s1Ctrl.text = (data['sprint1_goal'] ?? '') as String;
-      _s2Ctrl.text = (data['sprint2_goal'] ?? '') as String;
-      _s3Ctrl.text = (data['sprint3_goal'] ?? '') as String;
-      _s4Ctrl.text = (data['sprint4_goal'] ?? '') as String;
+      _s1Ctrl.text =
+          (data['week1_focus'] ?? data['sprint1_goal'] ?? '') as String;
+      _s2Ctrl.text =
+          (data['week2_focus'] ?? data['sprint2_goal'] ?? '') as String;
+      _s3Ctrl.text =
+          (data['week3_focus'] ?? data['sprint3_goal'] ?? '') as String;
+      _s4Ctrl.text =
+          (data['week4_focus'] ?? data['sprint4_goal'] ?? '') as String;
     } else {
       final data = v(4) ?? {};
-      _finalWhatCtrl.text = (data['final_what'] ?? '') as String;
-      _finalWhenCtrl.text = (data['final_when'] ?? '') as String;
-      _finalHowCtrl.text = (data['final_how'] ?? '') as String;
-      _commitment = (data['commitment'] ?? false) as bool;
+      _finalWhatCtrl.text =
+          (data['first_three_days'] ?? data['final_what'] ?? '') as String;
+      _finalWhenCtrl.text =
+          (data['start_date'] ?? data['final_when'] ?? '') as String;
+      _finalHowCtrl.text =
+          (data['accountability_person'] ?? data['final_how'] ?? '') as String;
+      final dynamic rs = data['readiness_score'];
+      if (rs is num) {
+        _commitment = rs >= 7;
+      } else {
+        _commitment = (data['commitment'] ?? false) as bool;
+      }
     }
   }
 
@@ -353,16 +374,16 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                               nextHint = 'Все этапы цели заполнены';
                             } else if (hasV3) {
                               nextHint = 'Заполните v4 «Финал» на чекпоинте';
-                              onCta = () => Navigator.of(context)
-                                  .pushNamed('/goal-checkpoint/4');
+                              onCta = () => GoRouter.of(context)
+                                  .push('/goal-checkpoint/4');
                             } else if (hasV2) {
                               nextHint = 'Заполните v3 «SMART» на чекпоинте';
-                              onCta = () => Navigator.of(context)
-                                  .pushNamed('/goal-checkpoint/3');
+                              onCta = () => GoRouter.of(context)
+                                  .push('/goal-checkpoint/3');
                             } else if (hasV1) {
                               nextHint = 'Заполните v2 «Метрики» на чекпоинте';
-                              onCta = () => Navigator.of(context)
-                                  .pushNamed('/goal-checkpoint/2');
+                              onCta = () => GoRouter.of(context)
+                                  .push('/goal-checkpoint/2');
                             } else {
                               nextHint = 'Создайте v1 «Семя цели» на Уровне 1';
                             }
@@ -426,7 +447,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                   Builder(builder: (context) {
                     final gs = ref.watch(goalScreenControllerProvider);
                     return ProgressWidget(
-                      versions: gs.versions,
+                      versions: _normalizeVersionsForProgress(gs.versions),
                       metricActual:
                           double.tryParse(_metricActualCtrl.text.trim()),
                       achievementText: _achievementCtrl.text.trim(),
@@ -437,9 +458,11 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
 
                   const SizedBox(height: 20),
 
-                  // Путь к цели (28-дневный спринт)
+                  // Путь к цели (28-дневный спринт) — только после v4
                   Builder(builder: (context) {
                     final gs = ref.watch(goalScreenControllerProvider);
+                    final hasV4 = gs.versions.containsKey(4);
+                    if (!hasV4) return const SizedBox.shrink();
                     return SprintSection(
                       versions: gs.versions,
                       selectedSprint: _selectedSprint,
@@ -500,26 +523,27 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
     final vData = (versions[selectedVersion]?['version_data'] as Map?) ?? {};
     final sb = StringBuffer('goal_version: $selectedVersion\n');
     if (selectedVersion == 1) {
-      sb.writeln('goal_initial: ${vData['goal_initial'] ?? ''}');
-      sb.writeln('goal_why: ${vData['goal_why'] ?? ''}');
-      sb.writeln('main_obstacle: ${vData['main_obstacle'] ?? ''}');
+      sb.writeln('concrete_result: ${vData['concrete_result'] ?? ''}');
+      sb.writeln('main_pain: ${vData['main_pain'] ?? ''}');
+      sb.writeln('first_action: ${vData['first_action'] ?? ''}');
     } else if (selectedVersion == 2) {
-      sb.writeln('goal_refined: ${vData['goal_refined'] ?? ''}');
-      sb.writeln('metric: ${vData['metric_name'] ?? ''}');
+      sb.writeln('concrete_result: ${vData['concrete_result'] ?? ''}');
+      sb.writeln('metric_type: ${vData['metric_type'] ?? ''}');
       sb.writeln(
-          'from: ${vData['metric_from'] ?? ''} to: ${vData['metric_to'] ?? ''}');
+          'current: ${vData['metric_current'] ?? ''} target: ${vData['metric_target'] ?? ''}');
       sb.writeln('financial_goal: ${vData['financial_goal'] ?? ''}');
     } else if (selectedVersion == 3) {
       sb.writeln('goal_smart: ${vData['goal_smart'] ?? ''}');
-      sb.writeln('sprint1: ${vData['sprint1_goal'] ?? ''}');
-      sb.writeln('sprint2: ${vData['sprint2_goal'] ?? ''}');
-      sb.writeln('sprint3: ${vData['sprint3_goal'] ?? ''}');
-      sb.writeln('sprint4: ${vData['sprint4_goal'] ?? ''}');
+      sb.writeln('week1_focus: ${vData['week1_focus'] ?? ''}');
+      sb.writeln('week2_focus: ${vData['week2_focus'] ?? ''}');
+      sb.writeln('week3_focus: ${vData['week3_focus'] ?? ''}');
+      sb.writeln('week4_focus: ${vData['week4_focus'] ?? ''}');
     } else {
-      sb.writeln('final_what: ${vData['final_what'] ?? ''}');
-      sb.writeln('final_when: ${vData['final_when'] ?? ''}');
-      sb.writeln('final_how: ${vData['final_how'] ?? ''}');
-      sb.writeln('commitment: ${vData['commitment'] ?? false}');
+      sb.writeln('first_three_days: ${vData['first_three_days'] ?? ''}');
+      sb.writeln('start_date: ${vData['start_date'] ?? ''}');
+      sb.writeln(
+          'accountability_person: ${vData['accountability_person'] ?? ''}');
+      sb.writeln('readiness_score: ${vData['readiness_score'] ?? ''}');
     }
     // Последний чек-ин (если заполнен)
     if (_achievementCtrl.text.isNotEmpty ||
@@ -697,6 +721,42 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
             ),
       ),
     );
+  }
+
+  // Нормализует версии под старые ключи, которые ожидает ProgressWidget
+  Map<int, Map<String, dynamic>> _normalizeVersionsForProgress(
+      Map<int, Map<String, dynamic>> versions) {
+    final out = <int, Map<String, dynamic>>{};
+    for (final entry in versions.entries) {
+      final v = Map<String, dynamic>.from(entry.value);
+      final vd = (v['version_data'] as Map?)?.cast<String, dynamic>() ?? {};
+      final vdNorm = Map<String, dynamic>.from(vd);
+      // v2: новые → старые
+      if (entry.key == 2) {
+        if (vdNorm.containsKey('metric_type') &&
+            !vdNorm.containsKey('metric_name')) {
+          vdNorm['metric_name'] = vdNorm['metric_type'];
+        }
+        if (vdNorm.containsKey('metric_current') &&
+            !vdNorm.containsKey('metric_from')) {
+          vdNorm['metric_from'] = vdNorm['metric_current'];
+        }
+        if (vdNorm.containsKey('metric_target') &&
+            !vdNorm.containsKey('metric_to')) {
+          vdNorm['metric_to'] = vdNorm['metric_target'];
+        }
+      }
+      // v4: новые → старые
+      if (entry.key == 4) {
+        if (vdNorm.containsKey('start_date') &&
+            !vdNorm.containsKey('final_when')) {
+          vdNorm['final_when'] = vdNorm['start_date'];
+        }
+      }
+      v['version_data'] = vdNorm;
+      out[entry.key] = v;
+    }
+    return out;
   }
 
   List<String> _weeklyRecommendedChips() {

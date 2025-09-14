@@ -104,72 +104,88 @@ final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
 /// Возвращает: { levelId, levelNumber, floorId: 1, requiresPremium }
 final nextLevelToContinueProvider =
     FutureProvider<Map<String, dynamic>>((ref) async {
+  // Дождёмся профиля, чтобы избежать гонки null currentLevel
+  final user = await ref.watch(currentUserProvider.future);
+  final int? userCurrentLevel = user?.currentLevel;
+
   final levels = await ref.watch(levelsProvider.future);
-  // Интеграция незавершённых goal_checkpoint как следующей цели (36.9)
-  // Используем towerNodesProvider, чтобы найти ближайший незавершённый checkpoint цели
   final nodes = await ref.watch(towerNodesProvider.future);
-  // Ищем первый узел goal_checkpoint с isCompleted=false и запоминаем его afterLevel
+
+  // 0) Чекпоинт цели (если предшествующий уровень завершён)
   final Map<String, dynamic> pendingGoalCp = nodes.firstWhere(
-      (n) => n['type'] == 'goal_checkpoint' && (n['isCompleted'] != true),
-      orElse: () => <String, dynamic>{});
-
-  final int? userCurrentLevel =
-      ref.watch(currentUserProvider.select((user) => user.value?.currentLevel));
-  // Подписки отключены — ветки, завязанные на премиум, убраны.
-
-  // 0) Если есть незавершённый чекпоинт цели — предлагаем дойти до него (скролл)
-  //    Только если предшествующий ему уровень действительно завершён пользователем
+    (n) => n['type'] == 'goal_checkpoint' && (n['isCompleted'] != true),
+    orElse: () => <String, dynamic>{},
+  );
   if (pendingGoalCp.isNotEmpty) {
     final int afterLevel = pendingGoalCp['afterLevel'] as int? ?? 0;
-    final int targetLevel = afterLevel; // скроллим к уровню перед чекпоинтом
+    final int targetLevel = afterLevel;
     final int? gver = pendingGoalCp['version'] as int?;
-    // Найдём сам уровень в списке levels
     final candidate = levels.firstWhere(
       (l) => (l['level'] as int? ?? -1) == targetLevel,
       orElse: () => levels.first,
     );
-    // Пропускаем checkpoint, если предшествующий уровень ещё не завершён
-    if ((candidate['isCompleted'] as bool? ?? false) == false) {
-      // Падать на checkpoint сейчас нельзя — продолжим обычной логикой ниже
-    } else {
-      // Премиум-гейтинг отключён; признак requiresPremium всегда false
-      const bool requiresPremium = false;
+    if ((candidate['isCompleted'] as bool? ?? false) == true) {
       return {
         'levelId': candidate['id'] as int,
         'levelNumber': targetLevel,
         'floorId': 1,
-        'requiresPremium': requiresPremium,
+        'requiresPremium': false,
+        'isLocked': false,
+        'targetScroll': targetLevel,
+        'label': 'Чекпоинт цели v${gver ?? ''}'.trim(),
         if (gver != null) 'goalCheckpointVersion': gver,
       };
     }
   }
 
-  // 1) Если есть текущий незавершённый — продолжаем его
-  Map<String, dynamic>? candidate = levels
-      .cast<Map<String, dynamic>?>()
-      .firstWhere(
-          (l) =>
-              (l?['isCurrent'] as bool? ?? false) &&
-              (l?['isCompleted'] as bool? ?? false) == false,
-          orElse: () => null);
+  // 1) Мини‑кейс (если предыдущий уровень завершён)
+  final Map<String, dynamic> pendingMiniCase = nodes.firstWhere(
+    (n) => n['type'] == 'mini_case' && (n['isCompleted'] != true),
+    orElse: () => <String, dynamic>{},
+  );
+  if (pendingMiniCase.isNotEmpty) {
+    final bool prevDone =
+        (pendingMiniCase['prevLevelCompleted'] as bool? ?? false);
+    if (prevDone) {
+      final int afterLevel = pendingMiniCase['afterLevel'] as int? ?? 0;
+      final int caseId = pendingMiniCase['caseId'] as int;
+      final String title = (pendingMiniCase['title'] as String?) ?? 'Мини‑кейс';
+      return {
+        'floorId': 1,
+        'requiresPremium': false,
+        'isLocked': false,
+        'targetScroll': afterLevel + 1,
+        'label': 'Мини‑кейс: $title',
+        'miniCaseId': caseId,
+      };
+    }
+  }
 
-  // 2) Иначе — берём уровень по номеру current_level (даже если он заблокирован премиумом)
+  // 2) Текущий незавершённый уровень
+  Map<String, dynamic>? candidate =
+      levels.cast<Map<String, dynamic>?>().firstWhere(
+            (l) =>
+                (l?['isCurrent'] as bool? ?? false) &&
+                (l?['isCompleted'] as bool? ?? false) == false,
+            orElse: () => null,
+          );
+
+  // 3) Иначе — уровень по номеру current_level
   candidate ??= levels.firstWhere(
     (l) => (l['level'] as int? ?? -1) == (userCurrentLevel ?? -999),
     orElse: () => levels.first,
   );
 
   final int levelNumber = candidate['level'] as int? ?? 0;
-  // Опираемся на данные уровня: если уровень помечен как «Только для премиум»,
-  // и у пользователя нет премиума — требуется премиум. Иначе — нет.
-  // Премиум-гейтинг отключён; признак requiresPremium всегда false
-  const bool requiresPremium = false;
-
+  final bool isLocked = candidate['isLocked'] as bool? ?? false;
   return {
     'levelId': candidate['id'] as int,
     'levelNumber': levelNumber,
     'floorId': 1,
-    'requiresPremium': requiresPremium,
+    'requiresPremium': false,
+    'isLocked': isLocked,
+    'targetScroll': levelNumber,
+    'label': 'Уровень ${formatLevelCode(1, levelNumber)}',
   };
 });
 
@@ -284,6 +300,8 @@ final towerNodesProvider =
         // Разрешаем входить в чекпоинт, только если предыдущий уровень завершён
         'prevLevelCompleted': (l['isCompleted'] as bool? ?? false),
       });
+      // Строгая логика: блокируем следующий уровень, пока checkpoint не завершён
+      // Новый UX: редактирование чекпоинтов не блокирует прогресс уровней
     }
   }
 

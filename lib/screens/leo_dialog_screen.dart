@@ -118,7 +118,10 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
       // Отправляем асинхронно после первого кадра, чтобы не мешать построению
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         if (!mounted) return;
-        await _sendMessageInternal(widget.autoUserMessage!.trim());
+        await _sendMessageInternal(
+          widget.autoUserMessage!.trim(),
+          isAuto: true,
+        );
       });
     }
   }
@@ -208,7 +211,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
     });
   }
 
-  Future<void> _sendMessageInternal(String text) async {
+  Future<void> _sendMessageInternal(String text, {bool isAuto = false}) async {
     // Дополнительная проверка на случай, если состояние изменилось
     if (_isSending || !mounted) return;
 
@@ -250,8 +253,9 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
         userContext: cleanUserContext,
         levelContext: cleanLevelContext,
         bot: widget.bot,
-        // Тонкая реакция: можно пропустить списания GP
-        skipSpend: widget.skipSpend,
+        // GP‑политика: авто‑сообщение (реакция) может быть бесплатным,
+        // пользовательские сообщения всегда со списанием
+        skipSpend: isAuto ? widget.skipSpend : false,
       );
 
       assistantMsg = response['message']['content'] as String? ?? '';
@@ -609,8 +613,16 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
   List<String> _resolveRecommendedChips() {
     if (widget.recommendedChips != null &&
         widget.recommendedChips!.isNotEmpty) {
-      return widget.recommendedChips!;
+      // Объединим серверные и локальные, удалив дубли и ограничив до 6 штук
+      final local = _localChipsFallback();
+      final merged = <String>{...widget.recommendedChips!, ...local}.toList();
+      if (merged.length > 6) return merged.sublist(0, 6);
+      return merged;
     }
+    return _localChipsFallback();
+  }
+
+  List<String> _localChipsFallback() {
     // Клиентский фолбэк: подбираем подсказки по версии цели в userContext
     if (widget.bot == 'max') {
       final ctx = widget.userContext ?? '';

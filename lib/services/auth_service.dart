@@ -102,6 +102,13 @@ class AuthService {
     String? goal,
     int? avatarId,
     bool? onboardingCompleted,
+    // Новые поля персонализации
+    String? businessArea,
+    String? experienceLevel,
+    String? businessSize,
+    List<String>? keyChallenges,
+    String? learningStyle,
+    String? businessRegion,
   }) async {
     final user = _client.auth.currentUser;
     if (user == null) {
@@ -134,6 +141,15 @@ class AuthService {
       if (onboardingCompleted != null) {
         payload['onboarding_completed'] = onboardingCompleted;
       }
+      // Персонализация
+      if (businessArea != null) payload['business_area'] = businessArea;
+      if (experienceLevel != null) {
+        payload['experience_level'] = experienceLevel;
+      }
+      if (businessSize != null) payload['business_size'] = businessSize;
+      if (keyChallenges != null) payload['key_challenges'] = keyChallenges;
+      if (learningStyle != null) payload['learning_style'] = learningStyle;
+      if (businessRegion != null) payload['business_region'] = businessRegion;
 
       await _client.from('users').update(payload).eq('id', user.id);
       // Попытка выдать бонус за заполненный профиль (идемпотентно)

@@ -54,12 +54,9 @@ scripts/local_build.sh
 scripts/local_build.ps1
 android/app/google-services.json
 
-
-Andriod-google-services.json
-Apple-GoogleService-Info.plist
 ios/Runner/GoogleService-Info.plist
 ios/GoogleService-Info.plist
 **/GoogleService-Info.plist
-**/google-services.json
+android/app/google-services.json
 google_keys/
 .gradle/

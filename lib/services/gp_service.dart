@@ -8,6 +8,23 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bizlevel/utils/env_helper.dart';
 
+// Private options holder for building Edge headers in a type-safe way
+class _EdgeHeadersOptions {
+  const _EdgeHeadersOptions({
+    required this.authorization,
+    required this.apikey,
+    this.idempotencyKey,
+    this.xUserJwt,
+    this.json = true,
+  });
+
+  final String authorization;
+  final String apikey;
+  final String? idempotencyKey;
+  final String? xUserJwt;
+  final bool json;
+}
+
 class GpFailure implements Exception {
   final String message;
   GpFailure(this.message);
@@ -19,6 +36,7 @@ class GpService {
   GpService(this._client);
 
   final SupabaseClient _client;
+  static const int _kDefaultFloorPrice = 1000;
 
   static final Dio _edgeDio = Dio(BaseOptions(
     baseUrl:
@@ -29,23 +47,150 @@ class GpService {
     responseType: ResponseType.json,
   ));
 
+  // ----------------- Small safety helpers -----------------
+  Session _requireSession() {
+    final session = _client.auth.currentSession;
+    if (session == null) throw GpFailure('Не авторизован');
+    return session;
+  }
+
+  void _addBreadcrumb(String message,
+      {SentryLevel level = SentryLevel.info,
+      Map<String, Object?> data = const {}}) {
+    try {
+      Sentry.addBreadcrumb(
+        Breadcrumb(message: message, level: level, data: data),
+      );
+    } catch (_) {}
+  }
+
+  // Breadcrumb wrappers
+  void _bcBalanceLoaded(int balance) =>
+      _addBreadcrumb('gp_balance_loaded', data: {'balance': balance});
+  void _bcSpent(String type, int amount) =>
+      _addBreadcrumb('gp_spent', data: {'type': type, 'amount': amount});
+  void _bcFloorUnlocked(int floor) =>
+      _addBreadcrumb('gp_floor_unlocked', data: {'floor': floor});
+  void _bcBonusGranted(String ruleKey) =>
+      _addBreadcrumb('gp_bonus_granted', data: {'rule_key': ruleKey});
+
+  Map<String, String> _edgeHeaders(_EdgeHeadersOptions o) {
+    final headers = <String, String>{
+      'Authorization': o.authorization,
+      'apikey': o.apikey,
+    };
+    if (o.json) headers['Content-Type'] = 'application/json';
+    if (o.idempotencyKey != null && o.idempotencyKey!.isNotEmpty) {
+      headers['Idempotency-Key'] = o.idempotencyKey!;
+    }
+    if (o.xUserJwt != null && o.xUserJwt!.isNotEmpty) {
+      headers['x-user-jwt'] = o.xUserJwt!;
+    }
+    return headers;
+  }
+
+  // Header wrappers
+  Map<String, String> _edgeHeadersForSession(Session session,
+          {String? idempotencyKey, bool json = true}) =>
+      _edgeHeaders(_EdgeHeadersOptions(
+        authorization: 'Bearer ${session.accessToken}',
+        apikey: envOrDefine('SUPABASE_ANON_KEY'),
+        idempotencyKey: idempotencyKey,
+        json: json,
+      ));
+
+  Map<String, String> _edgeHeadersAnonWithUserJwt(Session session,
+          {bool json = true}) =>
+      _edgeHeaders(_EdgeHeadersOptions(
+        authorization: 'Bearer ${envOrDefine('SUPABASE_ANON_KEY')}',
+        apikey: envOrDefine('SUPABASE_ANON_KEY'),
+        xUserJwt: session.accessToken,
+        json: json,
+      ));
+
+  // reserved for future use
+
+  Future<Map<String, int>> _getBalanceViaEdge(Session session) async {
+    final resp = await _edgeDio.get('/gp-balance',
+        options: Options(headers: _edgeHeadersForSession(session)));
+    if (resp.statusCode == 200 && resp.data is Map<String, dynamic>) {
+      final m = Map<String, dynamic>.from(resp.data);
+      return {
+        'balance': (m['balance'] as num?)?.toInt() ?? 0,
+        'total_earned': (m['total_earned'] as num?)?.toInt() ?? 0,
+        'total_spent': (m['total_spent'] as num?)?.toInt() ?? 0,
+      };
+    }
+    throw GpFailure('Не удалось загрузить баланс');
+  }
+
+  Future<int> _spendViaEdge(
+    Session session, {
+    required String type,
+    required int amount,
+    required String referenceId,
+    String? idempotencyKey,
+  }) async {
+    final resp = await _edgeDio.post('/gp-spend',
+        data: jsonEncode({
+          'type': type,
+          'amount': amount,
+          'reference_id': referenceId,
+        }),
+        options: Options(
+            headers: _edgeHeadersForSession(session,
+                idempotencyKey: idempotencyKey)));
+    if (resp.statusCode == 200 && resp.data is Map<String, dynamic>) {
+      final m = Map<String, dynamic>.from(resp.data);
+      return (m['balance_after'] as num?)?.toInt() ?? 0;
+    }
+    throw GpFailure('Не удалось списать GP');
+  }
+
+  int? _parseBalanceAfter(dynamic data) {
+    final scalar = _asFirstInt(data);
+    if (scalar != null) return scalar;
+    final row = _asRow(data);
+    if (row != null) return (row['balance_after'] as num?)?.toInt();
+    return null;
+  }
+
+  Future<int> _unlockFloorViaEdge(
+    Session session, {
+    required int floorNumber,
+    required String idempotencyKey,
+  }) async {
+    final resp = await _edgeDio.post('/gp-floor-unlock',
+        data: jsonEncode({'floor_number': floorNumber}),
+        options: Options(
+            headers: _edgeHeadersForSession(session,
+                idempotencyKey: idempotencyKey)));
+    if (resp.statusCode == 200 && resp.data is Map<String, dynamic>) {
+      final m = Map<String, dynamic>.from(resp.data);
+      return (m['balance_after'] as num?)?.toInt() ?? 0;
+    }
+    throw GpFailure('Не удалось открыть этаж');
+  }
+
+  Future<int> _bonusViaEdge(Session session, {required String ruleKey}) async {
+    final resp = await _edgeDio.post('/gp-bonus-claim',
+        data: jsonEncode({'rule_key': ruleKey}),
+        options: Options(headers: _edgeHeadersForSession(session)));
+    if (resp.statusCode == 200 && resp.data is Map<String, dynamic>) {
+      final m = Map<String, dynamic>.from(resp.data);
+      return (m['balance_after'] as num?)?.toInt() ?? 0;
+    }
+    throw GpFailure('Не удалось получить бонус');
+  }
+
   Future<Map<String, int>> getBalance() async {
     return _withRetry(() async {
       try {
-        final session = _client.auth.currentSession;
-        if (session == null) throw GpFailure('Не авторизован');
+        _requireSession();
         final data = await _client.rpc('gp_balance');
         final row = _asRow(data);
         if (row != null) {
-          try {
-            await Sentry.addBreadcrumb(Breadcrumb(
-              message: 'gp_balance_loaded',
-              level: SentryLevel.info,
-              data: {
-                'balance': (row['balance'] as num?)?.toInt() ?? 0,
-              },
-            ));
-          } catch (_) {}
+          _bcBalanceLoaded((row['balance'] as num?)?.toInt() ?? 0);
           return {
             'balance': (row['balance'] as num?)?.toInt() ?? 0,
             'total_earned': (row['total_earned'] as num?)?.toInt() ?? 0,
@@ -57,25 +202,8 @@ class GpService {
         // dev-fallback: если RPC ещё не доставлены
         if (!kReleaseMode && _isFunctionMissing(e)) {
           try {
-            final session = _client.auth.currentSession;
-            if (session == null) throw GpFailure('Не авторизован');
-            final resp = await _edgeDio.get(
-              '/gp-balance',
-              options: Options(
-                headers: _edgeHeaders(
-                  authorization: 'Bearer ${session.accessToken}',
-                  apikey: envOrDefine('SUPABASE_ANON_KEY'),
-                ),
-              ),
-            );
-            if (resp.statusCode == 200 && resp.data is Map<String, dynamic>) {
-              final m = Map<String, dynamic>.from(resp.data);
-              return {
-                'balance': (m['balance'] as num?)?.toInt() ?? 0,
-                'total_earned': (m['total_earned'] as num?)?.toInt() ?? 0,
-                'total_spent': (m['total_spent'] as num?)?.toInt() ?? 0,
-              };
-            }
+            final session = _requireSession();
+            return await _getBalanceViaEdge(session);
           } catch (_) {}
         }
         await _capture(e);
@@ -97,8 +225,7 @@ class GpService {
   }) async {
     return _withRetry(() async {
       try {
-        final session = _client.auth.currentSession;
-        if (session == null) throw GpFailure('Не авторизован');
+        _requireSession();
         final params = {
           'p_type': type,
           'p_amount': amount,
@@ -106,45 +233,23 @@ class GpService {
           'p_idempotency_key': idempotencyKey ?? '',
         };
         final data = await _client.rpc('gp_spend', params: params);
-        final row = _asRow(data);
-        if (row != null) {
-          try {
-            await Sentry.addBreadcrumb(Breadcrumb(
-              message: 'gp_spent',
-              level: SentryLevel.info,
-              data: {
-                'type': type,
-                'amount': amount,
-              },
-            ));
-          } catch (_) {}
-          return (row['balance_after'] as num?)?.toInt() ?? 0;
+        final parsed = _parseBalanceAfter(data);
+        if (parsed != null) {
+          _bcSpent(type, amount);
+          return parsed;
         }
         throw GpFailure('Не удалось списать GP');
       } on PostgrestException catch (e) {
         if (!kReleaseMode && _isFunctionMissing(e)) {
           try {
-            final session = _client.auth.currentSession;
-            if (session == null) throw GpFailure('Не авторизован');
-            final resp = await _edgeDio.post(
-              '/gp-spend',
-              data: jsonEncode({
-                'type': type,
-                'amount': amount,
-                'reference_id': referenceId,
-              }),
-              options: Options(
-                headers: _edgeHeaders(
-                  authorization: 'Bearer ${session.accessToken}',
-                  apikey: envOrDefine('SUPABASE_ANON_KEY'),
-                  idempotencyKey: idempotencyKey,
-                ),
-              ),
+            final session = _requireSession();
+            return await _spendViaEdge(
+              session,
+              type: type,
+              amount: amount,
+              referenceId: referenceId,
+              idempotencyKey: idempotencyKey,
             );
-            if (resp.statusCode == 200 && resp.data is Map<String, dynamic>) {
-              final m = Map<String, dynamic>.from(resp.data);
-              return (m['balance_after'] as num?)?.toInt() ?? 0;
-            }
           } on DioException catch (de) {
             final data = de.response?.data;
             if (data is Map && data['error'] == 'gp_insufficient_balance') {
@@ -185,12 +290,8 @@ class GpService {
             'package_id': packageId,
             'provider': provider,
           }),
-          options: Options(headers: {
-            'Authorization': 'Bearer ${envOrDefine('SUPABASE_ANON_KEY')}',
-            'apikey': envOrDefine('SUPABASE_ANON_KEY'),
-            'x-user-jwt': session.accessToken,
-            'Content-Type': 'application/json',
-          }));
+          options: Options(
+              headers: _edgeHeadersAnonWithUserJwt(session, json: true)));
       if (resp.statusCode == 200 && resp.data is Map<String, dynamic>) {
         final m = Map<String, dynamic>.from(resp.data);
         // Сохраним purchase_id локально для кнопки «Проверить покупку»
@@ -229,12 +330,8 @@ class GpService {
     try {
       final resp = await _edgeDio.post('/gp-purchase-verify',
           data: jsonEncode({'purchase_id': purchaseId}),
-          options: Options(headers: {
-            'Authorization': 'Bearer ${envOrDefine('SUPABASE_ANON_KEY')}',
-            'apikey': envOrDefine('SUPABASE_ANON_KEY'),
-            'x-user-jwt': session.accessToken,
-            'Content-Type': 'application/json',
-          }));
+          options: Options(
+              headers: _edgeHeadersAnonWithUserJwt(session, json: true)));
       if (resp.statusCode == 200 && resp.data is Map<String, dynamic>) {
         final m = Map<String, dynamic>.from(resp.data);
         return (m['balance_after'] as num?)?.toInt() ?? 0;
@@ -256,8 +353,7 @@ class GpService {
     required int floorNumber,
     required String idempotencyKey,
   }) async {
-    final session = _client.auth.currentSession;
-    if (session == null) throw GpFailure('Не авторизован');
+    _requireSession();
     try {
       // Переход на модель пакетов: покупка пакета доступа к этажу
       final packageCode = _packageCodeForFloor(floorNumber);
@@ -265,58 +361,29 @@ class GpService {
         'p_package_code': packageCode,
         'p_idempotency_key': idempotencyKey,
       });
-      // Поддерживаем оба формата ответа: record {balance_after} и скалярный int
-      final scalar = _asFirstInt(data);
-      if (scalar != null) {
-        try {
-          await Sentry.addBreadcrumb(Breadcrumb(
-            message: 'gp_floor_unlocked',
-            level: SentryLevel.info,
-            data: {'floor': floorNumber},
-          ));
-        } catch (_) {}
-        return scalar;
-      }
-      final row = _asRow(data);
-      if (row != null) {
-        try {
-          await Sentry.addBreadcrumb(Breadcrumb(
-            message: 'gp_floor_unlocked',
-            level: SentryLevel.info,
-            data: {'floor': floorNumber},
-          ));
-        } catch (_) {}
-        return (row['balance_after'] as num?)?.toInt() ?? 0;
+      final parsed = _parseBalanceAfter(data);
+      if (parsed != null) {
+        _bcFloorUnlocked(floorNumber);
+        return parsed;
       }
       throw GpFailure('Не удалось открыть этаж');
     } on PostgrestException catch (e) {
       if (!kReleaseMode && _isFunctionMissing(e)) {
         try {
-          final session = _client.auth.currentSession;
-          if (session == null) throw GpFailure('Не авторизован');
+          final session = _requireSession();
           // Дев-фолбэк: старый edge эндпоинт
-          final resp = await _edgeDio.post(
-            '/gp-floor-unlock',
-            data: jsonEncode({'floor_number': floorNumber}),
-            options: Options(
-              headers: _edgeHeaders(
-                authorization: 'Bearer ${session.accessToken}',
-                apikey: envOrDefine('SUPABASE_ANON_KEY'),
-                idempotencyKey: idempotencyKey,
-              ),
-            ),
+          return await _unlockFloorViaEdge(
+            session,
+            floorNumber: floorNumber,
+            idempotencyKey: idempotencyKey,
           );
-          if (resp.statusCode == 200 && resp.data is Map<String, dynamic>) {
-            final m = Map<String, dynamic>.from(resp.data);
-            return (m['balance_after'] as num?)?.toInt() ?? 0;
-          }
         } catch (_) {}
       }
       final msg = e.message.toString();
       if (msg.contains('gp_insufficient_balance')) {
         _throwInsufficientBalanceBreadcrumb(
           source: 'unlock_floor',
-          extra: {'amount': 1000, 'floor': floorNumber},
+          extra: {'amount': _kDefaultFloorPrice, 'floor': floorNumber},
         );
       }
       await _capture(e);
@@ -330,43 +397,22 @@ class GpService {
   }
 
   Future<int> claimBonus({required String ruleKey}) async {
-    final session = _client.auth.currentSession;
-    if (session == null) throw GpFailure('Не авторизован');
+    _requireSession();
     try {
       final data = await _client.rpc('gp_bonus_claim', params: {
         'p_rule_key': ruleKey,
       });
-      final row = _asRow(data);
-      if (row != null) {
-        try {
-          await Sentry.addBreadcrumb(Breadcrumb(
-            message: 'gp_bonus_granted',
-            level: SentryLevel.info,
-            data: {'rule_key': ruleKey},
-          ));
-        } catch (_) {}
-        return (row['balance_after'] as num?)?.toInt() ?? 0;
+      final parsed = _parseBalanceAfter(data);
+      if (parsed != null) {
+        _bcBonusGranted(ruleKey);
+        return parsed;
       }
       throw GpFailure('Не удалось получить бонус');
     } on PostgrestException catch (e) {
       if (!kReleaseMode && _isFunctionMissing(e)) {
         try {
-          final session = _client.auth.currentSession;
-          if (session == null) throw GpFailure('Не авторизован');
-          final resp = await _edgeDio.post(
-            '/gp-bonus-claim',
-            data: jsonEncode({'rule_key': ruleKey}),
-            options: Options(
-              headers: _edgeHeaders(
-                authorization: 'Bearer ${session.accessToken}',
-                apikey: envOrDefine('SUPABASE_ANON_KEY'),
-              ),
-            ),
-          );
-          if (resp.statusCode == 200 && resp.data is Map<String, dynamic>) {
-            final m = Map<String, dynamic>.from(resp.data);
-            return (m['balance_after'] as num?)?.toInt() ?? 0;
-          }
+          final session = _requireSession();
+          return await _bonusViaEdge(session, ruleKey: ruleKey);
         } catch (_) {}
       }
       await _capture(e);
@@ -428,27 +474,6 @@ class GpService {
       return (data.first as num).toInt();
     }
     return null;
-  }
-
-  Map<String, String> _edgeHeaders({
-    required String authorization,
-    required String apikey,
-    String? idempotencyKey,
-    String? xUserJwt,
-    bool json = true,
-  }) {
-    final headers = <String, String>{
-      'Authorization': authorization,
-      'apikey': apikey,
-    };
-    if (json) headers['Content-Type'] = 'application/json';
-    if (idempotencyKey != null && idempotencyKey.isNotEmpty) {
-      headers['Idempotency-Key'] = idempotencyKey;
-    }
-    if (xUserJwt != null && xUserJwt.isNotEmpty) {
-      headers['x-user-jwt'] = xUserJwt;
-    }
-    return headers;
   }
 
   String _packageCodeForFloor(int floorNumber) => 'FLOOR_$floorNumber';

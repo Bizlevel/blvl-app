@@ -39,12 +39,8 @@ mixin _$LevelModel {
   @JsonKey(name: 'created_at')
   DateTime? get createdAt => throw _privateConstructorUsedError;
 
-  /// Serializes this LevelModel to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
-
-  /// Create a copy of LevelModel
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
+  @JsonKey(ignore: true)
   $LevelModelCopyWith<LevelModel> get copyWith =>
       throw _privateConstructorUsedError;
 }
@@ -79,8 +75,6 @@ class _$LevelModelCopyWithImpl<$Res, $Val extends LevelModel>
   // ignore: unused_field
   final $Res Function($Val) _then;
 
-  /// Create a copy of LevelModel
-  /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
   @override
   $Res call({
@@ -175,8 +169,6 @@ class __$$LevelModelImplCopyWithImpl<$Res>
       _$LevelModelImpl _value, $Res Function(_$LevelModelImpl) _then)
       : super(_value, _then);
 
-  /// Create a copy of LevelModel
-  /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
   @override
   $Res call({
@@ -319,7 +311,7 @@ class _$LevelModelImpl implements _LevelModel {
                 other.createdAt == createdAt));
   }
 
-  @JsonKey(includeFromJson: false, includeToJson: false)
+  @JsonKey(ignore: true)
   @override
   int get hashCode => Object.hash(
       runtimeType,
@@ -335,9 +327,7 @@ class _$LevelModelImpl implements _LevelModel {
       skillId,
       createdAt);
 
-  /// Create a copy of LevelModel
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
+  @JsonKey(ignore: true)
   @override
   @pragma('vm:prefer-inline')
   _$$LevelModelImplCopyWith<_$LevelModelImpl> get copyWith =>
@@ -398,11 +388,8 @@ abstract class _LevelModel implements LevelModel {
   @override
   @JsonKey(name: 'created_at')
   DateTime? get createdAt;
-
-  /// Create a copy of LevelModel
-  /// with the given fields replaced by the non-null parameter values.
   @override
-  @JsonKey(includeFromJson: false, includeToJson: false)
+  @JsonKey(ignore: true)
   _$$LevelModelImplCopyWith<_$LevelModelImpl> get copyWith =>
       throw _privateConstructorUsedError;
 }

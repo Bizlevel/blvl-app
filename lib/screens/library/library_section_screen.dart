@@ -27,6 +27,7 @@ class _LibrarySectionScreenState extends ConsumerState<LibrarySectionScreen> {
         : widget.type == 'grants'
             ? ref.watch(grantsProvider(_category))
             : ref.watch(acceleratorsProvider(_category));
+    final favAsync = ref.watch(favoritesProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -71,6 +72,7 @@ class _LibrarySectionScreenState extends ConsumerState<LibrarySectionScreen> {
             ),
           ),
           _CategoryFilter(
+            type: widget.type,
             onSelected: (c) => setState(() => _category = c),
           ),
           Expanded(
@@ -83,6 +85,12 @@ class _LibrarySectionScreenState extends ConsumerState<LibrarySectionScreen> {
                   final r = rows[index];
                   final id = (r['id'] ?? index).toString();
                   final expanded = _expanded[id] ?? false;
+                  final favRows =
+                      favAsync.asData?.value ?? const <Map<String, dynamic>>[];
+                  final typeKey = _favoriteType(widget.type);
+                  final isFavorite = favRows.any((f) =>
+                      (f['resource_type']?.toString() ?? '') == typeKey &&
+                      (f['resource_id']?.toString() ?? '') == id);
                   return _ResourceCard(
                     type: widget.type,
                     data: r,
@@ -90,6 +98,7 @@ class _LibrarySectionScreenState extends ConsumerState<LibrarySectionScreen> {
                     onToggleExpand: () =>
                         setState(() => _expanded[id] = !expanded),
                     onOpenLink: () => _openLink(r['url']?.toString() ?? ''),
+                    isFavorite: isFavorite,
                     onToggleFavorite: () async {
                       try {
                         final repo = ref.read(libraryRepositoryProvider);
@@ -97,6 +106,9 @@ class _LibrarySectionScreenState extends ConsumerState<LibrarySectionScreen> {
                           resourceType: _favoriteType(widget.type),
                           resourceId: r['id']?.toString() ?? '',
                         );
+                        // Инвалидация избранного для обновления UI
+                        ref.invalidate(favoritesProvider);
+                        ref.invalidate(favoritesDetailedProvider);
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
@@ -162,26 +174,29 @@ class _LibrarySectionScreenState extends ConsumerState<LibrarySectionScreen> {
   }
 }
 
-class _CategoryFilter extends StatelessWidget {
+class _CategoryFilter extends ConsumerWidget {
+  final String type;
   final ValueChanged<String?> onSelected;
-  const _CategoryFilter({required this.onSelected});
+  const _CategoryFilter({required this.type, required this.onSelected});
 
   @override
-  Widget build(BuildContext context) {
-    // MVP: простой Dropdown со статичным набором, чтобы не усложнять запросами
-    final items = const <String>[
-      'Основы предпринимательства и бизнес-планирование',
-      'Финансовая грамотность и управление финансами',
-      'Цифровой маркетинг и SMM',
-      'Продажи и работа с клиентами',
-      'Маркетплейсы и электронная коммерция',
-      'Управление командой и личная эффективность',
-    ];
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(libraryCategoriesProvider(type));
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       child: LayoutBuilder(
         builder: (context, constraints) {
           final isNarrow = constraints.maxWidth < 420;
+          final categories = async.asData?.value ?? const <String>[];
+          final items = <DropdownMenuItem<String?>>[
+            const DropdownMenuItem<String?>(
+                value: null,
+                child: Text('Все', overflow: TextOverflow.ellipsis)),
+            ...categories.map((c) => DropdownMenuItem<String?>(
+                  value: c,
+                  child: Text(c, overflow: TextOverflow.ellipsis),
+                )),
+          ];
           final rowChildren = <Widget>[
             const Text('Категория:'),
             const SizedBox(width: 12),
@@ -191,17 +206,12 @@ class _CategoryFilter extends StatelessWidget {
                 value: null,
                 decoration: const InputDecoration(
                     isDense: true, border: OutlineInputBorder()),
-                hint: const Text('Все', overflow: TextOverflow.ellipsis),
-                onChanged: onSelected,
-                items: [
-                  const DropdownMenuItem<String?>(
-                      value: null,
-                      child: Text('Все', overflow: TextOverflow.ellipsis)),
-                  ...items.map((c) => DropdownMenuItem<String?>(
-                        value: c,
-                        child: Text(c, overflow: TextOverflow.ellipsis),
-                      )),
-                ],
+                hint: Text(
+                  async.isLoading ? 'Загрузка…' : 'Все',
+                  overflow: TextOverflow.ellipsis,
+                ),
+                onChanged: async.isLoading ? null : onSelected,
+                items: items,
               ),
             ),
           ];
@@ -216,17 +226,12 @@ class _CategoryFilter extends StatelessWidget {
                   value: null,
                   decoration: const InputDecoration(
                       isDense: true, border: OutlineInputBorder()),
-                  hint: const Text('Все', overflow: TextOverflow.ellipsis),
-                  onChanged: onSelected,
-                  items: [
-                    const DropdownMenuItem<String?>(
-                        value: null,
-                        child: Text('Все', overflow: TextOverflow.ellipsis)),
-                    ...items.map((c) => DropdownMenuItem<String?>(
-                          value: c,
-                          child: Text(c, overflow: TextOverflow.ellipsis),
-                        )),
-                  ],
+                  hint: Text(
+                    async.isLoading ? 'Загрузка…' : 'Все',
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  onChanged: async.isLoading ? null : onSelected,
+                  items: items,
                 ),
               ],
             );
@@ -245,6 +250,7 @@ class _ResourceCard extends StatelessWidget {
   final VoidCallback onToggleExpand;
   final VoidCallback onOpenLink;
   final VoidCallback onToggleFavorite;
+  final bool isFavorite;
 
   const _ResourceCard({
     required this.type,
@@ -253,6 +259,7 @@ class _ResourceCard extends StatelessWidget {
     required this.onToggleExpand,
     required this.onOpenLink,
     required this.onToggleFavorite,
+    required this.isFavorite,
   });
 
   @override
@@ -293,7 +300,7 @@ class _ResourceCard extends StatelessWidget {
                   onPressed: onToggleExpand,
                 ),
                 IconButton(
-                  icon: const Icon(Icons.star_border),
+                  icon: Icon(isFavorite ? Icons.star : Icons.star_border),
                   onPressed: onToggleFavorite,
                 ),
               ],
