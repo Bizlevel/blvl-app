@@ -28,9 +28,14 @@ import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:flutter/scheduler.dart';
 import 'services/push_service.dart';
 
+import 'package:firebase_core/firebase_core.dart';
+
 Future<void> main() async {
   // КРИТИЧНО для web: Все инициализации должны быть в одной зоне
   WidgetsFlutterBinding.ensureInitialized();
+  if (!kIsWeb) {
+    await Firebase.initializeApp();
+  }
 
   // Чистые URL без # — только для Web
   if (kIsWeb) {
@@ -65,10 +70,12 @@ Future<void> main() async {
     await Hive.openBox('notifications');
   } catch (_) {}
 
-  // Инициализация FCM (если доступно). Ошибки не фейлят запуск.
-  try {
-    await PushService.instance.initialize();
-  } catch (_) {}
+  // Инициализация FCM (только для мобильных).
+  if (!kIsWeb) {
+    try {
+      await PushService.instance.initialize();
+    } catch (_) {}
+  }
 
   final dsn = envOrDefine('SENTRY_DSN');
 

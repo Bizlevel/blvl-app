@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -24,14 +25,18 @@ class PushService {
   PushService._();
   static final PushService instance = PushService._();
 
-  final FirebaseMessaging _fm = FirebaseMessaging.instance;
+  late final FirebaseMessaging _fm;
 
   Future<void> initialize() async {
+    // В вебе этот сервис не должен работать
+    if (kIsWeb) return;
+
     try {
+      _fm = FirebaseMessaging.instance;
       await Firebase.initializeApp();
 
-      // iOS permissions
-      if (Platform.isIOS) {
+      // Mobile permissions
+      if (Platform.isIOS || Platform.isAndroid) {
         await _fm.requestPermission(alert: true, badge: true, sound: true);
       }
 
