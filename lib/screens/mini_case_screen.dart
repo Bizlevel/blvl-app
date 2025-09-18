@@ -7,6 +7,9 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:bizlevel/providers/cases_provider.dart';
+import 'package:bizlevel/providers/levels_provider.dart';
+import 'package:bizlevel/services/supabase_service.dart';
+import 'package:bizlevel/providers/auth_provider.dart';
 import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/screens/leo_dialog_screen.dart';
 
@@ -51,7 +54,6 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
         await Sentry.captureException(e, stackTrace: st);
       } catch (_) {
         // Sentry не настроен, просто логируем в консоль
-        print('DEBUG: Exception (Sentry not configured): $e');
       }
     }
 
@@ -76,7 +78,6 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
         await Sentry.captureException(e, stackTrace: st);
       } catch (_) {
         // Sentry не настроен, просто логируем в консоль
-        print('DEBUG: Exception (Sentry not configured): $e');
       }
       if (!mounted) return;
       setState(() => _loading = false);
@@ -211,7 +212,6 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
         await Sentry.captureException(e, stackTrace: st);
       } catch (_) {
         // Sentry не настроен, просто логируем в консоль
-        print('DEBUG: Exception (Sentry not configured): $e');
       }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -219,19 +219,53 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
     }
   }
 
-  String? _buildChecklistPreface() {
-    try {
-      final list = _script?['checklist'];
-      if (list is List && list.isNotEmpty) {
-        final b = StringBuffer('Список дел Даулета:\n');
-        for (final item in list) {
-          b.writeln(item.toString());
-        }
-        return b.toString().trim();
+  // String? _buildChecklistPreface() {
+  //   try {
+  //     final list = _script?['checklist'];
+  //     if (list is List && list.isNotEmpty) {
+  //       final b = StringBuffer('Презентация Гульнары:\n');
+  //       for (final item in list) {
+  //         b.writeln(item.toString());
+  //       }
+  //       return b.toString().trim();
+  //     }
+  //   } catch (_) {}
+  //   return null;
+  // }
+String? _buildChecklistPreface() {
+  try {
+    final list = _script?['checklist'];
+    if (list is List && list.isNotEmpty) {
+      // Определяем имя персонажа и тип списка по номеру кейса
+      String characterName;
+      String listType;
+      switch (widget.caseId) {
+        case 1:
+          characterName = 'Даулета';
+          listType = 'Список дел';
+          break;
+        case 2:
+          characterName = 'Гульнары';
+          listType = 'Презентация';
+          break;
+        case 3:
+          characterName = 'Руслана';
+          listType = 'План';
+          break;
+        default:
+          characterName = 'персонажа';
+          listType = 'Список';
       }
-    } catch (_) {}
-    return null;
-  }
+      
+      final b = StringBuffer('$listType $characterName:\n');
+      for (final item in list) {
+        b.writeln(item.toString());
+      }
+      return b.toString().trim();
+    }
+  } catch (_) {}
+  return null;
+}
 
   String _buildCaseSystemPrompt() {
     final title = _caseMeta?['title']?.toString() ?? '';
@@ -331,6 +365,40 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
         // Sentry не настроен, игнорируем
       }
       await ref.read(caseActionsProvider).complete(widget.caseId);
+      
+      // Обновляем current_level пользователя после завершения кейса
+      try {
+        final after = _caseMeta?['after_level'] as int?;
+        if (after != null) {
+          // Находим level_id для следующего уровня (after + 1)
+          final nextLevelNumber = after + 1;
+          // Получаем level_id для следующего уровня
+          final levelId = await SupabaseService.levelIdFromNumber(nextLevelNumber);
+          if (levelId != null) {
+            await SupabaseService.completeLevel(levelId);
+          }
+        }
+      } catch (_) {
+        // Игнорируем ошибки обновления уровня
+      }
+      
+      // СНАЧАЛА обновляем данные башни и уровней, ПОТОМ переходим
+      try {
+        // ignore: unused_result
+        ref.invalidate(towerNodesProvider);
+        // ignore: unused_result
+        ref.invalidate(levelsProvider);
+        // ignore: unused_result
+        ref.invalidate(nextLevelToContinueProvider);
+        // ignore: unused_result
+        ref.invalidate(currentUserProvider);
+        // ignore: unused_result
+        ref.invalidate(caseStatusProvider(widget.caseId));
+      } catch (_) {}
+      
+      // Небольшая задержка для обновления UI
+      await Future.delayed(const Duration(milliseconds: 100));
+      
       final after = _caseMeta?['after_level'] as int?;
       final target = after != null ? after + 1 : null;
       if (!mounted) return;
@@ -344,7 +412,6 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
         await Sentry.captureException(e, stackTrace: st);
       } catch (_) {
         // Sentry не настроен, просто логируем в консоль
-        print('DEBUG: Exception (Sentry not configured): $e');
       }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -378,7 +445,6 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
         await Sentry.captureException(e, stackTrace: st);
       } catch (_) {
         // Sentry не настроен, просто логируем в консоль
-        print('DEBUG: Exception (Sentry not configured): $e');
       }
       if (!mounted) return;
       ScaffoldMessenger.of(context)

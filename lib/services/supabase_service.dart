@@ -30,6 +30,38 @@ class SupabaseService {
   /// Экспортирует [SupabaseClient] для внешнего использования.
   SupabaseClient get client => Supabase.instance.client;
 
+  // Cached mapping: level_id -> levels.number
+  static Map<int, int>? _levelIdToNumber;
+
+  static Future<Map<int, int>> levelMap() async {
+    if (_levelIdToNumber != null) return _levelIdToNumber!;
+    final resp = await Supabase.instance.client
+        .from('levels')
+        .select('id, number');
+    final list = _asListOfMaps(resp);
+    _levelIdToNumber = {
+      for (final m in list)
+        (m['id'] as num).toInt(): (m['number'] as num).toInt()
+    };
+    return _levelIdToNumber!;
+  }
+
+  static Future<int> levelNumberFromId(int? levelId) async {
+    final map = await levelMap();
+    if (levelId == null) return 0;
+    return map[levelId] ?? 0;
+  }
+
+  static Future<int?> levelIdFromNumber(int levelNumber) async {
+    final map = await levelMap();
+    for (final entry in map.entries) {
+      if (entry.value == levelNumber) {
+        return entry.key;
+      }
+    }
+    return null;
+  }
+
   /// Унифицированное преобразование ответа PostgREST в список мапов.
   static List<Map<String, dynamic>> _asListOfMaps(dynamic response) {
     final list = response as List<dynamic>;
@@ -163,9 +195,50 @@ class SupabaseService {
           'is_completed': true,
           'updated_at': DateTime.now().toIso8601String(),
         });
-        // Update users.current_level if we just completed it
+        // Пересчитываем users.current_level на основании максимального levels.number среди завершённых уровней
+        // 1) Загружаем карту уровней: id -> number
+        final levelsResp = await Supabase.instance.client
+            .from('levels')
+            .select('id, number');
+        final levelsList = _asListOfMaps(levelsResp);
+        final Map<int, int> levelIdToNumber = {
+          for (final m in levelsList)
+            (m['id'] as num).toInt(): (m['number'] as num).toInt()
+        };
+
+        // 2) Загружаем завершённые уровни пользователя
+        final progressResp = await Supabase.instance.client
+            .from('user_progress')
+            .select('level_id')
+            .eq('user_id', user.id)
+            .eq('is_completed', true);
+        final progressList = _asListOfMaps(progressResp);
+
+        // 3) Определяем максимальный номер уровня
+        int maxNumber = 0;
+        for (final row in progressList) {
+          final int lid = (row['level_id'] as num).toInt();
+          final int numVal = levelIdToNumber[lid] ?? 0;
+          if (numVal > maxNumber) maxNumber = numVal;
+        }
+
+        // 4) Находим level_id, соответствующий maxNumber (если нет завершённых — ставим null)
+        int? targetLevelId;
+        if (maxNumber > 0) {
+          for (final entry in levelIdToNumber.entries) {
+            if (entry.value == maxNumber) {
+              targetLevelId = entry.key;
+              break;
+            }
+          }
+        }
+
+        // 5) Обновляем users.current_level безопасно: если нет завершённых уровней — ставим стартовый level_id = 22 (уровень №0)
+        final int safeLevelId = (targetLevelId ?? 22);
         await Supabase.instance.client
-            .rpc('update_current_level', params: {'p_level_id': levelId});
+            .from('users')
+            .update({'current_level': safeLevelId})
+            .eq('id', user.id);
       } on PostgrestException catch (e, st) {
         await Sentry.captureException(e, stackTrace: st);
         rethrow;

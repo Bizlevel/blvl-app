@@ -26,6 +26,7 @@ import 'package:bizlevel/widgets/common/bizlevel_button.dart';
 import 'package:bizlevel/widgets/common/gp_balance_widget.dart';
 import 'package:bizlevel/widgets/common/bizlevel_card.dart';
 import 'package:bizlevel/widgets/common/bizlevel_text_field.dart';
+import 'package:bizlevel/services/supabase_service.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -847,9 +848,15 @@ class _BodyState extends ConsumerState<_Body> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Expanded(
-              child: StatCard(
-                title: "${widget.currentLevel} Уровень",
-                icon: Icons.work,
+              child: FutureBuilder<int>(
+                future: SupabaseService.levelNumberFromId(widget.currentLevel),
+                builder: (context, snap) {
+                  final n = snap.data ?? 0;
+                  return StatCard(
+                    title: "$n Уровень",
+                    icon: Icons.work,
+                  );
+                },
               ),
             ),
             const SizedBox(width: AppSpacing.small),

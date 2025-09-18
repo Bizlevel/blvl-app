@@ -12,6 +12,7 @@ import 'package:bizlevel/screens/profile_screen.dart';
 import 'package:bizlevel/providers/auth_provider.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:bizlevel/screens/leo_dialog_screen.dart';
+import 'package:bizlevel/services/context_service.dart';
 
 class AppShell extends ConsumerStatefulWidget {
   final Widget child;
@@ -27,41 +28,11 @@ class _AppShellState extends ConsumerState<AppShell> {
   int _currentIndex = 0;
   bool _isSyncing = false;
 
-  String? _buildUserContext(WidgetRef ref) {
-    final user = ref.read(currentUserProvider).value;
-    if (user != null) {
-      final parts = <String>[];
-      if (user.goal?.isNotEmpty == true) parts.add('Цель: ${user.goal}');
-      if (user.about?.isNotEmpty == true) parts.add('О себе: ${user.about}');
-      if (user.businessArea?.isNotEmpty == true) {
-        parts.add('Сфера: ${user.businessArea}');
-      }
-      if (user.experienceLevel?.isNotEmpty == true) {
-        parts.add('Опыт: ${user.experienceLevel}');
-      }
-      if (user.businessSize?.isNotEmpty == true) {
-        parts.add('Размер бизнеса: ${user.businessSize}');
-      }
-      if ((user.keyChallenges ?? const []).isNotEmpty) {
-        parts.add('Вызовы: ${(user.keyChallenges!).join(', ')}');
-      }
-      if (user.learningStyle?.isNotEmpty == true) {
-        parts.add('Стиль: ${user.learningStyle}');
-      }
-      if (user.businessRegion?.isNotEmpty == true) {
-        parts.add('Регион: ${user.businessRegion}');
-      }
-      parts.add('Текущий уровень: ${user.currentLevel}');
-      return parts.isNotEmpty ? parts.join('. ') : null;
-    }
-    return null;
-  }
+  Future<String?> _buildUserContext(WidgetRef ref) =>
+      ContextService.buildUserContext(ref.read(currentUserProvider).value);
 
-  String? _buildLevelContext(WidgetRef ref) {
-    final user = ref.read(currentUserProvider).value;
-    if (user != null) return 'Уровень ${user.currentLevel}';
-    return null;
-  }
+  Future<String?> _buildLevelContext(WidgetRef ref) =>
+      ContextService.buildLevelContext(ref.read(currentUserProvider).value);
 
   int _locationToTab(String location) {
     for (int i = 0; i < _routes.length; i++) {
@@ -177,10 +148,20 @@ class _AppShellState extends ConsumerState<AppShell> {
                             } catch (_) {}
                             Navigator.of(context).push(
                               MaterialPageRoute(
-                                builder: (_) => LeoDialogScreen(
-                                  userContext: _buildUserContext(ref),
-                                  levelContext: _buildLevelContext(ref),
-                                  bot: 'leo',
+                                builder: (_) => FutureBuilder<List<String?>>( 
+                                  future: Future.wait([
+                                    _buildUserContext(ref),
+                                    _buildLevelContext(ref),
+                                  ]),
+                                  builder: (context, snap) {
+                                    final userCtx = (snap.data!=null) ? snap.data![0] : null;
+                                    final lvlCtx = (snap.data!=null) ? snap.data![1] : null;
+                                    return LeoDialogScreen(
+                                      userContext: userCtx,
+                                      levelContext: lvlCtx,
+                                      bot: 'leo',
+                                    );
+                                  },
                                 ),
                               ),
                             );

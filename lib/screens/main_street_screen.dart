@@ -8,6 +8,8 @@ import 'package:bizlevel/utils/formatters.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:bizlevel/widgets/common/gp_balance_widget.dart';
+import 'package:bizlevel/providers/auth_provider.dart';
+import 'package:bizlevel/services/supabase_service.dart';
 
 class MainStreetScreen extends ConsumerWidget {
   const MainStreetScreen({super.key});
@@ -61,58 +63,26 @@ class MainStreetScreen extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Consumer(builder: (context, ref, _) {
-                        final nextAsync =
-                            ref.watch(nextLevelToContinueProvider);
-                        return nextAsync.when(
-                          data: (next) {
-                            final String label = (next['label'] as String?) ??
-                                'Уровень ${formatLevelCode(
-                                  (next['floorId'] as int? ?? 1),
-                                  (next['levelNumber'] as int? ?? 0),
-                                )}';
-                            final bool isLocked =
-                                next['isLocked'] as bool? ?? false;
-                            final int targetScroll =
-                                next['targetScroll'] as int? ??
-                                    (next['levelNumber'] as int? ?? 0);
+                        // Принудительный вариант: вычисляем номер уровня из профиля
+                        final user = ref.watch(currentUserProvider).asData?.value;
+                        final int? currLevelId = user?.currentLevel;
+                        return FutureBuilder<int>(
+                          future: SupabaseService.levelNumberFromId(currLevelId),
+                          builder: (context, snap) {
+                            final ln = snap.data ?? 0;
+                            final String label = ln == 0 ? 'Первый шаг' : 'Уровень $ln';
                             return SizedBox(
                               height: 48,
                               child: ElevatedButton(
                                 onPressed: () {
                                   try {
-                                    // Чекпоинт цели
-                                    final int? gver =
-                                        next['goalCheckpointVersion'] as int?;
-                                    if (gver != null) {
-                                      context.go('/goal-checkpoint/$gver');
-                                      return;
-                                    }
-                                    // Мини‑кейс
-                                    final int? miniCaseId =
-                                        next['miniCaseId'] as int?;
-                                    if (miniCaseId != null) {
-                                      context.go('/case/$miniCaseId');
-                                      return;
-                                    }
-                                    // Заблокирован уровень → открываем башню со скроллом
-                                    if (isLocked) {
-                                      context
-                                          .go('/tower?scrollTo=$targetScroll');
-                                      return;
-                                    }
-                                    // Иначе — прямой переход на уровень
-                                    final levelNumber =
-                                        next['levelNumber'] as int? ?? 0;
-                                    final levelId =
-                                        next['levelId'] as int? ?? 0;
-                                    context.go(
-                                        '/levels/$levelId?num=$levelNumber');
+                                    // Переходим в башню с автоскроллом до уровня ln
+                                    context.go('/tower?scrollTo=$ln');
                                   } catch (e, st) {
                                     Sentry.captureException(e, stackTrace: st);
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(
-                                        content:
-                                            Text('Не удалось открыть уровень'),
+                                        content: Text('Не удалось открыть уровень'),
                                       ),
                                     );
                                   }
@@ -121,17 +91,6 @@ class MainStreetScreen extends ConsumerWidget {
                               ),
                             );
                           },
-                          loading: () => const SizedBox(
-                            height: 48,
-                            child: Center(child: CircularProgressIndicator()),
-                          ),
-                          error: (e, _) => SizedBox(
-                            height: 48,
-                            child: ElevatedButton(
-                              onPressed: () => context.go('/tower'),
-                              child: const Text('Открыть башню'),
-                            ),
-                          ),
                         );
                       }),
                       // Кнопка открытия башни убрана — вход через нажатие на центральное здание

@@ -3,6 +3,7 @@ import 'package:bizlevel/models/level_model.dart';
 import 'package:bizlevel/providers/levels_repository_provider.dart';
 import 'package:bizlevel/providers/auth_provider.dart';
 import 'package:bizlevel/utils/formatters.dart';
+import 'package:bizlevel/services/supabase_service.dart';
 // import 'package:hive_flutter/hive_flutter.dart';
 import 'package:bizlevel/providers/goals_providers.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -13,7 +14,9 @@ final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
 
   // Дожидаемся профиля пользователя, чтобы избежать расчётов с null userId
   final user = await ref.watch(currentUserProvider.future);
-  final int? userCurrentLevel = user?.currentLevel;
+  final int? userCurrentLevelId = user?.currentLevel;
+  final int userCurrentLevelNumber =
+      await SupabaseService.levelNumberFromId(userCurrentLevelId);
   // Подписки отключены (этап 39.1). Доступ уровней >3 будет реализован через GP (этап 39.7).
 
   final userId = Supabase.instance.client.auth.currentUser?.id;
@@ -51,11 +54,11 @@ final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
       // «Первый шаг» всегда доступен для просмотра
       isAccessible = true;
     } else if (!level.isFree && level.number > 3) {
+      // ВРЕМЕННО: отключаем GP-блокировку для тестирования
       // Этажи >1 требуют открытия за GP (этап 39.7)
       // Для простоты: уровни 1..10 — это этаж 1
       final int floorNumber = 1; // текущий этаж
-      final bool hasAccess =
-          unlockedFloors.contains(floorNumber) || level.number <= 3;
+      final bool hasAccess = true; // ВРЕМЕННО: всегда true для тестирования
       isAccessible = hasAccess && previousCompleted;
     } else {
       // Обычные уровни доступны только после завершения предыдущего уровня
@@ -65,7 +68,8 @@ final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
     // Обновляем previousCompleted для следующего уровня:
     // - уровень считается «пройденным» если user_progress.is_completed = true
     // - или если текущий уровень пользователя больше номера этого уровня
-    previousCompleted = isCompleted || ((userCurrentLevel ?? 0) > level.number);
+    previousCompleted =
+        isCompleted || (userCurrentLevelNumber > level.number);
 
     final bool isLocked = !isAccessible;
 
@@ -87,7 +91,7 @@ final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
       // Уровень 0 должен быть всегда доступен
       'isLocked': level.number == 0 ? false : isLocked,
       'isCompleted': isCompleted,
-      'isCurrent': level.number == userCurrentLevel,
+      'isCurrent': level.number == userCurrentLevelNumber,
       'lockReason': isLocked
           ? (level.number > 3 && !level.isFree
               ? 'Требуются GP'
@@ -106,7 +110,9 @@ final nextLevelToContinueProvider =
     FutureProvider<Map<String, dynamic>>((ref) async {
   // Дождёмся профиля, чтобы избежать гонки null currentLevel
   final user = await ref.watch(currentUserProvider.future);
-  final int? userCurrentLevel = user?.currentLevel;
+  final int? userCurrentLevelId = user?.currentLevel;
+  final int userCurrentLevelNumber =
+      await SupabaseService.levelNumberFromId(userCurrentLevelId);
 
   final levels = await ref.watch(levelsProvider.future);
   final nodes = await ref.watch(towerNodesProvider.future);
@@ -161,19 +167,16 @@ final nextLevelToContinueProvider =
     }
   }
 
-  // 2) Текущий незавершённый уровень
-  Map<String, dynamic>? candidate =
-      levels.cast<Map<String, dynamic>?>().firstWhere(
-            (l) =>
-                (l?['isCurrent'] as bool? ?? false) &&
-                (l?['isCompleted'] as bool? ?? false) == false,
-            orElse: () => null,
-          );
-
-  // 3) Иначе — уровень по номеру current_level
-  candidate ??= levels.firstWhere(
-    (l) => (l['level'] as int? ?? -1) == (userCurrentLevel ?? -999),
-    orElse: () => levels.first,
+  // Определяем целевой номер сами, чтобы исключить редкие падения на fallback'ах
+  final Map<String, dynamic>? currentRow = levels.cast<Map<String, dynamic>?>().firstWhere(
+    (l) => (l?['level'] as int? ?? -1) == userCurrentLevelNumber,
+    orElse: () => null,
+  );
+  final bool currDone = currentRow?['isCompleted'] as bool? ?? false;
+  final int desiredNumber = currDone ? (userCurrentLevelNumber + 1) : userCurrentLevelNumber;
+  Map<String, dynamic> candidate = levels.firstWhere(
+    (l) => (l['level'] as int? ?? -1) == desiredNumber,
+    orElse: () => currentRow ?? levels.first,
   );
 
   final int levelNumber = candidate['level'] as int? ?? 0;
@@ -185,7 +188,7 @@ final nextLevelToContinueProvider =
     'requiresPremium': false,
     'isLocked': isLocked,
     'targetScroll': levelNumber,
-    'label': 'Уровень ${formatLevelCode(1, levelNumber)}',
+    'label': levelNumber == 0 ? 'Первый шаг' : 'Уровень $levelNumber',
   };
 });
 
@@ -212,14 +215,17 @@ final towerNodesProvider =
       casesRows.map<int>((r) => (r['id'] as int)).toList(growable: false);
   final Set<int> doneCaseIds = <int>{};
   if (caseIds.isNotEmpty) {
+    final String uid = Supabase.instance.client.auth.currentUser?.id ?? '';
     final List<dynamic> prog = await supa
         .from('user_case_progress')
         .select('case_id, status')
+        .eq('user_id', uid)
         .inFilter('case_id', caseIds);
     for (final p in prog) {
       final status = (p['status'] as String?)?.toLowerCase() ?? 'started';
+      final caseId = (p['case_id'] as num).toInt();
       if (status == 'completed' || status == 'skipped') {
-        doneCaseIds.add((p['case_id'] as num).toInt());
+        doneCaseIds.add(caseId);
       }
     }
   }

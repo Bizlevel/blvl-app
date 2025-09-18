@@ -44,7 +44,6 @@ class LeoService {
     String bot = 'leo',
   }) async {
     // debug: entry point marker (no PII)
-    // print('🔧 DEBUG: sendMessage');
     final session = _client.auth.currentSession;
     if (session == null) {
       throw LeoFailure('Пользователь не авторизован');
@@ -53,7 +52,6 @@ class LeoService {
     // Do not log JWT/token to avoid PII
 
     // Используем только Edge Function
-    // print('🔧 DEBUG: Using Edge Function');
     // Списываем 1 GP за сообщение (идемпотентно), если не включён аварийный флаг
     final gp = GpService(_client);
     final String idempotencyKey = _generateIdempotencyKey(
@@ -181,7 +179,6 @@ class LeoService {
           await Sentry.captureException(e);
         } catch (_) {
           // Sentry не настроен, просто логируем в консоль
-          print('DEBUG: Exception (Sentry not configured): $e');
         }
         throw LeoFailure('Не удалось получить ответ Leo');
       }
@@ -197,16 +194,13 @@ class LeoService {
     String bot = 'leo',
     String? chatId, // Добавляем chatId параметр
     bool skipSpend = false,
+    bool caseMode = false,
   }) async {
     final session = _client.auth.currentSession;
     if (session == null) {
       throw LeoFailure('Пользователь не авторизован');
     }
 
-    print('🔧 DEBUG: sendMessageWithRAG начался');
-    print('🔧 DEBUG: session.user.id = ${session.user.id}');
-    // JWT/PII не логируем
-    print('🔧 DEBUG: chatId = $chatId'); // Добавляем логирование chatId
 
     // Списываем 1 GP за сообщение (идемпотентно), если не включён аварийный флаг
     final gp = GpService(_client);
@@ -283,6 +277,8 @@ class LeoService {
           'levelContext': cleanLevelContext,
           'bot': bot,
           'chatId': chatId,
+          'caseMode': caseMode,
+          'skipSpend': skipSpend,
         });
         try {
           response = await _edgeDio.post(
@@ -338,7 +334,6 @@ class LeoService {
           await Sentry.captureException(e);
         } catch (_) {
           // Sentry не настроен, просто логируем в консоль
-          print('DEBUG: Exception (Sentry not configured): $e');
         }
         if (e.error is SocketException) {
           throw LeoFailure('Нет соединения с интернетом');
@@ -363,7 +358,6 @@ class LeoService {
           await Sentry.captureException(e);
         } catch (_) {
           // Sentry не настроен, просто логируем в консоль
-          print('DEBUG: Exception (Sentry not configured): $e');
         }
         throw LeoFailure('Не удалось получить ответ Leo');
       }
@@ -459,7 +453,6 @@ class LeoService {
           await Sentry.captureException(e);
         } catch (_) {
           // Sentry не настроен, просто логируем в консоль
-          print('DEBUG: Exception (Sentry not configured): $e');
         }
         final data = e.response?.data;
         if (data is Map) {
@@ -482,7 +475,6 @@ class LeoService {
           await Sentry.captureException(e);
         } catch (_) {
           // Sentry не настроен, просто логируем в консоль
-          print('DEBUG: Exception (Sentry not configured): $e');
         }
         throw LeoFailure('Не удалось получить ответ Leo (quiz)');
       }
@@ -652,7 +644,6 @@ class LeoService {
         'request_type': requestType,
       });
 
-      print('🔧 DEBUG: AI message data saved via public method');
     } on PostgrestException catch (e) {
       print(
           'Warning: Failed to save AI message data to database: ${e.message}');

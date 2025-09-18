@@ -77,10 +77,12 @@ class GoalsRepository {
     required String goalText,
     required Map<String, dynamic> versionData,
   }) async {
+    final String? userId = _client.auth.currentUser?.id;
     final payload = {
       'version': version,
       'goal_text': goalText,
       'version_data': versionData,
+      if (userId != null) 'user_id': userId, // fallback: если нет триггера в БД
     };
 
     final inserted =
@@ -116,18 +118,69 @@ class GoalsRepository {
     required dynamic value,
   }) async {
     return _withRetry<Map<String, dynamic>>(() async {
-      final result = await _client.rpc(
-        'upsert_goal_field',
-        params: {
-          'p_version': version,
-          'p_field': field,
-          'p_value': value,
-        },
-      );
-      if (result is Map<String, dynamic>) {
-        return result;
+      try {
+        final result = await _client.rpc(
+          'upsert_goal_field',
+          params: {
+            'p_version': version,
+            'p_field': field,
+            'p_value': value,
+          },
+        );
+        if (result is Map<String, dynamic>) {
+          return result;
+        }
+        return Map<String, dynamic>.from(result as Map);
+      } on PostgrestException catch (e) {
+        // Fallback: если RPC отсутствует/недоступно — делаем client-side merge последней версии
+        // 1) Находим последнюю запись версии для текущего пользователя
+        final String? userId = _client.auth.currentUser?.id;
+        if (userId == null) rethrow;
+        final row = await _client
+            .from('core_goals')
+            .select('id, version, user_id, version_data')
+            .eq('user_id', userId)
+            .eq('version', version)
+            .order('updated_at', ascending: false)
+            .limit(1)
+            .maybeSingle();
+
+        Map<String, dynamic> vdata = <String, dynamic>{};
+        String? goalId;
+        if (row != null) {
+          goalId = row['id'] as String?;
+          final raw = row['version_data'];
+          if (raw is Map) {
+            vdata = Map<String, dynamic>.from(raw);
+          }
+        }
+
+        // 2) Мержим поле и сохраняем
+        vdata[field] = value;
+
+        if (goalId != null) {
+          final updated = await _client
+              .from('core_goals')
+              .update({'version_data': vdata})
+              .eq('id', goalId)
+              .select()
+              .single();
+          return Map<String, dynamic>.from(updated);
+        } else {
+          // Если записи нет — создаём новую оболочку версии
+          final created = await _client
+              .from('core_goals')
+              .insert({
+                'user_id': userId,
+                'version': version,
+                'goal_text': '',
+                'version_data': vdata,
+              })
+              .select()
+              .single();
+          return Map<String, dynamic>.from(created);
+        }
       }
-      return Map<String, dynamic>.from(result as Map);
     });
   }
 

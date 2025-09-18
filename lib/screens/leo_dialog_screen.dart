@@ -7,7 +7,6 @@ import 'package:bizlevel/providers/leo_service_provider.dart';
 import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/widgets/leo_message_bubble.dart';
 import 'package:bizlevel/widgets/typing_indicator.dart';
-import 'package:bizlevel/widgets/common/bizlevel_button.dart';
 import 'package:bizlevel/services/leo_service.dart';
 import 'package:bizlevel/providers/gp_providers.dart';
 
@@ -253,9 +252,10 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
         userContext: cleanUserContext,
         levelContext: cleanLevelContext,
         bot: widget.bot,
-        // GP‑политика: авто‑сообщение (реакция) может быть бесплатным,
-        // пользовательские сообщения всегда со списанием
-        skipSpend: isAuto ? widget.skipSpend : false,
+        // GP‑политика: в mentor-mode все сообщения бесплатные,
+        // в обычном режиме только авто‑сообщения бесплатные
+        skipSpend: widget.skipSpend,
+        caseMode: widget.caseMode, // Add caseMode parameter
       );
 
       assistantMsg = response['message']['content'] as String? ?? '';
@@ -311,7 +311,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
             }
           }
         } else if (assistantMsg.contains('[CASE:FINAL]')) {
-          // Показать финальную историю (если задана), затем CTA на возврат
+          // Показать финальную историю (если задана), затем предложить кнопку возврата
           final fs = widget.finalStory?.trim();
           if (fs != null && fs.isNotEmpty) {
             setState(() {
@@ -320,7 +320,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
             _scrollToBottom();
           }
           if (!mounted) return;
-          // Кнопка в нижнем листе
+          // Кнопка в нижнем листе для явного возврата
           // ignore: use_build_context_synchronously
           await showModalBottomSheet(
             context: context,
@@ -328,15 +328,28 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
             builder: (ctx) => SafeArea(
               child: Padding(
                 padding: const EdgeInsets.all(16),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: BizLevelButton(
-                    label: 'Вернуться в Башню',
-                    onPressed: () {
-                      Navigator.of(ctx).pop();
-                      Navigator.of(context).pop('case_final');
-                    },
-                  ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text(
+                      'Кейс завершён',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 12),
+                    ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(ctx).pop();
+                        Navigator.of(context).pop('case_final');
+                      },
+                      child: const Text('Вернуться в Башню'),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      child: const Text('Остаться в диалоге'),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -344,33 +357,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
           return;
         }
       }
-      // Если ассистент сообщил о финале кейса — предложим вернуться в башню
-      if (assistantMsg.contains('[CASE:FINAL]')) {
-        if (!mounted) return;
-        final goBack = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('Кейс завершён'),
-            content: const Text('Отличная работа! Перейти обратно на Башню?'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(false),
-                child: const Text('Остаться'),
-              ),
-              BizLevelButton(
-                label: 'Вернуться в Башню',
-                onPressed: () => Navigator.of(ctx).pop(true),
-                variant: BizLevelButtonVariant.primary,
-                size: BizLevelButtonSize.md,
-              ),
-            ],
-          ),
-        );
-        if (goBack == true && mounted) {
-          Navigator.of(context).pop('case_final');
-          return;
-        }
-      }
+      // В обычном режиме (не кейс) диалог не закрываем автоматически
       // После успешного ответа обновим баланс GP в фоне
       try {
         // ignore: unused_result

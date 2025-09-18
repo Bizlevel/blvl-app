@@ -250,12 +250,12 @@ class _CheckpointNodeTile extends StatelessWidget {
                 child: Center(
                   child: Icon(
                     type == 'mini_case'
-                        ? Icons.work_outline
+                        ? (isCompleted ? Icons.work : Icons.work_outline)
                         : (type == 'goal_checkpoint'
                             ? (isCompleted ? Icons.flag : Icons.flag_outlined)
                             : Icons.center_focus_strong),
                     color: type == 'mini_case'
-                        ? AppColor.info
+                        ? (isCompleted ? AppColor.success : AppColor.info)
                         : (type == 'goal_checkpoint'
                             ? (isCompleted ? AppColor.success : AppColor.info)
                             : AppColor.labelColor),
