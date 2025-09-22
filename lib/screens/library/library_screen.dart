@@ -64,7 +64,7 @@ class _SectionsTab extends ConsumerWidget {
     final grants = ref.watch(grantsProvider(null));
     final accels = ref.watch(acceleratorsProvider(null));
 
-    int? _len(AsyncValue<List<Map<String, dynamic>>> a) =>
+    int? len(AsyncValue<List<Map<String, dynamic>>> a) =>
         a.asData?.value.length;
 
     return SingleChildScrollView(
@@ -83,8 +83,8 @@ class _SectionsTab extends ConsumerWidget {
           _SectionCard(
             icon: Icons.menu_book,
             title: 'Курсы',
-            subtitle: _len(courses) != null
-                ? '${_len(courses)} бесплатных программ'
+            subtitle: len(courses) != null
+                ? '${len(courses)} бесплатных программ'
                 : 'Загрузка…',
             onTap: () {
               try {
@@ -98,8 +98,8 @@ class _SectionsTab extends ConsumerWidget {
           _SectionCard(
             icon: Icons.volunteer_activism,
             title: 'Гранты и поддержка',
-            subtitle: _len(grants) != null
-                ? '${_len(grants)} актуальных программ'
+            subtitle: len(grants) != null
+                ? '${len(grants)} актуальных программ'
                 : 'Загрузка…',
             onTap: () {
               try {
@@ -113,8 +113,8 @@ class _SectionsTab extends ConsumerWidget {
           _SectionCard(
             icon: Icons.rocket_launch,
             title: 'Акселераторы',
-            subtitle: _len(accels) != null
-                ? '${_len(accels)} программ развития'
+            subtitle: len(accels) != null
+                ? '${len(accels)} программ развития'
                 : 'Загрузка…',
             onTap: () {
               try {

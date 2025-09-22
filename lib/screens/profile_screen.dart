@@ -231,7 +231,10 @@ class ProfileScreen extends ConsumerWidget {
                             ),
                             child: SvgPicture.asset(
                               'assets/icons/bell.svg',
-                              color: AppColor.onPrimary,
+                              colorFilter: const ColorFilter.mode(
+                                AppColor.onPrimary,
+                                BlendMode.srcIn,
+                              ),
                               width: 18,
                               height: 18,
                             ),
@@ -253,7 +256,10 @@ class ProfileScreen extends ConsumerWidget {
                             ),
                             child: SvgPicture.asset(
                               'assets/icons/setting.svg',
-                              color: AppColor.onPrimary,
+                              colorFilter: const ColorFilter.mode(
+                                AppColor.onPrimary,
+                                BlendMode.srcIn,
+                              ),
                               width: 18,
                               height: 18,
                             ),
@@ -275,7 +281,10 @@ class ProfileScreen extends ConsumerWidget {
                             ),
                             child: SvgPicture.asset(
                               'assets/icons/wallet.svg',
-                              color: AppColor.onPrimary,
+                              colorFilter: const ColorFilter.mode(
+                                AppColor.onPrimary,
+                                BlendMode.srcIn,
+                              ),
                               width: 18,
                               height: 18,
                             ),
@@ -297,7 +306,10 @@ class ProfileScreen extends ConsumerWidget {
                             ),
                             child: SvgPicture.asset(
                               'assets/icons/logout.svg',
-                              color: AppColor.onPrimary,
+                              colorFilter: const ColorFilter.mode(
+                                AppColor.onPrimary,
+                                BlendMode.srcIn,
+                              ),
                               width: 18,
                               height: 18,
                             ),
@@ -634,7 +646,7 @@ class _BodyState extends ConsumerState<_Body> {
           itemCount: 12,
           itemBuilder: (_, index) {
             final id = index + 1;
-            final asset = 'assets/images/avatars/avatar_${id}.png';
+            final asset = 'assets/images/avatars/avatar_$id.png';
             final isSelected = id == widget.avatarId;
             return GestureDetector(
               onTap: () => Navigator.of(ctx).pop(id),
@@ -788,7 +800,7 @@ class _BodyState extends ConsumerState<_Body> {
                     decoration: BoxDecoration(
                       color: AppColor.surface,
                       borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
+                      boxShadow: const [
                         BoxShadow(
                           color: AppColor.shadow,
                           blurRadius: 2,
@@ -857,9 +869,9 @@ class _BodyState extends ConsumerState<_Body> {
               child: InkWell(
                 borderRadius: BorderRadius.circular(12),
                 onTap: _openAboutMeModal,
-                child: Stack(
+                child: const Stack(
                   children: [
-                    const StatCard(
+                    StatCard(
                       title: 'Информация обо мне',
                       icon: Icons.info_outline,
                       showChevron: true,
@@ -1299,8 +1311,8 @@ class DividerWrapper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 45),
+    return const Padding(
+      padding: EdgeInsets.only(left: 45),
       child: Divider(
         height: 0,
         color: AppColor.onSurfaceSubtle,

@@ -102,7 +102,7 @@ class GoalCompactCard extends StatelessWidget {
             if (expanded) ...[
               const SizedBox(height: 12),
               if (latestVersion >= 3) ...[
-                _GroupHeader('План по неделям'),
+                const _GroupHeader('План по неделям'),
                 _bullet(context, 'Неделя 1: ${data['sprint1_goal'] ?? '—'}'),
                 _bullet(context, 'Неделя 2: ${data['sprint2_goal'] ?? '—'}'),
                 _bullet(context, 'Неделя 3: ${data['sprint3_goal'] ?? '—'}'),

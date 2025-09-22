@@ -48,7 +48,7 @@ class CheckInForm extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _GroupHeader('Итоги спринта'),
+            const _GroupHeader('Итоги спринта'),
             _LabeledField(
               label: 'Что достигнуто',
               child: CustomTextBox(
@@ -65,7 +65,7 @@ class CheckInForm extends StatelessWidget {
                     final String dynamicLabel = metricAsync.maybeWhen(
                       data: (s) => (s == null || s.isEmpty)
                           ? 'Ключевая метрика (факт)'
-                          : 'Ключевая метрика — ' + s + ' (факт)',
+                          : 'Ключевая метрика — $s (факт)',
                       orElse: () => 'Ключевая метрика (факт)',
                     );
                     return _LabeledField(
@@ -96,7 +96,7 @@ class CheckInForm extends StatelessWidget {
                   final String dynamicLabel = metricAsync.maybeWhen(
                     data: (s) => (s == null || s.isEmpty)
                         ? 'Ключевая метрика (факт)'
-                        : 'Ключевая метрика — ' + s + ' (факт)',
+                        : 'Ключевая метрика — $s (факт)',
                     orElse: () => 'Ключевая метрика (факт)',
                   );
                   return _LabeledField(
@@ -118,7 +118,7 @@ class CheckInForm extends StatelessWidget {
                 ),
               ]),
             const SizedBox(height: 16),
-            _GroupHeader('Проверки недели'),
+            const _GroupHeader('Проверки недели'),
             Wrap(
               spacing: 12,
               runSpacing: 8,
@@ -171,7 +171,7 @@ class CheckInForm extends StatelessWidget {
                                 final current = techOtherCtrl.text.trim();
                                 if (current.contains(o)) return;
                                 techOtherCtrl.text =
-                                    current.isEmpty ? o : current + ', ' + o;
+                                    current.isEmpty ? o : '$current, $o';
                               },
                             );
                           }).toList(),

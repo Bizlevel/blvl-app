@@ -6,10 +6,9 @@ import 'package:bizlevel/theme/color.dart';
 /// - Размеры: 24 или 48 (можно задать любой)
 class SuccessIndicator extends StatefulWidget {
   const SuccessIndicator(
-      {Key? key,
+      {super.key,
       this.size = 24,
-      this.duration = const Duration(milliseconds: 400)})
-      : super(key: key);
+      this.duration = const Duration(milliseconds: 400)});
 
   final double size;
   final Duration duration;

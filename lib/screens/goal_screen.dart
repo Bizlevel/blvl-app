@@ -53,9 +53,9 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
   final TextEditingController _finalHowCtrl = TextEditingController();
   bool _commitment = false;
 
-  Timer? _debounce;
+  // Удалено поле _debounce (не используется)
   // ignore: unused_field
-  bool _saving = false;
+  final bool _saving = false;
   int _selectedSprint = 1;
   bool _sprintSaved = false; // локальный флаг для кнопки чата после сохранения
   final GlobalKey _sprintSectionKey = GlobalKey();
@@ -89,7 +89,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
   void initState() {
     super.initState();
     // Загружаем версии через контроллер
-    Future.microtask(() async {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       await ref.read(goalScreenControllerProvider.notifier).loadVersions();
       final st = ref.read(goalScreenControllerProvider);
       _fillControllersFor(st.selectedVersion, st.versions);
@@ -102,40 +102,9 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
       }
       if (mounted) setState(() {});
     });
-
-    // Автосохранение отключено по требованию: слушателей не добавляем
   }
 
-  @override
-  void dispose() {
-    _debounce?.cancel();
-    _goalInitialCtrl.dispose();
-    _goalWhyCtrl.dispose();
-    _mainObstacleCtrl.dispose();
-    _goalRefinedCtrl.dispose();
-    _metricNameCtrl.dispose();
-    _metricFromCtrl.dispose();
-    _metricToCtrl.dispose();
-    _financialGoalCtrl.dispose();
-    _goalSmartCtrl.dispose();
-    _s1Ctrl.dispose();
-    _s2Ctrl.dispose();
-    _s3Ctrl.dispose();
-    _s4Ctrl.dispose();
-    _finalWhatCtrl.dispose();
-    _finalWhenCtrl.dispose();
-    _finalHowCtrl.dispose();
-    _achievementCtrl.dispose();
-    _metricActualCtrl.dispose();
-    _keyInsightCtrl.dispose();
-    _artifactsDetailsCtrl.dispose();
-    _consultedBenefitCtrl.dispose();
-    _techniquesDetailsCtrl.dispose();
-    _techOtherCtrl.dispose();
-    super.dispose();
-  }
-
-  // Автосохранение отключено
+  // Автосохранение отключено по требованию: слушателей не добавляем
 
   // ignore: unused_element
   bool _isValidV1() {
@@ -247,14 +216,14 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
     // Определяем максимально доступную версию на основе текущего уровня пользователя
     final currentUserAsync = ref.watch(currentUserProvider);
     final int currentLevel = currentUserAsync.asData?.value?.currentLevel ?? 0;
-    int _allowedMaxVersion(int lvl) {
+    int allowedMaxVersion(int lvl) {
       if (lvl >= 11) return 4; // после Уровня 10
       if (lvl >= 8) return 3; // после Уровня 7
       if (lvl >= 5) return 2; // после Уровня 4
       return 1; // после Уровня 1
     }
 
-    final int allowedMax = _allowedMaxVersion(currentLevel);
+    final int allowedMax = allowedMaxVersion(currentLevel);
 
     return Scaffold(
       appBar: AppBar(
@@ -269,7 +238,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                   ? CircleAvatar(
                       radius: 16,
                       backgroundImage: AssetImage(
-                        'assets/images/avatars/avatar_${avatarId}.png',
+                        'assets/images/avatars/avatar_$avatarId.png',
                       ),
                       backgroundColor: Colors.transparent,
                     )
@@ -513,7 +482,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
             levelContext: 'current_level: $currentLevel',
             bot: 'max',
           ),
-        )
+        ),
       ]),
     );
   }
@@ -705,10 +674,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                 bot: 'max',
                 // После сохранения чек‑ина отправляем тонкую реакцию Макса
                 autoUserMessage: _sprintSaved
-                    ? 'weekly_checkin: Неделя ${_selectedSprint}; Итог: ' +
-                        _achievementCtrl.text.trim() +
-                        '; Метрика: ' +
-                        _metricActualCtrl.text.trim()
+                    ? 'weekly_checkin: Неделя $_selectedSprint; Итог: ${_achievementCtrl.text.trim()}; Метрика: ${_metricActualCtrl.text.trim()}'
                     : null,
                 skipSpend: _sprintSaved,
                 recommendedChips:

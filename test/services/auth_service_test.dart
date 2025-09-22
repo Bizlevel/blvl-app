@@ -57,7 +57,7 @@ void main() {
     test('преобразует AuthException в AuthFailure', () async {
       when(() => auth.signInWithPassword(
               email: any(named: 'email'), password: any(named: 'password')))
-          .thenThrow(AuthException('Invalid'));
+          .thenThrow(const AuthException('Invalid'));
 
       expect(
         () => service.signIn(email: 'e', password: 'p'),

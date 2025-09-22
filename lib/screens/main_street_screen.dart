@@ -4,57 +4,64 @@ import 'package:go_router/go_router.dart';
 import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/widgets/user_info_bar.dart';
 import 'package:bizlevel/providers/levels_provider.dart';
-import 'package:bizlevel/utils/formatters.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:bizlevel/widgets/common/gp_balance_widget.dart';
 
-class MainStreetScreen extends ConsumerWidget {
+class MainStreetScreen extends ConsumerStatefulWidget {
   const MainStreetScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MainStreetScreen> createState() => _MainStreetScreenState();
+}
+
+class _MainStreetScreenState extends ConsumerState<MainStreetScreen> {
+  @override
+  void initState() {
+    super.initState();
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColor.appBgColor,
       body: Stack(
         children: [
           const Positioned.fill(child: _BackgroundLayer()),
-          // Главный контент без сцены/облаков (задача 33.20)
           SafeArea(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Top bar: аватар/имя слева, GP справа
                 Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: Row(
-                    children: const [
-                      // Левая часть — аватар/имя/уровень
+                    children: [
                       Expanded(
                         child: Align(
                           alignment: Alignment.centerLeft,
                           child: UserInfoBar(showGp: false),
                         ),
                       ),
-                      // Правая часть — общий виджет баланса GP (как в Профиле/Башне)
                       GpBalanceWidget(),
                     ],
                   ),
                 ),
-                // Центральный блок: 5 карточек (3 ряда) — задача 33.21
                 Expanded(
                   child: Center(
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 900),
-                      child: const Padding(
+                      child: Padding(
                         padding: EdgeInsets.symmetric(horizontal: 16),
                         child: _MainActionsGrid(),
                       ),
                     ),
                   ),
                 ),
-                // Actions
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                   child: Column(
@@ -65,42 +72,34 @@ class MainStreetScreen extends ConsumerWidget {
                             ref.watch(nextLevelToContinueProvider);
                         return nextAsync.when(
                           data: (next) {
-                            final String label = (next['label'] as String?) ??
-                                'Уровень ${formatLevelCode(
-                                  (next['floorId'] as int? ?? 1),
-                                  (next['levelNumber'] as int? ?? 0),
-                                )}';
+                            final String label =
+                                (next['label'] as String?) ?? 'Далее';
                             final bool isLocked =
                                 next['isLocked'] as bool? ?? false;
                             final int targetScroll =
-                                next['targetScroll'] as int? ??
-                                    (next['levelNumber'] as int? ?? 0);
+                                next['targetScroll'] as int? ?? 0;
                             return SizedBox(
                               height: 48,
                               child: ElevatedButton(
                                 onPressed: () {
                                   try {
-                                    // Чекпоинт цели
                                     final int? gver =
                                         next['goalCheckpointVersion'] as int?;
                                     if (gver != null) {
                                       context.go('/goal-checkpoint/$gver');
                                       return;
                                     }
-                                    // Мини‑кейс
                                     final int? miniCaseId =
                                         next['miniCaseId'] as int?;
                                     if (miniCaseId != null) {
                                       context.go('/case/$miniCaseId');
                                       return;
                                     }
-                                    // Заблокирован уровень → открываем башню со скроллом
                                     if (isLocked) {
                                       context
                                           .go('/tower?scrollTo=$targetScroll');
                                       return;
                                     }
-                                    // Иначе — прямой переход на уровень
                                     final levelNumber =
                                         next['levelNumber'] as int? ?? 0;
                                     final levelId =
@@ -111,9 +110,8 @@ class MainStreetScreen extends ConsumerWidget {
                                     Sentry.captureException(e, stackTrace: st);
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(
-                                        content:
-                                            Text('Не удалось открыть уровень'),
-                                      ),
+                                          content: Text(
+                                              'Не удалось открыть уровень')),
                                     );
                                   }
                                 },
@@ -134,7 +132,6 @@ class MainStreetScreen extends ConsumerWidget {
                           ),
                         );
                       }),
-                      // Кнопка открытия башни убрана — вход через нажатие на центральное здание
                     ],
                   ),
                 ),
@@ -161,7 +158,7 @@ class _BackgroundLayer extends StatelessWidget {
           end: Alignment.bottomCenter,
           colors: [
             AppColor.appBgColor,
-            AppColor.appBgColor.withOpacity(0.8),
+            AppColor.appBgColor.withValues(alpha: 0.8),
           ],
         ),
       ),
@@ -381,10 +378,10 @@ class _MainActionCard extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                       fontSize: 16,
                       shadows: [
-                        Shadow(
+                        const Shadow(
                           color: AppColor.shadowColor,
                           blurRadius: 4,
-                          offset: const Offset(0, 1),
+                          offset: Offset(0, 1),
                         ),
                       ],
                     ),
@@ -403,9 +400,9 @@ class _MainActionCard extends StatelessWidget {
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: AppColor.borderColor),
                       ),
-                      child: Row(
+                      child: const Row(
                         mainAxisSize: MainAxisSize.min,
-                        children: const [
+                        children: [
                           Icon(Icons.lock,
                               size: 12, color: AppColor.labelColor),
                           SizedBox(width: 4),

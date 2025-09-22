@@ -38,9 +38,9 @@ void main() {
   testWidgets('SkillsTreeView shows empty message when no skills are provided',
       (WidgetTester tester) async {
     await tester.pumpWidget(
-      MaterialApp(
+      const MaterialApp(
         home: Scaffold(
-          body: const SkillsTreeView(skills: [], currentLevel: 0),
+          body: SkillsTreeView(skills: [], currentLevel: 0),
         ),
       ),
     );

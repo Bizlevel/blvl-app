@@ -28,7 +28,7 @@ void main() {
     mockGoRouter = MockGoRouter();
   });
 
-  Future<void> _pumpRegisterScreen(WidgetTester tester) async {
+  Future<void> pumpRegisterScreen(WidgetTester tester) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -51,7 +51,7 @@ void main() {
         email: any(named: 'email'),
         password: any(named: 'password'))).thenThrow(AuthFailure('Ошибка'));
 
-    await _pumpRegisterScreen(tester);
+    await pumpRegisterScreen(tester);
 
     // Заполняем поля
     await tester.enterText(find.byType(TextField).at(0), 'test@example.com');
@@ -76,7 +76,7 @@ void main() {
       return MockAuthResponse();
     });
 
-    await _pumpRegisterScreen(tester);
+    await pumpRegisterScreen(tester);
 
     await tester.enterText(find.byType(TextField).at(0), 'a@b.com');
     await tester.enterText(find.byType(TextField).at(1), 'pass');
@@ -99,7 +99,7 @@ void main() {
             email: any(named: 'email'), password: any(named: 'password')))
         .thenAnswer((_) async => MockAuthResponse());
 
-    await _pumpRegisterScreen(tester);
+    await pumpRegisterScreen(tester);
 
     // Act
     await tester.enterText(
@@ -126,7 +126,7 @@ void main() {
             email: any(named: 'email'), password: any(named: 'password')))
         .thenAnswer((_) async => MockAuthResponse());
 
-    await _pumpRegisterScreen(tester);
+    await pumpRegisterScreen(tester);
 
     // Act: проходим регистрацию
     await tester.enterText(

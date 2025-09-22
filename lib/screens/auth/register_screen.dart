@@ -2,6 +2,7 @@ import 'dart:developer';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../theme/color.dart' show AppColor;
@@ -9,7 +10,7 @@ import '../../services/auth_service.dart';
 
 import '../../providers/auth_provider.dart';
 import '../../widgets/custom_textfield.dart';
-import '../../widgets/custom_image.dart';
+// custom_image больше не используется для логотипа на этом экране
 import '../../theme/spacing.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
@@ -126,21 +127,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   Widget _buildRegistrationForm() {
     return Column(
       children: [
-        Container(
-          width: 96,
-          height: 96,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
-          ),
-          padding: AppSpacing.insetsAll(AppSpacing.sm),
-          child: const CustomImage(
-            'assets/images/logo_light.png',
-            width: 80,
-            height: 80,
-            isNetwork: false,
-            fit: BoxFit.contain,
-          ),
+        SvgPicture.asset(
+          'assets/images/logo_light.svg',
+          width: 176,
+          height: 176,
+          fit: BoxFit.contain,
         ),
         AppSpacing.gapH(AppSpacing.xl),
         CustomTextBox(
@@ -222,21 +213,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   Widget _buildSuccessView() {
     return Column(
       children: [
-        Container(
-          width: 96,
-          height: 96,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
-          ),
-          padding: AppSpacing.insetsAll(AppSpacing.sm),
-          child: const CustomImage(
-            'assets/images/logo_light.png',
-            width: 80,
-            height: 80,
-            isNetwork: false,
-            fit: BoxFit.contain,
-          ),
+        SvgPicture.asset(
+          'assets/images/logo_light.svg',
+          width: 176,
+          height: 176,
+          fit: BoxFit.contain,
         ),
         AppSpacing.gapH(AppSpacing.xl),
         Container(

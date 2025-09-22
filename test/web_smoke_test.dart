@@ -5,7 +5,6 @@ import 'package:integration_test/integration_test.dart';
 
 import 'package:bizlevel/models/lesson_model.dart';
 import 'package:bizlevel/widgets/lesson_widget.dart';
-import 'package:flutter/widgets.dart';
 
 void main() {
   // ignore: unnecessary_null_comparison

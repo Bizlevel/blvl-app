@@ -11,7 +11,7 @@ class CategoryBox extends StatelessWidget {
     this.selectedColor = AppColor.actionColor,
   });
 
-  final data;
+  final Map<String, dynamic> data;
   final Color selectedColor;
   final bool isSelected;
   final GestureTapCallback? onTap;
@@ -40,7 +40,10 @@ class CategoryBox extends StatelessWidget {
             ),
             child: SvgPicture.asset(
               data["icon"],
-              color: isSelected ? selectedColor : AppColor.textColor,
+              colorFilter: ColorFilter.mode(
+                isSelected ? selectedColor : AppColor.textColor,
+                BlendMode.srcIn,
+              ),
               width: 30,
               height: 30,
             ),

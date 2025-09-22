@@ -17,12 +17,10 @@ class _MotivationCardState extends ConsumerState<MotivationCard> {
   @override
   Widget build(BuildContext context) {
     final quoteAsync = ref.watch(dailyQuoteProvider);
-    const double targetHeight = 120;
-
     return AnimatedContainer(
       duration: const Duration(milliseconds: 250),
       curve: Curves.easeInOut,
-      height: targetHeight,
+      constraints: const BoxConstraints(minHeight: 120),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         child: Container(
@@ -118,8 +116,7 @@ class _MotivationCardState extends ConsumerState<MotivationCard> {
                                   fontStyle: FontStyle.italic,
                                   height: 1.4,
                                 ),
-                            maxLines: 3,
-                            overflow: TextOverflow.ellipsis,
+                            // Показываем полный текст без обрезки
                           ),
                           AppSpacing.gapH(4),
                           if (author != null && author.isNotEmpty)
@@ -145,7 +142,7 @@ class _MotivationCardState extends ConsumerState<MotivationCard> {
                   Container(
                     width: 56,
                     height: 56,
-                    decoration: BoxDecoration(
+                    decoration: const BoxDecoration(
                       color: AppColor.dividerColor,
                       shape: BoxShape.circle,
                     ),

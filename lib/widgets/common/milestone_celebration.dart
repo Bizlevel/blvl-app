@@ -57,11 +57,11 @@ class _MilestoneCelebrationState extends State<MilestoneCelebration>
             decoration: BoxDecoration(
               color: AppColor.card,
               borderRadius: BorderRadius.circular(16),
-              boxShadow: [
+              boxShadow: const [
                 BoxShadow(
                     color: AppColor.shadow,
                     blurRadius: 12,
-                    offset: const Offset(0, 6))
+                    offset: Offset(0, 6))
               ],
             ),
             child: Column(
@@ -130,7 +130,7 @@ class _ConfettiPainter extends CustomPainter {
           AppColor.success,
           AppColor.warning
         ][_rnd.nextInt(4)]
-            .withOpacity(0.8)
+            .withValues(alpha: 0.8)
         ..strokeWidth = 3
         ..strokeCap = StrokeCap.round;
       canvas.drawLine(Offset(px, py), Offset(px + 6, py + 6), paint);

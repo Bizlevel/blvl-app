@@ -52,7 +52,7 @@ class BizLevelButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    void _safeHapticTap() {
+    void safeHapticTap() {
       if (enableHaptic) {
         try {
           HapticFeedback.lightImpact();
@@ -77,7 +77,7 @@ class BizLevelButton extends StatelessWidget {
       case BizLevelButtonVariant.primary:
         button = ElevatedButton(
           key: buttonKey,
-          onPressed: onPressed == null ? null : _safeHapticTap,
+          onPressed: onPressed == null ? null : safeHapticTap,
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColor.primary,
             foregroundColor: AppColor.onPrimary,
@@ -93,7 +93,7 @@ class BizLevelButton extends StatelessWidget {
       case BizLevelButtonVariant.danger:
         button = ElevatedButton(
           key: buttonKey,
-          onPressed: onPressed == null ? null : _safeHapticTap,
+          onPressed: onPressed == null ? null : safeHapticTap,
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColor.error,
             foregroundColor: AppColor.onPrimary,
@@ -109,7 +109,7 @@ class BizLevelButton extends StatelessWidget {
       case BizLevelButtonVariant.outline:
         button = OutlinedButton(
           key: buttonKey,
-          onPressed: onPressed == null ? null : _safeHapticTap,
+          onPressed: onPressed == null ? null : safeHapticTap,
           style: OutlinedButton.styleFrom(
             minimumSize: _minSize,
             padding: _padding,
@@ -125,7 +125,7 @@ class BizLevelButton extends StatelessWidget {
       case BizLevelButtonVariant.text:
         button = TextButton(
           key: buttonKey,
-          onPressed: onPressed == null ? null : _safeHapticTap,
+          onPressed: onPressed == null ? null : safeHapticTap,
           style: TextButton.styleFrom(
             minimumSize: _minSize,
             padding: _padding,
@@ -137,7 +137,7 @@ class BizLevelButton extends StatelessWidget {
       case BizLevelButtonVariant.link:
         button = TextButton(
           key: buttonKey,
-          onPressed: onPressed == null ? null : _safeHapticTap,
+          onPressed: onPressed == null ? null : safeHapticTap,
           style: TextButton.styleFrom(
             minimumSize: _minSize,
             padding: _padding,
@@ -150,7 +150,7 @@ class BizLevelButton extends StatelessWidget {
       case BizLevelButtonVariant.secondary:
         button = OutlinedButton(
           key: buttonKey,
-          onPressed: onPressed == null ? null : _safeHapticTap,
+          onPressed: onPressed == null ? null : safeHapticTap,
           style: OutlinedButton.styleFrom(
             minimumSize: _minSize,
             padding: _padding,

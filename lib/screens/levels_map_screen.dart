@@ -35,8 +35,8 @@ class LevelsMapScreen extends ConsumerWidget {
 
   Widget _buildAppBar(BuildContext context, WidgetRef ref) {
     // Используем переиспользуемый виджет UserInfoBar
-    return Row(
-      children: const [
+    return const Row(
+      children: [
         UserInfoBar(),
         Spacer(),
         NotificationBox(notifiedNumber: 1),

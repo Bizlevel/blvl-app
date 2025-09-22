@@ -65,7 +65,7 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
   bool _saving = false;
   Map<int, Map<String, dynamic>> _versions = {};
   bool _loadFailed = false;
-  bool _showIntro = false;
+  final bool _showIntro = false;
   // В упрощённом режиме сохранения не используем подсказки Макса
   int _latestVersion = 0; // номер последней доступной версии
   // Для перезапуска embedded чата с авто-сообщением после сохранения
@@ -342,8 +342,7 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
       setState(() => _saving = false);
       // После сохранения — комментарий Макса в embedded-чате
       try {
-        final commentMsg = 'Прокомментируй мою цель v${widget.version}.\n' +
-            _buildUserContext();
+        final commentMsg = 'Прокомментируй мою цель v${widget.version}.\n${_buildUserContext()}';
         setState(() {
           _autoMessageForChat = commentMsg;
           _embeddedChatKey =

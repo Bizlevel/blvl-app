@@ -25,7 +25,6 @@ import 'package:bizlevel/services/notifications_service.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:flutter_native_timezone/flutter_native_timezone.dart';
-import 'package:flutter/scheduler.dart';
 import 'services/push_service.dart';
 
 Future<void> main() async {
@@ -74,7 +73,7 @@ Future<void> main() async {
 
   if (dsn.isEmpty) {
     // Без Sentry - просто запускаем приложение
-    print('INFO: Sentry DSN not configured, running without Sentry');
+    debugPrint('INFO: Sentry DSN not configured, running without Sentry');
     runApp(const ProviderScope(child: MyApp()));
   } else {
     // С Sentry, но в той же зоне
@@ -112,8 +111,10 @@ class MyApp extends ConsumerWidget {
     final GoRouter router = ref.watch(goRouterProvider);
     // Простая эвристика low-end устройства: низкий DPR или отключённая анимация ОС
     final bool lowDpr = MediaQuery.of(context).devicePixelRatio < 2.0;
-    final bool disableAnimations = SchedulerBinding
-        .instance.window.accessibilityFeatures.disableAnimations;
+    final bool disableAnimations = View.of(context)
+        .platformDispatcher
+        .accessibilityFeatures
+        .disableAnimations;
     final bool isLowEndDevice =
         lowDpr || disableAnimations; // reserved for global gating
 

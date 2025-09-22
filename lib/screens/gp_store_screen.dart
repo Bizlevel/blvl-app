@@ -9,12 +9,23 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:bizlevel/widgets/common/bizlevel_card.dart';
 import 'package:bizlevel/widgets/common/bizlevel_button.dart';
+import 'package:bizlevel/widgets/common/gp_balance_widget.dart';
+import 'package:bizlevel/theme/color.dart' show AppColor;
 
-class GpStoreScreen extends ConsumerWidget {
+class GpStoreScreen extends ConsumerStatefulWidget {
   const GpStoreScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<GpStoreScreen> createState() => _GpStoreScreenState();
+}
+
+class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
+  String? _selectedPackageId;
+  int? _selectedAmount;
+  String? _selectedLabel;
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Магазин GP')),
       body: ListView.builder(
@@ -25,17 +36,16 @@ class GpStoreScreen extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               // Короткий вводный блок «Что такое GP»
-              BizLevelCard(
-                padding: const EdgeInsets.all(12),
+              const BizLevelCard(
+                padding: EdgeInsets.all(12),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    SvgPicture.asset('assets/images/gp_coin.svg',
-                        width: 36, height: 36),
-                    const SizedBox(width: 12),
-                    const Expanded(
+                    GpBalanceWidget(),
+                    SizedBox(width: 12),
+                    Expanded(
                       child: Text(
-                        'GP — внутренняя валюта BizLevel. Сообщения Лео/Максу стоят 1 GP, а также GP открывают доступ к новым этажам.',
+                        'GP — внутренняя валюта BizLevel: 1 GP = 1 сообщение в чате тренеров, также GP открывают новые этажи.',
                         style: TextStyle(fontSize: 14),
                       ),
                     ),
@@ -57,8 +67,14 @@ class GpStoreScreen extends ConsumerWidget {
                     italicNote:
                         'Каждый успешный бизнес начинался с первого шага',
                     priceLabel: '₸3 000',
-                    onSelect: () =>
-                        _startPurchase(context, ref, 'gp_300', 3000),
+                    selected: _selectedPackageId == 'gp_300',
+                    onSelect: () {
+                      setState(() {
+                        _selectedPackageId = 'gp_300';
+                        _selectedAmount = 3000;
+                        _selectedLabel = 'СТАРТ: 300 GP';
+                      });
+                    },
                   )),
               const SizedBox(height: 12),
               Semantics(
@@ -75,8 +91,15 @@ class GpStoreScreen extends ConsumerWidget {
                     italicNote: 'Выбор 80% предпринимателей',
                     priceLabel: '₸9 960',
                     highlight: true,
-                    onSelect: () =>
-                        _startPurchase(context, ref, 'gp_1400', 9960),
+                    ribbon: 'Хит',
+                    selected: _selectedPackageId == 'gp_1400',
+                    onSelect: () {
+                      setState(() {
+                        _selectedPackageId = 'gp_1400';
+                        _selectedAmount = 9960;
+                        _selectedLabel = 'РАЗГОН: 1400 GP';
+                      });
+                    },
                   )),
               const SizedBox(height: 12),
               Semantics(
@@ -92,67 +115,114 @@ class GpStoreScreen extends ConsumerWidget {
                     ],
                     italicNote: 'Для тех, кто настроен серьезно',
                     priceLabel: '₸19 960',
-                    onSelect: () =>
-                        _startPurchase(context, ref, 'gp_3000', 19960),
-                  )),
-              const SizedBox(height: 24),
-              Center(
-                child: Semantics(
-                  label: 'Проверить покупку',
-                  button: true,
-                  child: BizLevelButton(
-                    label: 'Проверить покупку',
-                    icon: const Icon(Icons.verified),
-                    onPressed: () async {
-                      try {
-                        final box = Hive.box('gp');
-                        final lastId =
-                            (box.get('last_purchase_id') as String?) ?? '';
-                        if (lastId.isEmpty) {
-                          if (!context.mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                              content: Text(
-                                  'Нет активной покупки для проверки. Выберите пакет и оформите оплату.')));
-                          return;
-                        }
-                        await Sentry.addBreadcrumb(Breadcrumb(
-                          message: 'gp_purchase_verify_click',
-                          level: SentryLevel.info,
-                          data: {
-                            'purchase_id':
-                                lastId.substring(0, lastId.length.clamp(0, 8))
-                          },
-                        ));
-                        final gp = GpService(Supabase.instance.client);
-                        final balance =
-                            await gp.verifyPurchase(purchaseId: lastId);
-                        if (!context.mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                              content: Text(
-                                  'Покупка подтверждена, баланс: $balance')),
-                        );
-                        final container = ProviderScope.containerOf(context);
-                        container.invalidate(gpBalanceProvider);
-                      } catch (e) {
-                        if (!context.mounted) return;
-                        final msg = e
-                                .toString()
-                                .contains('gp_purchase_not_found')
-                            ? 'Покупка не найдена. Завершите оплату и попробуйте снова.'
-                            : 'Не удалось подтвердить. Проверьте интернет или попробуйте позже.';
-                        ScaffoldMessenger.of(context)
-                            .showSnackBar(SnackBar(content: Text(msg)));
-                      }
+                    ribbon: 'Выгоднее всего',
+                    selected: _selectedPackageId == 'gp_3000',
+                    onSelect: () {
+                      setState(() {
+                        _selectedPackageId = 'gp_3000';
+                        _selectedAmount = 19960;
+                        _selectedLabel = 'ТРАНСФОРМАЦИЯ: 3000 GP';
+                      });
                     },
-                  ),
+                  )),
+              const SizedBox(height: 16),
+              // FAQ/доверие
+              const BizLevelCard(
+                padding: EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Вопросы и безопасность',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w700, fontSize: 16)),
+                    SizedBox(height: 8),
+                    _FaqRow(
+                        icon: Icons.lock_outline,
+                        text:
+                            'Оплата защищена. Данные карт не хранятся в приложении.'),
+                    _FaqRow(
+                        icon: Icons.schedule_outlined,
+                        text:
+                            'GP зачисляются сразу после подтверждения покупки.'),
+                    _FaqRow(
+                        icon: Icons.help_outline,
+                        text:
+                            'Если GP не пришли — нажмите «Проверить» или обратитесь в поддержку.'),
+                  ],
                 ),
               ),
+              const SizedBox(height: 80),
             ],
           );
         },
       ),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: BizLevelButton(
+                  label: _selectedLabel == null ? 'Выберите пакет' : 'Оплатить',
+                  onPressed: _selectedPackageId == null
+                      ? null
+                      : () => _startPurchase(
+                            context,
+                            ref,
+                            _selectedPackageId!,
+                            _selectedAmount!,
+                          ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              BizLevelButton(
+                variant: BizLevelButtonVariant.secondary,
+                label: 'Проверить',
+                onPressed: () => _verifyLastPurchase(context),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
+  }
+}
+
+Future<void> _verifyLastPurchase(BuildContext context) async {
+  try {
+    final box = Hive.box('gp');
+    final lastId = (box.get('last_purchase_id') as String?) ?? '';
+    if (lastId.isEmpty) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text(
+              'Нет активной покупки для проверки. Выберите пакет и оформите оплату.')));
+      return;
+    }
+    await Sentry.addBreadcrumb(Breadcrumb(
+      message: 'gp_purchase_verify_click',
+      level: SentryLevel.info,
+      data: {'purchase_id': lastId.substring(0, lastId.length.clamp(0, 8))},
+    ));
+    final gp = GpService(Supabase.instance.client);
+    final balance = await gp.verifyPurchase(purchaseId: lastId);
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Покупка подтверждена, баланс: $balance')),
+    );
+    final container = ProviderScope.containerOf(context);
+    container.invalidate(gpBalanceProvider);
+  } catch (e) {
+    if (!context.mounted) return;
+    final msg = e.toString().contains('gp_purchase_not_found')
+        ? 'Покупка не найдена. Завершите оплату и попробуйте снова.'
+        : 'Не удалось подтвердить. Проверьте интернет или попробуйте позже.';
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 }
 
@@ -210,6 +280,8 @@ class _GpPlanCard extends StatelessWidget {
   final String priceLabel; // форматированная строка цены
   final VoidCallback onSelect;
   final bool highlight;
+  final String? ribbon;
+  final bool selected;
 
   const _GpPlanCard({
     required this.title,
@@ -220,6 +292,8 @@ class _GpPlanCard extends StatelessWidget {
     required this.priceLabel,
     required this.onSelect,
     this.highlight = false,
+    this.ribbon,
+    this.selected = false,
   });
 
   @override
@@ -249,13 +323,10 @@ class _GpPlanCard extends StatelessWidget {
                           ),
                         ),
                         SizedBox(
-                          height: 32,
-                          child: ElevatedButton(
+                          height: 40,
+                          child: BizLevelButton(
+                            label: priceLabel,
                             onPressed: onSelect,
-                            child: Text(priceLabel,
-                                style: theme.textTheme.labelLarge?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                )),
                           ),
                         ),
                       ],
@@ -270,14 +341,18 @@ class _GpPlanCard extends StatelessWidget {
                         _GpLabelText(label: gpLabel, compact: true),
                       ],
                     ),
+                    if (ribbon != null || selected) ...[
+                      const SizedBox(height: 8),
+                      _Ribbon(ribbon: ribbon, selected: selected),
+                    ],
                   ],
                 );
               }
               return Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  Row(
+                  Expanded(
+                      child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
@@ -290,19 +365,20 @@ class _GpPlanCard extends StatelessWidget {
                       SvgPicture.asset('assets/images/gp_coin.svg',
                           width: 20, height: 20),
                       const SizedBox(width: 6),
-                      _GpLabelText(label: gpLabel, compact: true),
-                    ],
-                  ),
-                  SizedBox(
-                    height: 36,
-                    child: ElevatedButton(
-                      onPressed: onSelect,
-                      child: Text(
-                        priceLabel,
-                        style: theme.textTheme.labelLarge?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
+                      Flexible(
+                        child: _GpLabelText(label: gpLabel, compact: true),
                       ),
+                      if (ribbon != null || selected) ...[
+                        const SizedBox(width: 8),
+                        _Ribbon(ribbon: ribbon, selected: selected),
+                      ],
+                    ],
+                  )),
+                  SizedBox(
+                    height: 40,
+                    child: BizLevelButton(
+                      label: priceLabel,
+                      onPressed: onSelect,
                     ),
                   ),
                 ],
@@ -322,7 +398,8 @@ class _GpPlanCard extends StatelessWidget {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.check, size: 16, color: Colors.green),
+                      const Icon(Icons.check,
+                          size: 16, color: AppColor.success),
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
@@ -386,6 +463,52 @@ class _GpLabelText extends StatelessWidget {
                       fontWeight: FontWeight.w600)),
         ],
       ],
+    );
+  }
+}
+
+class _Ribbon extends StatelessWidget {
+  final String? ribbon;
+  final bool selected;
+  const _Ribbon({this.ribbon, required this.selected});
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = selected ? AppColor.primary : AppColor.premium;
+    final text = selected ? 'Выбрано' : (ribbon ?? '');
+    if (text.isEmpty) return const SizedBox.shrink();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: bg.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: bg.withValues(alpha: 0.35)),
+      ),
+      child: Text(
+        text,
+        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+      ),
+    );
+  }
+}
+
+class _FaqRow extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  const _FaqRow({required this.icon, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 18, color: AppColor.labelColor),
+          const SizedBox(width: 8),
+          Expanded(child: Text(text)),
+        ],
+      ),
     );
   }
 }

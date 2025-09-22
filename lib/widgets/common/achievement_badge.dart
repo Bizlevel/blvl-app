@@ -96,11 +96,11 @@ class _AchievementBadgeState extends State<AchievementBadge>
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: fill,
-              boxShadow: [
+              boxShadow: const [
                 BoxShadow(
                     color: AppColor.shadow,
                     blurRadius: 6,
-                    offset: const Offset(0, 3)),
+                    offset: Offset(0, 3)),
               ],
               border: Border.all(color: border, width: 2),
             ),

@@ -35,7 +35,7 @@ void main() {
     );
   });
 
-  Future<void> _pumpLoginScreen(WidgetTester tester) async {
+  Future<void> pumpLoginScreen(WidgetTester tester) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -55,7 +55,7 @@ void main() {
         email: any(named: 'email'),
         password: any(named: 'password'))).thenThrow(AuthFailure('Ошибка'));
 
-    await _pumpLoginScreen(tester);
+    await pumpLoginScreen(tester);
 
     // Заполняем поля
     await tester.enterText(
@@ -81,7 +81,7 @@ void main() {
       return MockAuthResponse();
     });
 
-    await _pumpLoginScreen(tester);
+    await pumpLoginScreen(tester);
 
     await tester.enterText(
         find.byKey(const ValueKey('email_field')), 'a@b.com');

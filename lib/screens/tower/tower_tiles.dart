@@ -162,11 +162,11 @@ Widget _buildLevelCoreTile({
       boxShadow: [
         const BoxShadow(
             color: AppColor.shadowColor, blurRadius: 10, offset: Offset(0, 6)),
-        BoxShadow(
+        const BoxShadow(
             color: AppColor.shadowColor,
             blurRadius: 16,
             spreadRadius: 2,
-            offset: const Offset(0, 8)),
+            offset: Offset(0, 8)),
         if (isCurrent)
           BoxShadow(
               color: AppColor.premium.withValues(alpha: 0.55),
