@@ -842,23 +842,23 @@ class _ProfileFormBlock extends _PageBlock {
                   label: 'Перейти на Уровень 1',
                   onPressed: () async {
                     await save();
+                    if (!context.mounted) return;
                     try {
                       await SupabaseService.completeLevel(levelId);
+                      if (!context.mounted) return;
                       ref.invalidate(levelsProvider);
                       ref.invalidate(currentUserProvider);
                       ref.invalidate(userSkillsProvider);
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text(UIS.firstStepDone)),
-                        );
-                        Navigator.of(context).pop();
-                      }
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text(UIS.firstStepDone)),
+                      );
+                      Navigator.of(context).pop();
                     } catch (e) {
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Ошибка: $e')),
-                        );
-                      }
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Ошибка: $e')),
+                      );
                     }
                   },
                 ),

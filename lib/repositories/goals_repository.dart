@@ -71,21 +71,30 @@ class GoalsRepository {
     }
   }
 
-  /// Создать новую версию цели (insert новой записи). user_id проставится триггером.
+  /// Создать или обновить версию цели (upsert). user_id проставится триггером.
   Future<Map<String, dynamic>> upsertGoalVersion({
     required int version,
     required String goalText,
     required Map<String, dynamic> versionData,
   }) async {
+    final String? userId = _client.auth.currentUser?.id;
     final payload = {
       'version': version,
       'goal_text': goalText,
       'version_data': versionData,
+      if (userId != null) 'user_id': userId, // fallback: если нет триггера в БД
     };
 
-    final inserted =
-        await _client.from('core_goals').insert(payload).select().single();
-    return Map<String, dynamic>.from(inserted);
+    // Используем upsert для избежания дублирования
+    final result = await _client
+        .from('core_goals')
+        .upsert(
+          payload,
+          onConflict: 'user_id,version',
+        )
+        .select()
+        .single();
+    return Map<String, dynamic>.from(result);
   }
 
   /// Обновляет текущую (последнюю) версию v1 по id записи.
@@ -94,12 +103,14 @@ class GoalsRepository {
     required String goalText,
     required Map<String, dynamic> versionData,
   }) async {
+    final Map<String, dynamic> payload = {
+      'goal_text': goalText,
+      // не перезаписываем version_data, если передан пустой объект
+      if (versionData.isNotEmpty) 'version_data': versionData,
+    };
     final updated = await _client
         .from('core_goals')
-        .update({
-          'goal_text': goalText,
-          'version_data': versionData,
-        })
+        .update(payload)
         .eq('id', id)
         .select()
         .single();
@@ -114,18 +125,69 @@ class GoalsRepository {
     required dynamic value,
   }) async {
     return _withRetry<Map<String, dynamic>>(() async {
-      final result = await _client.rpc(
-        'upsert_goal_field',
-        params: {
-          'p_version': version,
-          'p_field': field,
-          'p_value': value,
-        },
-      );
-      if (result is Map<String, dynamic>) {
-        return result;
+      try {
+        final result = await _client.rpc(
+          'upsert_goal_field',
+          params: {
+            'p_version': version,
+            'p_field': field,
+            'p_value': value,
+          },
+        );
+        if (result is Map<String, dynamic>) {
+          return result;
+        }
+        return Map<String, dynamic>.from(result as Map);
+      } on PostgrestException {
+        // Fallback: если RPC отсутствует/недоступно — делаем client-side merge последней версии
+        // 1) Находим последнюю запись версии для текущего пользователя
+        final String? userId = _client.auth.currentUser?.id;
+        if (userId == null) rethrow;
+        final row = await _client
+            .from('core_goals')
+            .select('id, version, user_id, version_data')
+            .eq('user_id', userId)
+            .eq('version', version)
+            .order('updated_at', ascending: false)
+            .limit(1)
+            .maybeSingle();
+
+        Map<String, dynamic> vdata = <String, dynamic>{};
+        String? goalId;
+        if (row != null) {
+          goalId = row['id'] as String?;
+          final raw = row['version_data'];
+          if (raw is Map) {
+            vdata = Map<String, dynamic>.from(raw);
+          }
+        }
+
+        // 2) Мержим поле и сохраняем
+        vdata[field] = value;
+
+        if (goalId != null) {
+          final updated = await _client
+              .from('core_goals')
+              .update({'version_data': vdata})
+              .eq('id', goalId)
+              .select()
+              .single();
+          return Map<String, dynamic>.from(updated);
+        } else {
+          // Если записи нет — создаём новую оболочку версии
+          final created = await _client
+              .from('core_goals')
+              .insert({
+                'user_id': userId,
+                'version': version,
+                'goal_text': '',
+                'version_data': vdata,
+              })
+              .select()
+              .single();
+          return Map<String, dynamic>.from(created);
+        }
       }
-      return Map<String, dynamic>.from(result as Map);
     });
   }
 
@@ -136,10 +198,12 @@ class GoalsRepository {
     // Получаем version_data для указанной версии (если есть запись)
     Map<String, dynamic> versionRow = {};
     try {
+      final String? userId = _client.auth.currentUser?.id;
       final data = await _client
           .from('core_goals')
-          .select('version, version_data')
+          .select('version, version_data, user_id')
           .eq('version', version)
+          .eq('user_id', userId as Object)
           .order('updated_at', ascending: false)
           .limit(1)
           .maybeSingle();
@@ -151,10 +215,12 @@ class GoalsRepository {
     // Поля прогресса из goal_checkpoint_progress (RLS owner-only)
     List<String> completed = <String>[];
     try {
+      final String? userId = _client.auth.currentUser?.id;
       final rows = await _client
           .from('goal_checkpoint_progress')
-          .select('field_name')
-          .eq('version', version);
+          .select('field_name, user_id')
+          .eq('version', version)
+          .eq('user_id', userId as Object);
       // rows уже List по контракту PostgREST; лишняя проверка типа не нужна
       completed = (rows as List)
           .map((e) => (e as Map)['field_name'])

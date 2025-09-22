@@ -12,6 +12,7 @@ class CustomTextBox extends StatelessWidget {
     this.obscureText = false,
     this.keyboardType,
     this.readOnlySoftBackground = false,
+    this.maxLines = 1,
   });
 
   final String hint;
@@ -22,13 +23,14 @@ class CustomTextBox extends StatelessWidget {
   final TextEditingController? controller;
   final TextInputType? keyboardType;
   final bool readOnlySoftBackground;
+  final int maxLines;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       alignment: Alignment.center,
       padding: const EdgeInsets.only(bottom: 3),
-      height: 40,
+      constraints: const BoxConstraints(minHeight: 48),
       decoration: BoxDecoration(
         color: (readOnly && readOnlySoftBackground)
             ? Colors.grey.shade100
@@ -52,6 +54,8 @@ class CustomTextBox extends StatelessWidget {
         controller: controller,
         obscureText: obscureText,
         keyboardType: keyboardType,
+        maxLines: maxLines,
+        textAlignVertical: TextAlignVertical.center,
         decoration: InputDecoration(
           prefixIcon: prefix,
           suffixIcon: suffix,
@@ -60,6 +64,11 @@ class CustomTextBox extends StatelessWidget {
           hintStyle: const TextStyle(
             color: Colors.grey,
             fontSize: 15,
+          ),
+          isDense: false,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 10,
           ),
         ),
       ),

@@ -26,6 +26,11 @@ class UserModel with _$UserModel {
     bool onboardingCompleted,
     @JsonKey(name: 'created_at') DateTime? createdAt,
     @JsonKey(name: 'updated_at') DateTime? updatedAt,
+    // Новые поля персонализации профиля (этап draft-2)
+    @JsonKey(name: 'business_size') String? businessSize,
+    @JsonKey(name: 'key_challenges') List<String>? keyChallenges,
+    @JsonKey(name: 'learning_style') String? learningStyle,
+    @JsonKey(name: 'business_region') String? businessRegion,
   }) = _UserModel;
 
   factory UserModel.fromJson(Map<String, dynamic> json) =>

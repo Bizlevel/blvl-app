@@ -7,7 +7,6 @@ import 'package:bizlevel/providers/leo_service_provider.dart';
 import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/widgets/leo_message_bubble.dart';
 import 'package:bizlevel/widgets/typing_indicator.dart';
-import 'package:bizlevel/widgets/common/bizlevel_button.dart';
 import 'package:bizlevel/services/leo_service.dart';
 import 'package:bizlevel/providers/gp_providers.dart';
 
@@ -118,7 +117,10 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
       // Отправляем асинхронно после первого кадра, чтобы не мешать построению
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         if (!mounted) return;
-        await _sendMessageInternal(widget.autoUserMessage!.trim());
+        await _sendMessageInternal(
+          widget.autoUserMessage!.trim(),
+          isAuto: true,
+        );
       });
     }
   }
@@ -208,7 +210,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
     });
   }
 
-  Future<void> _sendMessageInternal(String text) async {
+  Future<void> _sendMessageInternal(String text, {bool isAuto = false}) async {
     // Дополнительная проверка на случай, если состояние изменилось
     if (_isSending || !mounted) return;
 
@@ -250,8 +252,10 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
         userContext: cleanUserContext,
         levelContext: cleanLevelContext,
         bot: widget.bot,
-        // Тонкая реакция: можно пропустить списания GP
+        // GP‑политика: в mentor-mode все сообщения бесплатные,
+        // в обычном режиме только авто‑сообщения бесплатные
         skipSpend: widget.skipSpend,
+        caseMode: widget.caseMode, // Add caseMode parameter
       );
 
       assistantMsg = response['message']['content'] as String? ?? '';
@@ -307,7 +311,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
             }
           }
         } else if (assistantMsg.contains('[CASE:FINAL]')) {
-          // Показать финальную историю (если задана), затем CTA на возврат
+          // Показать финальную историю (если задана), затем предложить кнопку возврата
           final fs = widget.finalStory?.trim();
           if (fs != null && fs.isNotEmpty) {
             setState(() {
@@ -316,7 +320,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
             _scrollToBottom();
           }
           if (!mounted) return;
-          // Кнопка в нижнем листе
+          // Кнопка в нижнем листе для явного возврата
           // ignore: use_build_context_synchronously
           await showModalBottomSheet(
             context: context,
@@ -324,15 +328,28 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
             builder: (ctx) => SafeArea(
               child: Padding(
                 padding: const EdgeInsets.all(16),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: BizLevelButton(
-                    label: 'Вернуться в Башню',
-                    onPressed: () {
-                      Navigator.of(ctx).pop();
-                      Navigator.of(context).pop('case_final');
-                    },
-                  ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text(
+                      'Кейс завершён',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 12),
+                    ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(ctx).pop();
+                        Navigator.of(context).pop('case_final');
+                      },
+                      child: const Text('Вернуться в Башню'),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      child: const Text('Остаться в диалоге'),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -340,33 +357,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
           return;
         }
       }
-      // Если ассистент сообщил о финале кейса — предложим вернуться в башню
-      if (assistantMsg.contains('[CASE:FINAL]')) {
-        if (!mounted) return;
-        final goBack = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('Кейс завершён'),
-            content: const Text('Отличная работа! Перейти обратно на Башню?'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(false),
-                child: const Text('Остаться'),
-              ),
-              BizLevelButton(
-                label: 'Вернуться в Башню',
-                onPressed: () => Navigator.of(ctx).pop(true),
-                variant: BizLevelButtonVariant.primary,
-                size: BizLevelButtonSize.md,
-              ),
-            ],
-          ),
-        );
-        if (goBack == true && mounted) {
-          Navigator.of(context).pop('case_final');
-          return;
-        }
-      }
+      // В обычном режиме (не кейс) диалог не закрываем автоматически
       // После успешного ответа обновим баланс GP в фоне
       try {
         // ignore: unused_result
@@ -609,15 +600,23 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
   List<String> _resolveRecommendedChips() {
     if (widget.recommendedChips != null &&
         widget.recommendedChips!.isNotEmpty) {
-      return widget.recommendedChips!;
+      // Объединим серверные и локальные, удалив дубли и ограничив до 6 штук
+      final local = _localChipsFallback();
+      final merged = <String>{...widget.recommendedChips!, ...local}.toList();
+      if (merged.length > 6) return merged.sublist(0, 6);
+      return merged;
     }
+    return _localChipsFallback();
+  }
+
+  List<String> _localChipsFallback() {
     // Клиентский фолбэк: подбираем подсказки по версии цели в userContext
     if (widget.bot == 'max') {
       final ctx = widget.userContext ?? '';
       final match = RegExp(r'goal_version:\s*(\d+)').firstMatch(ctx);
       final v = match != null ? int.tryParse(match.group(1) ?? '') : null;
       switch (v) {
-        case 2:
+        case 1:
           return const [
             '💰 Выручка',
             '👥 Кол-во клиентов',
@@ -625,14 +624,14 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
             '📊 Конверсия %',
             '✏️ Другое',
           ];
-        case 3:
+        case 2:
           return const [
             'Неделя 1: Подготовка',
             'Неделя 2: Запуск',
             'Неделя 3: Масштабирование',
             'Неделя 4: Оптимизация',
           ];
-        case 4:
+        case 3:
           return const [
             'Готовность 7/10',
             'Начать завтра',

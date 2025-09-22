@@ -8,6 +8,7 @@ import 'package:bizlevel/screens/leo_dialog_screen.dart';
 
 import 'package:bizlevel/theme/color.dart' show AppColor;
 import 'package:bizlevel/providers/auth_provider.dart';
+import 'package:bizlevel/services/context_service.dart';
 import 'package:bizlevel/theme/spacing.dart';
 
 class LeoChatScreen extends ConsumerStatefulWidget {
@@ -51,31 +52,11 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
     if (mounted) setState(() {});
   }
 
-  String? _getUserContext() {
-    final user = ref.read(currentUserProvider).value;
-    if (user != null) {
-      final contextParts = <String>[];
+  Future<String?> _getUserContext() async =>
+      ContextService.buildUserContext(ref.read(currentUserProvider).value);
 
-      if (user.goal?.isNotEmpty == true) {
-        contextParts.add('Цель: ${user.goal}');
-      }
-      if (user.about?.isNotEmpty == true) {
-        contextParts.add('О себе: ${user.about}');
-      }
-      final currentLevel = user.currentLevel;
-      contextParts.add('Текущий уровень: $currentLevel');
-
-      return contextParts.isNotEmpty ? contextParts.join('. ') : null;
-    }
-    return null;
-  }
-
-  String? _getLevelContext() {
-    // Получить текущий уровень пользователя
-    final user = ref.read(currentUserProvider).value;
-    if (user != null) return 'Уровень ${user.currentLevel}';
-    return null;
-  }
+  Future<String?> _getLevelContext() async =>
+      ContextService.buildLevelContext(ref.read(currentUserProvider).value);
 
   @override
   Widget build(BuildContext context) {
@@ -151,11 +132,18 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
           onTap: () {
             Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (_) => LeoDialogScreen(
+                builder: (_) => FutureBuilder<List<String?>>( 
+                  future: Future.wait([_getUserContext(), _getLevelContext()]),
+                  builder: (context, snap) {
+                    final userCtx = (snap.data!=null) ? snap.data![0] : null;
+                    final lvlCtx = (snap.data!=null) ? snap.data![1] : null;
+                    return LeoDialogScreen(
                   chatId: chat['id'],
-                  userContext: _getUserContext(),
-                  levelContext: _getLevelContext(),
+                  userContext: userCtx,
+                  levelContext: lvlCtx,
                   bot: _activeBot,
+                );
+                  }
                 ),
               ),
             );
@@ -168,10 +156,17 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
   void _onNewChat() {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => LeoDialogScreen(
-          userContext: _getUserContext(),
-          levelContext: _getLevelContext(),
-          bot: _activeBot,
+        builder: (_) => FutureBuilder<List<String?>>( 
+          future: Future.wait([_getUserContext(), _getLevelContext()]),
+          builder: (context, snap) {
+            final userCtx = (snap.data!=null) ? snap.data![0] : null;
+            final lvlCtx = (snap.data!=null) ? snap.data![1] : null;
+            return LeoDialogScreen(
+              userContext: userCtx,
+              levelContext: lvlCtx,
+              bot: _activeBot,
+            );
+          },
         ),
       ),
     );

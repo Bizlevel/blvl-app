@@ -40,3 +40,10 @@ final favoritesDetailedProvider =
   final repo = ref.watch(libraryRepositoryProvider);
   return repo.fetchFavoritesDetailed();
 });
+
+// Динамические категории per-type
+final libraryCategoriesProvider =
+    FutureProvider.family<List<String>, String>((ref, type) async {
+  final repo = ref.watch(libraryRepositoryProvider);
+  return repo.fetchCategories(type);
+});

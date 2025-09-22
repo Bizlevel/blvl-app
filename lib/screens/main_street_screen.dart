@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/widgets/user_info_bar.dart';
 import 'package:bizlevel/providers/levels_provider.dart';
-import 'package:bizlevel/utils/formatters.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:bizlevel/widgets/common/gp_balance_widget.dart';
@@ -61,43 +60,42 @@ class MainStreetScreen extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Consumer(builder: (context, ref, _) {
-                        final nextAsync =
-                            ref.watch(nextLevelToContinueProvider);
-                        return nextAsync.when(
-                          data: (next) {
-                            final int floorId = next['floorId'] as int? ?? 1;
-                            final int levelNumber =
-                                next['levelNumber'] as int? ?? 0;
-                            final levelCode =
-                                formatLevelCode(floorId, levelNumber);
+                        final nextLevel = ref.watch(nextLevelToContinueProvider);
+                        return nextLevel.when(
+                          data: (data) {
+                            final String label = data['label'] as String? ?? 'Продолжить';
+                            final int? targetScroll = data['targetScroll'] as int?;
+                            final int? goalCheckpointVersion = data['goalCheckpointVersion'] as int?;
+                            final int? miniCaseId = data['miniCaseId'] as int?;
+                            
                             return SizedBox(
                               height: 48,
                               child: ElevatedButton(
                                 onPressed: () {
                                   try {
-                                    final int? gver =
-                                        next['goalCheckpointVersion'] as int?;
-                                    if (gver != null) {
-                                      context.go('/goal-checkpoint/$gver');
+                                    if (goalCheckpointVersion != null) {
+                                      // Переходим к чекпоинту цели
+                                      context.go('/goal-checkpoint/$goalCheckpointVersion');
+                                    } else if (miniCaseId != null) {
+                                      // Переходим к мини-кейсу
+                                      context.go('/case/$miniCaseId');
+                                    } else if (targetScroll != null) {
+                                      // Переходим в башню с автоскроллом
+                                      context.go('/tower?scrollTo=$targetScroll');
                                     } else {
-                                      final levelNumber =
-                                          next['levelNumber'] as int? ?? 0;
-                                      final levelId =
-                                          next['levelId'] as int? ?? 0;
-                                      context.go(
-                                          '/levels/$levelId?num=$levelNumber');
+                                      // Fallback - переходим в башню
+                                      context.go('/tower');
                                     }
                                   } catch (e, st) {
                                     Sentry.captureException(e, stackTrace: st);
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(
-                                        content:
-                                            Text('Не удалось открыть уровень'),
+                                        content: Text('Не удалось открыть уровень'),
                                       ),
                                     );
                                   }
                                 },
-                                child: Text('Продолжить: Уровень $levelCode'),
+                                child: Text('Продолжить: $label'),
                               ),
                             );
                           },
@@ -105,13 +103,16 @@ class MainStreetScreen extends ConsumerWidget {
                             height: 48,
                             child: Center(child: CircularProgressIndicator()),
                           ),
-                          error: (e, _) => SizedBox(
-                            height: 48,
-                            child: ElevatedButton(
-                              onPressed: () => context.go('/tower'),
-                              child: const Text('Открыть башню'),
-                            ),
-                          ),
+                          error: (error, stack) {
+                            Sentry.captureException(error, stackTrace: stack);
+                            return SizedBox(
+                              height: 48,
+                              child: ElevatedButton(
+                                onPressed: () => context.go('/tower'),
+                                child: const Text('Продолжить: Башня'),
+                              ),
+                            );
+                          },
                         );
                       }),
                       // Кнопка открытия башни убрана — вход через нажатие на центральное здание
@@ -175,22 +176,12 @@ class _MainActionsGrid extends ConsumerWidget {
               children: [
                 Expanded(
                   child: _MainActionCard(
-                    key: const Key('ms_card_library'),
-                    title: 'Библиотека',
-                    icon: Icons.menu_book,
-                    svgAsset: 'assets/images/street/library.svg',
-                    state: _CardState.active,
-                    onTap: () {
-                      try {
-                        context.go('/library');
-                      } catch (e, st) {
-                        Sentry.captureException(e, stackTrace: st);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                              content: Text('Не удалось открыть страницу')),
-                        );
-                      }
-                    },
+                    key: const Key('ms_card_coworking'),
+                    title: 'Коворкинг',
+                    icon: Icons.workspaces_outline,
+                    svgAsset: 'assets/images/street/coworking.svg',
+                    state: _CardState.soon,
+                    onTap: () => _showSoonSnackBar(context),
                   ),
                 ),
                 const SizedBox(width: gap),
@@ -236,12 +227,22 @@ class _MainActionsGrid extends ConsumerWidget {
                 const SizedBox(width: gap),
                 Expanded(
                   child: _MainActionCard(
-                    key: const Key('ms_card_coworking'),
-                    title: 'Коворкинг',
-                    icon: Icons.workspaces_outline,
-                    svgAsset: 'assets/images/street/coworking.svg',
-                    state: _CardState.soon,
-                    onTap: () => _showSoonSnackBar(context),
+                    key: const Key('ms_card_library'),
+                    title: 'Библиотека',
+                    icon: Icons.menu_book,
+                    svgAsset: 'assets/images/street/library.svg',
+                    state: _CardState.active,
+                    onTap: () {
+                      try {
+                        context.go('/library');
+                      } catch (e, st) {
+                        Sentry.captureException(e, stackTrace: st);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                              content: Text('Не удалось открыть страницу')),
+                        );
+                      }
+                    },
                   ),
                 ),
               ],

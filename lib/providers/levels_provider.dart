@@ -3,6 +3,7 @@ import 'package:bizlevel/models/level_model.dart';
 import 'package:bizlevel/providers/levels_repository_provider.dart';
 import 'package:bizlevel/providers/auth_provider.dart';
 import 'package:bizlevel/utils/formatters.dart';
+import 'package:bizlevel/services/supabase_service.dart';
 // import 'package:hive_flutter/hive_flutter.dart';
 import 'package:bizlevel/providers/goals_providers.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -13,7 +14,9 @@ final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
 
   // Дожидаемся профиля пользователя, чтобы избежать расчётов с null userId
   final user = await ref.watch(currentUserProvider.future);
-  final int? userCurrentLevel = user?.currentLevel;
+  final int? userCurrentLevelId = user?.currentLevel;
+  final int userCurrentLevelNumber =
+      await SupabaseService.levelNumberFromId(userCurrentLevelId);
   // Подписки отключены (этап 39.1). Доступ уровней >3 будет реализован через GP (этап 39.7).
 
   final userId = Supabase.instance.client.auth.currentUser?.id;
@@ -51,11 +54,11 @@ final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
       // «Первый шаг» всегда доступен для просмотра
       isAccessible = true;
     } else if (!level.isFree && level.number > 3) {
+      // ВРЕМЕННО: отключаем GP-блокировку для тестирования
       // Этажи >1 требуют открытия за GP (этап 39.7)
       // Для простоты: уровни 1..10 — это этаж 1
       final int floorNumber = 1; // текущий этаж
-      final bool hasAccess =
-          unlockedFloors.contains(floorNumber) || level.number <= 3;
+      final bool hasAccess = true; // ВРЕМЕННО: всегда true для тестирования
       isAccessible = hasAccess && previousCompleted;
     } else {
       // Обычные уровни доступны только после завершения предыдущего уровня
@@ -65,7 +68,8 @@ final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
     // Обновляем previousCompleted для следующего уровня:
     // - уровень считается «пройденным» если user_progress.is_completed = true
     // - или если текущий уровень пользователя больше номера этого уровня
-    previousCompleted = isCompleted || ((userCurrentLevel ?? 0) > level.number);
+    previousCompleted =
+        isCompleted || (userCurrentLevelNumber > level.number);
 
     final bool isLocked = !isAccessible;
 
@@ -87,7 +91,7 @@ final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
       // Уровень 0 должен быть всегда доступен
       'isLocked': level.number == 0 ? false : isLocked,
       'isCompleted': isCompleted,
-      'isCurrent': level.number == userCurrentLevel,
+      'isCurrent': level.number == userCurrentLevelNumber,
       'lockReason': isLocked
           ? (level.number > 3 && !level.isFree
               ? 'Требуются GP'
@@ -104,72 +108,87 @@ final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
 /// Возвращает: { levelId, levelNumber, floorId: 1, requiresPremium }
 final nextLevelToContinueProvider =
     FutureProvider<Map<String, dynamic>>((ref) async {
+  // Дождёмся профиля, чтобы избежать гонки null currentLevel
+  final user = await ref.watch(currentUserProvider.future);
+  final int? userCurrentLevelId = user?.currentLevel;
+  final int userCurrentLevelNumber =
+      await SupabaseService.levelNumberFromId(userCurrentLevelId);
+
   final levels = await ref.watch(levelsProvider.future);
-  // Интеграция незавершённых goal_checkpoint как следующей цели (36.9)
-  // Используем towerNodesProvider, чтобы найти ближайший незавершённый checkpoint цели
   final nodes = await ref.watch(towerNodesProvider.future);
-  // Ищем первый узел goal_checkpoint с isCompleted=false и запоминаем его afterLevel
+
+  // 0) Чекпоинт цели (если предшествующий уровень завершён)
   final Map<String, dynamic> pendingGoalCp = nodes.firstWhere(
-      (n) => n['type'] == 'goal_checkpoint' && (n['isCompleted'] != true),
-      orElse: () => <String, dynamic>{});
-
-  final int? userCurrentLevel =
-      ref.watch(currentUserProvider.select((user) => user.value?.currentLevel));
-  // Подписки отключены — ветки, завязанные на премиум, убраны.
-
-  // 0) Если есть незавершённый чекпоинт цели — предлагаем дойти до него (скролл)
-  //    Только если предшествующий ему уровень действительно завершён пользователем
+    (n) => n['type'] == 'goal_checkpoint' && (n['isCompleted'] != true),
+    orElse: () => <String, dynamic>{},
+  );
   if (pendingGoalCp.isNotEmpty) {
     final int afterLevel = pendingGoalCp['afterLevel'] as int? ?? 0;
-    final int targetLevel = afterLevel; // скроллим к уровню перед чекпоинтом
+    final int targetLevel = afterLevel;
     final int? gver = pendingGoalCp['version'] as int?;
-    // Найдём сам уровень в списке levels
     final candidate = levels.firstWhere(
       (l) => (l['level'] as int? ?? -1) == targetLevel,
       orElse: () => levels.first,
     );
-    // Пропускаем checkpoint, если предшествующий уровень ещё не завершён
-    if ((candidate['isCompleted'] as bool? ?? false) == false) {
-      // Падать на checkpoint сейчас нельзя — продолжим обычной логикой ниже
-    } else {
-      // Премиум-гейтинг отключён; признак requiresPremium всегда false
-      const bool requiresPremium = false;
+    if ((candidate['isCompleted'] as bool? ?? false) == true) {
       return {
         'levelId': candidate['id'] as int,
         'levelNumber': targetLevel,
         'floorId': 1,
-        'requiresPremium': requiresPremium,
+        'requiresPremium': false,
+        'isLocked': false,
+        'targetScroll': targetLevel,
+        'label': 'Чекпоинт цели v${gver ?? ''}'.trim(),
         if (gver != null) 'goalCheckpointVersion': gver,
       };
     }
   }
 
-  // 1) Если есть текущий незавершённый — продолжаем его
-  Map<String, dynamic>? candidate = levels
-      .cast<Map<String, dynamic>?>()
-      .firstWhere(
-          (l) =>
-              (l?['isCurrent'] as bool? ?? false) &&
-              (l?['isCompleted'] as bool? ?? false) == false,
-          orElse: () => null);
+  // 1) Мини‑кейс (если предыдущий уровень завершён)
+  final Map<String, dynamic> pendingMiniCase = nodes.firstWhere(
+    (n) => n['type'] == 'mini_case' && (n['isCompleted'] != true),
+    orElse: () => <String, dynamic>{},
+  );
+  if (pendingMiniCase.isNotEmpty) {
+    final bool prevDone =
+        (pendingMiniCase['prevLevelCompleted'] as bool? ?? false);
+    if (prevDone) {
+      final int afterLevel = pendingMiniCase['afterLevel'] as int? ?? 0;
+      final int caseId = pendingMiniCase['caseId'] as int;
+      final String title = (pendingMiniCase['title'] as String?) ?? 'Мини‑кейс';
+      return {
+        'floorId': 1,
+        'requiresPremium': false,
+        'isLocked': false,
+        'targetScroll': afterLevel + 1,
+        'label': 'Мини‑кейс: $title',
+        'miniCaseId': caseId,
+      };
+    }
+  }
 
-  // 2) Иначе — берём уровень по номеру current_level (даже если он заблокирован премиумом)
-  candidate ??= levels.firstWhere(
-    (l) => (l['level'] as int? ?? -1) == (userCurrentLevel ?? -999),
-    orElse: () => levels.first,
+  // Определяем целевой номер сами, чтобы исключить редкие падения на fallback'ах
+  final Map<String, dynamic>? currentRow = levels.cast<Map<String, dynamic>?>().firstWhere(
+    (l) => (l?['level'] as int? ?? -1) == userCurrentLevelNumber,
+    orElse: () => null,
+  );
+  final bool currDone = currentRow?['isCompleted'] as bool? ?? false;
+  final int desiredNumber = currDone ? (userCurrentLevelNumber + 1) : userCurrentLevelNumber;
+  Map<String, dynamic> candidate = levels.firstWhere(
+    (l) => (l['level'] as int? ?? -1) == desiredNumber,
+    orElse: () => currentRow ?? levels.first,
   );
 
   final int levelNumber = candidate['level'] as int? ?? 0;
-  // Опираемся на данные уровня: если уровень помечен как «Только для премиум»,
-  // и у пользователя нет премиума — требуется премиум. Иначе — нет.
-  // Премиум-гейтинг отключён; признак requiresPremium всегда false
-  const bool requiresPremium = false;
-
+  final bool isLocked = candidate['isLocked'] as bool? ?? false;
   return {
     'levelId': candidate['id'] as int,
     'levelNumber': levelNumber,
     'floorId': 1,
-    'requiresPremium': requiresPremium,
+    'requiresPremium': false,
+    'isLocked': isLocked,
+    'targetScroll': levelNumber,
+    'label': levelNumber == 0 ? 'Первый шаг' : 'Уровень $levelNumber',
   };
 });
 
@@ -196,14 +215,17 @@ final towerNodesProvider =
       casesRows.map<int>((r) => (r['id'] as int)).toList(growable: false);
   final Set<int> doneCaseIds = <int>{};
   if (caseIds.isNotEmpty) {
+    final String uid = Supabase.instance.client.auth.currentUser?.id ?? '';
     final List<dynamic> prog = await supa
         .from('user_case_progress')
         .select('case_id, status')
+        .eq('user_id', uid)
         .inFilter('case_id', caseIds);
     for (final p in prog) {
       final status = (p['status'] as String?)?.toLowerCase() ?? 'started';
+      final caseId = (p['case_id'] as num).toInt();
       if (status == 'completed' || status == 'skipped') {
-        doneCaseIds.add((p['case_id'] as num).toInt());
+        doneCaseIds.add(caseId);
       }
     }
   }
@@ -284,6 +306,8 @@ final towerNodesProvider =
         // Разрешаем входить в чекпоинт, только если предыдущий уровень завершён
         'prevLevelCompleted': (l['isCompleted'] as bool? ?? false),
       });
+      // Строгая логика: блокируем следующий уровень, пока checkpoint не завершён
+      // Новый UX: редактирование чекпоинтов не блокирует прогресс уровней
     }
   }
 

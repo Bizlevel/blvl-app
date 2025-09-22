@@ -30,6 +30,38 @@ class SupabaseService {
   /// Экспортирует [SupabaseClient] для внешнего использования.
   SupabaseClient get client => Supabase.instance.client;
 
+  // Cached mapping: level_id -> levels.number
+  static Map<int, int>? _levelIdToNumber;
+
+  static Future<Map<int, int>> levelMap() async {
+    if (_levelIdToNumber != null) return _levelIdToNumber!;
+    final resp = await Supabase.instance.client
+        .from('levels')
+        .select('id, number');
+    final list = _asListOfMaps(resp);
+    _levelIdToNumber = {
+      for (final m in list)
+        (m['id'] as num).toInt(): (m['number'] as num).toInt()
+    };
+    return _levelIdToNumber!;
+  }
+
+  static Future<int> levelNumberFromId(int? levelId) async {
+    final map = await levelMap();
+    if (levelId == null) return 0;
+    return map[levelId] ?? 0;
+  }
+
+  static Future<int?> levelIdFromNumber(int levelNumber) async {
+    final map = await levelMap();
+    for (final entry in map.entries) {
+      if (entry.value == levelNumber) {
+        return entry.key;
+      }
+    }
+    return null;
+  }
+
   /// Унифицированное преобразование ответа PostgREST в список мапов.
   static List<Map<String, dynamic>> _asListOfMaps(dynamic response) {
     final list = response as List<dynamic>;
@@ -163,7 +195,8 @@ class SupabaseService {
           'is_completed': true,
           'updated_at': DateTime.now().toIso8601String(),
         });
-        // Update users.current_level if we just completed it
+        
+        // Call RPC function to update current_level and award skill points
         await Supabase.instance.client
             .rpc('update_current_level', params: {'p_level_id': levelId});
       } on PostgrestException catch (e, st) {
