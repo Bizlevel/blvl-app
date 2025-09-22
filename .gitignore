@@ -53,7 +53,7 @@ venv/
 scripts/local_build.sh
 scripts/local_build.ps1
 android/app/google-services.json
-<<<<<<< Updated upstream
+
 
 ios/Runner/GoogleService-Info.plist
 ios/GoogleService-Info.plist
@@ -61,5 +61,4 @@ ios/GoogleService-Info.plist
 android/app/google-services.json
 google_keys/
 .gradle/
-=======
->>>>>>> Stashed changes
+
