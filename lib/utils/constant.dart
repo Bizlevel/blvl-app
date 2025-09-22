@@ -11,6 +11,4 @@ const bool kEnableGoalChips = true;
 // Фича-флаги клиентских реакций (тонкий режим)
 const bool kEnableClientGoalReactions = true;
 const bool kEnableClientWeeklyReaction = true;
-// Фича-флаг показа мини-тура и его версия (для переобучения)
-const bool kEnableMiniTour = true;
-const int kRequiredTourVersion = 1;
+
