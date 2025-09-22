@@ -195,50 +195,10 @@ class SupabaseService {
           'is_completed': true,
           'updated_at': DateTime.now().toIso8601String(),
         });
-        // Пересчитываем users.current_level на основании максимального levels.number среди завершённых уровней
-        // 1) Загружаем карту уровней: id -> number
-        final levelsResp = await Supabase.instance.client
-            .from('levels')
-            .select('id, number');
-        final levelsList = _asListOfMaps(levelsResp);
-        final Map<int, int> levelIdToNumber = {
-          for (final m in levelsList)
-            (m['id'] as num).toInt(): (m['number'] as num).toInt()
-        };
-
-        // 2) Загружаем завершённые уровни пользователя
-        final progressResp = await Supabase.instance.client
-            .from('user_progress')
-            .select('level_id')
-            .eq('user_id', user.id)
-            .eq('is_completed', true);
-        final progressList = _asListOfMaps(progressResp);
-
-        // 3) Определяем максимальный номер уровня
-        int maxNumber = 0;
-        for (final row in progressList) {
-          final int lid = (row['level_id'] as num).toInt();
-          final int numVal = levelIdToNumber[lid] ?? 0;
-          if (numVal > maxNumber) maxNumber = numVal;
-        }
-
-        // 4) Находим level_id, соответствующий maxNumber (если нет завершённых — ставим null)
-        int? targetLevelId;
-        if (maxNumber > 0) {
-          for (final entry in levelIdToNumber.entries) {
-            if (entry.value == maxNumber) {
-              targetLevelId = entry.key;
-              break;
-            }
-          }
-        }
-
-        // 5) Обновляем users.current_level безопасно: если нет завершённых уровней — ставим стартовый level_id = 22 (уровень №0)
-        final int safeLevelId = (targetLevelId ?? 22);
+        
+        // Call RPC function to update current_level and award skill points
         await Supabase.instance.client
-            .from('users')
-            .update({'current_level': safeLevelId})
-            .eq('id', user.id);
+            .rpc('update_current_level', params: {'p_level_id': levelId});
       } on PostgrestException catch (e, st) {
         await Sentry.captureException(e, stackTrace: st);
         rethrow;

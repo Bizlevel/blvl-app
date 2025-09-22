@@ -62,6 +62,7 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
   final TextEditingController _finalWhenCtrl = TextEditingController();
   final TextEditingController _finalHowCtrl = TextEditingController();
   bool _commitment = false;
+  int? _readinessScore; // Значение ползунка готовности (1-10)
   bool _saving = false;
   Map<int, Map<String, dynamic>> _versions = {};
   bool _loadFailed = false;
@@ -195,8 +196,10 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
           (data['accountability_person'] ?? data['final_how'] ?? '') as String;
       final dynamic rs = data['readiness_score'];
       if (rs is num) {
+        _readinessScore = rs.toInt();
         _commitment = rs >= 7;
       } else {
+        _readinessScore = null;
         _commitment = (data['commitment'] ?? false) as bool;
       }
     } else if (version == 1) {
@@ -228,7 +231,7 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
       return s(_finalWhatCtrl.text).length >= 10 &&
           s(_finalWhenCtrl.text).isNotEmpty &&
           s(_finalHowCtrl.text).length >= 10 &&
-          _commitment;
+          (_readinessScore != null && _readinessScore! >= 1);
     } else {
       return s(_goalInitialCtrl.text).length >= 10 &&
           s(_goalWhyCtrl.text).length >= 10 &&
@@ -284,7 +287,7 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
         goalText = _goalSmartCtrl.text.trim();
       } else if (widget.version == 4) {
         // Новые ключи v4
-        final int readiness = _commitment ? 8 : 5; // мягкая проекция
+        final int readiness = _readinessScore ?? (_commitment ? 8 : 5);
         versionData = {
           'first_three_days': _finalWhatCtrl.text.trim(),
           'start_date': _finalWhenCtrl.text.trim(),
@@ -405,7 +408,7 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
       sb.writeln('first_three_days: ${_finalWhatCtrl.text.trim()}');
       sb.writeln('start_date: ${_finalWhenCtrl.text.trim()}');
       sb.writeln('accountability_person: ${_finalHowCtrl.text.trim()}');
-      sb.writeln('readiness_score: ${_commitment ? 8 : 5}');
+      sb.writeln('readiness_score: ${_readinessScore ?? (_commitment ? 8 : 5)}');
     }
     return sb.toString();
   }
@@ -618,6 +621,12 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
                               commitment: _commitment,
                               onCommitmentChanged: (v) =>
                                   setState(() => _commitment = v),
+                              readinessScore: _readinessScore,
+                              onReadinessScoreChanged: (v) =>
+                                  setState(() {
+                                    _readinessScore = v;
+                                    _commitment = v >= 7; // Синхронизируем с ползунком
+                                  }),
                             ),
                             const SizedBox(height: 12),
                             SizedBox(

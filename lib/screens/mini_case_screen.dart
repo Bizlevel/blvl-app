@@ -12,6 +12,7 @@ import 'package:bizlevel/services/supabase_service.dart';
 import 'package:bizlevel/providers/auth_provider.dart';
 import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/screens/leo_dialog_screen.dart';
+import 'package:bizlevel/providers/user_skills_provider.dart';
 
 class MiniCaseScreen extends ConsumerStatefulWidget {
   final int caseId;
@@ -69,7 +70,7 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
         _caseMeta = data == null ? {} : Map<String, dynamic>.from(data);
         final s = (_caseMeta?['script']);
         if (s is Map) {
-          _script = Map<String, dynamic>.from(s as Map);
+          _script = Map<String, dynamic>.from(s);
         }
         _loading = false;
       });
@@ -392,6 +393,8 @@ String? _buildChecklistPreface() {
         ref.invalidate(nextLevelToContinueProvider);
         // ignore: unused_result
         ref.invalidate(currentUserProvider);
+        // ignore: unused_result
+        ref.invalidate(userSkillsProvider);
         // ignore: unused_result
         ref.invalidate(caseStatusProvider(widget.caseId));
       } catch (_) {}

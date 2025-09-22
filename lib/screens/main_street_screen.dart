@@ -75,10 +75,10 @@ class MainStreetScreen extends ConsumerWidget {
                                   try {
                                     if (goalCheckpointVersion != null) {
                                       // Переходим к чекпоинту цели
-                                      context.go('/goal?version=$goalCheckpointVersion');
+                                      context.go('/goal-checkpoint/$goalCheckpointVersion');
                                     } else if (miniCaseId != null) {
                                       // Переходим к мини-кейсу
-                                      context.go('/mini-case/$miniCaseId');
+                                      context.go('/case/$miniCaseId');
                                     } else if (targetScroll != null) {
                                       // Переходим в башню с автоскроллом
                                       context.go('/tower?scrollTo=$targetScroll');
