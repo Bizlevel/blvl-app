@@ -4,12 +4,9 @@ import 'package:go_router/go_router.dart';
 import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/widgets/user_info_bar.dart';
 import 'package:bizlevel/providers/levels_provider.dart';
-import 'package:bizlevel/utils/formatters.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:bizlevel/widgets/common/gp_balance_widget.dart';
-import 'package:bizlevel/providers/auth_provider.dart';
-import 'package:bizlevel/services/supabase_service.dart';
 
 class MainStreetScreen extends ConsumerWidget {
   const MainStreetScreen({super.key});
@@ -63,21 +60,32 @@ class MainStreetScreen extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Consumer(builder: (context, ref, _) {
-                        // Принудительный вариант: вычисляем номер уровня из профиля
-                        final user = ref.watch(currentUserProvider).asData?.value;
-                        final int? currLevelId = user?.currentLevel;
-                        return FutureBuilder<int>(
-                          future: SupabaseService.levelNumberFromId(currLevelId),
-                          builder: (context, snap) {
-                            final ln = snap.data ?? 0;
-                            final String label = ln == 0 ? 'Первый шаг' : 'Уровень $ln';
+                        final nextLevel = ref.watch(nextLevelToContinueProvider);
+                        return nextLevel.when(
+                          data: (data) {
+                            final String label = data['label'] as String? ?? 'Продолжить';
+                            final int? targetScroll = data['targetScroll'] as int?;
+                            final int? goalCheckpointVersion = data['goalCheckpointVersion'] as int?;
+                            final int? miniCaseId = data['miniCaseId'] as int?;
+                            
                             return SizedBox(
                               height: 48,
                               child: ElevatedButton(
                                 onPressed: () {
                                   try {
-                                    // Переходим в башню с автоскроллом до уровня ln
-                                    context.go('/tower?scrollTo=$ln');
+                                    if (goalCheckpointVersion != null) {
+                                      // Переходим к чекпоинту цели
+                                      context.go('/goal?version=$goalCheckpointVersion');
+                                    } else if (miniCaseId != null) {
+                                      // Переходим к мини-кейсу
+                                      context.go('/mini-case/$miniCaseId');
+                                    } else if (targetScroll != null) {
+                                      // Переходим в башню с автоскроллом
+                                      context.go('/tower?scrollTo=$targetScroll');
+                                    } else {
+                                      // Fallback - переходим в башню
+                                      context.go('/tower');
+                                    }
                                   } catch (e, st) {
                                     Sentry.captureException(e, stackTrace: st);
                                     ScaffoldMessenger.of(context).showSnackBar(
@@ -88,6 +96,20 @@ class MainStreetScreen extends ConsumerWidget {
                                   }
                                 },
                                 child: Text('Продолжить: $label'),
+                              ),
+                            );
+                          },
+                          loading: () => const SizedBox(
+                            height: 48,
+                            child: Center(child: CircularProgressIndicator()),
+                          ),
+                          error: (error, stack) {
+                            Sentry.captureException(error, stackTrace: stack);
+                            return SizedBox(
+                              height: 48,
+                              child: ElevatedButton(
+                                onPressed: () => context.go('/tower'),
+                                child: const Text('Продолжить: Башня'),
                               ),
                             );
                           },

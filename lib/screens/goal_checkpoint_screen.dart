@@ -302,32 +302,22 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
         goalText = _goalInitialCtrl.text.trim();
       }
 
-      // Сохраняем все поля версии (partial merge по каждому полю)
-      for (final entry in versionData.entries) {
-        try {
-          await repo.upsertGoalField(
-              version: widget.version, field: entry.key, value: entry.value);
-        } catch (e, st) {
-          Sentry.captureException(e, stackTrace: st);
-          rethrow;
-        }
-      }
-
-      // Ensure goal_text consistency for latest version (минимально, без затирания version_data)
+      // Проверяем, существует ли уже запись для этой версии
       if (byVersion.containsKey(widget.version)) {
         final row = byVersion[widget.version]!;
         if (widget.version != latestVersion) {
           throw 'Редактировать можно только текущую версию';
         }
+        // Обновляем существующую запись
         await repo.updateGoalById(
-            id: row['id'] as String, goalText: goalText, versionData: const {});
+            id: row['id'] as String, goalText: goalText, versionData: versionData);
       } else {
         if (widget.version != latestVersion + 1) {
           throw 'Нельзя пропустить версии';
         }
-        // Create shell version with goal_text (version_data уже частично есть через RPC)
+        // Создаем новую запись с полными данными
         await repo.upsertGoalVersion(
-            version: widget.version, goalText: goalText, versionData: {});
+            version: widget.version, goalText: goalText, versionData: versionData);
       }
 
       ref.invalidate(goalLatestProvider);

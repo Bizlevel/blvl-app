@@ -71,7 +71,7 @@ class GoalsRepository {
     }
   }
 
-  /// Создать новую версию цели (insert новой записи). user_id проставится триггером.
+  /// Создать или обновить версию цели (upsert). user_id проставится триггером.
   Future<Map<String, dynamic>> upsertGoalVersion({
     required int version,
     required String goalText,
@@ -85,9 +85,16 @@ class GoalsRepository {
       if (userId != null) 'user_id': userId, // fallback: если нет триггера в БД
     };
 
-    final inserted =
-        await _client.from('core_goals').insert(payload).select().single();
-    return Map<String, dynamic>.from(inserted);
+    // Используем upsert для избежания дублирования
+    final result = await _client
+        .from('core_goals')
+        .upsert(
+          payload,
+          onConflict: 'user_id,version',
+        )
+        .select()
+        .single();
+    return Map<String, dynamic>.from(result);
   }
 
   /// Обновляет текущую (последнюю) версию v1 по id записи.
@@ -131,7 +138,7 @@ class GoalsRepository {
           return result;
         }
         return Map<String, dynamic>.from(result as Map);
-      } on PostgrestException catch (e) {
+      } on PostgrestException {
         // Fallback: если RPC отсутствует/недоступно — делаем client-side merge последней версии
         // 1) Находим последнюю запись версии для текущего пользователя
         final String? userId = _client.auth.currentUser?.id;
