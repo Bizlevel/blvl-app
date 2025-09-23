@@ -1,88 +1,72 @@
 import 'dart:developer';
 
+import 'package:bizlevel/providers/auth_provider.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../providers/login_controller.dart';
 import '../../theme/color.dart' show AppColor;
 import '../../services/auth_service.dart';
 
-import '../../providers/auth_provider.dart';
 import '../../widgets/custom_textfield.dart';
-// custom_image больше не используется для логотипа на этом экране
+import '../../widgets/common/animated_button.dart';
 import '../../theme/spacing.dart';
 
-class RegisterScreen extends ConsumerStatefulWidget {
+class RegisterScreen extends HookConsumerWidget {
   const RegisterScreen({super.key});
 
   @override
-  ConsumerState<RegisterScreen> createState() => _RegisterScreenState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final emailController = useTextEditingController();
+    final passwordController = useTextEditingController();
+    final confirmController = useTextEditingController();
 
-class _RegisterScreenState extends ConsumerState<RegisterScreen> {
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  final _confirmController = TextEditingController();
+    final loginState = ref.watch(loginControllerProvider);
+    final isLoading = loginState.isLoading;
+    final registrationSuccess = useState(false);
 
-  bool _isLoading = false;
-  bool _registrationSuccess = false;
+    final obscurePassword = useState(true);
+    final obscureConfirm = useState(true);
 
-  bool _obscurePassword = true;
-  bool _obscureConfirm = true;
-
-  @override
-  void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
-    _confirmController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _submit() async {
-    final email = _emailController.text.trim();
-    final password = _passwordController.text;
-    final confirm = _confirmController.text;
-
-    if (email.isEmpty || password.isEmpty || confirm.isEmpty) {
-      _showSnackBar('Заполните все поля');
-      return;
-    }
-    if (password != confirm) {
-      _showSnackBar('Пароли не совпадают');
-      return;
+    void showSnackBar(String message) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
     }
 
-    setState(() => _isLoading = true);
-    log('Attempting to sign up with email: $email');
-    try {
-      await ref.read(authServiceProvider).signUp(
-            email: email,
-            password: password,
-          );
-      log('Sign up successful for email: $email');
-      if (!mounted) return;
-      // Устанавливаем состояние успешной регистрации для показа экрана подтверждения
-      setState(() => _registrationSuccess = true);
-    } on AuthFailure catch (e) {
-      log('AuthFailure during sign up for $email', error: e);
-      _showSnackBar(e.message);
-    } catch (e, st) {
-      log('Unknown error during sign up for $email', error: e, stackTrace: st);
-      _showSnackBar('Неизвестная ошибка регистрации');
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+    Future<void> submit() async {
+      final email = emailController.text.trim();
+      final password = passwordController.text;
+      final confirm = confirmController.text;
+
+      if (email.isEmpty || password.isEmpty || confirm.isEmpty) {
+        showSnackBar('Заполните все поля');
+        return;
+      }
+      if (password != confirm) {
+        showSnackBar('Пароли не совпадают');
+        return;
+      }
+
+      log('Attempting to sign up with email: $email');
+      try {
+        await ref
+            .read(authServiceProvider)
+            .signUp(email: email, password: password);
+        log('Sign up successful for email: $email');
+        registrationSuccess.value = true;
+      } on AuthFailure catch (e) {
+        log('AuthFailure during sign up for $email', error: e);
+        showSnackBar(e.message);
+      } catch (e, st) {
+        log('Unknown error during sign up for $email', error: e, stackTrace: st);
+        showSnackBar('Неизвестная ошибка регистрации');
+      }
     }
-  }
 
-  void _showSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: Container(
@@ -93,7 +77,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 AppSpacing.insetsSymmetric(h: AppSpacing.xl, v: AppSpacing.x3l),
             child: Container(
               key: const Key('register_form'),
-              // adaptive width
               width: () {
                 final w = MediaQuery.of(context).size.width;
                 if (w >= 600 && w < 1024) {
@@ -108,15 +91,25 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 borderRadius: BorderRadius.circular(24),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
+                    color: Colors.black.withOpacity(0.05),
                     blurRadius: 12,
                     offset: const Offset(0, 4),
                   ),
                 ],
               ),
-              child: _registrationSuccess
-                  ? _buildSuccessView()
-                  : _buildRegistrationForm(),
+              child: registrationSuccess.value
+                  ? _buildSuccessView(context, registrationSuccess)
+                  : _buildRegistrationForm(
+                      context,
+                      ref,
+                      emailController,
+                      passwordController,
+                      confirmController,
+                      obscurePassword,
+                      obscureConfirm,
+                      isLoading,
+                      submit,
+                    ),
             ),
           ),
         ),
@@ -124,7 +117,17 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     );
   }
 
-  Widget _buildRegistrationForm() {
+  Widget _buildRegistrationForm(
+    BuildContext context,
+    WidgetRef ref,
+    TextEditingController emailController,
+    TextEditingController passwordController,
+    TextEditingController confirmController,
+    ValueNotifier<bool> obscurePassword,
+    ValueNotifier<bool> obscureConfirm,
+    bool isLoading,
+    Future<void> Function() submit,
+  ) {
     return Column(
       children: [
         SvgPicture.asset(
@@ -138,20 +141,19 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           key: const Key('email_field'),
           hint: 'Email',
           prefix: const Icon(Icons.email_outlined),
-          controller: _emailController,
+          controller: emailController,
         ),
         AppSpacing.gapH(AppSpacing.lg),
         CustomTextBox(
           key: const Key('password_field'),
           hint: 'Пароль',
           prefix: const Icon(Icons.lock_outline),
-          controller: _passwordController,
-          obscureText: _obscurePassword,
+          controller: passwordController,
+          obscureText: obscurePassword.value,
           suffix: IconButton(
             icon: Icon(
-                _obscurePassword ? Icons.visibility_off : Icons.visibility),
-            onPressed: () =>
-                setState(() => _obscurePassword = !_obscurePassword),
+                obscurePassword.value ? Icons.visibility_off : Icons.visibility),
+            onPressed: () => obscurePassword.value = !obscurePassword.value,
           ),
         ),
         AppSpacing.gapH(AppSpacing.lg),
@@ -159,46 +161,42 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           key: const Key('confirm_password_field'),
           hint: 'Подтвердите пароль',
           prefix: const Icon(Icons.lock_person_outlined),
-          controller: _confirmController,
-          obscureText: _obscureConfirm,
+          controller: confirmController,
+          obscureText: obscureConfirm.value,
           suffix: IconButton(
             icon:
-                Icon(_obscureConfirm ? Icons.visibility_off : Icons.visibility),
-            onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
+                Icon(obscureConfirm.value ? Icons.visibility_off : Icons.visibility),
+            onPressed: () => obscureConfirm.value = !obscureConfirm.value,
           ),
         ),
         AppSpacing.gapH(AppSpacing.xl),
-        GestureDetector(
-          onTap: _isLoading ? null : _submit,
-          child: Container(
-            height: 48,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [AppColor.primary, Color(0xFF1273C4)],
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-              ),
-              borderRadius: BorderRadius.circular(12),
+        AnimatedButton(
+          label: 'Создать аккаунт',
+          onPressed: isLoading ? null : submit,
+          loading: isLoading,
+        ),
+        AppSpacing.gapH(AppSpacing.lg),
+        const _OrDivider(),
+        AppSpacing.gapH(AppSpacing.lg),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            icon: SvgPicture.asset(
+              'assets/images/google_logo.svg',
+              width: 24,
+              height: 24,
             ),
-            alignment: Alignment.center,
-            child: _isLoading
-                ? const SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(
-                      color: Colors.white,
-                      strokeWidth: 3,
-                    ),
-                  )
-                : const Text(
-                    'Создать аккаунт',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+            label: const Text('Регистрация через Google'),
+            onPressed: () {
+              ref.read(loginControllerProvider.notifier).signInWithGoogle();
+            },
+            style: OutlinedButton.styleFrom(
+              padding: AppSpacing.insetsSymmetric(v: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              side: BorderSide(color: AppColor.textColor.withOpacity(0.2)),
+            ),
           ),
         ),
         AppSpacing.gapH(AppSpacing.lg),
@@ -210,7 +208,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     );
   }
 
-  Widget _buildSuccessView() {
+  Widget _buildSuccessView(
+      BuildContext context, ValueNotifier<bool> registrationSuccess) {
     return Column(
       children: [
         SvgPicture.asset(
@@ -223,9 +222,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         Container(
           padding: AppSpacing.insetsAll(AppSpacing.lg),
           decoration: BoxDecoration(
-            color: Colors.green.withValues(alpha: 0.1),
+            color: Colors.green.withOpacity(0.1),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+            border: Border.all(color: Colors.green.withOpacity(0.3)),
           ),
           child: const Row(
             children: [
@@ -263,35 +262,36 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           textAlign: TextAlign.center,
         ),
         AppSpacing.gapH(AppSpacing.xl),
-        GestureDetector(
-          onTap: () => context.go('/login?registered=true'),
-          child: Container(
-            height: 48,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [AppColor.primary, Color(0xFF1273C4)],
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-              ),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            alignment: Alignment.center,
-            child: const Text(
-              'Уже подтвердили? Войти',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
+        AnimatedButton(
+          label: 'Уже подтвердили? Войти',
+          onPressed: () => context.go('/login?registered=true'),
         ),
         AppSpacing.gapH(AppSpacing.lg),
         TextButton(
-          onPressed: () => setState(() => _registrationSuccess = false),
+          onPressed: () => registrationSuccess.value = false,
           child: const Text('← Назад к регистрации'),
         ),
+      ],
+    );
+  }
+}
+
+class _OrDivider extends StatelessWidget {
+  const _OrDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        const Expanded(child: Divider(thickness: 0.5)),
+        Padding(
+          padding: AppSpacing.insetsSymmetric(h: 16),
+          child: Text(
+            'или',
+            style: TextStyle(color: AppColor.textColor.withOpacity(0.5)),
+          ),
+        ),
+        const Expanded(child: Divider(thickness: 0.5)),
       ],
     );
   }
