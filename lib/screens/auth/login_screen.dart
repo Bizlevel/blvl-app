@@ -169,10 +169,38 @@ class LoginScreen extends HookConsumerWidget {
                           onPressed: isLoading ? null : submit,
                           loading: isLoading,
                         ),
-                        AppSpacing.gapH(16),
+                        AppSpacing.gapH(24),
+                        const _OrDivider(),
+                        AppSpacing.gapH(24),
+                        // Кнопка входа через Google
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            icon: SvgPicture.asset(
+                              'assets/images/google_logo.svg',
+                              width: 24,
+                              height: 24,
+                            ),
+                            label: const Text('Войти через Google'),
+                            onPressed: () {
+                              ref
+                                  .read(loginControllerProvider.notifier)
+                                  .signInWithGoogle();
+                            },
+                            style: OutlinedButton.styleFrom(
+                              padding: AppSpacing.insetsSymmetric(v: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              side: BorderSide(
+                                  color: AppColor.textColor.withValues(alpha: 0.2)),
+                            ),
+                          ),
+                        ),
+                        AppSpacing.gapH(32),
                         // Social proof (лёгкий блок
                         const _SocialProofBlock(),
-                        AppSpacing.gapH(8),
+                        AppSpacing.gapH(16),
                         TextButton(
                           onPressed: () => context.go('/register'),
                           child: const Text('Нет аккаунта? Зарегистрироваться'),
@@ -255,6 +283,27 @@ class _SocialProofBlock extends StatelessWidget {
           textAlign: TextAlign.center,
           style: TextStyle(color: AppColor.onSurfaceSubtle),
         ),
+      ],
+    );
+  }
+}
+
+class _OrDivider extends StatelessWidget {
+  const _OrDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        const Expanded(child: Divider(thickness: 0.5)),
+        Padding(
+          padding: AppSpacing.insetsSymmetric(h: 16),
+          child: Text(
+            'или',
+            style: TextStyle(color: AppColor.textColor.withValues(alpha: 0.5)),
+          ),
+        ),
+        const Expanded(child: Divider(thickness: 0.5)),
       ],
     );
   }
