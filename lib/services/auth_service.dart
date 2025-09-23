@@ -87,7 +87,7 @@ class AuthService {
         log('Google Sign-In: Initiating web OAuth flow with redirectTo: $redirectToUrl');
         await _client.auth.signInWithOAuth(
           OAuthProvider.google,
-          redirectTo: finalRedirectTo, // Use Supabase callback with next parameter
+          redirectTo: redirectToUrl, // Use Supabase callback with next parameter
         );
         // For web, signInWithOAuth initiates a redirect, the actual session
         // will be picked up by the onAuthStateChange listener.
