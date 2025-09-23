@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 
 class NotificationsService {
@@ -94,6 +95,90 @@ class NotificationsService {
       return (route != null && route.isNotEmpty) ? route : null;
     } catch (_) {
       return null;
+    }
+  }
+
+  /// Унифицированное получение маршрута запуска из:
+  /// 1) pendingRoute (in-app), 2) Hive('notifications').launch_route (push), 3) системных деталей (local notif)
+  /// После чтения очищает источники.
+  Future<String?> consumeAnyLaunchRoute() async {
+    try {
+      String? route;
+      if (pendingRoute != null && pendingRoute!.isNotEmpty) {
+        route = pendingRoute;
+        pendingRoute = null;
+      }
+      if (route == null) {
+        try {
+          final box = Hive.isBoxOpen('notifications')
+              ? Hive.box('notifications')
+              : await Hive.openBox('notifications');
+          final stored = box.get('launch_route');
+          if (stored is String && stored.isNotEmpty) {
+            route = stored;
+            await box.delete('launch_route');
+          }
+        } catch (_) {}
+      }
+      if (route == null) {
+        route = await getLaunchRoute();
+      }
+      return route;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Показ немедленного локального уведомления (foreground heads-up)
+  Future<void> showNow({
+    required String title,
+    required String body,
+    String channelId = 'education',
+    String? route,
+  }) async {
+    if (kIsWeb) return;
+    if (!_initialized) await initialize();
+    final android = AndroidNotificationDetails(
+      channelId,
+      _channelName(channelId),
+      channelDescription: _channelDesc(channelId),
+      importance: Importance.high,
+      priority: Priority.high,
+    );
+    final details = NotificationDetails(android: android);
+    final payload = route != null && route.isNotEmpty
+        ? '{"route":"$route"}'
+        : null;
+    try {
+      await _plugin.show(DateTime.now().millisecondsSinceEpoch % 1000000,
+          title, body, details,
+          payload: payload);
+    } catch (_) {}
+  }
+
+  String _channelName(String id) {
+    switch (id) {
+      case 'goal_reminder':
+        return 'Напоминания по целям';
+      case 'gp_economy':
+        return 'Экономика GP';
+      case 'chat_messages':
+        return 'Сообщения чатов';
+      default:
+        return 'Обучение';
+    }
+  }
+
+  String _channelDesc(String id) {
+    switch (id) {
+      case 'goal_reminder':
+        return 'План недели и чекины';
+      case 'gp_economy':
+        return 'Покупки и начисления GP';
+      case 'chat_messages':
+        return 'Ответы ИИ‑тренеров';
+      default:
+        return 'Новые материалы';
     }
   }
 

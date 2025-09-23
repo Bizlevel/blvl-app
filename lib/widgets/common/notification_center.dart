@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
+import 'package:bizlevel/services/notification_log_service.dart';
 
 enum _BannerType { success, info, warn, error }
 
@@ -78,6 +79,19 @@ class NotificationCenter {
         message: 'notif_banner_shown:${type.name}',
         data: {'message': message},
       ));
+    } catch (_) {}
+    // Лог в локальный журнал
+    try {
+      NotificationLogService.instance.record(
+        kind: switch (type) {
+          _BannerType.success => NotificationKind.success,
+          _BannerType.info => NotificationKind.info,
+          _BannerType.warn => NotificationKind.warn,
+          _BannerType.error => NotificationKind.error,
+        },
+        message: message,
+        category: 'banner',
+      );
     } catch (_) {}
     // Автозакрытие баннера через ms
     Future<void>.delayed(Duration(milliseconds: ms)).then((_) {

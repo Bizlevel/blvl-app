@@ -7,6 +7,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:bizlevel/services/notifications_service.dart';
 
 // Топ-левел background handler обязателен для Android
 @pragma('vm:entry-point')
@@ -49,7 +50,16 @@ class PushService {
           data: {'from': 'foreground', 'hasData': message.data.isNotEmpty},
           level: SentryLevel.info,
         ));
-        // При необходимости можно отобразить баннер/локальное уведомление
+        // Показываем системное уведомление в фореграунде (минимальный контент)
+        final title = message.notification?.title ?? 'Сообщение BizLevel';
+        final body = message.notification?.body ?? 'Откройте приложение';
+        final route = message.data['route']?.toString();
+        NotificationsService.instance.showNow(
+          title: title,
+          body: body,
+          channelId: 'education',
+          route: route,
+        );
       });
 
       // Taps from background/killed

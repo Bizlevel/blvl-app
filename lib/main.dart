@@ -25,7 +25,6 @@ import 'package:bizlevel/services/notifications_service.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:flutter_timezone/flutter_timezone.dart';
-import 'package:flutter/scheduler.dart';
 import 'services/push_service.dart';
 
 import 'package:firebase_core/firebase_core.dart';
@@ -172,7 +171,7 @@ class MyApp extends ConsumerWidget {
                 }),
               ),
               child: FutureBuilder<String?>(
-                future: NotificationsService.instance.getLaunchRoute(),
+                future: NotificationsService.instance.consumeAnyLaunchRoute(),
                 builder: (context, snap) {
                   if (snap.connectionState == ConnectionState.done &&
                       snap.data != null &&

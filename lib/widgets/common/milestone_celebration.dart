@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:bizlevel/theme/color.dart';
+import 'package:bizlevel/services/notification_log_service.dart';
 
 class MilestoneCelebration extends StatefulWidget {
   const MilestoneCelebration({super.key, required this.onClose, this.gpGain});
@@ -22,6 +23,16 @@ class _MilestoneCelebrationState extends State<MilestoneCelebration>
     _controller = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 1600))
       ..forward();
+    // Лог события открытия
+    try {
+      NotificationLogService.instance.record(
+        kind: NotificationKind.success,
+        message: widget.gpGain != null
+            ? 'Бонус получен: +${widget.gpGain} GP'
+            : 'Праздничное уведомление',
+        category: 'celebration',
+      );
+    } catch (_) {}
   }
 
   @override
