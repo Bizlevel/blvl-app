@@ -1,7 +1,10 @@
 import 'dart:developer';
 import 'dart:io';
-import 'package:flutter/foundation.dart' show kIsWeb; // Import kIsWeb directly
-import 'package:bizlevel/utils/platform_html_stub.dart' if (dart.library.html) 'package:bizlevel/utils/platform_html_web.dart'; // Correct conditional import
+import 'package:flutter/foundation.dart' show kIsWeb;
+
+// Conditional import for platform-specific redirect URL
+import 'auth_service_stub.dart'
+    if (dart.library.html) 'auth_service_web.dart';
 
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -79,16 +82,9 @@ class AuthService {
       // For web, we use the signInWithOAuth method directly.
       // For mobile, we use google_sign_in package to get an ID token,
       // then sign in with Supabase using that token.
-      if (kIsWeb) { // Use kIsWeb for platform detection
-        final String? redirectToUrl = PlatformHtml.locationOrigin;
-        if (redirectToUrl == null) {
-          throw AuthFailure('Web platform: Could not determine redirect URL.');
-        }
-        log('Supabase URL: ${envOrDefine('SUPABASE_URL')}');
-        log('Supabase Anon Key: ${envOrDefine('SUPABASE_ANON_KEY')}');
-        final String supabaseCallbackUrl = '${envOrDefine('SUPABASE_URL')}/auth/v1/callback';
-        final String finalRedirectTo = '$supabaseCallbackUrl?next=${PlatformHtml.locationOrigin}';
-        log('Google Sign-In: Initiating web OAuth flow with redirectTo: $finalRedirectTo');
+      if (kIsWeb) {
+        final String redirectToUrl = getRedirectUrl();
+        log('Google Sign-In: Initiating web OAuth flow with redirectTo: $redirectToUrl');
         await _client.auth.signInWithOAuth(
           OAuthProvider.google,
           redirectTo: finalRedirectTo, // Use Supabase callback with next parameter
