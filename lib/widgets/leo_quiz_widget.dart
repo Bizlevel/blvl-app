@@ -122,7 +122,7 @@ class _LeoQuizWidgetState extends ConsumerState<LeoQuizWidget> {
         : widget.userContext?.trim();
 
     if (correct) {
-      final String base = 'Верно! 👍 Отличная работа.';
+      const String base = 'Верно! 👍 Отличная работа.';
       final String contextLine =
           ctx != null ? '\nПрименение к твоему контексту: $ctx' : '';
       final String extra =

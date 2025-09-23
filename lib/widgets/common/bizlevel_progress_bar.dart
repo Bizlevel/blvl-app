@@ -24,7 +24,7 @@ class BizLevelProgressBar extends StatelessWidget {
     final Color barColor = color ?? AppColor.primary;
     final Color bg = backgroundColor ?? barColor.withValues(alpha: 0.2);
     final double clamped = value.clamp(0.0, 1.0);
-    final String semanticsLabel = 'Прогресс';
+    const String semanticsLabel = 'Прогресс';
     final String semanticsValue = '${(clamped * 100).round()}%';
     final Widget bar = Semantics(
       label: semanticsLabel,

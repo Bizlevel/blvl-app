@@ -57,8 +57,9 @@ final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
       // ВРЕМЕННО: отключаем GP-блокировку для тестирования
       // Этажи >1 требуют открытия за GP (этап 39.7)
       // Для простоты: уровни 1..10 — это этаж 1
-      final int floorNumber = 1; // текущий этаж
-      final bool hasAccess = true; // ВРЕМЕННО: всегда true для тестирования
+      const int floorNumber = 1; // текущий этаж
+      final bool hasAccess =
+          unlockedFloors.contains(floorNumber) || level.number <= 3;
       isAccessible = hasAccess && previousCompleted;
     } else {
       // Обычные уровни доступны только после завершения предыдущего уровня
@@ -231,7 +232,7 @@ final towerNodesProvider =
   }
 
   // Статусы версий цели (v2 после L4, v3 после L7, v4 после L10)
-  final Map<int, int> goalCheckpointVersionByAfterLevel = const {
+  const Map<int, int> goalCheckpointVersionByAfterLevel = {
     4: 2,
     7: 3,
     10: 4,

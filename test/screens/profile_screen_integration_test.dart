@@ -35,7 +35,7 @@ void main() {
     ),
   );
 
-  final userModel = UserModel(
+  const userModel = UserModel(
     id: 'test_user_id',
     name: 'Test User',
     email: 'test@example.com',

@@ -10,7 +10,7 @@ class SettingBox extends StatelessWidget {
     this.color = AppColor.darker,
   });
 
-  final title;
+  final String title;
   final String icon;
   final Color color;
 
@@ -34,7 +34,7 @@ class SettingBox extends StatelessWidget {
         children: [
           SvgPicture.asset(
             icon,
-            color: color,
+            colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
             width: 22,
             height: 22,
           ),

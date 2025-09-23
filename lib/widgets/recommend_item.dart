@@ -9,7 +9,7 @@ class RecommendItem extends StatelessWidget {
     this.onTap,
   });
 
-  final data;
+  final Map<String, dynamic> data;
   final GestureTapCallback? onTap;
 
   @override

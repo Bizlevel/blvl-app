@@ -49,13 +49,13 @@ class _AppShellState extends ConsumerState<AppShell> {
   @override
   Widget build(BuildContext context) {
     final String location =
-        GoRouter.of(context).routeInformationProvider.value.location;
+        GoRouter.of(context).routeInformationProvider.value.uri.toString();
     final int activeTab = _locationToTab(location);
 
     final width = MediaQuery.of(context).size.width;
     final bool isDesktop = width >= 1024;
 
-    void _goTab(int index) {
+    void goTab(int index) {
       if (_pageController != null && _pageController!.positions.isNotEmpty) {
         _pageController!.animateToPage(index,
             duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
@@ -127,14 +127,22 @@ class _AppShellState extends ConsumerState<AppShell> {
                         icon,
                         isActive: activeTab == index,
                         activeColor: AppColor.primary,
-                        onTap: () => _goTab(index),
+                        onTap: () => goTab(index),
                         iconWidget: index == 1
                             ? Padding(
                                 padding: const EdgeInsets.only(top: 2),
                                 child:
                                     _GoalSvgIcon(isActive: activeTab == index),
                               )
-                            : null,
+                            : index == 2
+                                ? Icon(
+                                    icon,
+                                    color: activeTab == index
+                                        ? AppColor.primary
+                                        : Colors.grey,
+                                    size: 26,
+                                  )
+                                : null,
                       );
                     }),
                     // Четвёртая кнопка: быстрый чат с Лео, наполовину торчит над баром
@@ -203,10 +211,10 @@ class _AppShellState extends ConsumerState<AppShell> {
                       context.go(_routes[i]);
                     });
                   },
-                  children: [
-                    const MainStreetScreen(key: PageStorageKey('tab_home')),
-                    _GoalTabGate(key: const PageStorageKey('tab_goal')),
-                    const ProfileScreen(key: PageStorageKey('tab_profile')),
+                  children: const [
+                    MainStreetScreen(key: PageStorageKey('tab_home')),
+                    _GoalTabGate(key: PageStorageKey('tab_goal')),
+                    ProfileScreen(key: PageStorageKey('tab_profile')),
                   ],
                 )
               : widget.child,

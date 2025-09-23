@@ -333,7 +333,7 @@ class GoalVersionForm extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: c.withOpacity(0.08),
+          color: c.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(16),
         ),
         child: Text(label,

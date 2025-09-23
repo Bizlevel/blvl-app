@@ -62,8 +62,8 @@ class _AnimatedButtonState extends State<AnimatedButton>
 
   @override
   Widget build(BuildContext context) {
-    final double start = 1.0;
-    final double end = 0.95;
+    const double start = 1.0;
+    const double end = 0.95;
     final Animation<double> scale = Tween<double>(begin: start, end: end)
         .animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
 

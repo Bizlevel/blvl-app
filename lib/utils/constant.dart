@@ -11,3 +11,4 @@ const bool kEnableGoalChips = true;
 // Фича-флаги клиентских реакций (тонкий режим)
 const bool kEnableClientGoalReactions = true;
 const bool kEnableClientWeeklyReaction = true;
+

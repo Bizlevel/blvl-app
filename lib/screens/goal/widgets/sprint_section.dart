@@ -73,7 +73,7 @@ class SprintSection extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Icon(Icons.lock_outline, color: AppColor.labelColor, size: 28),
+            const Icon(Icons.lock_outline, color: AppColor.labelColor, size: 28),
             AppSpacing.gapW(12),
             Expanded(
               child: Column(

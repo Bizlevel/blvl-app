@@ -148,7 +148,7 @@ class NotificationsService {
       'Откройте страницу «Цель» и уточните план недели',
       _nextInstanceOf(weekday: DateTime.monday, hour: 9, minute: 0),
       details,
-      androidAllowWhileIdle: true,
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
       matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
@@ -162,7 +162,7 @@ class NotificationsService {
       'Проверьте цель и отметьте прогресс',
       _nextInstanceOf(weekday: DateTime.wednesday, hour: 14, minute: 0),
       details,
-      androidAllowWhileIdle: true,
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
       matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
@@ -176,7 +176,7 @@ class NotificationsService {
       'Через два дня — чекин недели',
       _nextInstanceOf(weekday: DateTime.friday, hour: 16, minute: 0),
       details,
-      androidAllowWhileIdle: true,
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
       matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
@@ -191,7 +191,7 @@ class NotificationsService {
         'Заполните итоги недели на странице «Цель»',
         _nextInstanceOf(weekday: DateTime.sunday, hour: hm.$1, minute: hm.$2),
         details,
-        androidAllowWhileIdle: true,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
         uiLocalNotificationDateInterpretation:
             UILocalNotificationDateInterpretation.absoluteTime,
         matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,

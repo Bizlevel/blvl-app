@@ -671,7 +671,7 @@ class _ProfileFormBlock extends _PageBlock {
           itemCount: 12,
           itemBuilder: (_, index) {
             final id = index + 1;
-            final asset = 'assets/images/avatars/avatar_${id}.png';
+            final asset = 'assets/images/avatars/avatar_$id.png';
             final isSelected = id == selectedAvatarId;
             return GestureDetector(
               onTap: () => Navigator.of(ctx).pop(id),
@@ -778,7 +778,7 @@ class _ProfileFormBlock extends _PageBlock {
                     ClipRRect(
                       borderRadius: BorderRadius.circular(15),
                       child: Image.asset(
-                        'assets/images/avatars/avatar_${selectedAvatarId}.png',
+                        'assets/images/avatars/avatar_$selectedAvatarId.png',
                         width: 90,
                         height: 90,
                         fit: BoxFit.cover,
@@ -793,7 +793,7 @@ class _ProfileFormBlock extends _PageBlock {
                         decoration: BoxDecoration(
                           color: AppColor.surface,
                           borderRadius: BorderRadius.circular(14),
-                          boxShadow: [
+                          boxShadow: const [
                             BoxShadow(
                               color: AppColor.shadow,
                               blurRadius: 2,
@@ -889,7 +889,7 @@ class _IntroBlock extends _PageBlock {
     return Padding(
       padding: const EdgeInsets.all(16),
       child: LayoutBuilder(builder: (context, constraints) {
-        final String assetPath = 'assets/images/lvls/level_${levelNumber}.png';
+        final String assetPath = 'assets/images/lvls/level_$levelNumber.png';
         final double imageHeight = constraints.maxHeight * 0.45;
         return Stack(
           children: [
@@ -1028,8 +1028,9 @@ class _QuizBlock extends _PageBlock {
             if (user != null) {
               if (user.name.isNotEmpty) parts.add('Имя: ${user.name}');
               if ((user.goal ?? '').isNotEmpty) parts.add('Цель: ${user.goal}');
-              if ((user.about ?? '').isNotEmpty)
+              if ((user.about ?? '').isNotEmpty) {
                 parts.add('О себе: ${user.about}');
+              }
             }
             final userCtx = parts.isEmpty ? null : parts.join('. ');
             if (kUseLeoQuiz) {

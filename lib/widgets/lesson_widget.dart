@@ -334,7 +334,7 @@ class _LessonWidgetState extends ConsumerState<LessonWidget> {
                                 child: Semantics(
                                   label: 'Перемотать назад на 10 секунд',
                                   button: true,
-                                  child: SizedBox.expand(),
+                                  child: const SizedBox.expand(),
                                 ),
                               ),
                             ),
@@ -347,7 +347,7 @@ class _LessonWidgetState extends ConsumerState<LessonWidget> {
                                 child: Semantics(
                                   label: 'Перемотать вперёд на 10 секунд',
                                   button: true,
-                                  child: SizedBox.expand(),
+                                  child: const SizedBox.expand(),
                                 ),
                               ),
                             ),

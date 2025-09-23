@@ -124,18 +124,19 @@ class LoginScreen extends HookConsumerWidget {
                     ),
                     child: Column(
                       children: [
+                        // Логотип без внешнего кольца: чистый белый круг и увеличенный логотип
                         Container(
-                          width: 96,
-                          height: 96,
+                          width: 224,
+                          height: 224,
                           decoration: const BoxDecoration(
-                            color: AppColor.dividerColor,
+                            color: AppColor.surface,
                             shape: BoxShape.circle,
                           ),
-                          padding: AppSpacing.insetsAll(8),
+                          alignment: Alignment.center,
                           child: SvgPicture.asset(
                             'assets/images/logo_light.svg',
-                            width: 80,
-                            height: 80,
+                            width: 176,
+                            height: 176,
                             fit: BoxFit.contain,
                           ),
                         ),
@@ -247,8 +248,8 @@ class _SocialProofBlock extends StatelessWidget {
   const _SocialProofBlock();
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: const [
+    return const Column(
+      children: [
         Text(
           'С BizLevel учатся предприниматели по всему СНГ',
           textAlign: TextAlign.center,

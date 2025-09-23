@@ -14,8 +14,8 @@ class GpBalanceWidget extends ConsumerWidget {
     final gpAsync = ref.watch(gpBalanceProvider);
     final balance = gpAsync.value?['balance'] ?? 0;
 
-    final width = 80.0;
-    final height = 32.0;
+    const width = 80.0;
+    const height = 32.0;
 
     return InkWell(
       onTap: () {

@@ -79,11 +79,11 @@ class _SkillsTreeViewState extends State<SkillsTreeView>
       decoration: BoxDecoration(
         color: AppColor.surface,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
+        boxShadow: const [
           BoxShadow(
             color: AppColor.shadow,
             blurRadius: 8,
-            offset: const Offset(0, 4),
+            offset: Offset(0, 4),
           ),
         ],
       ),
@@ -110,12 +110,12 @@ class _SkillsTreeViewState extends State<SkillsTreeView>
                       borderRadius:
                           BorderRadius.vertical(top: Radius.circular(16)),
                     ),
-                    builder: (ctx) => Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                    builder: (ctx) => const Padding(
+                      padding: EdgeInsets.fromLTRB(16, 8, 16, 24),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
+                        children: [
                           Text('Дерево навыков',
                               style: TextStyle(
                                   fontSize: 18, fontWeight: FontWeight.w600)),
@@ -136,9 +136,9 @@ class _SkillsTreeViewState extends State<SkillsTreeView>
           LayoutBuilder(
             builder: (context, constraints) {
               // Один столбец: навыки расположены вертикально, один под другим
-              final crossAxisCount = 1;
-              final spacing = 12.0;
-              final totalSpacing = spacing * (crossAxisCount - 1);
+              const crossAxisCount = 1;
+              const spacing = 12.0;
+              const totalSpacing = spacing * (crossAxisCount - 1);
               final tileWidth =
                   (constraints.maxWidth - totalSpacing) / crossAxisCount;
 
@@ -157,7 +157,7 @@ class _SkillsTreeViewState extends State<SkillsTreeView>
             },
           ),
           const SizedBox(height: 12),
-          Divider(color: AppColor.divider),
+          const Divider(color: AppColor.divider),
           const SizedBox(height: 8),
           if (nextSkill == null)
             const Text(
@@ -213,12 +213,11 @@ class _SkillsTreeViewState extends State<SkillsTreeView>
         decoration: BoxDecoration(
           color: AppColor.card,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColor.borderColor.withOpacity(0.6)),
-          boxShadow: [
+          border:
+              Border.all(color: AppColor.borderColor.withValues(alpha: 0.6)),
+          boxShadow: const [
             BoxShadow(
-                color: AppColor.shadow,
-                blurRadius: 4,
-                offset: const Offset(0, 2)),
+                color: AppColor.shadow, blurRadius: 4, offset: Offset(0, 2)),
           ],
         ),
         child: Row(
@@ -236,7 +235,7 @@ class _SkillsTreeViewState extends State<SkillsTreeView>
                       value: progress,
                       strokeWidth: 4,
                       color: color,
-                      backgroundColor: color.withOpacity(0.15),
+                      backgroundColor: color.withValues(alpha: 0.15),
                     ),
                   ),
                   Icon(icon, size: 20, color: color),
@@ -295,7 +294,8 @@ class _SegmentedProgressBar extends StatelessWidget {
               height: 8,
               margin: EdgeInsets.only(right: i == total - 1 ? 0 : 4),
               decoration: BoxDecoration(
-                color: i < clampedFilled ? color : color.withOpacity(0.15),
+                color:
+                    i < clampedFilled ? color : color.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(6),
               ),
             ),

@@ -196,11 +196,11 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
               border: Border.all(
                   color: active ? AppColor.primary : Colors.grey.shade300,
                   width: active ? 2 : 1),
-              boxShadow: [
+              boxShadow: const [
                 BoxShadow(
                   color: AppColor.shadowColor,
                   blurRadius: 6,
-                  offset: const Offset(0, 3),
+                  offset: Offset(0, 3),
                 )
               ],
             ),

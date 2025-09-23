@@ -55,6 +55,7 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
         await Sentry.captureException(e, stackTrace: st);
       } catch (_) {
         // Sentry не настроен, просто логируем в консоль
+        debugPrint('DEBUG: Exception (Sentry not configured): $e');
       }
     }
 
@@ -79,6 +80,7 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
         await Sentry.captureException(e, stackTrace: st);
       } catch (_) {
         // Sentry не настроен, просто логируем в консоль
+        debugPrint('DEBUG: Exception (Sentry not configured): $e');
       }
       if (!mounted) return;
       setState(() => _loading = false);
@@ -213,6 +215,7 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
         await Sentry.captureException(e, stackTrace: st);
       } catch (_) {
         // Sentry не настроен, просто логируем в консоль
+        debugPrint('DEBUG: Exception (Sentry not configured): $e');
       }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -281,7 +284,7 @@ String? _buildChecklistPreface() {
     if (!hasProfile) {
       return 'Режим: case_facilitатор. Ты — Лео, фасилитатор мини‑кейса. '
           'Кейс: "$title" (после уровня $afterLevel, навык: $skill). '
-          '${contextText.isNotEmpty ? 'Текст кейса: ' + contextText + ' ' : ''}'
+          '${contextText.isNotEmpty ? 'Текст кейса: $contextText ' : ''}'
           '⚠️ ВАЖНО: Профиль пользователя не заполнен или заполнен неполностью. '
           'Сначала помоги пользователю заполнить профиль (имя, сфера деятельности, цель, опыт), '
           'а затем переходи к кейсу. Объясни, что качество ответов зависит от полноты профиля. '
@@ -292,7 +295,7 @@ String? _buildChecklistPreface() {
 
     return 'Режим: case_facilitатор. Ты — Лео, фасилитатор мини‑кейса. '
         'Кейс: "$title" (после уровня $afterLevel, навык: $skill). '
-        '${contextText.isNotEmpty ? 'Текст кейса: ' + contextText + ' ' : ''}'
+        '${contextText.isNotEmpty ? 'Текст кейса: $contextText ' : ''}'
         'Правила: отвечай ТОЛЬКО на основе «Текста кейса», игнорируй внешние источники/память/RAG. '
         'Алгоритм: дай «Задание 1» как ассистент; оцени ответ (EXCELLENT/GOOD/ACCEPTABLE/WEAK/INVALID). '
         'При EXCELLENT/GOOD — переход к следующему заданию (верни маркер [CASE:NEXT]); '
@@ -415,6 +418,7 @@ String? _buildChecklistPreface() {
         await Sentry.captureException(e, stackTrace: st);
       } catch (_) {
         // Sentry не настроен, просто логируем в консоль
+        debugPrint('DEBUG: Exception (Sentry not configured): $e');
       }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -448,6 +452,7 @@ String? _buildChecklistPreface() {
         await Sentry.captureException(e, stackTrace: st);
       } catch (_) {
         // Sentry не настроен, просто логируем в консоль
+        debugPrint('DEBUG: Exception (Sentry not configured): $e');
       }
       if (!mounted) return;
       ScaffoldMessenger.of(context)

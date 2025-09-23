@@ -12,7 +12,7 @@ class FeatureItem extends StatelessWidget {
     this.onTap,
   });
 
-  final data;
+  final Map<String, dynamic> data;
   final double width;
   final double height;
   final GestureTapCallback? onTap;
