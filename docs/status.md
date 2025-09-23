@@ -449,9 +449,12 @@ TODO:
 - Экран `GpStoreScreen` переведен на компактный одноэкранный дизайн: шапка с балансом, выбор плана через чипы (3 варианта), отображается только выбранный план, снизу sticky‑бар CTA.
 - Длинные лейблы и цены адаптированы под xs‑экраны (ellipsis/RichText), FAQ свёрнут в ExpansionTile.
 - Линтер чистый; проверено на ширинах 320–400 px — без overflow.
-
 Задача 47.fix - модификация: Цель — напоминания, «что дальше» и UX
 - Экран `Напоминания`: добавлен `NotificationsSettingsScreen` (`/notifications`) с выбором времени Пн/Ср/Пт и до 3 слотов на Вс; пересоздание расписания через `NotificationsService.rescheduleWeekly`.
 - RPC: `upsert_goal_version` и `fetch_goal_state` с валидациями последовательности/редактирования latest и возвратом `next_action`; репозиторий обновлен (RPC + dev‑fallback).
 - Цель v2: хинты и индикатор реалистичности роста (%). Чекпоинт: клиентские `recommendedChips` для незаполнённых полей.
 - «Что дальше»: `GoalScreen` использует `fetch_goal_state`; добавлен вход в `/notifications` в AppBar. Breadcrumb `goal_next_action_resolved` при авто‑переходе.
+Задача 47.bonus-system: Бонусы и уведомления
+- Supabase: деактивирован `onboarding_tour`; `gp_bonus_claim` усилили серверными проверками (profile/cases) и metadata; `update_current_level` начисляет +20 GP (идемпотентно, idempotency_key `bonus:level:<id>:<user>`).
+- Клиент: при завершении уровня показывается анимированное уведомление («Поздравляем! Вы получили бонус — 20 GP!») через `MilestoneCelebration`; при завершении третьего кейса вызывается `gp_bonus_claim('all_three_cases_completed')` и показывается уведомление на +200 GP.
+- Документация: в `bizlevel-concept.md` обновлён список бонусов (добавлен `level_completed`, удалён `onboarding_tour`).

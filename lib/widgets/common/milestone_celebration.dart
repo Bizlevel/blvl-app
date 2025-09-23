@@ -71,8 +71,13 @@ class _MilestoneCelebrationState extends State<MilestoneCelebration>
                     style:
                         TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
                 const SizedBox(height: 8),
-                const Text('Вы достигли вехи. Продолжайте в том же духе!',
-                    textAlign: TextAlign.center),
+                if (widget.gpGain != null)
+                  const Text('Вы получили бонус!',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontWeight: FontWeight.w600))
+                else
+                  const Text('Вы достигли вехи. Продолжайте в том же духе!',
+                      textAlign: TextAlign.center),
                 const SizedBox(height: 12),
                 if (widget.gpGain != null)
                   TweenAnimationBuilder<double>(

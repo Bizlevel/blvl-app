@@ -92,7 +92,7 @@
 - Сообщение в чатах: при `gp_insufficient_balance` — модал «Пополнить GP» (переход в магазин с пресетом 1400 GP).
 ### Магазин и бонусы
 - Магазин (Web): пакеты 300/1400/3000 GP; сервер валидирует пакет и сумму.
-- Бонусы: `signup_bonus` (+30), `profile_completed` (+50), `all_three_cases_completed` (+200). Идемпотентность по PK grants и `idempotency_key` в леджере.
+- Бонусы: `signup_bonus` (+30), `profile_completed` (+50), `all_three_cases_completed` (+200), `level_completed` (+20 за каждый завершённый уровень). Идемпотентность по PK grants и `idempotency_key` в леджере.
 ### Кэширование/офлайн
 - `gpBalanceProvider`: SWR + Hive, фоновые рефетчи без редиректов. Ошибки/401 не вызывают `refreshSession` на клиенте.
 ---

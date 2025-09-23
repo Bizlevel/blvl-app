@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:bizlevel/widgets/common/milestone_celebration.dart';
 
 import 'package:bizlevel/providers/cases_provider.dart';
 import 'package:bizlevel/providers/levels_provider.dart';
@@ -236,40 +237,40 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
   //   } catch (_) {}
   //   return null;
   // }
-String? _buildChecklistPreface() {
-  try {
-    final list = _script?['checklist'];
-    if (list is List && list.isNotEmpty) {
-      // Определяем имя персонажа и тип списка по номеру кейса
-      String characterName;
-      String listType;
-      switch (widget.caseId) {
-        case 1:
-          characterName = 'Даулета';
-          listType = 'Список дел';
-          break;
-        case 2:
-          characterName = 'Гульнары';
-          listType = 'Презентация';
-          break;
-        case 3:
-          characterName = 'Руслана';
-          listType = 'План';
-          break;
-        default:
-          characterName = 'персонажа';
-          listType = 'Список';
+  String? _buildChecklistPreface() {
+    try {
+      final list = _script?['checklist'];
+      if (list is List && list.isNotEmpty) {
+        // Определяем имя персонажа и тип списка по номеру кейса
+        String characterName;
+        String listType;
+        switch (widget.caseId) {
+          case 1:
+            characterName = 'Даулета';
+            listType = 'Список дел';
+            break;
+          case 2:
+            characterName = 'Гульнары';
+            listType = 'Презентация';
+            break;
+          case 3:
+            characterName = 'Руслана';
+            listType = 'План';
+            break;
+          default:
+            characterName = 'персонажа';
+            listType = 'Список';
+        }
+
+        final b = StringBuffer('$listType $characterName:\n');
+        for (final item in list) {
+          b.writeln(item.toString());
+        }
+        return b.toString().trim();
       }
-      
-      final b = StringBuffer('$listType $characterName:\n');
-      for (final item in list) {
-        b.writeln(item.toString());
-      }
-      return b.toString().trim();
-    }
-  } catch (_) {}
-  return null;
-}
+    } catch (_) {}
+    return null;
+  }
 
   String _buildCaseSystemPrompt() {
     final title = _caseMeta?['title']?.toString() ?? '';
@@ -369,7 +370,42 @@ String? _buildChecklistPreface() {
         // Sentry не настроен, игнорируем
       }
       await ref.read(caseActionsProvider).complete(widget.caseId);
-      
+
+      // Попытка начислить бонус за 3 завершённых кейса (идемпотентно)
+      try {
+        final client = Supabase.instance.client;
+        final before = await client
+            .from('gp_bonus_grants')
+            .select('rule_key')
+            .eq('rule_key', 'all_three_cases_completed')
+            .maybeSingle();
+
+        await client.rpc('gp_bonus_claim',
+            params: {'p_rule_key': 'all_three_cases_completed'});
+
+        final after = await client
+            .from('gp_bonus_grants')
+            .select('rule_key')
+            .eq('rule_key', 'all_three_cases_completed')
+            .maybeSingle();
+
+        final newlyGranted = before == null && after != null;
+        if (newlyGranted && mounted) {
+          showDialog(
+            context: context,
+            barrierDismissible: true,
+            builder: (_) => Dialog(
+              backgroundColor: Colors.transparent,
+              insetPadding: const EdgeInsets.all(16),
+              child: MilestoneCelebration(
+                gpGain: 200,
+                onClose: () => Navigator.of(context).maybePop(),
+              ),
+            ),
+          );
+        }
+      } catch (_) {}
+
       // Обновляем current_level пользователя после завершения кейса
       try {
         final after = _caseMeta?['after_level'] as int?;
@@ -377,7 +413,8 @@ String? _buildChecklistPreface() {
           // Находим level_id для следующего уровня (after + 1)
           final nextLevelNumber = after + 1;
           // Получаем level_id для следующего уровня
-          final levelId = await SupabaseService.levelIdFromNumber(nextLevelNumber);
+          final levelId =
+              await SupabaseService.levelIdFromNumber(nextLevelNumber);
           if (levelId != null) {
             await SupabaseService.completeLevel(levelId);
           }
@@ -385,7 +422,7 @@ String? _buildChecklistPreface() {
       } catch (_) {
         // Игнорируем ошибки обновления уровня
       }
-      
+
       // СНАЧАЛА обновляем данные башни и уровней, ПОТОМ переходим
       try {
         // ignore: unused_result
@@ -401,10 +438,10 @@ String? _buildChecklistPreface() {
         // ignore: unused_result
         ref.invalidate(caseStatusProvider(widget.caseId));
       } catch (_) {}
-      
+
       // Небольшая задержка для обновления UI
       await Future.delayed(const Duration(milliseconds: 100));
-      
+
       final after = _caseMeta?['after_level'] as int?;
       final target = after != null ? after + 1 : null;
       if (!mounted) return;
