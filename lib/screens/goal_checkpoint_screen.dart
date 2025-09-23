@@ -313,14 +313,18 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
         }
         // Обновляем существующую запись
         await repo.updateGoalById(
-            id: row['id'] as String, goalText: goalText, versionData: versionData);
+            id: row['id'] as String,
+            goalText: goalText,
+            versionData: versionData);
       } else {
         if (widget.version != latestVersion + 1) {
           throw 'Нельзя пропустить версии';
         }
         // Создаем новую запись с полными данными
         await repo.upsertGoalVersion(
-            version: widget.version, goalText: goalText, versionData: versionData);
+            version: widget.version,
+            goalText: goalText,
+            versionData: versionData);
       }
 
       ref.invalidate(goalLatestProvider);
@@ -335,12 +339,30 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
       setState(() => _saving = false);
       // После сохранения — комментарий Макса в embedded-чате
       try {
-        final commentMsg = 'Прокомментируй мою цель v${widget.version}.\n${_buildUserContext()}';
+        final commentMsg =
+            'Прокомментируй мою цель v${widget.version}.\n${_buildUserContext()}';
         setState(() {
           _autoMessageForChat = commentMsg;
           _embeddedChatKey =
               UniqueKey(); // пересоздать чат и отправить авто-сообщение
         });
+      } catch (e, st) {
+        Sentry.captureException(e, stackTrace: st);
+      }
+      // Короткая пауза для UX и авто-переход к следующему узлу в башне
+      try {
+        final String action = widget.version < 4 ? 'goal_checkpoint' : 'weeks';
+        final int target = _nextLevelNumber();
+        Sentry.addBreadcrumb(Breadcrumb(
+          category: 'goal',
+          type: 'info',
+          message: 'goal_next_action_resolved',
+          data: {'action': action, 'target': target, 'version': widget.version},
+          level: SentryLevel.info,
+        ));
+        await Future.delayed(const Duration(milliseconds: 800));
+        if (!mounted) return;
+        context.go('/tower?scrollTo=${_nextLevelNumber()}');
       } catch (e, st) {
         Sentry.captureException(e, stackTrace: st);
       }
@@ -407,9 +429,58 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
       sb.writeln('first_three_days: ${_finalWhatCtrl.text.trim()}');
       sb.writeln('start_date: ${_finalWhenCtrl.text.trim()}');
       sb.writeln('accountability_person: ${_finalHowCtrl.text.trim()}');
-      sb.writeln('readiness_score: ${_readinessScore ?? (_commitment ? 8 : 5)}');
+      sb.writeln(
+          'readiness_score: ${_readinessScore ?? (_commitment ? 8 : 5)}');
     }
     return sb.toString();
+  }
+
+  List<String> _recommendedChips() {
+    final List<String> chips = <String>[];
+    if (widget.version == 2) {
+      if (_metricNameCtrl.text.trim().isEmpty) {
+        chips.add('Выбрать метрику');
+      }
+      if (_metricToCtrl.text.trim().isEmpty ||
+          double.tryParse(_metricFromCtrl.text.trim()) == null ||
+          double.tryParse(_metricToCtrl.text.trim()) == null) {
+        chips.add('Подскажи реалистичную цель');
+      }
+      if (_financialGoalCtrl.text.trim().isEmpty) {
+        chips.add('Предложи финансовую цель');
+      }
+      if (_goalRefinedCtrl.text.trim().isEmpty) {
+        chips.add('Сформулировать конкретный результат');
+      }
+    } else if (widget.version == 3) {
+      if (_goalSmartCtrl.text.trim().isEmpty) {
+        chips.add('Сформулировать SMART');
+      }
+      if (_s1Ctrl.text.trim().isEmpty) chips.add('Фокус недели 1');
+      if (_s2Ctrl.text.trim().isEmpty) chips.add('Фокус недели 2');
+      if (_s3Ctrl.text.trim().isEmpty) chips.add('Фокус недели 3');
+      if (_s4Ctrl.text.trim().isEmpty) chips.add('Фокус недели 4');
+    } else if (widget.version == 4) {
+      if (_finalWhatCtrl.text.trim().isEmpty) {
+        chips.add('Сформировать план на 3 дня');
+      }
+      if (_finalWhenCtrl.text.trim().isEmpty) {
+        chips.add('Выбрать дату старта');
+      }
+      if (_finalHowCtrl.text.trim().isEmpty) {
+        chips.add('Кого позвать в ответственные');
+      }
+      if (_readinessScore == null) {
+        chips.add('Оценить готовность');
+      }
+    }
+    final seen = <String>{};
+    final out = <String>[];
+    for (final c in chips) {
+      if (seen.add(c)) out.add(c);
+      if (out.length >= 6) break;
+    }
+    return out;
   }
 
   // Прямой колбэк удалён: сообщение сохраняется через лямбда в onAssistantMessage
@@ -551,6 +622,41 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
                     }),
                     if (widget.version != _latestVersion)
                       const SizedBox(height: 12),
+                    // Подсказка о последовательном заполнении версий
+                    if (!_versions.containsKey(widget.version) &&
+                        widget.version != _latestVersion + 1)
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColor.labelColor.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                              color:
+                                  AppColor.labelColor.withValues(alpha: 0.4)),
+                        ),
+                        child: Row(children: [
+                          const Icon(Icons.timeline,
+                              color: AppColor.labelColor),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Версии заполняются последовательно. Сначала заполните v${_latestVersion + 1}.',
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              try {
+                                context.go(
+                                    '/goal-checkpoint/${_latestVersion + 1}');
+                              } catch (e, st) {
+                                Sentry.captureException(e, stackTrace: st);
+                              }
+                            },
+                            child: const Text('Перейти'),
+                          ),
+                        ]),
+                      ),
                     if (!_showIntro)
                       Container(
                         padding: const EdgeInsets.all(16),
@@ -584,7 +690,7 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
                                           : (widget.version == 3
                                               ? 'Соберём SMART и 4 недельных фокуса. Начнём с SMART.'
                                               : 'Зафиксируем финальный план, дату старта и готовность. Начнём с плана на 3 дня.'),
-                                      recommendedChips: const [],
+                                      recommendedChips: _recommendedChips(),
                                       autoUserMessage: _autoMessageForChat,
                                       skipSpend: true,
                                     ),
@@ -621,11 +727,11 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
                               onCommitmentChanged: (v) =>
                                   setState(() => _commitment = v),
                               readinessScore: _readinessScore,
-                              onReadinessScoreChanged: (v) =>
-                                  setState(() {
-                                    _readinessScore = v;
-                                    _commitment = v >= 7; // Синхронизируем с ползунком
-                                  }),
+                              onReadinessScoreChanged: (v) => setState(() {
+                                _readinessScore = v;
+                                _commitment =
+                                    v >= 7; // Синхронизируем с ползунком
+                              }),
                             ),
                             const SizedBox(height: 12),
                             SizedBox(

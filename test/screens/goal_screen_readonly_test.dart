@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('GoalScreen renders read-only table and no Save button',
+  testWidgets('GoalScreen renders steps guide and week header; no Save button',
       (tester) async {
     // Подготавливаем данные версий: только v1
     final v1 = {
@@ -35,12 +35,17 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    // Есть секция «Кристаллизация цели»
+    // Есть секция «Кристаллизация цели» и компактный гид по шагам (v1..v4..Недели)
     expect(find.text('Кристаллизация цели'), findsOneWidget);
+    expect(find.text('v1'), findsWidgets);
+    expect(find.text('v2'), findsWidgets);
+    expect(find.text('v3'), findsWidgets);
+    expect(find.text('v4'), findsWidgets);
+    expect(find.text('Недели'), findsWidgets);
     // Новые секции этапа 38.3 присутствуют (хотя бы прогресс-бар из компактной карточки)
     expect(find.byType(LinearProgressIndicator), findsWidgets);
-    // Таймлайн недель рендерится (карточки «Нед N»)
-    expect(find.textContaining('Нед '), findsWidgets);
+    // Хедер недели
+    expect(find.textContaining('Неделя'), findsWidgets);
     // Табличные лейблы из v1 видны
     expect(find.text('Основная цель'), findsOneWidget);
     expect(find.text('Почему сейчас'), findsOneWidget);

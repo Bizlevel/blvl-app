@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
@@ -17,6 +18,18 @@ class NotificationsService {
 
   Future<void> initialize() async {
     if (_initialized) return;
+    if (kIsWeb) {
+      // На Web локальные уведомления не поддерживаются
+      _initialized = true;
+      try {
+        Sentry.addBreadcrumb(Breadcrumb(
+          level: SentryLevel.info,
+          category: 'notif',
+          message: 'notif_init_skipped_web',
+        ));
+      } catch (_) {}
+      return;
+    }
     const AndroidInitializationSettings androidInit =
         AndroidInitializationSettings('ic_launcher');
     const DarwinInitializationSettings iosInit = DarwinInitializationSettings();
@@ -51,7 +64,7 @@ class NotificationsService {
 
     await _ensureAndroidChannels();
 
-    if (Platform.isIOS) {
+    if (!kIsWeb && Platform.isIOS) {
       await _plugin
           .resolvePlatformSpecificImplementation<
               IOSFlutterLocalNotificationsPlugin>()
@@ -131,6 +144,17 @@ class NotificationsService {
   }
 
   Future<void> scheduleWeeklyPlan() async {
+    if (kIsWeb) {
+      // no-op на Web
+      try {
+        Sentry.addBreadcrumb(Breadcrumb(
+          level: SentryLevel.info,
+          category: 'notif',
+          message: 'notif_schedule_skipped_web',
+        ));
+      } catch (_) {}
+      return;
+    }
     if (!_initialized) await initialize();
     const AndroidNotificationDetails android = AndroidNotificationDetails(
       'goal_reminder',
@@ -203,6 +227,133 @@ class NotificationsService {
         level: SentryLevel.info,
         category: 'notif',
         message: 'notif_scheduled_weekly_plan',
+      ));
+    } catch (_) {}
+  }
+
+  /// Отменяет существующее расписание еженедельных напоминаний (известные ID)
+  Future<void> cancelWeeklyPlan() async {
+    if (kIsWeb) {
+      try {
+        Sentry.addBreadcrumb(Breadcrumb(
+          level: SentryLevel.info,
+          category: 'notif',
+          message: 'notif_cancel_skipped_web',
+        ));
+      } catch (_) {}
+      return;
+    }
+    if (!_initialized) await initialize();
+    // Базовые ID по умолчанию
+    final List<int> ids = <int>[1001, 1002, 1003];
+    // Диапазон воскресных ID (10:00, 13:00, 18:00), а также на будущее — с 0..23 часов
+    for (int h = 0; h <= 23; h++) {
+      ids.add(1100 + h);
+    }
+    for (final id in ids) {
+      try {
+        await _plugin.cancel(id);
+      } catch (_) {}
+    }
+  }
+
+  /// Пересоздаёт еженедельное расписание под выбранные дни/время
+  /// mon/wed/fri — кортежи (hour, minute). sunTimes — список кортежей.
+  Future<void> rescheduleWeekly({
+    (int, int)? mon,
+    (int, int)? wed,
+    (int, int)? fri,
+    List<(int, int)> sunTimes = const <(int, int)>[],
+  }) async {
+    if (kIsWeb) {
+      try {
+        Sentry.addBreadcrumb(Breadcrumb(
+          level: SentryLevel.info,
+          category: 'notif',
+          message: 'notif_reschedule_skipped_web',
+        ));
+      } catch (_) {}
+      return;
+    }
+    if (!_initialized) await initialize();
+    await cancelWeeklyPlan();
+
+    const AndroidNotificationDetails android = AndroidNotificationDetails(
+      'goal_reminder',
+      'Напоминания по целям',
+      channelDescription: 'План/середина недели и чекин',
+      importance: Importance.high,
+      priority: Priority.high,
+    );
+    const NotificationDetails details = NotificationDetails(android: android);
+
+    Future<void> _scheduleIf(
+        {required (int, int)? time,
+        required int id,
+        required int weekday,
+        required String title,
+        required String body}) async {
+      if (time == null) return;
+      await _plugin.zonedSchedule(
+        id,
+        title,
+        body,
+        _nextInstanceOf(weekday: weekday, hour: time.$1, minute: time.$2),
+        details,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+        payload: '{"route":"/goal"}',
+      );
+    }
+
+    await _scheduleIf(
+      time: mon,
+      id: 1001,
+      weekday: DateTime.monday,
+      title: 'Новая неделя! План готов?',
+      body: 'Откройте страницу «Цель» и уточните план недели',
+    );
+
+    await _scheduleIf(
+      time: wed,
+      id: 1002,
+      weekday: DateTime.wednesday,
+      title: 'Середина недели. Как прогресс?',
+      body: 'Проверьте цель и отметьте прогресс',
+    );
+
+    await _scheduleIf(
+      time: fri,
+      id: 1003,
+      weekday: DateTime.friday,
+      title: 'Напоминание на выходные',
+      body: 'Через два дня — чекин недели',
+    );
+
+    // Вс — один или несколько слотов
+    for (final hm in sunTimes) {
+      final int id = 1100 + hm.$1; // уникальный ID на основе часа
+      await _plugin.zonedSchedule(
+        id,
+        'Время недельного чекина',
+        'Заполните итоги недели на странице «Цель»',
+        _nextInstanceOf(weekday: DateTime.sunday, hour: hm.$1, minute: hm.$2),
+        details,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+        payload: '{"route":"/goal"}',
+      );
+    }
+
+    try {
+      Sentry.addBreadcrumb(Breadcrumb(
+        level: SentryLevel.info,
+        category: 'notif',
+        message: 'notif_rescheduled_weekly_plan',
       ));
     } catch (_) {}
   }

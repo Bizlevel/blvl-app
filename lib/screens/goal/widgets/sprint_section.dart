@@ -73,7 +73,8 @@ class SprintSection extends StatelessWidget {
         ),
         child: Row(
           children: [
-            const Icon(Icons.lock_outline, color: AppColor.labelColor, size: 28),
+            const Icon(Icons.lock_outline,
+                color: AppColor.labelColor, size: 28),
             AppSpacing.gapW(12),
             Expanded(
               child: Column(
@@ -145,6 +146,24 @@ class SprintSection extends StatelessWidget {
             selectedSprint: selectedSprint,
             onSelectSprint: onSelectSprint,
           ),
+          // Хедер текущей недели: «Неделя N из 4 с {датой старта из v4}»
+          AppSpacing.gapH(8),
+          Builder(builder: (context) {
+            final Map<String, dynamic> v4 =
+                (versions[4]?['version_data'] as Map?)
+                        ?.cast<String, dynamic>() ??
+                    const <String, dynamic>{};
+            final String startDate = (v4['start_date'] ?? '').toString().trim();
+            final String title =
+                'Неделя $selectedSprint из 4${startDate.isNotEmpty ? ' с $startDate' : ''}';
+            return Text(
+              title,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColor.labelColor,
+                    fontWeight: FontWeight.w600,
+                  ),
+            );
+          }),
           // Вертикальный список недель скрыт по требованию (оставлена только горизонтальная лента)
           AppSpacing.gapH(12),
           CheckInForm(
