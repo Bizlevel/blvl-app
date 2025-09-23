@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 
 import 'package:dio/dio.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
@@ -36,6 +37,106 @@ class LeoService {
     responseType: ResponseType.json,
   ));
 
+  // =============== Private helpers to reduce duplication and complexity ===============
+
+  Map<String, String> _edgeHeaders() {
+    return {
+      'Authorization': 'Bearer ${envOrDefine('SUPABASE_ANON_KEY')}',
+      'apikey': envOrDefine('SUPABASE_ANON_KEY'),
+      'x-user-jwt': _client.auth.currentSession?.accessToken ?? '',
+      'Content-Type': 'application/json',
+    };
+  }
+
+  bool _isAuthError(DioException e) {
+    final status = e.response?.statusCode ?? 0;
+    final body = e.response?.data;
+    final msg =
+        body is Map ? (body['error'] ?? body['message'])?.toString() : null;
+    return status == 401 || (msg != null && msg.contains('Invalid JWT'));
+  }
+
+  Future<Response<dynamic>> _postLeoChat(String dataStr) async {
+    try {
+      return await _edgeDio.post(
+        '/leo-chat',
+        data: dataStr,
+        options: Options(headers: _edgeHeaders()),
+      );
+    } on DioException catch (e) {
+      if (_isAuthError(e)) {
+        try {
+          await _client.auth.refreshSession();
+        } catch (_) {}
+        return await _edgeDio.post(
+          '/leo-chat',
+          data: dataStr,
+          options: Options(headers: _edgeHeaders()),
+        );
+      }
+      rethrow;
+    }
+  }
+
+  String? _parseServerMessage(dynamic data) {
+    if (data is Map) {
+      final err = (data['error'] ?? data['message'])?.toString();
+      final details = data['details']?.toString();
+      if (err != null && err.isNotEmpty) {
+        return details != null && details.isNotEmpty ? '$err: $details' : err;
+      }
+    }
+    return null;
+  }
+
+  String? _clean(String? value) {
+    if (value == null) return null;
+    final v = value.trim();
+    if (v.isEmpty || v == 'null') return null;
+    return v;
+  }
+
+  Future<void> _spendMessageAndRefresh({
+    required GpService gp,
+    required String idempotencyKey,
+    String? chatId,
+    bool skipSpend = false,
+  }) async {
+    if (skipSpend) return;
+    if (!kDisableGpSpendInChat) {
+      await gp.spend(
+        type: 'spend_message',
+        amount: 1,
+        referenceId: chatId ?? '',
+        idempotencyKey: idempotencyKey,
+      );
+      // Обновим кеш баланса в фоне
+      Future.microtask(() async {
+        try {
+          final fresh = await gp.getBalance();
+          await GpService.saveBalanceCache(fresh);
+        } catch (_) {}
+      });
+    } else {
+      _addBreadcrumb('gp', 'gp_spend_skipped', {
+        'reason': 'kDisableGpSpendInChat=true',
+        if (chatId != null) 'chatId': chatId,
+      });
+    }
+  }
+
+  void _addBreadcrumb(String category, String message,
+      [Map<String, dynamic>? data]) {
+    try {
+      Sentry.addBreadcrumb(Breadcrumb(
+        category: category,
+        message: message,
+        level: SentryLevel.info,
+        data: data,
+      ));
+    } catch (_) {}
+  }
+
   /// Отправляет список сообщений в Edge Function `leo-chat` и возвращает
   /// ответ ассистента + статистику токенов.
   /// Expects [messages] in chat completion API format.
@@ -44,7 +145,6 @@ class LeoService {
     String bot = 'leo',
   }) async {
     // debug: entry point marker (no PII)
-    // print('🔧 DEBUG: sendMessage');
     final session = _client.auth.currentSession;
     if (session == null) {
       throw LeoFailure('Пользователь не авторизован');
@@ -52,8 +152,6 @@ class LeoService {
 
     // Do not log JWT/token to avoid PII
 
-    // Используем только Edge Function
-    // print('🔧 DEBUG: Using Edge Function');
     // Списываем 1 GP за сообщение (идемпотентно), если не включён аварийный флаг
     final gp = GpService(_client);
     final String idempotencyKey = _generateIdempotencyKey(
@@ -65,60 +163,23 @@ class LeoService {
     return _withRetry(() async {
       try {
         try {
-          if (!kDisableGpSpendInChat) {
-            await gp.spend(
-              type: 'spend_message',
-              amount: 1,
-              idempotencyKey: idempotencyKey,
-            );
-            // Обновим кеш баланса в фоне
-            Future.microtask(() async {
-              try {
-                final fresh = await gp.getBalance();
-                await GpService.saveBalanceCache(fresh);
-              } catch (_) {}
-            });
-          } else {
-            // Breadcrumb для наблюдаемости rollback-режима
-            try {
-              await Sentry.addBreadcrumb(Breadcrumb(
-                message: 'gp_spend_skipped',
-                category: 'gp',
-                level: SentryLevel.info,
-                data: {'reason': 'kDisableGpSpendInChat=true'},
-              ));
-            } catch (_) {}
-          }
+          await _spendMessageAndRefresh(
+            gp: gp,
+            idempotencyKey: idempotencyKey,
+            chatId: null,
+            skipSpend: false,
+          );
         } on GpFailure catch (ge) {
           if (ge.message.contains('Недостаточно GP')) {
-            try {
-              await Sentry.addBreadcrumb(Breadcrumb(
-                message: 'gp_insufficient',
-                level: SentryLevel.warning,
-                data: {'where': 'leo_sendMessage'},
-              ));
-            } catch (_) {}
+            _addBreadcrumb(
+                'gp', 'gp_insufficient', {'where': 'leo_sendMessage'});
             throw LeoFailure('Недостаточно GP');
           }
           rethrow;
         }
-
-        final response = await _edgeDio.post(
-          '/leo-chat',
-          data: jsonEncode({'messages': messages, 'bot': bot}),
-          options: Options(headers: {
-            'Authorization': 'Bearer ${envOrDefine('SUPABASE_ANON_KEY')}',
-            'apikey': envOrDefine('SUPABASE_ANON_KEY'),
-            'x-user-jwt': session.accessToken,
-            'Authorization': 'Bearer ${envOrDefine('SUPABASE_ANON_KEY')}',
-            'apikey': envOrDefine('SUPABASE_ANON_KEY'),
-            'x-user-jwt': session.accessToken,
-            'Content-Type': 'application/json',
-          }),
+        final response = await _postLeoChat(
+          jsonEncode({'messages': messages, 'bot': bot}),
         );
-
-        print('🔧 DEBUG: Response status: ${response.statusCode}');
-        print('🔧 DEBUG: Response data: ${response.data}');
 
         if (response.statusCode == 200 &&
             response.data is Map<String, dynamic>) {
@@ -134,28 +195,13 @@ class LeoService {
       } on DioException catch (e) {
         try {
           await Sentry.captureException(e);
-        } catch (_) {
-          // Sentry не настроен, просто логируем в консоль
-          print('DEBUG: Exception (Sentry not configured): $e');
-        }
-        try {
-          await Sentry.captureException(e);
-        } catch (_) {
-          // Sentry не настроен, просто логируем в консоль
-          print('DEBUG: Exception (Sentry not configured): $e');
-        }
+        } catch (_) {}
         if (e.error is SocketException) {
           throw LeoFailure('Нет соединения с интернетом');
         }
-        final data = e.response?.data;
-        if (data is Map) {
-          final err = (data['error'] ?? data['message'])?.toString();
-          final details = data['details']?.toString();
-          if (err != null && err.isNotEmpty) {
-            final composed =
-                details != null && details.isNotEmpty ? '$err: $details' : err;
-            throw LeoFailure(_humanizeServerError(composed));
-          }
+        final parsed = _parseServerMessage(e.response?.data);
+        if (parsed != null) {
+          throw LeoFailure(_humanizeServerError(parsed));
         }
         if ((e.response?.statusCode ?? 0) >= 500) {
           throw LeoFailure(
@@ -167,7 +213,7 @@ class LeoService {
           await Sentry.captureException(e);
         } catch (_) {
           // Sentry не настроен, просто логируем в консоль
-          print('DEBUG: Exception (Sentry not configured): $e');
+          debugPrint('DEBUG: Exception (Sentry not configured): $e');
         }
         throw LeoFailure('Не удалось получить ответ Leo');
       }
@@ -183,18 +229,17 @@ class LeoService {
     String bot = 'leo',
     String? chatId, // Добавляем chatId параметр
     bool skipSpend = false,
+    bool caseMode = false,
   }) async {
     final session = _client.auth.currentSession;
     if (session == null) {
       throw LeoFailure('Пользователь не авторизован');
     }
 
-    print('🔧 DEBUG: sendMessageWithRAG начался');
-    print('🔧 DEBUG: session.user.id = ${session.user.id}');
-    print('🔧 DEBUG: JWT длина = ${session.accessToken.length}');
-    print(
-        '🔧 DEBUG: JWT начинается с = ${session.accessToken.substring(0, 20)}...');
-    print('🔧 DEBUG: chatId = $chatId'); // Добавляем логирование chatId
+    debugPrint('🔧 DEBUG: sendMessageWithRAG начался');
+    debugPrint('🔧 DEBUG: session.user.id = ${session.user.id}');
+    // JWT/PII не логируем
+    debugPrint('🔧 DEBUG: chatId = $chatId'); // Добавляем логирование chatId
 
     // Списываем 1 GP за сообщение (идемпотентно), если не включён аварийный флаг
     final gp = GpService(_client);
@@ -208,87 +253,39 @@ class LeoService {
     return _withRetry(() async {
       try {
         try {
-          if (!skipSpend) {
-            if (!kDisableGpSpendInChat) {
-              await gp.spend(
-                type: 'spend_message',
-                amount: 1,
-                referenceId: chatId ?? '',
-                idempotencyKey: idempotencyKey,
-              );
-              // Обновим кеш баланса в фоне
-              Future.microtask(() async {
-                try {
-                  final fresh = await gp.getBalance();
-                  await GpService.saveBalanceCache(fresh);
-                } catch (_) {}
-              });
-            } else {
-              try {
-                await Sentry.addBreadcrumb(Breadcrumb(
-                  message: 'gp_spend_skipped',
-                  category: 'gp',
-                  level: SentryLevel.info,
-                  data: {
-                    'reason': 'kDisableGpSpendInChat=true',
-                    'chatId': chatId ?? 'new'
-                  },
-                ));
-              } catch (_) {}
-            }
-          }
+          await _spendMessageAndRefresh(
+            gp: gp,
+            idempotencyKey: idempotencyKey,
+            chatId: chatId,
+            skipSpend: skipSpend,
+          );
         } on GpFailure catch (ge) {
           if (ge.message.contains('Недостаточно GP')) {
-            try {
-              await Sentry.addBreadcrumb(Breadcrumb(
-                message: 'gp_insufficient',
-                level: SentryLevel.warning,
-                data: {
-                  'where': 'leo_sendMessageWithRAG',
-                  'chatId': chatId ?? 'new'
-                },
-              ));
-            } catch (_) {}
+            _addBreadcrumb('gp', 'gp_insufficient', {
+              'where': 'leo_sendMessageWithRAG',
+              'chatId': chatId ?? 'new',
+            });
             throw LeoFailure('Недостаточно GP');
           }
           rethrow;
         }
 
         // Фильтруем строки "null" и пустые значения
-        final cleanUserContext =
-            (userContext == 'null' || userContext.isEmpty) ? null : userContext;
-        final cleanLevelContext =
-            (levelContext == 'null' || levelContext.isEmpty)
-                ? null
-                : levelContext;
+        final cleanUserContext = _clean(userContext);
+        final cleanLevelContext = _clean(levelContext);
 
-        print('🔧 DEBUG: Отправляем POST запрос к /leo-chat');
-        print('🔧 DEBUG: payload size = ${jsonEncode({
-              'messages': messages,
-              'userContext': cleanUserContext,
-              'levelContext': cleanLevelContext,
-              'bot': bot,
-              'chatId': chatId, // Добавляем chatId в payload
-            }).length} символов');
+        // send request
 
-        final response = await _edgeDio.post(
-          '/leo-chat',
-          data: jsonEncode({
-            'messages': messages,
-            'userContext': cleanUserContext,
-            'levelContext': cleanLevelContext,
-            'bot': bot,
-            'chatId': chatId, // Добавляем chatId в payload
-          }),
-          options: Options(headers: {
-            'Authorization': 'Bearer ${envOrDefine('SUPABASE_ANON_KEY')}',
-            'apikey': envOrDefine('SUPABASE_ANON_KEY'),
-            'x-user-jwt': session.accessToken,
-            'Content-Type': 'application/json',
-          }),
-        );
+        final payload = jsonEncode({
+          'messages': messages,
+          'userContext': cleanUserContext,
+          'levelContext': cleanLevelContext,
+          'bot': bot,
+          'chatId': chatId,
+        });
+        final response = await _postLeoChat(payload);
 
-        print('🔧 DEBUG: Получен HTTP ответ: ${response.statusCode}');
+        // response handled below
 
         if (response.statusCode == 200 &&
             response.data is Map<String, dynamic>) {
@@ -306,20 +303,14 @@ class LeoService {
           await Sentry.captureException(e);
         } catch (_) {
           // Sentry не настроен, просто логируем в консоль
-          print('DEBUG: Exception (Sentry not configured): $e');
+          debugPrint('DEBUG: Exception (Sentry not configured): $e');
         }
         if (e.error is SocketException) {
           throw LeoFailure('Нет соединения с интернетом');
         }
-        final data = e.response?.data;
-        if (data is Map) {
-          final err = (data['error'] ?? data['message'])?.toString();
-          final details = data['details']?.toString();
-          if (err != null && err.isNotEmpty) {
-            final composed =
-                details != null && details.isNotEmpty ? '$err: $details' : err;
-            throw LeoFailure(_humanizeServerError(composed));
-          }
+        final parsed = _parseServerMessage(e.response?.data);
+        if (parsed != null) {
+          throw LeoFailure(_humanizeServerError(parsed));
         }
         if ((e.response?.statusCode ?? 0) >= 500) {
           throw LeoFailure(
@@ -331,7 +322,7 @@ class LeoService {
           await Sentry.captureException(e);
         } catch (_) {
           // Sentry не настроен, просто логируем в консоль
-          print('DEBUG: Exception (Sentry not configured): $e');
+          debugPrint('DEBUG: Exception (Sentry not configured): $e');
         }
         throw LeoFailure('Не удалось получить ответ Leo');
       }
@@ -372,16 +363,8 @@ class LeoService {
 
     return _withRetry(() async {
       try {
-        final response = await _edgeDio.post(
-          '/leo-chat',
-          data: jsonEncode(payload),
-          options: Options(headers: {
-            'Authorization': 'Bearer ${envOrDefine('SUPABASE_ANON_KEY')}',
-            'apikey': envOrDefine('SUPABASE_ANON_KEY'),
-            'x-user-jwt': session.accessToken,
-            'Content-Type': 'application/json',
-          }),
-        );
+        final dataStr = jsonEncode(payload);
+        final response = await _postLeoChat(dataStr);
 
         if (response.statusCode == 200 &&
             response.data is Map<String, dynamic>) {
@@ -400,18 +383,11 @@ class LeoService {
           await Sentry.captureException(e);
         } catch (_) {
           // Sentry не настроен, просто логируем в консоль
-          print('DEBUG: Exception (Sentry not configured): $e');
+          debugPrint('DEBUG: Exception (Sentry not configured): $e');
         }
-        final data = e.response?.data;
-        if (data is Map) {
-          final err = (data['error'] ?? data['message'])?.toString();
-          final details = data['details']?.toString();
-          if (err != null && err.isNotEmpty) {
-            final composed = (details != null && details.isNotEmpty)
-                ? '$err: $details'
-                : err;
-            throw LeoFailure(_humanizeServerError(composed));
-          }
+        final parsed = _parseServerMessage(e.response?.data);
+        if (parsed != null) {
+          throw LeoFailure(_humanizeServerError(parsed));
         }
         if ((e.response?.statusCode ?? 0) >= 500) {
           throw LeoFailure(
@@ -423,7 +399,7 @@ class LeoService {
           await Sentry.captureException(e);
         } catch (_) {
           // Sentry не настроен, просто логируем в консоль
-          print('DEBUG: Exception (Sentry not configured): $e');
+          debugPrint('DEBUG: Exception (Sentry not configured): $e');
         }
         throw LeoFailure('Не удалось получить ответ Leo (quiz)');
       }
@@ -593,13 +569,13 @@ class LeoService {
         'request_type': requestType,
       });
 
-      print('🔧 DEBUG: AI message data saved via public method');
+      debugPrint('🔧 DEBUG: AI message data saved via public method');
     } on PostgrestException catch (e) {
-      print(
+      debugPrint(
           'Warning: Failed to save AI message data to database: ${e.message}');
       rethrow; // Пробрасываем ошибку для обработки на уровне выше
     } catch (e) {
-      print('Warning: Unexpected error saving AI message data: $e');
+      debugPrint('Warning: Unexpected error saving AI message data: $e');
       rethrow;
     }
   }

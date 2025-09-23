@@ -25,7 +25,7 @@ class UserRepository {
       final response = await _client
           .from('users')
           .select(
-              'id, name, email, about, goal, business_area, experience_level, onboarding_completed, current_level, avatar_id')
+              'id, name, email, about, goal, business_area, experience_level, onboarding_completed, current_level, avatar_id, business_size, key_challenges, learning_style, business_region')
           .eq('id', userId)
           .maybeSingle();
 

@@ -167,6 +167,13 @@ class AuthService {
     String? goal,
     int? avatarId,
     bool? onboardingCompleted,
+    // Новые поля персонализации
+    String? businessArea,
+    String? experienceLevel,
+    String? businessSize,
+    List<String>? keyChallenges,
+    String? learningStyle,
+    String? businessRegion,
   }) async {
     final user = _client.auth.currentUser;
     if (user == null) {
@@ -181,8 +188,8 @@ class AuthService {
 
     await _handleAuthCall(() async {
       // Формируем payload динамически, добавляя только переданные поля
+      // Для избегания 23502 (NOT NULL name) используем UPDATE по id вместо UPSERT.
       final Map<String, dynamic> payload = {
-        'id': user.id,
         'updated_at': DateTime.now().toIso8601String(),
       };
 
@@ -199,8 +206,17 @@ class AuthService {
       if (onboardingCompleted != null) {
         payload['onboarding_completed'] = onboardingCompleted;
       }
+      // Персонализация
+      if (businessArea != null) payload['business_area'] = businessArea;
+      if (experienceLevel != null) {
+        payload['experience_level'] = experienceLevel;
+      }
+      if (businessSize != null) payload['business_size'] = businessSize;
+      if (keyChallenges != null) payload['key_challenges'] = keyChallenges;
+      if (learningStyle != null) payload['learning_style'] = learningStyle;
+      if (businessRegion != null) payload['business_region'] = businessRegion;
 
-      await _client.from('users').upsert(payload);
+      await _client.from('users').update(payload).eq('id', user.id);
       // Попытка выдать бонус за заполненный профиль (идемпотентно)
       try {
         final row = await _client
@@ -225,7 +241,7 @@ class AuthService {
     }, unknownErrorMessage: 'Не удалось сохранить профиль');
   }
 
-  /// Updates the avatar id (1..7) for current user.
+  /// Updates the avatar id (1..12) for current user.
   /// Deprecated: Use updateProfile(avatarId: id) instead.
   Future<void> updateAvatar(int avatarId) async {
     await updateProfile(avatarId: avatarId);

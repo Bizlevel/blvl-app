@@ -120,9 +120,13 @@ class ProgressWidget extends StatelessWidget {
       Map<int, Map<String, dynamic>> versions) {
     final Map<String, dynamic> v2 =
         (versions[2]?['version_data'] as Map?)?.cast<String, dynamic>() ?? {};
-    final String? metricName = (v2['metric_name'] ?? '') as String?;
-    final double? from = double.tryParse('${v2['metric_from'] ?? ''}'.trim());
-    final double? to = double.tryParse('${v2['metric_to'] ?? ''}'.trim());
+    // Поддержка новых ключей с fallback на старые
+    final String? metricName =
+        (v2['metric_type'] ?? v2['metric_name'] ?? '') as String?;
+    final double? from = double.tryParse(
+        '${v2['metric_current'] ?? v2['metric_from'] ?? ''}'.trim());
+    final double? to = double.tryParse(
+        '${v2['metric_target'] ?? v2['metric_to'] ?? ''}'.trim());
     return (metricName, from, to);
   }
 
@@ -142,7 +146,7 @@ class ProgressWidget extends StatelessWidget {
   static int _currentWeekNumber(Map<int, Map<String, dynamic>> versions) {
     final Map<String, dynamic> v4 =
         (versions[4]?['version_data'] as Map?)?.cast<String, dynamic>() ?? {};
-    final String when = (v4['final_when'] ?? '').toString();
+    final String when = (v4['start_date'] ?? v4['final_when'] ?? '').toString();
     final start = DateTime.tryParse(when)?.toUtc();
     if (start == null) return 1;
     final int days = DateTime.now().toUtc().difference(start).inDays;

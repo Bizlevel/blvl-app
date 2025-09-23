@@ -2,6 +2,7 @@ import 'package:badges/badges.dart' as badges;
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:bizlevel/theme/color.dart';
+import 'package:bizlevel/services/notification_log_service.dart';
 
 class NotificationBox extends StatelessWidget {
   const NotificationBox({
@@ -18,7 +19,12 @@ class NotificationBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: () async {
+        try {
+          await NotificationLogService.instance.markAllRead();
+        } catch (_) {}
+        onTap?.call();
+      },
       child: Container(
         padding: EdgeInsets.all(size),
         decoration: BoxDecoration(

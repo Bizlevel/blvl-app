@@ -49,8 +49,8 @@ void main() {
 
   group('GoalsRepository SWR', () {
     test('fetchLatestGoal returns cache when offline', () async {
-      final userId = 'u1';
-      final key = 'latest_$userId';
+      const userId = 'u1';
+      const key = 'latest_$userId';
       final cached = {
         'id': 'g1',
         'user_id': userId,
@@ -71,7 +71,7 @@ void main() {
     });
 
     test('fetchSprint returns cache when offline', () async {
-      final key = 'sprint_2';
+      const key = 'sprint_2';
       final cached = {
         'sprint_number': 2,
         'achievement': 'Сделано X',

@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'auth_provider.dart';
 import 'goals_repository_provider.dart';
+import 'levels_provider.dart';
 
 // Последняя версия цели пользователя
 final goalLatestProvider = FutureProvider<Map<String, dynamic>?>((ref) async {
@@ -78,4 +79,46 @@ final hasGoalVersionProvider =
     if (v == version) return true;
   }
   return false;
+});
+
+/// Прогресс активного чекпоинта (version): собранные поля и текущие данные версии
+final goalProgressProvider =
+    FutureProvider.family<Map<String, dynamic>, int>((ref, version) async {
+  final repo = ref.read(goalsRepositoryProvider);
+  return repo.fetchGoalProgress(version);
+});
+
+/// Динамический label метрики из v2 для чек-ина недели
+final metricLabelProvider = FutureProvider<String?>((ref) async {
+  final all = await ref.watch(goalVersionsProvider.future);
+  final Map<int, Map<String, dynamic>> map = {
+    for (final m in all) (m['version'] as int): Map<String, dynamic>.from(m)
+  };
+  final Map<String, dynamic>? v2 =
+      (map[2]?['version_data'] as Map?)?.cast<String, dynamic>();
+  if (v2 == null) return null;
+  return (v2['metric_type'] ?? v2['metric_name'])?.toString();
+});
+
+/// Список опций «инструментов недели» для чек-ина (SWR через уровни)
+final usedToolsOptionsProvider = FutureProvider<List<String>>((ref) async {
+  // Берём уровни через существующий провайдер уровней
+  final levels = await ref.watch(levelsProvider.future);
+  // Формируем базовый набор опций из завершённых/пройденных уровней
+  final List<String> tools = <String>[];
+  for (final lv in levels) {
+    final String title = (lv['title'] ?? '') as String? ?? '';
+    if (title.isEmpty) continue;
+    tools.add(title);
+  }
+  // Минимальный набор дефолтов для UX
+  if (tools.isEmpty) {
+    return const <String>[
+      'Матрица Эйзенхауэра',
+      'Финансовый учёт',
+      'УТП',
+      'SMART‑планирование',
+    ];
+  }
+  return tools;
 });

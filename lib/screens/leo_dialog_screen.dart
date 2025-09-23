@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:bizlevel/providers/leo_service_provider.dart';
 import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/widgets/leo_message_bubble.dart';
+import 'package:bizlevel/widgets/typing_indicator.dart';
 import 'package:bizlevel/services/leo_service.dart';
 import 'package:bizlevel/providers/gp_providers.dart';
 
@@ -16,15 +17,24 @@ class LeoDialogScreen extends ConsumerStatefulWidget {
   final String? chatId;
   final String? userContext;
   final String? levelContext;
-  final String bot; // 'leo' | 'alex'
+  final String bot; // 'leo' | 'max'
   final bool caseMode; // режим мини‑кейса: не тратим лимиты, не сохраняем чаты
   final String? systemPrompt; // опц. системный промпт (для кейса)
+  final String? firstPrompt; // опц. первый ассистентский промпт (для кейса)
+  final List<String>? casePrompts; // весь список промптов кейса (Q1..Qn)
+  final List<String>? caseContexts; // контексты для Q2..Qn (по индексам)
+  final String?
+      casePreface; // вступление перед первым заданием (например, список дел)
+  final String? finalStory; // развёрнутый финальный текст кейса
   final bool
       embedded; // когда true — рендер без Scaffold/AppBar (встраиваемый вид)
   final ValueChanged<String>?
       onAssistantMessage; // колбэк для получения ответа ассистента
   final List<String>?
       recommendedChips; // опц. серверные подсказки (fallback на клиенте)
+  final String?
+      autoUserMessage; // при передаче — автоматически отправить это сообщение
+  final bool skipSpend; // пропуск списаний GP для тонкой реакции
 
   const LeoDialogScreen({
     super.key,
@@ -34,9 +44,16 @@ class LeoDialogScreen extends ConsumerStatefulWidget {
     this.bot = 'leo',
     this.caseMode = false,
     this.systemPrompt,
+    this.firstPrompt,
+    this.casePrompts,
+    this.caseContexts,
     this.embedded = false,
     this.onAssistantMessage,
     this.recommendedChips,
+    this.casePreface,
+    this.finalStory,
+    this.autoUserMessage,
+    this.skipSpend = false,
   });
 
   @override
@@ -58,9 +75,10 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
   bool _hasMore =
       false; // включаем пагинацию только после реальной загрузки из БД
   int _page = 0; // 0-based page counter
-  int _remaining = -1; // −1 unknown (лимиты отключены)
+  // int _remaining = -1; // −1 unknown (лимиты отключены)
 
   late final LeoService _leo;
+  int _caseStepIndex = -1; // -1 когда не в сценарии или не начато
 
   // Добавляем debounce для предотвращения дублей
   Timer? _debounceTimer;
@@ -72,24 +90,38 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
     _leo = ref.read(leoServiceProvider);
     // Лимиты сообщений отключены (этап 39.1)
     _chatId = widget.chatId;
-    print('🔧 DEBUG: Инициализация chatId: $_chatId');
-    print('🔧 DEBUG: widget.chatId: ${widget.chatId}');
-    print('🔧 DEBUG: Тип widget.chatId: ${widget.chatId.runtimeType}');
-    // Автоприветствие: кейс → задание; иначе Алекс.
+    // Автоприветствие: кейс → первый промпт задания; иначе Макс приветствие
     if (widget.caseMode && _chatId == null && _messages.isEmpty) {
-      _messages.add({
-        'role': 'assistant',
-        'content': 'Начнём с короткого задания. Ответьте в 2–3 предложениях.',
-      });
-    } else if (widget.bot == 'alex' && _chatId == null && _messages.isEmpty) {
-      _messages.add({
-        'role': 'assistant',
-        'content':
-            'Я — Алекс, трекер цели BizLevel. Помогаю кристаллизовать цель и держать темп 28 дней. Напишите, чего хотите добиться — предложу ближайший шаг.',
-      });
+      final String start = (widget.firstPrompt?.trim().isNotEmpty == true)
+          ? widget.firstPrompt!.trim()
+          : 'Задание 1: Ответьте в 2–3 предложениях.';
+      final preface = widget.casePreface?.trim();
+      if (preface != null && preface.isNotEmpty) {
+        _messages.add({'role': 'assistant', 'content': preface});
+      }
+      _messages.add({'role': 'assistant', 'content': start});
+      _caseStepIndex = 0;
+    } else if (widget.bot == 'max' && _chatId == null && _messages.isEmpty) {
+      final String greeting = (widget.firstPrompt?.trim().isNotEmpty == true)
+          ? widget.firstPrompt!.trim()
+          : 'Я — Макс, трекер цели BizLevel. Помогаю кристаллизовать цель и держать темп 28 дней. Напишите, чего хотите добиться — предложу ближайший шаг.';
+      _messages.add({'role': 'assistant', 'content': greeting});
     }
     if (_chatId != null) {
       _loadMessages();
+    }
+
+    // Автоматическая отправка пользовательского сообщения (тонкая реакция)
+    if (widget.autoUserMessage != null &&
+        widget.autoUserMessage!.trim().isNotEmpty) {
+      // Отправляем асинхронно после первого кадра, чтобы не мешать построению
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (!mounted) return;
+        await _sendMessageInternal(
+          widget.autoUserMessage!.trim(),
+          isAuto: true,
+        );
+      });
     }
   }
 
@@ -162,10 +194,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
       });
 
   Future<void> _sendMessage() async {
-    print('🔧 DEBUG: _sendMessage вызван');
-    print('🔧 DEBUG: text = "${_inputController.text.trim()}"');
-    print('🔧 DEBUG: _isSending = $_isSending');
-    print('🔧 DEBUG: _remaining = $_remaining');
+    // debug prints removed
 
     // Лимиты отключены — не блокируем отправку
 
@@ -181,7 +210,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
     });
   }
 
-  Future<void> _sendMessageInternal(String text) async {
+  Future<void> _sendMessageInternal(String text, {bool isAuto = false}) async {
     // Дополнительная проверка на случай, если состояние изменилось
     if (_isSending || !mounted) return;
 
@@ -208,33 +237,28 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
       String assistantMsg;
 
       // Фильтруем строки "null" и пустые значения
-      final cleanUserContext = (widget.userContext == 'null' || widget.userContext?.isEmpty == true) ? '' : (widget.userContext ?? '');
-      final cleanLevelContext = (widget.levelContext == 'null' || widget.levelContext?.isEmpty == true) ? '' : (widget.levelContext ?? '');
-      
-      print('🔧 DEBUG: userContext = "${widget.userContext}"');
-      print('🔧 DEBUG: levelContext = "${widget.levelContext}"');
-      print('🔧 DEBUG: cleanUserContext = "$cleanUserContext"');
-      print('🔧 DEBUG: cleanLevelContext = "$cleanLevelContext"');
-      print('🔧 DEBUG: userContext.isNotEmpty = ${cleanUserContext.isNotEmpty}');
-      print('🔧 DEBUG: levelContext.isNotEmpty = ${cleanLevelContext.isNotEmpty}');
+      final cleanUserContext =
+          (widget.userContext == 'null' || widget.userContext?.isEmpty == true)
+              ? ''
+              : (widget.userContext ?? '');
+      final cleanLevelContext = (widget.levelContext == 'null' ||
+              widget.levelContext?.isEmpty == true)
+          ? ''
+          : (widget.levelContext ?? '');
 
       // Единый вызов: сервер выполнит RAG + персонализацию при необходимости
-      print('🔧 DEBUG: Отправляем запрос к sendMessageWithRAG...');
-      print('🔧 DEBUG: messages count: ${_buildChatContext().length}');
-      print('🔧 DEBUG: bot: ${widget.bot}');
-      
       final response = await _leo.sendMessageWithRAG(
         messages: _buildChatContext(),
         userContext: cleanUserContext,
         levelContext: cleanLevelContext,
         bot: widget.bot,
-        skipSpend: widget.caseMode,
+        // GP‑политика: в mentor-mode все сообщения бесплатные,
+        // в обычном режиме только авто‑сообщения бесплатные
+        skipSpend: widget.skipSpend,
+        caseMode: widget.caseMode, // Add caseMode parameter
       );
-      
-      print('🔧 DEBUG: Получен ответ от sendMessageWithRAG');
-      print('🔧 DEBUG: response keys: ${response.keys.toList()}');
+
       assistantMsg = response['message']['content'] as String? ?? '';
-      print('🔧 DEBUG: assistantMsg length: ${assistantMsg.length}');
 
       if (!widget.caseMode) {
         await _leo.saveConversation(
@@ -242,9 +266,98 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
       }
 
       if (!mounted) return;
+      // Скрываем служебные маркеры и префикс "Оценка:" для пользователя
+      String displayMsg = assistantMsg
+          .replaceAll(RegExp(r"\[CASE:(NEXT|RETRY|FINAL)\]"), '')
+          .replaceFirst(RegExp(r"^\s*Оценка\s*:\s*", caseSensitive: false), '')
+          .replaceFirst(
+              RegExp(
+                  r"^(EXCELLENT|GOOD|ACCEPTABLE|WEAK|INVALID)\s*[\.|\-–:]?\s*",
+                  caseSensitive: true),
+              '')
+          .replaceFirst(
+              RegExp(
+                  r"^(Excellent|Good|Acceptable|Weak|Invalid)\s*[\.|\-–:]?\s*",
+                  caseSensitive: false),
+              '')
+          .trim();
       setState(() {
-        _messages.add({'role': 'assistant', 'content': assistantMsg});
+        _messages.add({'role': 'assistant', 'content': displayMsg});
       });
+      // Реакция на маркеры сценария (после отображения очищенного текста)
+      if (widget.caseMode && widget.casePrompts != null) {
+        if (assistantMsg.contains('[CASE:NEXT]')) {
+          // Перейти к следующему заданию
+          final nextIndex = (_caseStepIndex >= 0) ? _caseStepIndex + 1 : 1;
+          if (nextIndex < (widget.casePrompts!.length)) {
+            _caseStepIndex = nextIndex;
+            // Показать контекст следующего вопроса, если имеется
+            final ctx = (widget.caseContexts != null &&
+                    nextIndex < widget.caseContexts!.length)
+                ? widget.caseContexts![nextIndex]
+                : '';
+            if (ctx.trim().isNotEmpty) {
+              setState(() {
+                _messages.add({'role': 'assistant', 'content': ctx.trim()});
+              });
+            }
+            // Показать следующий вопрос как ассистентское сообщение
+            final q = widget.casePrompts![nextIndex].trim();
+            if (q.isNotEmpty) {
+              setState(() {
+                _messages.add({'role': 'assistant', 'content': q});
+              });
+              _scrollToBottom();
+            }
+          }
+        } else if (assistantMsg.contains('[CASE:FINAL]')) {
+          // Показать финальную историю (если задана), затем предложить кнопку возврата
+          final fs = widget.finalStory?.trim();
+          if (fs != null && fs.isNotEmpty) {
+            setState(() {
+              _messages.add({'role': 'assistant', 'content': fs});
+            });
+            _scrollToBottom();
+          }
+          if (!mounted) return;
+          // Кнопка в нижнем листе для явного возврата
+          // ignore: use_build_context_synchronously
+          await showModalBottomSheet(
+            context: context,
+            showDragHandle: true,
+            builder: (ctx) => SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text(
+                      'Кейс завершён',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 12),
+                    ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(ctx).pop();
+                        Navigator.of(context).pop('case_final');
+                      },
+                      child: const Text('Вернуться в Башню'),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      child: const Text('Остаться в диалоге'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+          return;
+        }
+      }
+      // В обычном режиме (не кейс) диалог не закрываем автоматически
       // После успешного ответа обновим баланс GP в фоне
       try {
         // ignore: unused_result
@@ -256,8 +369,6 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
       } catch (_) {}
       _scrollToBottom();
     } catch (e) {
-      print('🔧 DEBUG: ОШИБКА при отправке сообщения: $e');
-      print('🔧 DEBUG: Тип ошибки: ${e.runtimeType}');
       if (!mounted) return;
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text('Ошибка: $e')));
@@ -328,8 +439,9 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
       child: ListView.builder(
         controller: _scrollController,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        itemCount: _messages.length + (_hasMore ? 1 : 0),
+        itemCount: _messages.length + (_hasMore ? 1 : 0) + (_isSending ? 1 : 0),
         itemBuilder: (context, index) {
+          // 1) Плашка загрузки предыдущих сообщений
           if (_hasMore && index == 0) {
             return Center(
               child: _isLoadingMore
@@ -337,14 +449,66 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
                       padding: EdgeInsets.all(8.0),
                       child: CircularProgressIndicator())
                   : TextButton(
-                      onPressed: _loadMore, child: const Text('Загрузить ещё')),
+                      onPressed: _loadMore,
+                      child: Text(
+                        'Загрузить ещё',
+                        style: Theme.of(context)
+                            .textTheme
+                            .labelLarge
+                            ?.copyWith(color: AppColor.primary),
+                      ),
+                    ),
             );
           }
-          final msgIndex = _hasMore ? index - 1 : index;
+          final offset = _hasMore ? 1 : 0;
+          final msgIndex = index - offset;
+          // 2) Последний элемент — индикатор набора, если ждём ответ
+          if (_isSending && msgIndex == _messages.length) {
+            return Align(
+              alignment: Alignment.centerLeft,
+              child: Container(
+                margin: const EdgeInsets.symmetric(vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                constraints: BoxConstraints(
+                    maxWidth: MediaQuery.of(context).size.width * 0.8),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade200,
+                  borderRadius: BorderRadius.circular(12).copyWith(
+                    topLeft: const Radius.circular(0),
+                    topRight: const Radius.circular(12),
+                  ),
+                ),
+                child: const TypingIndicator.small(),
+              ),
+            );
+          }
+          // 3) Обычные сообщения
           final msg = _messages[msgIndex];
           final isUser = msg['role'] == 'user';
-          return LeoMessageBubble(
-              text: msg['content'] as String? ?? '', isUser: isUser);
+          final bubble = LeoMessageBubble(
+            text: msg['content'] as String? ?? '',
+            isUser: isUser,
+          );
+          // Лёгкая анимация появления только для последних 6 элементов,
+          // чтобы избежать нагрузки на длинные списки
+          final bool animate = index >=
+              ((_hasMore ? 1 : 0) + (_isSending ? 1 : 0) + _messages.length - 6)
+                  .clamp(0, _messages.length + 2);
+          if (!animate) return bubble;
+          return TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0.0, end: 1.0),
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+            builder: (context, v, child) => Opacity(
+              opacity: v,
+              child: Transform.translate(
+                offset: Offset(0, (1 - v) * 20),
+                child: child,
+              ),
+            ),
+            child: bubble,
+          );
         },
       ),
     );
@@ -362,21 +526,24 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
             Row(
               children: [
                 Expanded(
-                  child: TextField(
-                    controller: _inputController,
-                    focusNode: _inputFocus,
-                    minLines: 1,
-                    maxLines: 4,
-                    decoration: const InputDecoration(
-                      hintText: 'Введите сообщение...',
-                      border: OutlineInputBorder(),
+                  child: Semantics(
+                    label: 'Поле ввода сообщения',
+                    child: TextField(
+                      controller: _inputController,
+                      focusNode: _inputFocus,
+                      minLines: 1,
+                      maxLines: 4,
+                      decoration: const InputDecoration(
+                        hintText: 'Введите сообщение...',
+                        border: OutlineInputBorder(),
+                      ),
+                      // Отправка по Enter
+                      onSubmitted: (text) {
+                        if (text.trim().isNotEmpty && !_isSending) {
+                          _sendMessage();
+                        }
+                      },
                     ),
-                    // Отправка по Enter
-                    onSubmitted: (text) {
-                      if (text.trim().isNotEmpty && !_isSending) {
-                        _sendMessage();
-                      }
-                    },
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -385,10 +552,15 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
                         width: 24,
                         height: 24,
                         child: CircularProgressIndicator())
-                    : IconButton(
-                        icon: const Icon(Icons.send),
-                        color: AppColor.primary,
-                        onPressed: _sendMessage,
+                    : Semantics(
+                        label: 'Отправить сообщение',
+                        button: true,
+                        child: IconButton(
+                          key: const Key('chat_send_button'),
+                          icon: const Icon(Icons.send),
+                          color: AppColor.primary,
+                          onPressed: _sendMessage,
+                        ),
                       ),
               ],
             ),
@@ -408,9 +580,12 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
         runSpacing: 8,
         children: [
           for (final text in chips)
-            ActionChip(
-              label: Text(text, overflow: TextOverflow.ellipsis),
-              onPressed: () {
+            _SuggestionCard(
+              text: text,
+              icon: text.contains('?')
+                  ? Icons.help_outline
+                  : Icons.lightbulb_outline,
+              onTap: () {
                 _inputController.text = text;
                 _inputController.selection = TextSelection.fromPosition(
                     TextPosition(offset: _inputController.text.length));
@@ -425,15 +600,23 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
   List<String> _resolveRecommendedChips() {
     if (widget.recommendedChips != null &&
         widget.recommendedChips!.isNotEmpty) {
-      return widget.recommendedChips!;
+      // Объединим серверные и локальные, удалив дубли и ограничив до 6 штук
+      final local = _localChipsFallback();
+      final merged = <String>{...widget.recommendedChips!, ...local}.toList();
+      if (merged.length > 6) return merged.sublist(0, 6);
+      return merged;
     }
+    return _localChipsFallback();
+  }
+
+  List<String> _localChipsFallback() {
     // Клиентский фолбэк: подбираем подсказки по версии цели в userContext
     if (widget.bot == 'max') {
       final ctx = widget.userContext ?? '';
       final match = RegExp(r'goal_version:\s*(\d+)').firstMatch(ctx);
       final v = match != null ? int.tryParse(match.group(1) ?? '') : null;
       switch (v) {
-        case 2:
+        case 1:
           return const [
             '💰 Выручка',
             '👥 Кол-во клиентов',
@@ -441,14 +624,14 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
             '📊 Конверсия %',
             '✏️ Другое',
           ];
-        case 3:
+        case 2:
           return const [
             'Неделя 1: Подготовка',
             'Неделя 2: Запуск',
             'Неделя 3: Масштабирование',
             'Неделя 4: Оптимизация',
           ];
-        case 4:
+        case 3:
           return const [
             'Готовность 7/10',
             'Начать завтра',
@@ -459,5 +642,52 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
       }
     }
     return const [];
+  }
+}
+
+class _SuggestionCard extends StatelessWidget {
+  const _SuggestionCard({
+    required this.text,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final String text;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: AppColor.surface,
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: [
+            BoxShadow(
+              color: AppColor.shadowColor.withValues(alpha: 0.06),
+              blurRadius: 3,
+              offset: const Offset(0, 1),
+            )
+          ],
+          border: Border.all(color: AppColor.borderColor),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: AppColor.labelColor),
+            const SizedBox(width: 8),
+            Text(
+              text,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

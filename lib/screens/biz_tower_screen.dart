@@ -7,7 +7,12 @@ import 'package:go_router/go_router.dart';
 import 'package:bizlevel/providers/gp_providers.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bizlevel/services/gp_service.dart';
-import 'package:flutter_svg/flutter_svg.dart';
+// import 'package:flutter_svg/flutter_svg.dart';
+import 'package:bizlevel/widgets/common/gp_balance_widget.dart';
+import 'package:bizlevel/widgets/common/bizlevel_modal.dart';
+import 'package:bizlevel/theme/ui_strings.dart';
+import 'package:bizlevel/widgets/common/notification_center.dart';
+import 'package:bizlevel/services/notification_log_service.dart';
 
 part 'tower/tower_constants.dart';
 part 'tower/tower_helpers.dart';
@@ -23,7 +28,8 @@ part 'tower/tower_floor_widgets.dart';
 /// Внешний API/поведение не меняем; внутренняя структура упрощена.
 class BizTowerScreen extends ConsumerStatefulWidget {
   final int? scrollTo;
-  const BizTowerScreen({super.key, this.scrollTo});
+  const BizTowerScreen(
+      {super.key = const Key('biz_tower_screen'), this.scrollTo});
 
   @override
   ConsumerState<BizTowerScreen> createState() => _BizTowerScreenState();
@@ -31,6 +37,7 @@ class BizTowerScreen extends ConsumerStatefulWidget {
 
 /// Состояние экрана башни: содержит автоскролл и ключи узлов.
 class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
+  // ignore: unused_field
   final ScrollController _scrollController = ScrollController();
   final Map<int, GlobalKey> _nodeKeys = {};
   final GlobalKey _stackKey = GlobalKey();
@@ -54,7 +61,7 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
         if (!mounted) return;
         await Scrollable.ensureVisible(key!.currentContext!,
             duration: const Duration(milliseconds: 500),
-            curve: Curves.easeInOut,
+            curve: Curves.easeInOutCubic,
             alignment: 0.3);
         _logBreadcrumb('tower_autoscroll_done level=$levelNumber');
       }
@@ -70,6 +77,15 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
     return Scaffold(
       appBar: AppBar(
         centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
+          tooltip: 'Главная улица',
+          onPressed: () {
+            try {
+              GoRouter.of(context).go('/home');
+            } catch (_) {}
+          },
+        ),
         title: const Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -77,41 +93,15 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
             SizedBox(height: 2),
             Text(
               'Этаж 1: База предпринимательства',
-              style: TextStyle(fontSize: 12, color: Color.fromARGB(137, 42, 42, 42)),
+              style: TextStyle(fontSize: 12, color: AppColor.labelColor),
             ),
           ],
         ),
         actions: [
-          Consumer(builder: (context, ref, _) {
-            final gpAsync = ref.watch(gpBalanceProvider);
-            final balance = gpAsync.value?['balance'];
-            if (balance == null) return const SizedBox.shrink();
-            return Padding(
-              padding: const EdgeInsets.only(right: 12),
-              child: Center(
-                child: InkWell(
-                  onTap: () {
-                    // Переход в магазин GP (маршрут добавим в 39.8)
-                    try {
-                      GoRouter.of(context).go('/gp-store');
-                    } catch (_) {}
-                  },
-                  child: Row(
-                    children: [
-                      SvgPicture.asset('assets/images/gp_coin.svg',
-                          width: 36, height: 36),
-                      const SizedBox(width: 8),
-                      Text('$balance',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 28,
-                          )),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          })
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: const Center(child: GpBalanceWidget()),
+          )
         ],
         backgroundColor: AppColor.appBarColor,
       ),
@@ -122,143 +112,47 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
           data: (nodes) {
             _lastNodes = nodes;
             // Обработка запроса автоскролла через переданный параметр scrollTo
-            bool scrolledByQuery = false;
             final int? requested = widget.scrollTo;
             if (requested != null && _lastScrolledTo != requested) {
               _scheduleAutoscrollTo(requested);
               _lastScrolledTo = requested;
-              scrolledByQuery = true;
             }
-            // Определяем текущий узел уровня для автоскролла
-            final levelNodes = nodes
-                .where((n) => n['type'] == 'level')
-                .toList(growable: false);
-            Map<String, dynamic>? current = levelNodes
-                .cast<Map<String, dynamic>?>()
-                .firstWhere(
-                    (n) =>
-                        ((n?['data'] as Map?)?['isCurrent'] as bool? ?? false),
-                    orElse: () => null);
-            current ??= levelNodes.firstWhere(
-              (n) =>
-                  (((n['data'] as Map?)?['isLocked'] as bool? ?? true) ==
-                      false) &&
-                  (n['blockedByCheckpoint'] as bool? ?? false) == false,
-              orElse: () => levelNodes.first,
+            return Stack(
+              key: _stackKey,
+              children: [
+                _buildTowerGrid(context, ref, nodes),
+                // Поверх башни может быть слой ошибок/баннеров
+                // Баннеры показываются через статические методы NotificationCenter
+              ],
             );
-
-            // Автоскролл только при смене целевого узла,
-            // чтобы не мешать кликам во время постоянных перерисовок
-            // После вычисления current выше он всегда не null (есть минимум один levelNode)
-            final int targetLevel = (current['level'] as int? ?? 0);
-            if (!scrolledByQuery && _lastScrolledTo != targetLevel) {
-              _scheduleAutoscrollTo(targetLevel);
-              _lastScrolledTo = targetLevel;
-            }
-
-            return LayoutBuilder(builder: (context, c) {
-              return Stack(key: _stackKey, children: [
-                // Вертикальные стены
-                Positioned.fill(
-                  left: 24,
-                  right: 24,
-                  child: Row(
-                    children: [
-                      Container(width: 3, color: Colors.black26),
-                      const Spacer(),
-                      Container(width: 3, color: Colors.black26),
-                    ],
-                  ),
-                ),
-                // Дороги между узлами: рисуются внутри сетки (_buildTowerGrid) новым painter
-                const SizedBox.shrink(),
-                SafeArea(
-                  child: SingleChildScrollView(
-                    primary: false,
-                    controller: _scrollController,
-                    physics: const BouncingScrollPhysics(
-                        parent: AlwaysScrollableScrollPhysics()),
-                    padding: const EdgeInsets.fromLTRB(32, 16, 32, 24),
-                    child: Align(
-                      alignment: Alignment.bottomCenter,
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 900),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            // Тизеры этажей 2..4 (должны быть выше уровней этажа 1)
-                            const _FloorDivider(),
-                            _FloorSection(
-                                child: _LockedFloorTile(
-                                    title: 'Этаж 4',
-                                    onTap: () => ScaffoldMessenger.of(context)
-                                        .showSnackBar(const SnackBar(
-                                            content: Text('Скоро'))))),
-                            const _FloorDivider(),
-                            _FloorSection(
-                                child: _LockedFloorTile(
-                                    title: 'Этаж 3',
-                                    onTap: () => ScaffoldMessenger.of(context)
-                                        .showSnackBar(const SnackBar(
-                                            content: Text('Скоро'))))),
-                            const _FloorDivider(),
-                            _FloorSection(
-                                child: _LockedFloorTile(
-                                    title: 'Этаж 2',
-                                    onTap: () => ScaffoldMessenger.of(context)
-                                        .showSnackBar(const SnackBar(
-                                            content: Text('Скоро'))))),
-                            const SizedBox(height: 12),
-                            // Секция сетки узлов этажа 1: статичная 3-колоночная раскладка
-                            _buildTowerGrid(context, ref, nodes),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ]);
-            });
           },
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (e, st) {
             _captureError(e, st);
             return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text('Не удалось загрузить башню',
-                        style: TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 8),
-                    Text(e.toString(),
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(color: Colors.black54)),
-                    const SizedBox(height: 16),
-                    ElevatedButton.icon(
-                      onPressed: () {
-                        try {
-                          _logBreadcrumb('tower_retry');
-                          // Перезапрос узлов
-                          ref.invalidate(towerNodesProvider);
-                        } catch (ex, stx) {
-                          _captureError(ex, stx);
-                        }
-                      },
-                      icon: const Icon(Icons.refresh),
-                      label: const Text('Повторить'),
-                    ),
-                  ],
-                ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.error_outline, color: AppColor.labelColor),
+                  const SizedBox(height: 8),
+                  const Text('Не удалось загрузить башню'),
+                  const SizedBox(height: 8),
+                  ElevatedButton(
+                    onPressed: () => ref.invalidate(towerNodesProvider),
+                    child: const Text('Повторить'),
+                  ),
+                ],
               ),
             );
           },
         );
       }),
     );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
   }
 
   // Статичная 3‑колоночная сетка узлов башни (этаж 1)

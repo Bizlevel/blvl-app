@@ -33,12 +33,8 @@ mixin _$CoreGoalModel {
   @JsonKey(name: 'updated_at')
   DateTime? get updatedAt => throw _privateConstructorUsedError;
 
-  /// Serializes this CoreGoalModel to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
-
-  /// Create a copy of CoreGoalModel
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
+  @JsonKey(ignore: true)
   $CoreGoalModelCopyWith<CoreGoalModel> get copyWith =>
       throw _privateConstructorUsedError;
 }
@@ -69,8 +65,6 @@ class _$CoreGoalModelCopyWithImpl<$Res, $Val extends CoreGoalModel>
   // ignore: unused_field
   final $Res Function($Val) _then;
 
-  /// Create a copy of CoreGoalModel
-  /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
   @override
   $Res call({
@@ -141,8 +135,6 @@ class __$$CoreGoalModelImplCopyWithImpl<$Res>
       _$CoreGoalModelImpl _value, $Res Function(_$CoreGoalModelImpl) _then)
       : super(_value, _then);
 
-  /// Create a copy of CoreGoalModel
-  /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
   @override
   $Res call({
@@ -254,14 +246,12 @@ class _$CoreGoalModelImpl implements _CoreGoalModel {
                 other.updatedAt == updatedAt));
   }
 
-  @JsonKey(includeFromJson: false, includeToJson: false)
+  @JsonKey(ignore: true)
   @override
   int get hashCode => Object.hash(runtimeType, id, userId, version, goalText,
       const DeepCollectionEquality().hash(_versionData), createdAt, updatedAt);
 
-  /// Create a copy of CoreGoalModel
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
+  @JsonKey(ignore: true)
   @override
   @pragma('vm:prefer-inline')
   _$$CoreGoalModelImplCopyWith<_$CoreGoalModelImpl> get copyWith =>
@@ -308,11 +298,8 @@ abstract class _CoreGoalModel implements CoreGoalModel {
   @override
   @JsonKey(name: 'updated_at')
   DateTime? get updatedAt;
-
-  /// Create a copy of CoreGoalModel
-  /// with the given fields replaced by the non-null parameter values.
   @override
-  @JsonKey(includeFromJson: false, includeToJson: false)
+  @JsonKey(ignore: true)
   _$$CoreGoalModelImplCopyWith<_$CoreGoalModelImpl> get copyWith =>
       throw _privateConstructorUsedError;
 }

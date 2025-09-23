@@ -8,7 +8,10 @@ import 'package:bizlevel/providers/goals_repository_provider.dart';
 import 'package:bizlevel/providers/auth_provider.dart';
 import 'package:bizlevel/widgets/goal_version_form.dart';
 import 'package:bizlevel/screens/leo_dialog_screen.dart';
+// removed unused AppColor import after intro block removal
+// import removed: no longer using feature flags in simplified mode
 import 'package:bizlevel/theme/color.dart';
+import 'package:bizlevel/widgets/common/bizlevel_button.dart';
 
 class GoalCheckpointScreen extends ConsumerStatefulWidget {
   final int version;
@@ -20,6 +23,28 @@ class GoalCheckpointScreen extends ConsumerStatefulWidget {
 }
 
 class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
+  final ScrollController _scrollCtrl = ScrollController();
+  final Map<String, GlobalKey> _fieldKeys = {
+    // v1 new keys
+    'concrete_result': GlobalKey(),
+    'main_pain': GlobalKey(),
+    'first_action': GlobalKey(),
+    // v2 new keys (+ историческое financial_goal)
+    'metric_type': GlobalKey(),
+    'metric_current': GlobalKey(),
+    'metric_target': GlobalKey(),
+    'financial_goal': GlobalKey(),
+    // v3 new keys
+    'week1_focus': GlobalKey(),
+    'week2_focus': GlobalKey(),
+    'week3_focus': GlobalKey(),
+    'week4_focus': GlobalKey(),
+    // v4 new keys
+    'first_three_days': GlobalKey(),
+    'start_date': GlobalKey(),
+    'accountability_person': GlobalKey(),
+    'readiness_score': GlobalKey(),
+  };
   final TextEditingController _goalInitialCtrl = TextEditingController();
   final TextEditingController _goalWhyCtrl = TextEditingController();
   final TextEditingController _mainObstacleCtrl = TextEditingController();
@@ -37,11 +62,16 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
   final TextEditingController _finalWhenCtrl = TextEditingController();
   final TextEditingController _finalHowCtrl = TextEditingController();
   bool _commitment = false;
+  int? _readinessScore; // Значение ползунка готовности (1-10)
   bool _saving = false;
   Map<int, Map<String, dynamic>> _versions = {};
   bool _loadFailed = false;
-  bool _showIntro = true;
-  String? _lastAssistantMessage;
+  final bool _showIntro = false;
+  // В упрощённом режиме сохранения не используем подсказки Макса
+  int _latestVersion = 0; // номер последней доступной версии
+  // Для перезапуска embedded чата с авто-сообщением после сохранения
+  Key _embeddedChatKey = UniqueKey();
+  String? _autoMessageForChat;
 
   @override
   void initState() {
@@ -81,7 +111,39 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
       _versions = {
         for (final m in all) m['version'] as int: Map<String, dynamic>.from(m)
       };
+      // Определим последнюю доступную версию
+      if (_versions.keys.isNotEmpty) {
+        _latestVersion = _versions.keys.reduce((a, b) => a > b ? a : b);
+      } else {
+        _latestVersion = 0;
+      }
+      // 43.25: Создать «оболочку» новой версии latest+1 при первом входе — только если версия доступна по уровню
+      try {
+        final user = await ref.read(currentUserProvider.future);
+        final lvl = user?.currentLevel ?? 0;
+        final allowedMax = _allowedMaxByLevel(lvl);
+        final lockedByLevel = widget.version > allowedMax;
+        if (!_versions.containsKey(widget.version) &&
+            widget.version == _latestVersion + 1 &&
+            !lockedByLevel) {
+          try {
+            final repo = ref.read(goalsRepositoryProvider);
+            await repo.upsertGoalVersion(
+                version: widget.version, goalText: '', versionData: {});
+            _versions[widget.version] = {
+              'version': widget.version,
+              'version_data': <String, dynamic>{},
+            };
+            _latestVersion = widget.version;
+          } catch (e, st) {
+            Sentry.captureException(e, stackTrace: st);
+          }
+        }
+      } catch (e, st) {
+        Sentry.captureException(e, stackTrace: st);
+      }
       _fillControllersFor(widget.version);
+      // Упрощённый режим: прогресс по шагам не используем
       if (mounted) setState(() {});
     } catch (e, st) {
       Sentry.captureException(e, stackTrace: st);
@@ -92,6 +154,8 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
     }
   }
 
+  // Прогресс шагов больше не загружаем в упрощённом режиме
+
   void _fillControllersFor(int version) {
     Map<String, dynamic>? v(int idx) {
       final raw = _versions[idx]?['version_data'];
@@ -101,30 +165,51 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
 
     if (version == 2) {
       final data = v(2) ?? v(1) ?? {};
-      _goalRefinedCtrl.text =
-          (data['goal_refined'] ?? (v(1)?['goal_initial'] ?? '')) as String;
-      _metricNameCtrl.text = (data['metric_name'] ?? '') as String;
-      _metricFromCtrl.text = (data['metric_from']?.toString() ?? '');
-      _metricToCtrl.text = (data['metric_to']?.toString() ?? '');
+      _goalRefinedCtrl.text = (data['concrete_result'] ??
+          data['goal_refined'] ??
+          (v(1)?['goal_initial'] ?? '')) as String;
+      _metricNameCtrl.text =
+          (data['metric_type'] ?? data['metric_name'] ?? '') as String;
+      _metricFromCtrl.text =
+          ((data['metric_current'] ?? data['metric_from'])?.toString() ?? '');
+      _metricToCtrl.text =
+          ((data['metric_target'] ?? data['metric_to'])?.toString() ?? '');
       _financialGoalCtrl.text = (data['financial_goal']?.toString() ?? '');
     } else if (version == 3) {
       final data = v(3) ?? {};
       _goalSmartCtrl.text = (data['goal_smart'] ?? '') as String;
-      _s1Ctrl.text = (data['sprint1_goal'] ?? '') as String;
-      _s2Ctrl.text = (data['sprint2_goal'] ?? '') as String;
-      _s3Ctrl.text = (data['sprint3_goal'] ?? '') as String;
-      _s4Ctrl.text = (data['sprint4_goal'] ?? '') as String;
+      _s1Ctrl.text =
+          (data['week1_focus'] ?? data['sprint1_goal'] ?? '') as String;
+      _s2Ctrl.text =
+          (data['week2_focus'] ?? data['sprint2_goal'] ?? '') as String;
+      _s3Ctrl.text =
+          (data['week3_focus'] ?? data['sprint3_goal'] ?? '') as String;
+      _s4Ctrl.text =
+          (data['week4_focus'] ?? data['sprint4_goal'] ?? '') as String;
     } else if (version == 4) {
       final data = v(4) ?? {};
-      _finalWhatCtrl.text = (data['final_what'] ?? '') as String;
-      _finalWhenCtrl.text = (data['final_when'] ?? '') as String;
-      _finalHowCtrl.text = (data['final_how'] ?? '') as String;
-      _commitment = (data['commitment'] ?? false) as bool;
+      _finalWhatCtrl.text =
+          (data['first_three_days'] ?? data['final_what'] ?? '') as String;
+      _finalWhenCtrl.text =
+          (data['start_date'] ?? data['final_when'] ?? '') as String;
+      _finalHowCtrl.text =
+          (data['accountability_person'] ?? data['final_how'] ?? '') as String;
+      final dynamic rs = data['readiness_score'];
+      if (rs is num) {
+        _readinessScore = rs.toInt();
+        _commitment = rs >= 7;
+      } else {
+        _readinessScore = null;
+        _commitment = (data['commitment'] ?? false) as bool;
+      }
     } else if (version == 1) {
       final data = v(1) ?? {};
-      _goalInitialCtrl.text = (data['goal_initial'] ?? '') as String;
-      _goalWhyCtrl.text = (data['goal_why'] ?? '') as String;
-      _mainObstacleCtrl.text = (data['main_obstacle'] ?? '') as String;
+      _goalInitialCtrl.text =
+          (data['concrete_result'] ?? data['goal_initial'] ?? '') as String;
+      _goalWhyCtrl.text =
+          (data['main_pain'] ?? data['goal_why'] ?? '') as String;
+      _mainObstacleCtrl.text =
+          (data['first_action'] ?? data['main_obstacle'] ?? '') as String;
     }
   }
 
@@ -146,7 +231,7 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
       return s(_finalWhatCtrl.text).length >= 10 &&
           s(_finalWhenCtrl.text).isNotEmpty &&
           s(_finalHowCtrl.text).length >= 10 &&
-          _commitment;
+          (_readinessScore != null && _readinessScore! >= 1);
     } else {
       return s(_goalInitialCtrl.text).length >= 10 &&
           s(_goalWhyCtrl.text).length >= 10 &&
@@ -173,57 +258,69 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
       Map<String, dynamic> versionData;
       String goalText;
       if (widget.version == 2) {
+        // Новые ключи v2
+        final String concrete = _goalRefinedCtrl.text.trim();
+        final String metricType = _metricNameCtrl.text.trim();
+        final double? from = double.tryParse(_metricFromCtrl.text.trim());
+        final double? to = double.tryParse(_metricToCtrl.text.trim());
+        final double? fin = double.tryParse(_financialGoalCtrl.text.trim());
+        if (from == null || to == null || fin == null) {
+          throw 'Введите числа в полях метрик/фин. цели';
+        }
         versionData = {
-          'goal_refined': _goalRefinedCtrl.text.trim(),
-          'metric_name': _metricNameCtrl.text.trim(),
-          'metric_from': double.parse(_metricFromCtrl.text.trim()),
-          'metric_to': double.parse(_metricToCtrl.text.trim()),
-          'financial_goal': double.parse(_financialGoalCtrl.text.trim()),
+          'concrete_result': concrete,
+          'metric_type': metricType,
+          'metric_current': from,
+          'metric_target': to,
+          'financial_goal': fin,
         };
-        goalText = _goalRefinedCtrl.text.trim();
+        goalText = concrete;
       } else if (widget.version == 3) {
+        // Новые ключи v3
         versionData = {
           'goal_smart': _goalSmartCtrl.text.trim(),
-          'sprint1_goal': _s1Ctrl.text.trim(),
-          'sprint2_goal': _s2Ctrl.text.trim(),
-          'sprint3_goal': _s3Ctrl.text.trim(),
-          'sprint4_goal': _s4Ctrl.text.trim(),
+          'week1_focus': _s1Ctrl.text.trim(),
+          'week2_focus': _s2Ctrl.text.trim(),
+          'week3_focus': _s3Ctrl.text.trim(),
+          'week4_focus': _s4Ctrl.text.trim(),
         };
         goalText = _goalSmartCtrl.text.trim();
       } else if (widget.version == 4) {
+        // Новые ключи v4
+        final int readiness = _readinessScore ?? (_commitment ? 8 : 5);
         versionData = {
-          'final_what': _finalWhatCtrl.text.trim(),
-          'final_when': _finalWhenCtrl.text.trim(),
-          'final_how': _finalHowCtrl.text.trim(),
-          'commitment': _commitment,
+          'first_three_days': _finalWhatCtrl.text.trim(),
+          'start_date': _finalWhenCtrl.text.trim(),
+          'accountability_person': _finalHowCtrl.text.trim(),
+          'readiness_score': readiness,
         };
         goalText = _finalWhatCtrl.text.trim();
       } else {
+        // v1
         versionData = {
-          'goal_initial': _goalInitialCtrl.text.trim(),
-          'goal_why': _goalWhyCtrl.text.trim(),
-          'main_obstacle': _mainObstacleCtrl.text.trim(),
+          'concrete_result': _goalInitialCtrl.text.trim(),
+          'main_pain': _goalWhyCtrl.text.trim(),
+          'first_action': _mainObstacleCtrl.text.trim(),
         };
         goalText = _goalInitialCtrl.text.trim();
       }
 
+      // Проверяем, существует ли уже запись для этой версии
       if (byVersion.containsKey(widget.version)) {
         final row = byVersion[widget.version]!;
         if (widget.version != latestVersion) {
           throw 'Редактировать можно только текущую версию';
         }
+        // Обновляем существующую запись
         await repo.updateGoalById(
-            id: row['id'] as String,
-            goalText: goalText,
-            versionData: versionData);
+            id: row['id'] as String, goalText: goalText, versionData: versionData);
       } else {
         if (widget.version != latestVersion + 1) {
           throw 'Нельзя пропустить версии';
         }
+        // Создаем новую запись с полными данными
         await repo.upsertGoalVersion(
-            version: widget.version,
-            goalText: goalText,
-            versionData: versionData);
+            version: widget.version, goalText: goalText, versionData: versionData);
       }
 
       ref.invalidate(goalLatestProvider);
@@ -236,9 +333,14 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('Цель сохранена')));
       setState(() => _saving = false);
-      // Возврат на башню с автоскроллом к следующему уровню
+      // После сохранения — комментарий Макса в embedded-чате
       try {
-        context.go('/tower?scrollTo=${_nextLevelNumber()}');
+        final commentMsg = 'Прокомментируй мою цель v${widget.version}.\n${_buildUserContext()}';
+        setState(() {
+          _autoMessageForChat = commentMsg;
+          _embeddedChatKey =
+              UniqueKey(); // пересоздать чат и отправить авто-сообщение
+        });
       } catch (e, st) {
         Sentry.captureException(e, stackTrace: st);
       }
@@ -250,6 +352,8 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
           .showSnackBar(SnackBar(content: Text('Ошибка сохранения: $e')));
     }
   }
+
+  // Контроллеры полей в упрощённом режиме берутся напрямую при сборке versionData
 
   String _title() {
     switch (widget.version) {
@@ -264,6 +368,20 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
     }
   }
 
+  int _allowedMaxByLevel(int lvl) {
+    if (lvl >= 11) return 4; // после Уровня 10
+    if (lvl >= 8) return 3; // после Уровня 7
+    if (lvl >= 5) return 2; // после Уровня 4
+    return 1; // после Уровня 1
+  }
+
+  int _requiredLevelForVersion(int v) {
+    if (v == 2) return 4;
+    if (v == 3) return 7;
+    if (v == 4) return 10;
+    return 1;
+  }
+
   int _nextLevelNumber() {
     if (widget.version == 2) return 5;
     if (widget.version == 3) return 8;
@@ -274,10 +392,10 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
   String _buildUserContext() {
     final sb = StringBuffer('goal_version: ${widget.version}\n');
     if (widget.version == 2) {
-      sb.writeln('goal_refined: ${_goalRefinedCtrl.text.trim()}');
-      sb.writeln('metric: ${_metricNameCtrl.text.trim()}');
+      sb.writeln('concrete_result: ${_goalRefinedCtrl.text.trim()}');
+      sb.writeln('metric_type: ${_metricNameCtrl.text.trim()}');
       sb.writeln(
-          'from: ${_metricFromCtrl.text.trim()} to: ${_metricToCtrl.text.trim()}');
+          'metric_current: ${_metricFromCtrl.text.trim()} metric_target: ${_metricToCtrl.text.trim()}');
       sb.writeln('financial_goal: ${_financialGoalCtrl.text.trim()}');
     } else if (widget.version == 3) {
       sb.writeln('goal_smart: ${_goalSmartCtrl.text.trim()}');
@@ -286,67 +404,17 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
       sb.writeln('sprint3: ${_s3Ctrl.text.trim()}');
       sb.writeln('sprint4: ${_s4Ctrl.text.trim()}');
     } else if (widget.version == 4) {
-      sb.writeln('final_what: ${_finalWhatCtrl.text.trim()}');
-      sb.writeln('final_when: ${_finalWhenCtrl.text.trim()}');
-      sb.writeln('final_how: ${_finalHowCtrl.text.trim()}');
-      sb.writeln('commitment: ${_commitment.toString()}');
+      sb.writeln('first_three_days: ${_finalWhatCtrl.text.trim()}');
+      sb.writeln('start_date: ${_finalWhenCtrl.text.trim()}');
+      sb.writeln('accountability_person: ${_finalHowCtrl.text.trim()}');
+      sb.writeln('readiness_score: ${_readinessScore ?? (_commitment ? 8 : 5)}');
     }
     return sb.toString();
   }
 
-  void _onAssistantMessage(String msg) {
-    setState(() => _lastAssistantMessage = msg);
-  }
+  // Прямой колбэк удалён: сообщение сохраняется через лямбда в onAssistantMessage
 
-  void _applySuggestionToForm() {
-    final msg = _lastAssistantMessage?.trim();
-    if (msg == null || msg.isEmpty) return;
-    // Простейший префилл без агрессивного парсинга — минимальные правки
-    if (widget.version == 2) {
-      if (_goalRefinedCtrl.text.trim().isEmpty) {
-        _goalRefinedCtrl.text = msg.split('\n').first.trim();
-      }
-      // Попытка вытащить числа для from/to
-      final numbers = RegExp(r"[-+]?[0-9]*\.?[0-9]+")
-          .allMatches(msg)
-          .map((m) => m.group(0)!)
-          .toList();
-      if (_metricFromCtrl.text.trim().isEmpty && numbers.isNotEmpty) {
-        _metricFromCtrl.text = numbers.first;
-      }
-      if (_metricToCtrl.text.trim().isEmpty && numbers.length >= 2) {
-        _metricToCtrl.text = numbers[1];
-      }
-      if (_metricNameCtrl.text.trim().isEmpty) {
-        // Наивная эвристика: искать знакомые метрики
-        final lower = msg.toLowerCase();
-        if (lower.contains('конверси')) {
-          _metricNameCtrl.text = 'Конверсия %';
-        } else if (lower.contains('выручк') || lower.contains('доход')) {
-          _metricNameCtrl.text = 'Выручка';
-        } else if (lower.contains('клиент')) {
-          _metricNameCtrl.text = 'Количество клиентов';
-        }
-      }
-    } else if (widget.version == 3) {
-      if (_goalSmartCtrl.text.trim().isEmpty) {
-        _goalSmartCtrl.text = msg.split('\n').first.trim();
-      }
-      // Простая разбивка на строки для спринтов, если есть ключевые слова
-      final lines = msg.split('\n');
-      String pick(String key) => lines
-          .firstWhere((l) => l.toLowerCase().contains(key), orElse: () => '');
-      if (_s1Ctrl.text.trim().isEmpty)
-        _s1Ctrl.text =
-            pick('недел').replaceAll(RegExp(r'^[^:]*:\s?'), '').trim();
-    } else if (widget.version == 4) {
-      if (_finalWhatCtrl.text.trim().isEmpty) {
-        _finalWhatCtrl.text = msg.split('.').first.trim();
-      }
-    }
-    ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Предложение Макса применено')));
-  }
+  // Применение предложений Макса не требуется в упрощённом режиме
 
   @override
   Widget build(BuildContext context) {
@@ -369,6 +437,7 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
       ),
       body: SafeArea(
         child: SingleChildScrollView(
+          controller: _scrollCtrl,
           padding: const EdgeInsets.all(16),
           child: Center(
             child: ConstrainedBox(
@@ -380,11 +449,11 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: AppColor.surface,
                         borderRadius: BorderRadius.circular(12),
                         boxShadow: const [
                           BoxShadow(
-                              color: Color(0x11000000),
+                              color: AppColor.shadowColor,
                               blurRadius: 8,
                               offset: Offset(0, 4))
                         ],
@@ -397,82 +466,100 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
                               style: TextStyle(
                                   fontSize: 16, fontWeight: FontWeight.w600)),
                           const SizedBox(height: 8),
-                          ElevatedButton.icon(
-                            onPressed: _loadAndFill,
-                            icon: const Icon(Icons.refresh),
-                            label: const Text('Повторить'),
+                          SizedBox(
+                            height: 44,
+                            child: BizLevelButton(
+                              label: 'Повторить',
+                              onPressed: _loadAndFill,
+                              variant: BizLevelButtonVariant.primary,
+                              size: BizLevelButtonSize.md,
+                            ),
                           )
                         ],
                       ),
                     ),
                   if (!(_loadFailed && _versions.isEmpty)) ...[
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: const [
-                          BoxShadow(
-                              color: Color(0x11000000),
-                              blurRadius: 8,
-                              offset: Offset(0, 4))
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Container(
-                                width: 64,
-                                height: 64,
-                                decoration: BoxDecoration(
-                                  color: AppColor.info.withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: const Icon(Icons.flag,
-                                    color: AppColor.info),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Text(
-                                  widget.version == 2
-                                      ? 'Сформулируйте измеримую цель и ключевую метрику. Укажите текущие и целевые значения, финансовую цель.'
-                                      : (widget.version == 3
-                                          ? 'Опишите SMART‑формулировку и цели спринтов. Конкретика и сроки повысят фокус.'
-                                          : 'Зафиксируйте финальную формулировку цели, срок и ключевые действия. Подтвердите готовность.'),
-                                  style: Theme.of(context).textTheme.bodyMedium,
-                                ),
-                              )
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: SizedBox(
-                              height: 40,
-                              child: OutlinedButton.icon(
-                                icon: const Icon(Icons.edit_outlined),
-                                label: const Text('Перейти к форме'),
-                                onPressed: () =>
-                                    setState(() => _showIntro = false),
+                    const SizedBox.shrink(),
+                    const SizedBox(height: 16),
+                    if (widget.version != _latestVersion)
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColor.warning.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                              color: AppColor.warning.withValues(alpha: 0.5)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.info_outline,
+                                color: AppColor.warning),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Редактировать можно только текущую версию v$_latestVersion',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodyMedium
+                                    ?.copyWith(fontWeight: FontWeight.w600),
                               ),
                             ),
-                          ),
-                        ],
+                            TextButton(
+                              onPressed: () {
+                                try {
+                                  context
+                                      .go('/goal-checkpoint/$_latestVersion');
+                                } catch (e, st) {
+                                  Sentry.captureException(e, stackTrace: st);
+                                }
+                              },
+                              child: const Text('Перейти'),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 16),
+                    // Preflight-гейтинг версии по текущему уровню пользователя
+                    Builder(builder: (context) {
+                      final userAsync = ref.watch(currentUserProvider);
+                      final lvl = userAsync.asData?.value?.currentLevel ?? 0;
+                      final allowedMax = _allowedMaxByLevel(lvl);
+                      final requiredLevel =
+                          _requiredLevelForVersion(widget.version);
+                      final lockedByLevel = widget.version > allowedMax;
+                      if (!lockedByLevel) return const SizedBox.shrink();
+                      return Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColor.labelColor.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                              color:
+                                  AppColor.labelColor.withValues(alpha: 0.4)),
+                        ),
+                        child: Row(children: [
+                          const Icon(Icons.lock_outline,
+                              color: AppColor.labelColor),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Версия v${widget.version} откроется после завершения Уровня $requiredLevel',
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                          ),
+                        ]),
+                      );
+                    }),
+                    if (widget.version != _latestVersion)
+                      const SizedBox(height: 12),
                     if (!_showIntro)
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: AppColor.surface,
                           borderRadius: BorderRadius.circular(12),
                           boxShadow: const [
                             BoxShadow(
-                                color: Color(0x11000000),
+                                color: AppColor.shadowColor,
                                 blurRadius: 8,
                                 offset: Offset(0, 4))
                           ],
@@ -480,18 +567,26 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            // Встроенный чат Макса (embedded)
+                            // Встроенный чат Макса (embedded): после сохранения отправится авто‑сообщение
                             SizedBox(
                               height: 420,
                               child: ref.read(currentUserProvider).when(
                                     data: (user) => LeoDialogScreen(
+                                      key: _embeddedChatKey,
                                       chatId: null,
                                       userContext: _buildUserContext(),
                                       levelContext:
                                           'current_level: ${user?.currentLevel ?? 0}',
                                       bot: 'max',
                                       embedded: true,
-                                      onAssistantMessage: _onAssistantMessage,
+                                      firstPrompt: widget.version == 2
+                                          ? 'Сформулируем измеримую цель и метрику. Укажи текущее и целевое значения, затем финансовую цель.'
+                                          : (widget.version == 3
+                                              ? 'Соберём SMART и 4 недельных фокуса. Начнём с SMART.'
+                                              : 'Зафиксируем финальный план, дату старта и готовность. Начнём с плана на 3 дня.'),
+                                      recommendedChips: const [],
+                                      autoUserMessage: _autoMessageForChat,
+                                      skipSpend: true,
                                     ),
                                     loading: () => const Center(
                                         child: CircularProgressIndicator()),
@@ -503,6 +598,9 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
                             GoalVersionForm(
                               version: widget.version,
                               editing: true,
+                              editableFields: null, // все поля доступны сразу
+                              completedFields: null,
+                              fieldKeys: _fieldKeys,
                               goalInitialCtrl: _goalInitialCtrl,
                               goalWhyCtrl: _goalWhyCtrl,
                               mainObstacleCtrl: _mainObstacleCtrl,
@@ -522,39 +620,22 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
                               commitment: _commitment,
                               onCommitmentChanged: (v) =>
                                   setState(() => _commitment = v),
+                              readinessScore: _readinessScore,
+                              onReadinessScoreChanged: (v) =>
+                                  setState(() {
+                                    _readinessScore = v;
+                                    _commitment = v >= 7; // Синхронизируем с ползунком
+                                  }),
                             ),
                             const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                if (_lastAssistantMessage != null)
-                                  Padding(
-                                    padding: const EdgeInsets.only(right: 12),
-                                    child: SizedBox(
-                                      height: 44,
-                                      child: OutlinedButton.icon(
-                                        icon: const Icon(Icons.content_paste),
-                                        label:
-                                            const Text('Применить предложение'),
-                                        onPressed: _applySuggestionToForm,
-                                      ),
-                                    ),
-                                  ),
-                                SizedBox(
-                                  height: 44,
-                                  child: ElevatedButton(
-                                    onPressed: _saving ? null : _save,
-                                    child: _saving
-                                        ? const SizedBox(
-                                            width: 18,
-                                            height: 18,
-                                            child: CircularProgressIndicator(
-                                                strokeWidth: 2,
-                                                color: Colors.white))
-                                        : const Text('Сохранить'),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                              ],
+                            SizedBox(
+                              height: 44,
+                              child: BizLevelButton(
+                                label: 'Сохранить',
+                                onPressed: _saving ? null : _save,
+                                variant: BizLevelButtonVariant.primary,
+                                size: BizLevelButtonSize.md,
+                              ),
                             ),
                           ],
                         ),

@@ -25,7 +25,7 @@ void main() {
     expect(find.textContaining('Этаж 1 •'), findsNothing);
   });
 
-  testWidgets('MainStreetScreen: клики по «Скоро» показывают SnackBar',
+  testWidgets('MainStreetScreen: клики по «Скоро» показывают SnackBar/активы',
       (tester) async {
     await tester.pumpWidget(
         const ProviderScope(child: MaterialApp(home: MainStreetScreen())));
@@ -33,7 +33,8 @@ void main() {
 
     await tester.tap(find.text('Библиотека'));
     await tester.pump();
-    expect(find.text('Скоро'), findsOneWidget);
+    // После активации библиотеки SnackBar «Скоро» не должен появляться
+    expect(find.text('Скоро'), findsNothing);
 
     // Закрыть и проверить другую карточку «Скоро»
     ScaffoldMessenger.maybeOf(tester.element(find.byType(MainStreetScreen)))

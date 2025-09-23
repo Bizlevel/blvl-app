@@ -63,7 +63,7 @@ class WeeksTimelineRow extends StatelessWidget {
                             ?.copyWith(fontWeight: FontWeight.w600)),
                     const SizedBox(height: 6),
                     Text(
-                      plan.isEmpty ? 'План: —' : 'План: ${plan}',
+                      plan.isEmpty ? 'План: —' : 'План: $plan',
                       style: Theme.of(context)
                           .textTheme
                           .bodySmall

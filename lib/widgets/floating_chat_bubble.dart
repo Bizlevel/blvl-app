@@ -32,7 +32,7 @@ class FloatingChatBubble extends ConsumerStatefulWidget {
   /// Дополнительный контекст уровня/экрана (опционально)
   final String? levelContext;
 
-  /// Какого бота открыть: 'leo' (по умолчанию) или 'alex'
+  /// Какого бота открыть: 'leo' (по умолчанию) или 'max'
   final String bot;
 
   const FloatingChatBubble(

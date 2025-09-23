@@ -10,6 +10,7 @@ class BottomBarItem extends StatelessWidget {
     this.activeColor = AppColor.primary,
     this.isActive = false,
     this.isNotified = false,
+    this.iconWidget,
   });
 
   final IconData icon;
@@ -18,6 +19,7 @@ class BottomBarItem extends StatelessWidget {
   final bool isNotified;
   final bool isActive;
   final GestureTapCallback? onTap;
+  final Widget? iconWidget;
 
   @override
   Widget build(BuildContext context) {
@@ -40,11 +42,12 @@ class BottomBarItem extends StatelessWidget {
               ),
           ],
         ),
-        child: Icon(
-          icon,
-          color: isActive ? activeColor : color,
-          size: 26,
-        ),
+        child: iconWidget ??
+            Icon(
+              icon,
+              color: isActive ? activeColor : color,
+              size: 26,
+            ),
       ),
     );
   }

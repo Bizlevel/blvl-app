@@ -6,8 +6,10 @@ import 'package:bizlevel/providers/leo_service_provider.dart';
 import 'package:bizlevel/widgets/chat_item.dart';
 import 'package:bizlevel/screens/leo_dialog_screen.dart';
 
-import 'package:bizlevel/theme/color.dart';
+import 'package:bizlevel/theme/color.dart' show AppColor;
 import 'package:bizlevel/providers/auth_provider.dart';
+import 'package:bizlevel/services/context_service.dart';
+import 'package:bizlevel/theme/spacing.dart';
 
 class LeoChatScreen extends ConsumerStatefulWidget {
   const LeoChatScreen({super.key});
@@ -50,35 +52,16 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
     if (mounted) setState(() {});
   }
 
-  String? _getUserContext() {
-    final user = ref.read(currentUserProvider).value;
-    if (user != null) {
-      final contextParts = <String>[];
+  Future<String?> _getUserContext() async =>
+      ContextService.buildUserContext(ref.read(currentUserProvider).value);
 
-      if (user.goal?.isNotEmpty == true) {
-        contextParts.add('Цель: ${user.goal}');
-      }
-      if (user.about?.isNotEmpty == true) {
-        contextParts.add('О себе: ${user.about}');
-      }
-      final currentLevel = user.currentLevel;
-      contextParts.add('Текущий уровень: $currentLevel');
-
-      return contextParts.isNotEmpty ? contextParts.join('. ') : null;
-    }
-    return null;
-  }
-
-  String? _getLevelContext() {
-    // Получить текущий уровень пользователя
-    final user = ref.read(currentUserProvider).value;
-    if (user != null) return 'Уровень ${user.currentLevel}';
-    return null;
-  }
+  Future<String?> _getLevelContext() async =>
+      ContextService.buildLevelContext(ref.read(currentUserProvider).value);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(title: const Text('База тренеров')),
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: AppColor.primary,
         onPressed: _onNewChat,
@@ -91,35 +74,20 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
         ),
         label: Text(
           _activeBot == 'max' ? 'Новый чат с Максом' : 'Новый чат с Лео',
-          style:
-              const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+          style: const TextStyle(
+              color: AppColor.onPrimary, fontWeight: FontWeight.w600),
         ),
       ),
       body: FutureBuilder<void>(
         future: _loadFuture,
         builder: (context, snapshot) {
           return SingleChildScrollView(
-            padding: EdgeInsets.only(
-              left: 15,
-              right: 15,
-              top: MediaQuery.of(context).padding.top +
-                  8, // отступ от статус-бара
-            ),
+            padding: AppSpacing.insetsSymmetric(h: 15, v: 8),
             child: Column(
               children: [
-                const SizedBox(height: 4),
-                Center(
-                  child: Text(
-                    'База тренеров',
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleLarge
-                        ?.copyWith(fontWeight: FontWeight.w700),
-                  ),
-                ),
-                const SizedBox(height: 8),
+                AppSpacing.gapH(4),
                 _buildBotSelectorCards(),
-                const SizedBox(height: 10),
+                AppSpacing.gapH(10),
                 _buildChats(),
               ],
             ),
@@ -164,11 +132,18 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
           onTap: () {
             Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (_) => LeoDialogScreen(
+                builder: (_) => FutureBuilder<List<String?>>( 
+                  future: Future.wait([_getUserContext(), _getLevelContext()]),
+                  builder: (context, snap) {
+                    final userCtx = (snap.data!=null) ? snap.data![0] : null;
+                    final lvlCtx = (snap.data!=null) ? snap.data![1] : null;
+                    return LeoDialogScreen(
                   chatId: chat['id'],
-                  userContext: _getUserContext(),
-                  levelContext: _getLevelContext(),
+                  userContext: userCtx,
+                  levelContext: lvlCtx,
                   bot: _activeBot,
+                );
+                  }
                 ),
               ),
             );
@@ -181,10 +156,17 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
   void _onNewChat() {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => LeoDialogScreen(
-          userContext: _getUserContext(),
-          levelContext: _getLevelContext(),
-          bot: _activeBot,
+        builder: (_) => FutureBuilder<List<String?>>( 
+          future: Future.wait([_getUserContext(), _getLevelContext()]),
+          builder: (context, snap) {
+            final userCtx = (snap.data!=null) ? snap.data![0] : null;
+            final lvlCtx = (snap.data!=null) ? snap.data![1] : null;
+            return LeoDialogScreen(
+              userContext: userCtx,
+              levelContext: lvlCtx,
+              bot: _activeBot,
+            );
+          },
         ),
       ),
     );
@@ -205,20 +187,20 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
             _loadData();
           },
           child: Container(
-            padding: const EdgeInsets.all(12),
-            margin: const EdgeInsets.symmetric(horizontal: 6),
+            padding: AppSpacing.insetsAll(12),
+            margin: AppSpacing.insetsSymmetric(h: 6),
             constraints: const BoxConstraints(minHeight: 100),
             decoration: BoxDecoration(
-              color: active ? Colors.white : Colors.white,
+              color: active ? AppColor.surface : AppColor.surface,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                   color: active ? AppColor.primary : Colors.grey.shade300,
                   width: active ? 2 : 1),
-              boxShadow: [
+              boxShadow: const [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.04),
+                  color: AppColor.shadowColor,
                   blurRadius: 6,
-                  offset: const Offset(0, 3),
+                  offset: Offset(0, 3),
                 )
               ],
             ),
@@ -230,7 +212,7 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
                   backgroundImage: AssetImage(avatar),
                   backgroundColor: Colors.transparent,
                 ),
-                const SizedBox(width: 12),
+                AppSpacing.gapW(12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -238,14 +220,14 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
                       Text(name,
                           style: const TextStyle(
                               fontSize: 18, fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 2),
+                      AppSpacing.gapH(2),
                       Text(
                         subtitle,
                         maxLines: 2,
                         softWrap: true,
                         overflow: TextOverflow.ellipsis,
-                        style:
-                            const TextStyle(fontSize: 12, color: Colors.grey),
+                        style: const TextStyle(
+                            fontSize: 12, color: AppColor.labelColor),
                       ),
                     ],
                   ),

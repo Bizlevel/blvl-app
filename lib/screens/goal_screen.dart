@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
+import 'package:go_router/go_router.dart';
 
 import 'package:bizlevel/providers/goals_providers.dart';
 import 'package:bizlevel/screens/goal/widgets/motivation_card.dart';
@@ -17,6 +18,7 @@ import 'package:bizlevel/screens/goal/widgets/crystallization_section.dart';
 import 'package:bizlevel/screens/goal/widgets/progress_widget.dart';
 import 'package:bizlevel/screens/goal/widgets/sprint_section.dart';
 import 'package:bizlevel/screens/goal/controller/goal_screen_controller.dart';
+import 'package:bizlevel/utils/constant.dart';
 
 class GoalScreen extends ConsumerStatefulWidget {
   const GoalScreen({super.key});
@@ -51,9 +53,9 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
   final TextEditingController _finalHowCtrl = TextEditingController();
   bool _commitment = false;
 
-  Timer? _debounce;
+  // Удалено поле _debounce (не используется)
   // ignore: unused_field
-  bool _saving = false;
+  final bool _saving = false;
   int _selectedSprint = 1;
   bool _sprintSaved = false; // локальный флаг для кнопки чата после сохранения
   final GlobalKey _sprintSectionKey = GlobalKey();
@@ -71,6 +73,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
   bool _consultedLeo = false;
   bool _appliedTechniques = false;
   final TextEditingController _keyInsightCtrl = TextEditingController();
+  // Краткие данные по неделям удалены — аккордеон получает summary из провайдера
   // details for weekly progress
   final TextEditingController _artifactsDetailsCtrl = TextEditingController();
   final TextEditingController _consultedBenefitCtrl = TextEditingController();
@@ -86,46 +89,22 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
   void initState() {
     super.initState();
     // Загружаем версии через контроллер
-    Future.microtask(() async {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       await ref.read(goalScreenControllerProvider.notifier).loadVersions();
       final st = ref.read(goalScreenControllerProvider);
       _fillControllersFor(st.selectedVersion, st.versions);
+      // Если есть v4 — выбираем текущую неделю по дате старта
+      final hasV4 = st.versions.containsKey(4);
+      if (hasV4) {
+        final currentWeek =
+            ref.read(goalScreenControllerProvider.notifier).currentWeekNumber();
+        _selectedSprint = currentWeek;
+      }
       if (mounted) setState(() {});
     });
-
-    // Автосохранение отключено по требованию: слушателей не добавляем
   }
 
-  @override
-  void dispose() {
-    _debounce?.cancel();
-    _goalInitialCtrl.dispose();
-    _goalWhyCtrl.dispose();
-    _mainObstacleCtrl.dispose();
-    _goalRefinedCtrl.dispose();
-    _metricNameCtrl.dispose();
-    _metricFromCtrl.dispose();
-    _metricToCtrl.dispose();
-    _financialGoalCtrl.dispose();
-    _goalSmartCtrl.dispose();
-    _s1Ctrl.dispose();
-    _s2Ctrl.dispose();
-    _s3Ctrl.dispose();
-    _s4Ctrl.dispose();
-    _finalWhatCtrl.dispose();
-    _finalWhenCtrl.dispose();
-    _finalHowCtrl.dispose();
-    _achievementCtrl.dispose();
-    _metricActualCtrl.dispose();
-    _keyInsightCtrl.dispose();
-    _artifactsDetailsCtrl.dispose();
-    _consultedBenefitCtrl.dispose();
-    _techniquesDetailsCtrl.dispose();
-    _techOtherCtrl.dispose();
-    super.dispose();
-  }
-
-  // Автосохранение отключено
+  // Автосохранение отключено по требованию: слушателей не добавляем
 
   // ignore: unused_element
   bool _isValidV1() {
@@ -179,30 +158,50 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
 
     if (version == 1) {
       final data = v(1) ?? {};
-      _goalInitialCtrl.text = (data['goal_initial'] ?? '') as String;
-      _goalWhyCtrl.text = (data['goal_why'] ?? '') as String;
-      _mainObstacleCtrl.text = (data['main_obstacle'] ?? '') as String;
+      // Новые ключи с fallback к старым
+      _goalInitialCtrl.text =
+          (data['concrete_result'] ?? data['goal_initial'] ?? '') as String;
+      _goalWhyCtrl.text =
+          (data['main_pain'] ?? data['goal_why'] ?? '') as String;
+      _mainObstacleCtrl.text =
+          (data['first_action'] ?? data['main_obstacle'] ?? '') as String;
     } else if (version == 2) {
       final data = v(2) ?? v(1) ?? {};
-      _goalRefinedCtrl.text =
-          (data['goal_refined'] ?? (v(1)?['goal_initial'] ?? '')) as String;
-      _metricNameCtrl.text = (data['metric_name'] ?? '') as String;
-      _metricFromCtrl.text = (data['metric_from']?.toString() ?? '');
-      _metricToCtrl.text = (data['metric_to']?.toString() ?? '');
+      _goalRefinedCtrl.text = (data['concrete_result'] ??
+          data['goal_refined'] ??
+          (v(1)?['goal_initial'] ?? '')) as String;
+      _metricNameCtrl.text =
+          (data['metric_type'] ?? data['metric_name'] ?? '') as String;
+      _metricFromCtrl.text =
+          ((data['metric_current'] ?? data['metric_from'])?.toString() ?? '');
+      _metricToCtrl.text =
+          ((data['metric_target'] ?? data['metric_to'])?.toString() ?? '');
       _financialGoalCtrl.text = (data['financial_goal']?.toString() ?? '');
     } else if (version == 3) {
       final data = v(3) ?? {};
       _goalSmartCtrl.text = (data['goal_smart'] ?? '') as String;
-      _s1Ctrl.text = (data['sprint1_goal'] ?? '') as String;
-      _s2Ctrl.text = (data['sprint2_goal'] ?? '') as String;
-      _s3Ctrl.text = (data['sprint3_goal'] ?? '') as String;
-      _s4Ctrl.text = (data['sprint4_goal'] ?? '') as String;
+      _s1Ctrl.text =
+          (data['week1_focus'] ?? data['sprint1_goal'] ?? '') as String;
+      _s2Ctrl.text =
+          (data['week2_focus'] ?? data['sprint2_goal'] ?? '') as String;
+      _s3Ctrl.text =
+          (data['week3_focus'] ?? data['sprint3_goal'] ?? '') as String;
+      _s4Ctrl.text =
+          (data['week4_focus'] ?? data['sprint4_goal'] ?? '') as String;
     } else {
       final data = v(4) ?? {};
-      _finalWhatCtrl.text = (data['final_what'] ?? '') as String;
-      _finalWhenCtrl.text = (data['final_when'] ?? '') as String;
-      _finalHowCtrl.text = (data['final_how'] ?? '') as String;
-      _commitment = (data['commitment'] ?? false) as bool;
+      _finalWhatCtrl.text =
+          (data['first_three_days'] ?? data['final_what'] ?? '') as String;
+      _finalWhenCtrl.text =
+          (data['start_date'] ?? data['final_when'] ?? '') as String;
+      _finalHowCtrl.text =
+          (data['accountability_person'] ?? data['final_how'] ?? '') as String;
+      final dynamic rs = data['readiness_score'];
+      if (rs is num) {
+        _commitment = rs >= 7;
+      } else {
+        _commitment = (data['commitment'] ?? false) as bool;
+      }
     }
   }
 
@@ -217,14 +216,14 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
     // Определяем максимально доступную версию на основе текущего уровня пользователя
     final currentUserAsync = ref.watch(currentUserProvider);
     final int currentLevel = currentUserAsync.asData?.value?.currentLevel ?? 0;
-    int _allowedMaxVersion(int lvl) {
+    int allowedMaxVersion(int lvl) {
       if (lvl >= 11) return 4; // после Уровня 10
       if (lvl >= 8) return 3; // после Уровня 7
       if (lvl >= 5) return 2; // после Уровня 4
       return 1; // после Уровня 1
     }
 
-    final int allowedMax = _allowedMaxVersion(currentLevel);
+    final int allowedMax = allowedMaxVersion(currentLevel);
 
     return Scaffold(
       appBar: AppBar(
@@ -239,7 +238,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                   ? CircleAvatar(
                       radius: 16,
                       backgroundImage: AssetImage(
-                        'assets/images/avatars/avatar_${avatarId}.png',
+                        'assets/images/avatars/avatar_$avatarId.png',
                       ),
                       backgroundColor: Colors.transparent,
                     )
@@ -326,6 +325,64 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                             metricActual:
                                 double.tryParse(_metricActualCtrl.text.trim()),
                           ),
+                          const SizedBox(height: 8),
+                          // Прогресс по версиям и подсказка «что дальше»
+                          Builder(builder: (context) {
+                            final hasV1 = gs.versions.containsKey(1);
+                            final hasV2 = gs.versions.containsKey(2);
+                            final hasV3 = gs.versions.containsKey(3);
+                            final hasV4 = gs.versions.containsKey(4);
+                            final int percent = hasV4
+                                ? 100
+                                : (hasV3
+                                    ? 75
+                                    : (hasV2 ? 50 : (hasV1 ? 25 : 0)));
+                            String nextHint;
+                            VoidCallback? onCta;
+                            if (hasV4) {
+                              nextHint = 'Все этапы цели заполнены';
+                            } else if (hasV3) {
+                              nextHint = 'Заполните v4 «Финал» на чекпоинте';
+                              onCta = () => GoRouter.of(context)
+                                  .push('/goal-checkpoint/4');
+                            } else if (hasV2) {
+                              nextHint = 'Заполните v3 «SMART» на чекпоинте';
+                              onCta = () => GoRouter.of(context)
+                                  .push('/goal-checkpoint/3');
+                            } else if (hasV1) {
+                              nextHint = 'Заполните v2 «Метрики» на чекпоинте';
+                              onCta = () => GoRouter.of(context)
+                                  .push('/goal-checkpoint/2');
+                            } else {
+                              nextHint = 'Создайте v1 «Семя цели» на Уровне 1';
+                            }
+                            return Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: AppColor.primary
+                                        .withValues(alpha: 0.08),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text('Прогресс: $percent%'),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(nextHint,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall),
+                                ),
+                                if (onCta != null)
+                                  TextButton(
+                                    onPressed: onCta,
+                                    child: const Text('Что дальше'),
+                                  ),
+                              ],
+                            );
+                          }),
                           const SizedBox(height: 16),
                           CrystallizationSection(
                             versions: gs.versions,
@@ -359,7 +416,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                   Builder(builder: (context) {
                     final gs = ref.watch(goalScreenControllerProvider);
                     return ProgressWidget(
-                      versions: gs.versions,
+                      versions: _normalizeVersionsForProgress(gs.versions),
                       metricActual:
                           double.tryParse(_metricActualCtrl.text.trim()),
                       achievementText: _achievementCtrl.text.trim(),
@@ -370,9 +427,11 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
 
                   const SizedBox(height: 20),
 
-                  // Путь к цели (28-дневный спринт)
+                  // Путь к цели (28-дневный спринт) — только после v4
                   Builder(builder: (context) {
                     final gs = ref.watch(goalScreenControllerProvider);
+                    final hasV4 = gs.versions.containsKey(4);
+                    if (!hasV4) return const SizedBox.shrink();
                     return SprintSection(
                       versions: gs.versions,
                       selectedSprint: _selectedSprint,
@@ -423,7 +482,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
             levelContext: 'current_level: $currentLevel',
             bot: 'max',
           ),
-        )
+        ),
       ]),
     );
   }
@@ -433,26 +492,27 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
     final vData = (versions[selectedVersion]?['version_data'] as Map?) ?? {};
     final sb = StringBuffer('goal_version: $selectedVersion\n');
     if (selectedVersion == 1) {
-      sb.writeln('goal_initial: ${vData['goal_initial'] ?? ''}');
-      sb.writeln('goal_why: ${vData['goal_why'] ?? ''}');
-      sb.writeln('main_obstacle: ${vData['main_obstacle'] ?? ''}');
+      sb.writeln('concrete_result: ${vData['concrete_result'] ?? ''}');
+      sb.writeln('main_pain: ${vData['main_pain'] ?? ''}');
+      sb.writeln('first_action: ${vData['first_action'] ?? ''}');
     } else if (selectedVersion == 2) {
-      sb.writeln('goal_refined: ${vData['goal_refined'] ?? ''}');
-      sb.writeln('metric: ${vData['metric_name'] ?? ''}');
+      sb.writeln('concrete_result: ${vData['concrete_result'] ?? ''}');
+      sb.writeln('metric_type: ${vData['metric_type'] ?? ''}');
       sb.writeln(
-          'from: ${vData['metric_from'] ?? ''} to: ${vData['metric_to'] ?? ''}');
+          'current: ${vData['metric_current'] ?? ''} target: ${vData['metric_target'] ?? ''}');
       sb.writeln('financial_goal: ${vData['financial_goal'] ?? ''}');
     } else if (selectedVersion == 3) {
       sb.writeln('goal_smart: ${vData['goal_smart'] ?? ''}');
-      sb.writeln('sprint1: ${vData['sprint1_goal'] ?? ''}');
-      sb.writeln('sprint2: ${vData['sprint2_goal'] ?? ''}');
-      sb.writeln('sprint3: ${vData['sprint3_goal'] ?? ''}');
-      sb.writeln('sprint4: ${vData['sprint4_goal'] ?? ''}');
+      sb.writeln('week1_focus: ${vData['week1_focus'] ?? ''}');
+      sb.writeln('week2_focus: ${vData['week2_focus'] ?? ''}');
+      sb.writeln('week3_focus: ${vData['week3_focus'] ?? ''}');
+      sb.writeln('week4_focus: ${vData['week4_focus'] ?? ''}');
     } else {
-      sb.writeln('final_what: ${vData['final_what'] ?? ''}');
-      sb.writeln('final_when: ${vData['final_when'] ?? ''}');
-      sb.writeln('final_how: ${vData['final_how'] ?? ''}');
-      sb.writeln('commitment: ${vData['commitment'] ?? false}');
+      sb.writeln('first_three_days: ${vData['first_three_days'] ?? ''}');
+      sb.writeln('start_date: ${vData['start_date'] ?? ''}');
+      sb.writeln(
+          'accountability_person: ${vData['accountability_person'] ?? ''}');
+      sb.writeln('readiness_score: ${vData['readiness_score'] ?? ''}');
     }
     // Последний чек-ин (если заполнен)
     if (_achievementCtrl.text.isNotEmpty ||
@@ -505,6 +565,23 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
   Future<void> _onSaveSprint() async {
     try {
       final repo = ref.read(goalsRepositoryProvider);
+      // Валидации 43.30: длина week_result ≤100, metric_value число (если указано)
+      if (_achievementCtrl.text.trim().length > 100) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Главное за неделю: максимум 100 символов')),
+        );
+        return;
+      }
+      if (_metricActualCtrl.text.trim().isNotEmpty &&
+          double.tryParse(_metricActualCtrl.text.trim()) == null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Метрика: введите число')),
+        );
+        return;
+      }
       // Собираем чекбоксы в текст деталей техник (минимальная интеграция без DDL)
       final List<String> checks = [];
       if (_chkEisenhower) checks.add('Матрица Эйзенхауэра');
@@ -542,10 +619,29 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
         techniquesDetails: techniquesSummary.isEmpty ? null : techniquesSummary,
       );
       if (!mounted) return;
+      Sentry.addBreadcrumb(Breadcrumb(
+        category: 'goal',
+        type: 'info',
+        message: 'weekly_checkin_saved',
+        data: {
+          'week': _selectedSprint,
+          'has_metric': _metricActualCtrl.text.trim().isNotEmpty,
+        },
+        level: SentryLevel.info,
+      ));
       setState(() => _sprintSaved = true);
       ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Итоги спринта сохранены')));
-      _openChatWithMax();
+      if (kEnableClientWeeklyReaction) {
+        Sentry.addBreadcrumb(Breadcrumb(
+          category: 'goal',
+          type: 'info',
+          message: 'weekly_reaction_requested_client',
+          data: {'week': _selectedSprint},
+          level: SentryLevel.info,
+        ));
+        _openChatWithMax();
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -576,6 +672,13 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                 ),
                 levelContext: 'current_level: ${user?.currentLevel ?? 0}',
                 bot: 'max',
+                // После сохранения чек‑ина отправляем тонкую реакцию Макса
+                autoUserMessage: _sprintSaved
+                    ? 'weekly_checkin: Неделя $_selectedSprint; Итог: ${_achievementCtrl.text.trim()}; Метрика: ${_metricActualCtrl.text.trim()}'
+                    : null,
+                skipSpend: _sprintSaved,
+                recommendedChips:
+                    _sprintSaved ? _weeklyRecommendedChips() : null,
               ),
               loading: () => const Scaffold(
                   body: Center(child: CircularProgressIndicator())),
@@ -584,5 +687,53 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
             ),
       ),
     );
+  }
+
+  // Нормализует версии под старые ключи, которые ожидает ProgressWidget
+  Map<int, Map<String, dynamic>> _normalizeVersionsForProgress(
+      Map<int, Map<String, dynamic>> versions) {
+    final out = <int, Map<String, dynamic>>{};
+    for (final entry in versions.entries) {
+      final v = Map<String, dynamic>.from(entry.value);
+      final vd = (v['version_data'] as Map?)?.cast<String, dynamic>() ?? {};
+      final vdNorm = Map<String, dynamic>.from(vd);
+      // v2: новые → старые
+      if (entry.key == 2) {
+        if (vdNorm.containsKey('metric_type') &&
+            !vdNorm.containsKey('metric_name')) {
+          vdNorm['metric_name'] = vdNorm['metric_type'];
+        }
+        if (vdNorm.containsKey('metric_current') &&
+            !vdNorm.containsKey('metric_from')) {
+          vdNorm['metric_from'] = vdNorm['metric_current'];
+        }
+        if (vdNorm.containsKey('metric_target') &&
+            !vdNorm.containsKey('metric_to')) {
+          vdNorm['metric_to'] = vdNorm['metric_target'];
+        }
+      }
+      // v4: новые → старые
+      if (entry.key == 4) {
+        if (vdNorm.containsKey('start_date') &&
+            !vdNorm.containsKey('final_when')) {
+          vdNorm['final_when'] = vdNorm['start_date'];
+        }
+      }
+      v['version_data'] = vdNorm;
+      out[entry.key] = v;
+    }
+    return out;
+  }
+
+  List<String> _weeklyRecommendedChips() {
+    final List<String> chips = [];
+    chips.add('План на следующую неделю');
+    if (_metricActualCtrl.text.trim().isNotEmpty) {
+      chips.add('Как ускорить рост метрики');
+    } else {
+      chips.add('Выбрать метрику для фокуса');
+    }
+    chips.add('Что мешает, как убрать препятствия');
+    return chips;
   }
 }

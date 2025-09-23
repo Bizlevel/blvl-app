@@ -29,12 +29,8 @@ mixin _$UserSkillModel {
   @JsonKey(name: 'name')
   String get skillName => throw _privateConstructorUsedError;
 
-  /// Serializes this UserSkillModel to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
-
-  /// Create a copy of UserSkillModel
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
+  @JsonKey(ignore: true)
   $UserSkillModelCopyWith<UserSkillModel> get copyWith =>
       throw _privateConstructorUsedError;
 }
@@ -62,8 +58,6 @@ class _$UserSkillModelCopyWithImpl<$Res, $Val extends UserSkillModel>
   // ignore: unused_field
   final $Res Function($Val) _then;
 
-  /// Create a copy of UserSkillModel
-  /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
   @override
   $Res call({
@@ -116,8 +110,6 @@ class __$$UserSkillModelImplCopyWithImpl<$Res>
       _$UserSkillModelImpl _value, $Res Function(_$UserSkillModelImpl) _then)
       : super(_value, _then);
 
-  /// Create a copy of UserSkillModel
-  /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
   @override
   $Res call({
@@ -190,14 +182,12 @@ class _$UserSkillModelImpl implements _UserSkillModel {
                 other.skillName == skillName));
   }
 
-  @JsonKey(includeFromJson: false, includeToJson: false)
+  @JsonKey(ignore: true)
   @override
   int get hashCode =>
       Object.hash(runtimeType, userId, skillId, points, skillName);
 
-  /// Create a copy of UserSkillModel
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
+  @JsonKey(ignore: true)
   @override
   @pragma('vm:prefer-inline')
   _$$UserSkillModelImplCopyWith<_$UserSkillModelImpl> get copyWith =>
@@ -230,15 +220,12 @@ abstract class _UserSkillModel implements UserSkillModel {
   @JsonKey(name: 'skill_id')
   int get skillId;
   @override
-  int get points; // This field will be populated by a JOIN query
-  @override
+  int get points;
+  @override // This field will be populated by a JOIN query
   @JsonKey(name: 'name')
   String get skillName;
-
-  /// Create a copy of UserSkillModel
-  /// with the given fields replaced by the non-null parameter values.
   @override
-  @JsonKey(includeFromJson: false, includeToJson: false)
+  @JsonKey(ignore: true)
   _$$UserSkillModelImplCopyWith<_$UserSkillModelImpl> get copyWith =>
       throw _privateConstructorUsedError;
 }

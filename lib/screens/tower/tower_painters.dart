@@ -14,7 +14,7 @@ class _GridPathPainter extends CustomPainter {
         ..isAntiAlias = true;
 
       final path = Path();
-      final double r = kCornerRadius;
+      const double r = kCornerRadius;
       final dx = s.end.dx - s.start.dx;
       final dy = s.end.dy - s.start.dy;
 

@@ -29,12 +29,8 @@ mixin _$MotivationalQuoteModel {
   @JsonKey(name: 'is_active')
   bool? get isActive => throw _privateConstructorUsedError;
 
-  /// Serializes this MotivationalQuoteModel to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
-
-  /// Create a copy of MotivationalQuoteModel
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
+  @JsonKey(ignore: true)
   $MotivationalQuoteModelCopyWith<MotivationalQuoteModel> get copyWith =>
       throw _privateConstructorUsedError;
 }
@@ -64,8 +60,6 @@ class _$MotivationalQuoteModelCopyWithImpl<$Res,
   // ignore: unused_field
   final $Res Function($Val) _then;
 
-  /// Create a copy of MotivationalQuoteModel
-  /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
   @override
   $Res call({
@@ -127,8 +121,6 @@ class __$$MotivationalQuoteModelImplCopyWithImpl<$Res>
       $Res Function(_$MotivationalQuoteModelImpl) _then)
       : super(_value, _then);
 
-  /// Create a copy of MotivationalQuoteModel
-  /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
   @override
   $Res call({
@@ -209,14 +201,12 @@ class _$MotivationalQuoteModelImpl implements _MotivationalQuoteModel {
                 other.isActive == isActive));
   }
 
-  @JsonKey(includeFromJson: false, includeToJson: false)
+  @JsonKey(ignore: true)
   @override
   int get hashCode =>
       Object.hash(runtimeType, id, quoteText, author, category, isActive);
 
-  /// Create a copy of MotivationalQuoteModel
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
+  @JsonKey(ignore: true)
   @override
   @pragma('vm:prefer-inline')
   _$$MotivationalQuoteModelImplCopyWith<_$MotivationalQuoteModelImpl>
@@ -255,11 +245,8 @@ abstract class _MotivationalQuoteModel implements MotivationalQuoteModel {
   @override
   @JsonKey(name: 'is_active')
   bool? get isActive;
-
-  /// Create a copy of MotivationalQuoteModel
-  /// with the given fields replaced by the non-null parameter values.
   @override
-  @JsonKey(includeFromJson: false, includeToJson: false)
+  @JsonKey(ignore: true)
   _$$MotivationalQuoteModelImplCopyWith<_$MotivationalQuoteModelImpl>
       get copyWith => throw _privateConstructorUsedError;
 }

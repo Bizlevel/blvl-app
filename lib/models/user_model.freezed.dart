@@ -48,14 +48,19 @@ mixin _$UserModel {
   @JsonKey(name: 'created_at')
   DateTime? get createdAt => throw _privateConstructorUsedError;
   @JsonKey(name: 'updated_at')
-  DateTime? get updatedAt => throw _privateConstructorUsedError;
+  DateTime? get updatedAt =>
+      throw _privateConstructorUsedError; // Новые поля персонализации профиля (этап draft-2)
+  @JsonKey(name: 'business_size')
+  String? get businessSize => throw _privateConstructorUsedError;
+  @JsonKey(name: 'key_challenges')
+  List<String>? get keyChallenges => throw _privateConstructorUsedError;
+  @JsonKey(name: 'learning_style')
+  String? get learningStyle => throw _privateConstructorUsedError;
+  @JsonKey(name: 'business_region')
+  String? get businessRegion => throw _privateConstructorUsedError;
 
-  /// Serializes this UserModel to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
-
-  /// Create a copy of UserModel
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
+  @JsonKey(ignore: true)
   $UserModelCopyWith<UserModel> get copyWith =>
       throw _privateConstructorUsedError;
 }
@@ -82,7 +87,11 @@ abstract class $UserModelCopyWith<$Res> {
       @JsonKey(name: 'leo_reset_at') DateTime? leoResetAt,
       @JsonKey(name: 'onboarding_completed') bool onboardingCompleted,
       @JsonKey(name: 'created_at') DateTime? createdAt,
-      @JsonKey(name: 'updated_at') DateTime? updatedAt});
+      @JsonKey(name: 'updated_at') DateTime? updatedAt,
+      @JsonKey(name: 'business_size') String? businessSize,
+      @JsonKey(name: 'key_challenges') List<String>? keyChallenges,
+      @JsonKey(name: 'learning_style') String? learningStyle,
+      @JsonKey(name: 'business_region') String? businessRegion});
 }
 
 /// @nodoc
@@ -95,8 +104,6 @@ class _$UserModelCopyWithImpl<$Res, $Val extends UserModel>
   // ignore: unused_field
   final $Res Function($Val) _then;
 
-  /// Create a copy of UserModel
-  /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
   @override
   $Res call({
@@ -117,6 +124,10 @@ class _$UserModelCopyWithImpl<$Res, $Val extends UserModel>
     Object? onboardingCompleted = null,
     Object? createdAt = freezed,
     Object? updatedAt = freezed,
+    Object? businessSize = freezed,
+    Object? keyChallenges = freezed,
+    Object? learningStyle = freezed,
+    Object? businessRegion = freezed,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -187,6 +198,22 @@ class _$UserModelCopyWithImpl<$Res, $Val extends UserModel>
           ? _value.updatedAt
           : updatedAt // ignore: cast_nullable_to_non_nullable
               as DateTime?,
+      businessSize: freezed == businessSize
+          ? _value.businessSize
+          : businessSize // ignore: cast_nullable_to_non_nullable
+              as String?,
+      keyChallenges: freezed == keyChallenges
+          ? _value.keyChallenges
+          : keyChallenges // ignore: cast_nullable_to_non_nullable
+              as List<String>?,
+      learningStyle: freezed == learningStyle
+          ? _value.learningStyle
+          : learningStyle // ignore: cast_nullable_to_non_nullable
+              as String?,
+      businessRegion: freezed == businessRegion
+          ? _value.businessRegion
+          : businessRegion // ignore: cast_nullable_to_non_nullable
+              as String?,
     ) as $Val);
   }
 }
@@ -216,7 +243,11 @@ abstract class _$$UserModelImplCopyWith<$Res>
       @JsonKey(name: 'leo_reset_at') DateTime? leoResetAt,
       @JsonKey(name: 'onboarding_completed') bool onboardingCompleted,
       @JsonKey(name: 'created_at') DateTime? createdAt,
-      @JsonKey(name: 'updated_at') DateTime? updatedAt});
+      @JsonKey(name: 'updated_at') DateTime? updatedAt,
+      @JsonKey(name: 'business_size') String? businessSize,
+      @JsonKey(name: 'key_challenges') List<String>? keyChallenges,
+      @JsonKey(name: 'learning_style') String? learningStyle,
+      @JsonKey(name: 'business_region') String? businessRegion});
 }
 
 /// @nodoc
@@ -227,8 +258,6 @@ class __$$UserModelImplCopyWithImpl<$Res>
       _$UserModelImpl _value, $Res Function(_$UserModelImpl) _then)
       : super(_value, _then);
 
-  /// Create a copy of UserModel
-  /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
   @override
   $Res call({
@@ -249,6 +278,10 @@ class __$$UserModelImplCopyWithImpl<$Res>
     Object? onboardingCompleted = null,
     Object? createdAt = freezed,
     Object? updatedAt = freezed,
+    Object? businessSize = freezed,
+    Object? keyChallenges = freezed,
+    Object? learningStyle = freezed,
+    Object? businessRegion = freezed,
   }) {
     return _then(_$UserModelImpl(
       id: null == id
@@ -319,6 +352,22 @@ class __$$UserModelImplCopyWithImpl<$Res>
           ? _value.updatedAt
           : updatedAt // ignore: cast_nullable_to_non_nullable
               as DateTime?,
+      businessSize: freezed == businessSize
+          ? _value.businessSize
+          : businessSize // ignore: cast_nullable_to_non_nullable
+              as String?,
+      keyChallenges: freezed == keyChallenges
+          ? _value._keyChallenges
+          : keyChallenges // ignore: cast_nullable_to_non_nullable
+              as List<String>?,
+      learningStyle: freezed == learningStyle
+          ? _value.learningStyle
+          : learningStyle // ignore: cast_nullable_to_non_nullable
+              as String?,
+      businessRegion: freezed == businessRegion
+          ? _value.businessRegion
+          : businessRegion // ignore: cast_nullable_to_non_nullable
+              as String?,
     ));
   }
 }
@@ -343,7 +392,12 @@ class _$UserModelImpl implements _UserModel {
       @JsonKey(name: 'leo_reset_at') this.leoResetAt,
       @JsonKey(name: 'onboarding_completed') this.onboardingCompleted = false,
       @JsonKey(name: 'created_at') this.createdAt,
-      @JsonKey(name: 'updated_at') this.updatedAt});
+      @JsonKey(name: 'updated_at') this.updatedAt,
+      @JsonKey(name: 'business_size') this.businessSize,
+      @JsonKey(name: 'key_challenges') final List<String>? keyChallenges,
+      @JsonKey(name: 'learning_style') this.learningStyle,
+      @JsonKey(name: 'business_region') this.businessRegion})
+      : _keyChallenges = keyChallenges;
 
   factory _$UserModelImpl.fromJson(Map<String, dynamic> json) =>
       _$$UserModelImplFromJson(json);
@@ -394,10 +448,31 @@ class _$UserModelImpl implements _UserModel {
   @override
   @JsonKey(name: 'updated_at')
   final DateTime? updatedAt;
+// Новые поля персонализации профиля (этап draft-2)
+  @override
+  @JsonKey(name: 'business_size')
+  final String? businessSize;
+  final List<String>? _keyChallenges;
+  @override
+  @JsonKey(name: 'key_challenges')
+  List<String>? get keyChallenges {
+    final value = _keyChallenges;
+    if (value == null) return null;
+    if (_keyChallenges is EqualUnmodifiableListView) return _keyChallenges;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(value);
+  }
+
+  @override
+  @JsonKey(name: 'learning_style')
+  final String? learningStyle;
+  @override
+  @JsonKey(name: 'business_region')
+  final String? businessRegion;
 
   @override
   String toString() {
-    return 'UserModel(id: $id, email: $email, name: $name, avatarUrl: $avatarUrl, avatarId: $avatarId, about: $about, goal: $goal, businessArea: $businessArea, experienceLevel: $experienceLevel, isPremium: $isPremium, currentLevel: $currentLevel, leoMessagesTotal: $leoMessagesTotal, leoMessagesToday: $leoMessagesToday, leoResetAt: $leoResetAt, onboardingCompleted: $onboardingCompleted, createdAt: $createdAt, updatedAt: $updatedAt)';
+    return 'UserModel(id: $id, email: $email, name: $name, avatarUrl: $avatarUrl, avatarId: $avatarId, about: $about, goal: $goal, businessArea: $businessArea, experienceLevel: $experienceLevel, isPremium: $isPremium, currentLevel: $currentLevel, leoMessagesTotal: $leoMessagesTotal, leoMessagesToday: $leoMessagesToday, leoResetAt: $leoResetAt, onboardingCompleted: $onboardingCompleted, createdAt: $createdAt, updatedAt: $updatedAt, businessSize: $businessSize, keyChallenges: $keyChallenges, learningStyle: $learningStyle, businessRegion: $businessRegion)';
   }
 
   @override
@@ -433,34 +508,45 @@ class _$UserModelImpl implements _UserModel {
             (identical(other.createdAt, createdAt) ||
                 other.createdAt == createdAt) &&
             (identical(other.updatedAt, updatedAt) ||
-                other.updatedAt == updatedAt));
+                other.updatedAt == updatedAt) &&
+            (identical(other.businessSize, businessSize) ||
+                other.businessSize == businessSize) &&
+            const DeepCollectionEquality()
+                .equals(other._keyChallenges, _keyChallenges) &&
+            (identical(other.learningStyle, learningStyle) ||
+                other.learningStyle == learningStyle) &&
+            (identical(other.businessRegion, businessRegion) ||
+                other.businessRegion == businessRegion));
   }
 
-  @JsonKey(includeFromJson: false, includeToJson: false)
+  @JsonKey(ignore: true)
   @override
-  int get hashCode => Object.hash(
-      runtimeType,
-      id,
-      email,
-      name,
-      avatarUrl,
-      avatarId,
-      about,
-      goal,
-      businessArea,
-      experienceLevel,
-      isPremium,
-      currentLevel,
-      leoMessagesTotal,
-      leoMessagesToday,
-      leoResetAt,
-      onboardingCompleted,
-      createdAt,
-      updatedAt);
+  int get hashCode => Object.hashAll([
+        runtimeType,
+        id,
+        email,
+        name,
+        avatarUrl,
+        avatarId,
+        about,
+        goal,
+        businessArea,
+        experienceLevel,
+        isPremium,
+        currentLevel,
+        leoMessagesTotal,
+        leoMessagesToday,
+        leoResetAt,
+        onboardingCompleted,
+        createdAt,
+        updatedAt,
+        businessSize,
+        const DeepCollectionEquality().hash(_keyChallenges),
+        learningStyle,
+        businessRegion
+      ]);
 
-  /// Create a copy of UserModel
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
+  @JsonKey(ignore: true)
   @override
   @pragma('vm:prefer-inline')
   _$$UserModelImplCopyWith<_$UserModelImpl> get copyWith =>
@@ -492,7 +578,11 @@ abstract class _UserModel implements UserModel {
           @JsonKey(name: 'leo_reset_at') final DateTime? leoResetAt,
           @JsonKey(name: 'onboarding_completed') final bool onboardingCompleted,
           @JsonKey(name: 'created_at') final DateTime? createdAt,
-          @JsonKey(name: 'updated_at') final DateTime? updatedAt}) =
+          @JsonKey(name: 'updated_at') final DateTime? updatedAt,
+          @JsonKey(name: 'business_size') final String? businessSize,
+          @JsonKey(name: 'key_challenges') final List<String>? keyChallenges,
+          @JsonKey(name: 'learning_style') final String? learningStyle,
+          @JsonKey(name: 'business_region') final String? businessRegion}) =
       _$UserModelImpl;
 
   factory _UserModel.fromJson(Map<String, dynamic> json) =
@@ -544,11 +634,20 @@ abstract class _UserModel implements UserModel {
   @override
   @JsonKey(name: 'updated_at')
   DateTime? get updatedAt;
-
-  /// Create a copy of UserModel
-  /// with the given fields replaced by the non-null parameter values.
+  @override // Новые поля персонализации профиля (этап draft-2)
+  @JsonKey(name: 'business_size')
+  String? get businessSize;
   @override
-  @JsonKey(includeFromJson: false, includeToJson: false)
+  @JsonKey(name: 'key_challenges')
+  List<String>? get keyChallenges;
+  @override
+  @JsonKey(name: 'learning_style')
+  String? get learningStyle;
+  @override
+  @JsonKey(name: 'business_region')
+  String? get businessRegion;
+  @override
+  @JsonKey(ignore: true)
   _$$UserModelImplCopyWith<_$UserModelImpl> get copyWith =>
       throw _privateConstructorUsedError;
 }
