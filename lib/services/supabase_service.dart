@@ -35,9 +35,8 @@ class SupabaseService {
 
   static Future<Map<int, int>> levelMap() async {
     if (_levelIdToNumber != null) return _levelIdToNumber!;
-    final resp = await Supabase.instance.client
-        .from('levels')
-        .select('id, number');
+    final resp =
+        await Supabase.instance.client.from('levels').select('id, number');
     final list = _asListOfMaps(resp);
     _levelIdToNumber = {
       for (final m in list)
@@ -50,6 +49,31 @@ class SupabaseService {
     final map = await levelMap();
     if (levelId == null) return 0;
     return map[levelId] ?? 0;
+  }
+
+  /// Resolves current level stored in users.current_level which can be either
+  /// a level id (legacy) or a level number (standardized, see 47.levels-standardization).
+  /// Returns a normalized level number in range 0..max(number)+1.
+  static Future<int> resolveCurrentLevelNumber(int? currentLevel) async {
+    if (currentLevel == null) return 0;
+    final map = await levelMap();
+    // If value matches a known level id → map to number
+    if (map.containsKey(currentLevel)) {
+      return map[currentLevel] ?? 0;
+    }
+    // If value matches one of known numbers (or max+1) → treat as number
+    final Set<int> numbers = map.values.toSet();
+    if (numbers.contains(currentLevel)) {
+      return currentLevel;
+    }
+    // If value is exactly max(number)+1 (after last level) → keep as is
+    final int maxNumber =
+        numbers.isEmpty ? 0 : numbers.reduce((a, b) => a > b ? a : b);
+    if (currentLevel == maxNumber + 1) {
+      return currentLevel;
+    }
+    // Fallback: map unknown id via best effort (legacy DB drift) → 0
+    return 0;
   }
 
   static Future<int?> levelIdFromNumber(int levelNumber) async {
@@ -170,7 +194,7 @@ class SupabaseService {
         final response = await Supabase.instance.client
             .from('levels')
             .select(
-                'id, number, title, description, image_url, cover_path, artifact_title, artifact_description, artifact_url, is_free, lessons(count), user_progress(user_id, is_completed)')
+                'id, number, floor_number, title, description, image_url, cover_path, artifact_title, artifact_description, artifact_url, is_free, lessons(count), user_progress(user_id, is_completed)')
             .order('number', ascending: true);
         return _asListOfMaps(response);
       } on PostgrestException catch (e, st) {
@@ -195,7 +219,7 @@ class SupabaseService {
           'is_completed': true,
           'updated_at': DateTime.now().toIso8601String(),
         });
-        
+
         // Call RPC function to update current_level and award skill points
         await Supabase.instance.client
             .rpc('update_current_level', params: {'p_level_id': levelId});

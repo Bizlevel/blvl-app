@@ -718,29 +718,42 @@ serve(async (req) => {
             personaSummary = cachedPersona;
           }
 
-      // Получаем максимальный пройденный уровень пользователя (по номеру уровня)
-      try {
-        const { data: completedLevels, error: maxLevelError } = await supabaseAdmin!.from('user_progress').select('level_id').eq('user_id', user.id).eq('is_completed', true);
-
-        // Маппинг level_id -> номер уровня
-        const levelIdToNumber = {
-          '11': 1, '12': 2, '13': 3, '14': 4, '15': 5, '16': 6, '17': 7, '18': 8, '19': 9, '20': 10, '22': 0
-        };
-
-        if (Array.isArray(completedLevels) && completedLevels.length > 0) {
-          let maxNum = 0;
-          for (const row of completedLevels) {
-            const lid = String(row?.level_id ?? '');
-            const num = levelIdToNumber[lid] ?? 0;
-            if (num > maxNum) maxNum = num;
-          }
-          maxCompletedLevel = maxNum;
-            } else {
-          maxCompletedLevel = 0;
+          // Получаем максимальный пройденный уровень пользователя (по номеру из levels)
+          try {
+            // 1) Все завершённые level_id пользователя
+            const { data: completedRows, error: upErr } = await (supabaseAdmin as any)
+              .from('user_progress')
+              .select('level_id')
+              .eq('user_id', user.id)
+              .eq('is_completed', true);
+            if (upErr) {
+              console.error('ERR user_progress_select', { message: upErr.message });
             }
 
-            if (maxLevelError) {
-              console.error('ERR max_completed_level', { message: maxLevelError.message });
+            const levelIds: number[] = Array.isArray(completedRows)
+              ? completedRows.map((r: any) => (r?.level_id as number)).filter((x: any) => Number.isFinite(x))
+              : [];
+
+            if (levelIds.length > 0) {
+              // 2) Получаем их номера/этажи и считаем максимум по номеру
+              const { data: levelRows, error: lvlErr } = await (supabaseAdmin as any)
+                .from('levels')
+                .select('number, floor_number')
+                .in('id', levelIds);
+              if (lvlErr) {
+                console.error('ERR levels_in_filter', { message: lvlErr.message });
+              }
+              let maxNum = 0;
+              if (Array.isArray(levelRows)) {
+                for (const r of levelRows) {
+                  const n = Number(r?.number ?? 0);
+                  if (Number.isFinite(n) && n > maxNum) maxNum = n;
+                }
+              }
+              maxCompletedLevel = maxNum;
+            } else {
+              console.log('🔧 DEBUG: Нет завершённых уровней у пользователя');
+              maxCompletedLevel = 0;
             }
           } catch (e) {
             console.error('ERR max_completed_level_exception', { message: String(e).slice(0, 200) });

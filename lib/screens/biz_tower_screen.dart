@@ -116,14 +116,29 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
             if (requested != null && _lastScrolledTo != requested) {
               _scheduleAutoscrollTo(requested);
               _lastScrolledTo = requested;
+            } else if (_lastScrolledTo == null) {
+              // Автоскролл по умолчанию к текущему уровню пользователя (если есть)
+              try {
+                final Map<String, dynamic> current = nodes.firstWhere(
+                  (n) =>
+                      n['type'] == 'level' &&
+                      ((n['data'] as Map?)?['isCurrent'] == true),
+                  orElse: () => <String, dynamic>{},
+                );
+                if (current.isNotEmpty) {
+                  final int levelNum =
+                      ((current['data'] as Map)['level'] as int?) ?? 0;
+                  _scheduleAutoscrollTo(levelNum);
+                  _lastScrolledTo = levelNum;
+                }
+              } catch (_) {
+                // тихо игнорируем
+              }
             }
-            return Stack(
+            return SingleChildScrollView(
               key: _stackKey,
-              children: [
-                _buildTowerGrid(context, ref, nodes),
-                // Поверх башни может быть слой ошибок/баннеров
-                // Баннеры показываются через статические методы NotificationCenter
-              ],
+              controller: _scrollController,
+              child: _buildTowerGrid(context, ref, nodes),
             );
           },
           loading: () => const Center(child: CircularProgressIndicator()),

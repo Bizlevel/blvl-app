@@ -12,3 +12,7 @@ const bool kEnableGoalChips = true;
 const bool kEnableClientGoalReactions = true;
 const bool kEnableClientWeeklyReaction = true;
 
+// Фича-флаг: использовать реальный этаж уровня (floor_number) в клиентской логике
+// При false — сохраняется поведение «все уровни 1..10 на этаже 1»
+const bool kUseFloorMapping =
+    true; // включено для dev-проверки FNN/гейтинга по этажу

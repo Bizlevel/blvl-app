@@ -7,6 +7,7 @@ import 'package:bizlevel/services/supabase_service.dart';
 // import 'package:hive_flutter/hive_flutter.dart';
 import 'package:bizlevel/providers/goals_providers.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:bizlevel/utils/constant.dart';
 
 /// Provides список уровней с учётом прогресса пользователя.
 final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
@@ -14,15 +15,16 @@ final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
 
   // Дожидаемся профиля пользователя, чтобы избежать расчётов с null userId
   final user = await ref.watch(currentUserProvider.future);
-  final int? userCurrentLevelId = user?.currentLevel;
   final int userCurrentLevelNumber =
-      await SupabaseService.levelNumberFromId(userCurrentLevelId);
+      await SupabaseService.resolveCurrentLevelNumber(user?.currentLevel);
   // Подписки отключены (этап 39.1). Доступ уровней >3 будет реализован через GP (этап 39.7).
 
   final userId = Supabase.instance.client.auth.currentUser?.id;
   final rows = await repo.fetchLevels(userId: userId);
 
   // Получаем доступ к этажам (floor_access) — учитываем для уровней >3
+  // Дожидаемся профиля, чтобы гарантированно иметь авторизованную сессию перед чтением прогресса
+  await ref.watch(currentUserProvider.future);
   final supa = Supabase.instance.client;
   final List<dynamic> accessRows = await supa
       .from('floor_access')
@@ -39,8 +41,25 @@ final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
 
   bool previousCompleted = false;
 
+  int _floorForLevelJson(Map<String, dynamic> json, LevelModel level) {
+    // При активном флаге используем floor_number из API, иначе считаем, что все уровни на этаже 1
+    if (kUseFloorMapping) {
+      final v = json['floor_number'];
+      if (v is int) return v;
+      if (v is num) return v.toInt();
+    }
+    return 1;
+  }
+
+  bool _isFreeOnFloor(int floor, int number) {
+    // Для этажа 1 бесплатны 0..3; для остальных этажей по умолчанию всё платно
+    if (floor == 1) return number <= 3;
+    return false;
+  }
+
   return rows.map((json) {
     final level = LevelModel.fromJson(json);
+    final floor = _floorForLevelJson(json, level);
 
     // Определяем, завершён ли текущий уровень пользователем
     final progressArr = json['user_progress'] as List?;
@@ -53,24 +72,17 @@ final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
     if (level.number == 0) {
       // «Первый шаг» всегда доступен для просмотра
       isAccessible = true;
-    } else if (!level.isFree && level.number > 3) {
-      // ВРЕМЕННО: отключаем GP-блокировку для тестирования
-      // Этажи >1 требуют открытия за GP (этап 39.7)
-      // Для простоты: уровни 1..10 — это этаж 1
-      const int floorNumber = 1; // текущий этаж
-      final bool hasAccess =
-          unlockedFloors.contains(floorNumber) || level.number <= 3;
-      isAccessible = hasAccess && previousCompleted;
     } else {
-      // Обычные уровни доступны только после завершения предыдущего уровня
-      isAccessible = previousCompleted;
+      // Доступ по этажу: бесплатные на этаже — всегда; иначе нужен floor_access
+      final bool hasAccess =
+          _isFreeOnFloor(floor, level.number) || unlockedFloors.contains(floor);
+      isAccessible = hasAccess && previousCompleted;
     }
 
     // Обновляем previousCompleted для следующего уровня:
     // - уровень считается «пройденным» если user_progress.is_completed = true
     // - или если текущий уровень пользователя больше номера этого уровня
-    previousCompleted =
-        isCompleted || (userCurrentLevelNumber > level.number);
+    previousCompleted = isCompleted || (userCurrentLevelNumber > level.number);
 
     final bool isLocked = !isAccessible;
 
@@ -80,8 +92,9 @@ final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
       // Используем его с приоритетом, иначе fallback на image_url из модели.
       'image': (json['image'] ?? level.imageUrl),
       'level': level.number,
+      'floor': floor,
       'name': level.title,
-      'displayCode': formatLevelCode(1, level.number),
+      'displayCode': formatLevelCode(floor, level.number),
       'lessons': () {
         final lessonsAgg = json['lessons'];
         if (lessonsAgg is List && lessonsAgg.isNotEmpty) {
@@ -94,7 +107,8 @@ final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
       'isCompleted': isCompleted,
       'isCurrent': level.number == userCurrentLevelNumber,
       'lockReason': isLocked
-          ? (level.number > 3 && !level.isFree
+          ? (!_isFreeOnFloor(floor, level.number) &&
+                  !unlockedFloors.contains(floor)
               ? 'Требуются GP'
               : 'Завершите предыдущий уровень')
           : null,
@@ -111,9 +125,8 @@ final nextLevelToContinueProvider =
     FutureProvider<Map<String, dynamic>>((ref) async {
   // Дождёмся профиля, чтобы избежать гонки null currentLevel
   final user = await ref.watch(currentUserProvider.future);
-  final int? userCurrentLevelId = user?.currentLevel;
   final int userCurrentLevelNumber =
-      await SupabaseService.levelNumberFromId(userCurrentLevelId);
+      await SupabaseService.resolveCurrentLevelNumber(user?.currentLevel);
 
   final levels = await ref.watch(levelsProvider.future);
   final nodes = await ref.watch(towerNodesProvider.future);
@@ -153,8 +166,10 @@ final nextLevelToContinueProvider =
   if (pendingMiniCase.isNotEmpty) {
     final bool prevDone =
         (pendingMiniCase['prevLevelCompleted'] as bool? ?? false);
-    if (prevDone) {
-      final int afterLevel = pendingMiniCase['afterLevel'] as int? ?? 0;
+    final bool isRequired = pendingMiniCase['isRequired'] as bool? ?? true;
+    final int afterLevel = pendingMiniCase['afterLevel'] as int? ?? 0;
+    // Предлагаем мини‑кейс только если он обязательный и пользователь ещё не ушёл дальше по прогрессу
+    if (prevDone && isRequired && userCurrentLevelNumber <= afterLevel) {
       final int caseId = pendingMiniCase['caseId'] as int;
       final String title = (pendingMiniCase['title'] as String?) ?? 'Мини‑кейс';
       return {
@@ -169,12 +184,14 @@ final nextLevelToContinueProvider =
   }
 
   // Определяем целевой номер сами, чтобы исключить редкие падения на fallback'ах
-  final Map<String, dynamic>? currentRow = levels.cast<Map<String, dynamic>?>().firstWhere(
-    (l) => (l?['level'] as int? ?? -1) == userCurrentLevelNumber,
-    orElse: () => null,
-  );
+  final Map<String, dynamic>? currentRow =
+      levels.cast<Map<String, dynamic>?>().firstWhere(
+            (l) => (l?['level'] as int? ?? -1) == userCurrentLevelNumber,
+            orElse: () => null,
+          );
   final bool currDone = currentRow?['isCompleted'] as bool? ?? false;
-  final int desiredNumber = currDone ? (userCurrentLevelNumber + 1) : userCurrentLevelNumber;
+  final int desiredNumber =
+      currDone ? (userCurrentLevelNumber + 1) : userCurrentLevelNumber;
   Map<String, dynamic> candidate = levels.firstWhere(
     (l) => (l['level'] as int? ?? -1) == desiredNumber,
     orElse: () => currentRow ?? levels.first,
@@ -182,14 +199,15 @@ final nextLevelToContinueProvider =
 
   final int levelNumber = candidate['level'] as int? ?? 0;
   final bool isLocked = candidate['isLocked'] as bool? ?? false;
+  final int floor = (candidate['floor'] as int?) ?? 1;
   return {
     'levelId': candidate['id'] as int,
     'levelNumber': levelNumber,
-    'floorId': 1,
+    'floorId': floor,
     'requiresPremium': false,
     'isLocked': isLocked,
     'targetScroll': levelNumber,
-    'label': levelNumber == 0 ? 'Первый шаг' : 'Уровень $levelNumber',
+    'label': levelNumber == 0 ? 'Ресепшн' : 'Уровень $levelNumber',
   };
 });
 
