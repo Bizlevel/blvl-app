@@ -54,10 +54,17 @@ class PushService {
         final title = message.notification?.title ?? 'Сообщение BizLevel';
         final body = message.notification?.body ?? 'Откройте приложение';
         final route = message.data['route']?.toString();
+        final type = message.data['type']?.toString();
+        final channel = switch (type) {
+          'goal_reminder' => 'goal_reminder',
+          'gp_economy' => 'gp_economy',
+          'chat_messages' => 'chat_messages',
+          _ => 'education',
+        };
         NotificationsService.instance.showNow(
           title: title,
           body: body,
-          channelId: 'education',
+          channelId: channel,
           route: route,
         );
       });

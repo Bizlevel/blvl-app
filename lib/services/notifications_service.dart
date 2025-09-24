@@ -17,6 +17,31 @@ class NotificationsService {
 
   bool _initialized = false;
 
+  // Централизованная таблица каналов (id -> (name, description, importance))
+  static const Map<String, (String name, String desc, Importance imp)>
+      _channelsMeta = {
+    'goal_reminder': (
+      'Напоминания по целям',
+      'План/середина недели и чекин',
+      Importance.high,
+    ),
+    'gp_economy': (
+      'Экономика GP',
+      'Покупки, начисления и баланс GP',
+      Importance.high,
+    ),
+    'education': (
+      'Обучение',
+      'Новые материалы, курсы и библиотека',
+      Importance.defaultImportance,
+    ),
+    'chat_messages': (
+      'Сообщения чатов',
+      'Ответы ИИ‑тренеров и уведомления чатов',
+      Importance.high,
+    ),
+  };
+
   Future<void> initialize() async {
     if (_initialized) return;
     if (kIsWeb) {
@@ -64,23 +89,8 @@ class NotificationsService {
     );
 
     await _ensureAndroidChannels();
+    await _requestPermissionsIfNeeded();
 
-    if (!kIsWeb && Platform.isIOS) {
-      await _plugin
-          .resolvePlatformSpecificImplementation<
-              IOSFlutterLocalNotificationsPlugin>()
-          ?.requestPermissions(alert: true, badge: true, sound: true);
-    }
-    if (Platform.isAndroid) {
-      final android = _plugin.resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin>();
-      // Guard: только Android 13+
-      if ((await android?.areNotificationsEnabled()) == false) {
-        try {
-          await android?.requestNotificationsPermission();
-        } catch (_) {}
-      }
-    }
     _initialized = true;
   }
 
@@ -241,14 +251,15 @@ class NotificationsService {
       return;
     }
     if (!_initialized) await initialize();
-    const AndroidNotificationDetails android = AndroidNotificationDetails(
+    final ch = _channelsMeta['goal_reminder']!;
+    final AndroidNotificationDetails android = AndroidNotificationDetails(
       'goal_reminder',
-      'Напоминания по целям',
-      channelDescription: 'План/середина недели и чекин',
-      importance: Importance.high,
+      ch.$1,
+      channelDescription: ch.$2,
+      importance: ch.$3,
       priority: Priority.high,
     );
-    const NotificationDetails details = NotificationDetails(android: android);
+    final NotificationDetails details = NotificationDetails(android: android);
 
     // Пн 09:00
     await _plugin.zonedSchedule(
@@ -363,14 +374,15 @@ class NotificationsService {
     if (!_initialized) await initialize();
     await cancelWeeklyPlan();
 
-    const AndroidNotificationDetails android = AndroidNotificationDetails(
+    final ch = _channelsMeta['goal_reminder']!;
+    final AndroidNotificationDetails android = AndroidNotificationDetails(
       'goal_reminder',
-      'Напоминания по целям',
-      channelDescription: 'План/середина недели и чекин',
-      importance: Importance.high,
+      ch.$1,
+      channelDescription: ch.$2,
+      importance: ch.$3,
       priority: Priority.high,
     );
-    const NotificationDetails details = NotificationDetails(android: android);
+    final NotificationDetails details = NotificationDetails(android: android);
 
     Future<void> _scheduleIf(
         {required (int, int)? time,
@@ -479,5 +491,23 @@ class NotificationsService {
       scheduled = scheduled.add(const Duration(days: 1));
     }
     return scheduled;
+  }
+
+  Future<void> _requestPermissionsIfNeeded() async {
+    if (kIsWeb) return;
+    if (Platform.isIOS) {
+      await _plugin
+          .resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>()
+          ?.requestPermissions(alert: true, badge: true, sound: true);
+    }
+    if (Platform.isAndroid) {
+      final android = _plugin
+          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+      if ((await android?.areNotificationsEnabled()) == false) {
+        try {
+          await android?.requestNotificationsPermission();
+        } catch (_) {}
+      }
+    }
   }
 }

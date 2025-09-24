@@ -8,26 +8,28 @@ class NotificationCenter {
   NotificationCenter._();
 
   static void showSuccess(BuildContext context, String message,
-      {int ms = 3500}) {
-    _show(context, message, _BannerType.success, ms: ms);
+      {int ms = 3500, String? route}) {
+    _show(context, message, _BannerType.success, ms: ms, route: route);
   }
 
-  static void showInfo(BuildContext context, String message, {int ms = 3500}) {
-    _show(context, message, _BannerType.info, ms: ms);
+  static void showInfo(BuildContext context, String message,
+      {int ms = 3500, String? route}) {
+    _show(context, message, _BannerType.info, ms: ms, route: route);
   }
 
   static void showWarn(BuildContext context, String message,
-      {int ms = 3500, VoidCallback? onAction, String? actionLabel}) {
+      {int ms = 3500, VoidCallback? onAction, String? actionLabel, String? route}) {
     _show(context, message, _BannerType.warn,
-        ms: ms, onAction: onAction, actionLabel: actionLabel);
+        ms: ms, onAction: onAction, actionLabel: actionLabel, route: route);
   }
 
-  static void showError(BuildContext context, String message, {int ms = 3500}) {
-    _show(context, message, _BannerType.error, ms: ms);
+  static void showError(BuildContext context, String message,
+      {int ms = 3500, String? route}) {
+    _show(context, message, _BannerType.error, ms: ms, route: route);
   }
 
   static void _show(BuildContext context, String message, _BannerType type,
-      {int ms = 3500, VoidCallback? onAction, String? actionLabel}) {
+      {int ms = 3500, VoidCallback? onAction, String? actionLabel, String? route}) {
     final messenger = ScaffoldMessenger.of(context);
     messenger.hideCurrentMaterialBanner();
 
@@ -91,6 +93,7 @@ class NotificationCenter {
         },
         message: message,
         category: 'banner',
+        route: route,
       );
     } catch (_) {}
     // Автозакрытие баннера через ms
