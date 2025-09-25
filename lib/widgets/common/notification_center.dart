@@ -18,7 +18,10 @@ class NotificationCenter {
   }
 
   static void showWarn(BuildContext context, String message,
-      {int ms = 3500, VoidCallback? onAction, String? actionLabel, String? route}) {
+      {int ms = 3500,
+      VoidCallback? onAction,
+      String? actionLabel,
+      String? route}) {
     _show(context, message, _BannerType.warn,
         ms: ms, onAction: onAction, actionLabel: actionLabel, route: route);
   }
@@ -29,7 +32,10 @@ class NotificationCenter {
   }
 
   static void _show(BuildContext context, String message, _BannerType type,
-      {int ms = 3500, VoidCallback? onAction, String? actionLabel, String? route}) {
+      {int ms = 3500,
+      VoidCallback? onAction,
+      String? actionLabel,
+      String? route}) {
     final messenger = ScaffoldMessenger.of(context);
     messenger.hideCurrentMaterialBanner();
 

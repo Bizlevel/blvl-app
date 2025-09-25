@@ -30,6 +30,7 @@ class _SkillsTreeViewState extends State<SkillsTreeView>
     3: Color(0xFFFB923C), // orange
     4: Color(0xFF3B82F6), // blue
     5: Color(0xFF10B981), // green
+    6: Color(0xFF6366F1), // indigo (AI‑предприниматель)
   };
 
   // Подбор иконок (можно заменить на кастомные изображения при желании).
@@ -39,6 +40,7 @@ class _SkillsTreeViewState extends State<SkillsTreeView>
     3: Icons.campaign_outlined,
     4: Icons.task_alt_outlined,
     5: Icons.trending_up,
+    6: Icons.smart_toy_outlined,
   };
 
   @override

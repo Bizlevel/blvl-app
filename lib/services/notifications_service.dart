@@ -156,12 +156,11 @@ class NotificationsService {
       priority: Priority.high,
     );
     final details = NotificationDetails(android: android);
-    final payload = route != null && route.isNotEmpty
-        ? '{"route":"$route"}'
-        : null;
+    final payload =
+        route != null && route.isNotEmpty ? '{"route":"$route"}' : null;
     try {
-      await _plugin.show(DateTime.now().millisecondsSinceEpoch % 1000000,
-          title, body, details,
+      await _plugin.show(
+          DateTime.now().millisecondsSinceEpoch % 1000000, title, body, details,
           payload: payload);
     } catch (_) {}
   }
@@ -497,12 +496,13 @@ class NotificationsService {
     if (kIsWeb) return;
     if (Platform.isIOS) {
       await _plugin
-          .resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>()
+          .resolvePlatformSpecificImplementation<
+              IOSFlutterLocalNotificationsPlugin>()
           ?.requestPermissions(alert: true, badge: true, sound: true);
     }
     if (Platform.isAndroid) {
-      final android = _plugin
-          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+      final android = _plugin.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
       if ((await android?.areNotificationsEnabled()) == false) {
         try {
           await android?.requestNotificationsPermission();

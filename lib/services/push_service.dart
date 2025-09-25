@@ -33,8 +33,11 @@ class PushService {
     if (kIsWeb) return;
 
     try {
+      // Пытаемся инициализировать Firebase безопасно
+      if (Firebase.apps.isEmpty) {
+        await Firebase.initializeApp();
+      }
       _fm = FirebaseMessaging.instance;
-      await Firebase.initializeApp();
 
       // Mobile permissions
       if (Platform.isIOS || Platform.isAndroid) {
@@ -83,7 +86,8 @@ class PushService {
       });
 
       // Cold start
-      final initial = await _fm.getInitialMessage();
+      final initial =
+          (Firebase.apps.isNotEmpty) ? await _fm.getInitialMessage() : null;
       if (initial != null) {
         final route = initial.data['route']?.toString();
         if (route != null && route.isNotEmpty) {

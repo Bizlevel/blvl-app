@@ -458,3 +458,12 @@ TODO:
 - Supabase: деактивирован `onboarding_tour`; `gp_bonus_claim` усилили серверными проверками (profile/cases) и metadata; `update_current_level` начисляет +20 GP (идемпотентно, idempotency_key `bonus:level:<id>:<user>`).
 - Клиент: при завершении уровня показывается анимированное уведомление («Поздравляем! Вы получили бонус — 20 GP!») через `MilestoneCelebration`; при завершении третьего кейса вызывается `gp_bonus_claim('all_three_cases_completed')` и показывается уведомление на +200 GP.
 - Документация: в `bizlevel-concept.md` обновлён список бонусов (добавлен `level_completed`, удалён `onboarding_tour`).
++Задача 47.ai-skill: Навык «AI‑предприниматель»
++ - Supabase: добавлен навык в `public.skills`, создан индекс `idx_leo_messages_user_user_only`, функция и триггер `award_ai_skill_on_message` (начисление +1 за каждые 100 пользовательских сообщений; квизы и кейсы исключены архитектурно). Выполнен backfill.
++ - RPC: `update_current_level` возвращён учёт очков навыка за завершённый уровень (UPSERT в `user_skills` по `levels.skill_id`).
++ - Клиент: в `SkillsTreeView` добавлены цвет/иконка для нового `skill_id`.
++ - Линты/сборка: без ошибок; обратная совместимость сохранена.
+Задача 47 fix: iOS (Xcode 26) — восстановлен запуск
+ - Переинициализированы Pods; исправлен путь `GoogleService-Info.plist`; отключён `ENABLE_USER_SCRIPT_SANDBOXING`.
+ - Безопасная инициализация Firebase; пуши работают при наличии plist и Capability.
+ - Очищен DerivedData; проект собирается и запускается в Xcode 26.

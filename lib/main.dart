@@ -33,7 +33,7 @@ Future<void> main() async {
   // КРИТИЧНО для web: Все инициализации должны быть в одной зоне
   WidgetsFlutterBinding.ensureInitialized();
   if (!kIsWeb) {
-    await Firebase.initializeApp();
+    await _tryInitFirebase();
   }
 
   // Чистые URL без # — только для Web
@@ -107,6 +107,19 @@ Future<void> main() async {
 
     // Запускаем приложение в той же зоне
     runApp(const ProviderScope(child: MyApp()));
+  }
+}
+
+// Пытаемся инициализировать Firebase, но не падаем, если конфиг отсутствует
+Future<void> _tryInitFirebase() async {
+  try {
+    if (Firebase.apps.isEmpty) {
+      await Firebase.initializeApp();
+    }
+  } catch (e) {
+    // В Dev/CI окружениях файл GoogleService-Info.plist может отсутствовать
+    // Это не блокирует работу приложения (FCM будет отключён)
+    debugPrint('WARN: Firebase is not initialized: $e');
   }
 }
 
