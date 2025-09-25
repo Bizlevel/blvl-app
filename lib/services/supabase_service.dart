@@ -57,22 +57,19 @@ class SupabaseService {
   static Future<int> resolveCurrentLevelNumber(int? currentLevel) async {
     if (currentLevel == null) return 0;
     final map = await levelMap();
-    // If value matches a known level id → map to number
+    // Treat explicit numeric representation first (standardized path):
+    // если значение в диапазоне 0..max(number)+1 — это номер уровня
+    final Set<int> numbers = map.values.toSet();
+    final int maxNumber =
+        numbers.isEmpty ? 0 : numbers.reduce((a, b) => a > b ? a : b);
+    if (currentLevel >= 0 && currentLevel <= maxNumber + 1) {
+      return currentLevel;
+    }
+    // Legacy: если значение совпадает с известным level_id — конвертируем в number
     if (map.containsKey(currentLevel)) {
       return map[currentLevel] ?? 0;
     }
-    // If value matches one of known numbers (or max+1) → treat as number
-    final Set<int> numbers = map.values.toSet();
-    if (numbers.contains(currentLevel)) {
-      return currentLevel;
-    }
-    // If value is exactly max(number)+1 (after last level) → keep as is
-    final int maxNumber =
-        numbers.isEmpty ? 0 : numbers.reduce((a, b) => a > b ? a : b);
-    if (currentLevel == maxNumber + 1) {
-      return currentLevel;
-    }
-    // Fallback: map unknown id via best effort (legacy DB drift) → 0
+    // Fallback: неизвестное значение → 0
     return 0;
   }
 

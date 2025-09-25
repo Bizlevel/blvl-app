@@ -467,3 +467,11 @@ TODO:
  - Переинициализированы Pods; исправлен путь `GoogleService-Info.plist`; отключён `ENABLE_USER_SCRIPT_SANDBOXING`.
  - Безопасная инициализация Firebase; пуши работают при наличии plist и Capability.
  - Очищен DerivedData; проект собирается и запускается в Xcode 26.
++Задача 47.level-fix: Последовательность уровней и current_level
++ - Supabase: нормализован `users.current_level` по факту завершений (`user_progress` → max(levels.number)+1); создано представление `v_users_level_mismatch` для мониторинга расхождений.
++ - Клиент: в `MiniCaseScreen` добавлен guard — повышение уровня выполняется только если `current_level` пользователя меньше `after_level+1` и существует `level_id` целевого уровня.
++ - RPC `update_current_level`: используется как единственная точка изменения `current_level` (доп. клиентских пересчётов нет).
++ - Результат: после прохождения 10 уровней `current_level` корректно становится 11; регресс‑проверка — без сбоев.
++Задача 47.level-label-fix: Отображение "Ты на N уровне!"
++ - Исправлен метод `SupabaseService.resolveCurrentLevelNumber`: при числовом значении 0..max+1 трактуется как номер уровня (стандартизированный путь), legacy‑ветка по `level_id` используется только как fallback.
++ - Симптом: при `current_level=11` UI показывал «1 уровень» — теперь корректно «11 уровень».

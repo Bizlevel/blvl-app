@@ -415,9 +415,16 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
           // Получаем level_id для следующего уровня
           final levelId =
               await SupabaseService.levelIdFromNumber(nextLevelNumber);
-          if (levelId != null) {
-            await SupabaseService.completeLevel(levelId);
-          }
+          // Guard: повышаем уровень только если текущий уровень пользователя
+          // строго меньше целевого nextLevelNumber (число уровней уже пройденных + 1)
+          try {
+            final user = await ref.read(currentUserProvider.future);
+            final currNum = await SupabaseService.resolveCurrentLevelNumber(
+                user?.currentLevel);
+            if (levelId != null && currNum < nextLevelNumber) {
+              await SupabaseService.completeLevel(levelId);
+            }
+          } catch (_) {}
         }
       } catch (_) {
         // Игнорируем ошибки обновления уровня
