@@ -25,7 +25,6 @@ import 'package:bizlevel/services/notifications_service.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:flutter_timezone/flutter_timezone.dart';
-import 'package:flutter/scheduler.dart';
 import 'services/push_service.dart';
 
 import 'package:firebase_core/firebase_core.dart';
@@ -34,7 +33,7 @@ Future<void> main() async {
   // КРИТИЧНО для web: Все инициализации должны быть в одной зоне
   WidgetsFlutterBinding.ensureInitialized();
   if (!kIsWeb) {
-    await Firebase.initializeApp();
+    await _tryInitFirebase();
   }
 
   // Чистые URL без # — только для Web
@@ -111,6 +110,19 @@ Future<void> main() async {
   }
 }
 
+// Пытаемся инициализировать Firebase, но не падаем, если конфиг отсутствует
+Future<void> _tryInitFirebase() async {
+  try {
+    if (Firebase.apps.isEmpty) {
+      await Firebase.initializeApp();
+    }
+  } catch (e) {
+    // В Dev/CI окружениях файл GoogleService-Info.plist может отсутствовать
+    // Это не блокирует работу приложения (FCM будет отключён)
+    debugPrint('WARN: Firebase is not initialized: $e');
+  }
+}
+
 class MyApp extends ConsumerWidget {
   const MyApp({super.key});
 
@@ -172,7 +184,7 @@ class MyApp extends ConsumerWidget {
                 }),
               ),
               child: FutureBuilder<String?>(
-                future: NotificationsService.instance.getLaunchRoute(),
+                future: NotificationsService.instance.consumeAnyLaunchRoute(),
                 builder: (context, snap) {
                   if (snap.connectionState == ConnectionState.done &&
                       snap.data != null &&

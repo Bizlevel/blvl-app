@@ -26,6 +26,8 @@ import 'package:bizlevel/widgets/common/breadcrumb.dart';
 import 'package:bizlevel/widgets/common/bizlevel_button.dart';
 import 'package:bizlevel/theme/ui_strings.dart';
 import 'package:bizlevel/theme/spacing.dart';
+import 'package:bizlevel/widgets/common/milestone_celebration.dart';
+import 'package:bizlevel/providers/gp_providers.dart';
 
 /// Shows a level as full-screen blocks (Intro → Lesson → Quiz → …).
 class LevelDetailScreen extends ConsumerStatefulWidget {
@@ -192,10 +194,21 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
                               // Инвалидация навыков для обновления древа навыков в профиле
                               ref.invalidate(userSkillsProvider);
                               if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                      content: Text(UIS.levelCompleted)),
+                                // Праздничное уведомление о бонусе за уровень (+20 GP)
+                                await showDialog(
+                                  context: context,
+                                  barrierDismissible: true,
+                                  builder: (_) => Dialog(
+                                    backgroundColor: Colors.transparent,
+                                    insetPadding: const EdgeInsets.all(16),
+                                    child: MilestoneCelebration(
+                                        gpGain: 20,
+                                        onClose: () =>
+                                            Navigator.of(context).maybePop()),
+                                  ),
                                 );
+                                // Обновим баланс GP (SWR провайдер)
+                                ref.invalidate(gpBalanceProvider);
                                 if ((widget.levelNumber ?? -1) == 1) {
                                   if (context.mounted) {
                                     context.go('/goal');

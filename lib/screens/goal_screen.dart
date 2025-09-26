@@ -246,17 +246,31 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                       radius: 16,
                       child: Icon(Icons.person_outline, size: 18),
                     );
-              return GestureDetector(
-                onTap: () {
-                  Sentry.addBreadcrumb(Breadcrumb(
-                    category: 'ui',
-                    type: 'click',
-                    message: 'goal_header_avatar_tap',
-                    level: SentryLevel.info,
-                  ));
-                },
-                child: avatar,
-              );
+              return Row(children: [
+                IconButton(
+                  tooltip: 'Напоминания',
+                  icon: const Icon(Icons.notifications_active_outlined),
+                  onPressed: () {
+                    try {
+                      GoRouter.of(context).push('/notifications');
+                    } catch (e, st) {
+                      Sentry.captureException(e, stackTrace: st);
+                    }
+                  },
+                ),
+                const SizedBox(width: 4),
+                GestureDetector(
+                  onTap: () {
+                    Sentry.addBreadcrumb(Breadcrumb(
+                      category: 'ui',
+                      type: 'click',
+                      message: 'goal_header_avatar_tap',
+                      level: SentryLevel.info,
+                    ));
+                  },
+                  child: avatar,
+                ),
+              ]);
             }),
           ),
         ],
@@ -326,63 +340,240 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                                 double.tryParse(_metricActualCtrl.text.trim()),
                           ),
                           const SizedBox(height: 8),
-                          // Прогресс по версиям и подсказка «что дальше»
+                          // Компактный гид по шагам: v1→v4→Недели
                           Builder(builder: (context) {
                             final hasV1 = gs.versions.containsKey(1);
                             final hasV2 = gs.versions.containsKey(2);
                             final hasV3 = gs.versions.containsKey(3);
                             final hasV4 = gs.versions.containsKey(4);
-                            final int percent = hasV4
-                                ? 100
-                                : (hasV3
-                                    ? 75
-                                    : (hasV2 ? 50 : (hasV1 ? 25 : 0)));
-                            String nextHint;
-                            VoidCallback? onCta;
-                            if (hasV4) {
-                              nextHint = 'Все этапы цели заполнены';
-                            } else if (hasV3) {
-                              nextHint = 'Заполните v4 «Финал» на чекпоинте';
-                              onCta = () => GoRouter.of(context)
-                                  .push('/goal-checkpoint/4');
-                            } else if (hasV2) {
-                              nextHint = 'Заполните v3 «SMART» на чекпоинте';
-                              onCta = () => GoRouter.of(context)
-                                  .push('/goal-checkpoint/3');
-                            } else if (hasV1) {
-                              nextHint = 'Заполните v2 «Метрики» на чекпоинте';
-                              onCta = () => GoRouter.of(context)
-                                  .push('/goal-checkpoint/2');
+                            String currentStep;
+                            if (!hasV1) {
+                              currentStep = 'v1';
+                            } else if (!hasV2) {
+                              currentStep = 'v2';
+                            } else if (!hasV3) {
+                              currentStep = 'v3';
+                            } else if (!hasV4) {
+                              currentStep = 'v4';
                             } else {
-                              nextHint = 'Создайте v1 «Семя цели» на Уровне 1';
+                              currentStep = 'weeks';
                             }
-                            return Row(
+
+                            Widget buildChip({
+                              required String label,
+                              required bool completed,
+                              required bool active,
+                              required bool locked,
+                              required VoidCallback? onTap,
+                            }) {
+                              final Color bg = locked
+                                  ? AppColor.surface
+                                  : (active
+                                      ? AppColor.primary.withValues(alpha: 0.08)
+                                      : Colors.white);
+                              final Color border = active
+                                  ? AppColor.primary
+                                  : (locked
+                                      ? AppColor.labelColor
+                                          .withValues(alpha: 0.4)
+                                      : AppColor.labelColor
+                                          .withValues(alpha: 0.3));
+                              final TextStyle? ts = Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
+                                    fontWeight: active
+                                        ? FontWeight.w700
+                                        : FontWeight.w500,
+                                    color: locked
+                                        ? AppColor.labelColor
+                                        : AppColor.textColor,
+                                  );
+                              return Padding(
+                                padding:
+                                    const EdgeInsets.only(right: 8, bottom: 6),
+                                child: InkWell(
+                                  onTap: locked ? null : onTap,
+                                  borderRadius: BorderRadius.circular(16),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 10, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: bg,
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(color: border),
+                                      boxShadow: const [
+                                        BoxShadow(
+                                          color: Color(0x08000000),
+                                          blurRadius: 4,
+                                          offset: Offset(0, 2),
+                                        )
+                                      ],
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        if (completed)
+                                          const Padding(
+                                            padding: EdgeInsets.only(right: 4),
+                                            child: Icon(Icons.check_circle,
+                                                size: 16, color: Colors.green),
+                                          )
+                                        else if (locked)
+                                          const Padding(
+                                            padding: EdgeInsets.only(right: 4),
+                                            child: Icon(Icons.lock_outline,
+                                                size: 16, color: Colors.grey),
+                                          ),
+                                        Text(label, style: ts),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }
+
+                            void showLockedSnack(String msg) {
+                              ScaffoldMessenger.of(context)
+                                  .showSnackBar(SnackBar(content: Text(msg)));
+                            }
+
+                            return Wrap(
                               children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 10, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: AppColor.primary
-                                        .withValues(alpha: 0.08),
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Text('Прогресс: $percent%'),
+                                // v1
+                                buildChip(
+                                  label: 'v1',
+                                  completed: hasV1,
+                                  active: currentStep == 'v1',
+                                  locked: false,
+                                  onTap: () {
+                                    if (!hasV1) {
+                                      GoRouter.of(context)
+                                          .push('/tower?scrollTo=1');
+                                    }
+                                  },
                                 ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(nextHint,
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodySmall),
+                                // v2
+                                buildChip(
+                                  label: 'v2',
+                                  completed: hasV2,
+                                  active: currentStep == 'v2',
+                                  locked: (!hasV1) || allowedMax < 2,
+                                  onTap: (!hasV1 || allowedMax < 2)
+                                      ? () => showLockedSnack(
+                                          'Откроется после Уровня 4')
+                                      : () => GoRouter.of(context)
+                                          .push('/goal-checkpoint/2'),
                                 ),
-                                if (onCta != null)
-                                  TextButton(
-                                    onPressed: onCta,
-                                    child: const Text('Что дальше'),
-                                  ),
+                                // v3
+                                buildChip(
+                                  label: 'v3',
+                                  completed: hasV3,
+                                  active: currentStep == 'v3',
+                                  locked: (!hasV2) || allowedMax < 3,
+                                  onTap: (!hasV2 || allowedMax < 3)
+                                      ? () => showLockedSnack(
+                                          'Откроется после Уровня 7')
+                                      : () => GoRouter.of(context)
+                                          .push('/goal-checkpoint/3'),
+                                ),
+                                // v4
+                                buildChip(
+                                  label: 'v4',
+                                  completed: hasV4,
+                                  active: currentStep == 'v4',
+                                  locked: (!hasV3) || allowedMax < 4,
+                                  onTap: (!hasV3 || allowedMax < 4)
+                                      ? () => showLockedSnack(
+                                          'Откроется после Уровня 10')
+                                      : () => GoRouter.of(context)
+                                          .push('/goal-checkpoint/4'),
+                                ),
+                                // Weeks
+                                buildChip(
+                                  label: 'Недели',
+                                  completed: false,
+                                  active: currentStep == 'weeks',
+                                  locked: !hasV4,
+                                  onTap: !hasV4
+                                      ? () => showLockedSnack(
+                                          'Доступно после v4 «Финал»')
+                                      : () => _scrollToSprintSection(),
+                                ),
                               ],
                             );
                           }),
+                          // Прогресс и «Что дальше» через fetch_goal_state
+                          FutureBuilder<Map<String, dynamic>>(
+                            future: ref
+                                .read(goalsRepositoryProvider)
+                                .fetchGoalState(),
+                            builder: (context, snap) {
+                              final data =
+                                  snap.data ?? const <String, dynamic>{};
+                              final bool hasV1 =
+                                  (data['has_v1'] as bool?) ?? false;
+                              final bool hasV2 =
+                                  (data['has_v2'] as bool?) ?? false;
+                              final bool hasV3 =
+                                  (data['has_v3'] as bool?) ?? false;
+                              final bool hasV4 =
+                                  (data['has_v4'] as bool?) ?? false;
+                              final int percent = hasV4
+                                  ? 100
+                                  : (hasV3
+                                      ? 75
+                                      : (hasV2 ? 50 : (hasV1 ? 25 : 0)));
+                              final String nextAction =
+                                  (data['next_action'] as String?) ?? '';
+                              final int nextTarget =
+                                  (data['next_action_target'] as int?) ?? 0;
+                              String nextHint;
+                              VoidCallback? onCta;
+                              if (nextAction == 'goal_checkpoint' &&
+                                  nextTarget >= 2 &&
+                                  nextTarget <= 4) {
+                                nextHint =
+                                    'Заполните v$nextTarget на чекпоинте';
+                                onCta = () => GoRouter.of(context)
+                                    .push('/goal-checkpoint/$nextTarget');
+                              } else if (nextAction == 'weeks') {
+                                nextHint =
+                                    'Все версии заполнены — переходите к неделям';
+                                onCta = () => _scrollToSprintSection();
+                              } else {
+                                nextHint = !hasV1
+                                    ? 'Создайте v1 «Семя цели» на Уровне 1'
+                                    : 'Продолжайте к следующему шагу';
+                              }
+                              return Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 10, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: AppColor.primary
+                                          .withValues(alpha: 0.08),
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Text('Прогресс: $percent%'),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(nextHint,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall),
+                                  ),
+                                  if (onCta != null)
+                                    TextButton(
+                                      onPressed: onCta,
+                                      child: const Text('Что дальше'),
+                                    ),
+                                ],
+                              );
+                            },
+                          ),
                           const SizedBox(height: 16),
                           CrystallizationSection(
                             versions: gs.versions,

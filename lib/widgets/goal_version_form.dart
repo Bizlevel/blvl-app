@@ -120,7 +120,8 @@ class GoalVersionForm extends StatelessWidget {
               controller: goalRefinedCtrl,
               readOnly: !editing || !_isEditable('concrete_result'),
               readOnlySoftBackground: true,
-              hint: 'Конкретная цель*',
+              hint:
+                  'Напр.: «Увеличить выручку» / «Получить 5 заявок от новых клиентов»',
             ),
             const SizedBox(height: 16),
             _groupHeader(context, 'Метрика',
@@ -145,7 +146,7 @@ class GoalVersionForm extends StatelessWidget {
                   if (v != null) metricNameCtrl?.text = v;
                 },
                 decoration: const InputDecoration(
-                  hintText: 'Что измеряем*',
+                  hintText: 'Напр.: «Выручка (₸)» / «Лиды (шт.)»',
                   border: OutlineInputBorder(),
                 ),
               )
@@ -166,7 +167,7 @@ class GoalVersionForm extends StatelessWidget {
                   readOnly: !editing || !_isEditable('metric_current'),
                   readOnlySoftBackground: true,
                   keyboardType: TextInputType.number,
-                  hint: 'Текущее значение*',
+                  hint: 'Текущее значение* (например, 10000)',
                 ),
               ),
               const SizedBox(width: 12),
@@ -177,7 +178,7 @@ class GoalVersionForm extends StatelessWidget {
                   readOnly: !editing || !_isEditable('metric_target'),
                   readOnlySoftBackground: true,
                   keyboardType: TextInputType.number,
-                  hint: 'Целевое значение*',
+                  hint: 'Целевое значение* (например, 15000)',
                 ),
               ),
             ]),
@@ -192,7 +193,7 @@ class GoalVersionForm extends StatelessWidget {
               readOnly: !editing || !_isEditable('financial_goal'),
               readOnlySoftBackground: true,
               keyboardType: TextInputType.number,
-              hint: 'Финансовый результат в ₸*',
+              hint: 'Напр.: «Выручка за 4 недели — 300 000 ₸»',
             ),
           ],
         );

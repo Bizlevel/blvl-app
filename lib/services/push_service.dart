@@ -7,6 +7,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:bizlevel/services/notifications_service.dart';
 
 // Топ-левел background handler обязателен для Android
 @pragma('vm:entry-point')
@@ -32,8 +33,11 @@ class PushService {
     if (kIsWeb) return;
 
     try {
+      // Пытаемся инициализировать Firebase безопасно
+      if (Firebase.apps.isEmpty) {
+        await Firebase.initializeApp();
+      }
       _fm = FirebaseMessaging.instance;
-      await Firebase.initializeApp();
 
       // Mobile permissions
       if (Platform.isIOS || Platform.isAndroid) {
@@ -49,7 +53,23 @@ class PushService {
           data: {'from': 'foreground', 'hasData': message.data.isNotEmpty},
           level: SentryLevel.info,
         ));
-        // При необходимости можно отобразить баннер/локальное уведомление
+        // Показываем системное уведомление в фореграунде (минимальный контент)
+        final title = message.notification?.title ?? 'Сообщение BizLevel';
+        final body = message.notification?.body ?? 'Откройте приложение';
+        final route = message.data['route']?.toString();
+        final type = message.data['type']?.toString();
+        final channel = switch (type) {
+          'goal_reminder' => 'goal_reminder',
+          'gp_economy' => 'gp_economy',
+          'chat_messages' => 'chat_messages',
+          _ => 'education',
+        };
+        NotificationsService.instance.showNow(
+          title: title,
+          body: body,
+          channelId: channel,
+          route: route,
+        );
       });
 
       // Taps from background/killed
@@ -66,7 +86,8 @@ class PushService {
       });
 
       // Cold start
-      final initial = await _fm.getInitialMessage();
+      final initial =
+          (Firebase.apps.isNotEmpty) ? await _fm.getInitialMessage() : null;
       if (initial != null) {
         final route = initial.data['route']?.toString();
         if (route != null && route.isNotEmpty) {

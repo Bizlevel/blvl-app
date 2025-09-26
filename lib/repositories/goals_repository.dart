@@ -77,24 +77,35 @@ class GoalsRepository {
     required String goalText,
     required Map<String, dynamic> versionData,
   }) async {
-    final String? userId = _client.auth.currentUser?.id;
-    final payload = {
-      'version': version,
-      'goal_text': goalText,
-      'version_data': versionData,
-      if (userId != null) 'user_id': userId, // fallback: если нет триггера в БД
-    };
-
-    // Используем upsert для избежания дублирования
-    final result = await _client
-        .from('core_goals')
-        .upsert(
-          payload,
-          onConflict: 'user_id,version',
-        )
-        .select()
-        .single();
-    return Map<String, dynamic>.from(result);
+    try {
+      final resp = await _client.rpc('upsert_goal_version', params: {
+        'p_version': version,
+        'p_goal_text': goalText,
+        'p_version_data': versionData,
+      });
+      if (resp is List && resp.isNotEmpty) {
+        return Map<String, dynamic>.from(resp.first as Map);
+      }
+      if (resp is Map) {
+        return Map<String, dynamic>.from(resp);
+      }
+      // fallback: старый путь (на случай отсутствия RPC в окружении dev)
+      final String? userId = _client.auth.currentUser?.id;
+      final payload = {
+        'version': version,
+        'goal_text': goalText,
+        'version_data': versionData,
+        if (userId != null) 'user_id': userId,
+      };
+      final result = await _client
+          .from('core_goals')
+          .upsert(payload, onConflict: 'user_id,version')
+          .select()
+          .single();
+      return Map<String, dynamic>.from(result);
+    } catch (e) {
+      rethrow;
+    }
   }
 
   /// Обновляет текущую (последнюю) версию v1 по id записи.
@@ -115,6 +126,18 @@ class GoalsRepository {
         .select()
         .single();
     return Map<String, dynamic>.from(updated);
+  }
+
+  /// Возвращает агрегированное состояние цели пользователя и next_action
+  Future<Map<String, dynamic>> fetchGoalState() async {
+    final resp = await _client.rpc('fetch_goal_state');
+    if (resp is List && resp.isNotEmpty) {
+      return Map<String, dynamic>.from(resp.first as Map);
+    }
+    if (resp is Map) {
+      return Map<String, dynamic>.from(resp);
+    }
+    return <String, dynamic>{};
   }
 
   /// Partial update of a single field in core_goals.version_data via RPC.

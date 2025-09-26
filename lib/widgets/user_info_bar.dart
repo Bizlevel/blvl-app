@@ -93,7 +93,8 @@ class UserInfoBar extends ConsumerWidget {
               ),
               const SizedBox(height: 4),
               FutureBuilder<int>(
-                future: SupabaseService.levelNumberFromId(user.currentLevel),
+                future: SupabaseService.resolveCurrentLevelNumber(
+                    user.currentLevel),
                 builder: (context, snap) {
                   final n = snap.data ?? 0;
                   return Text(

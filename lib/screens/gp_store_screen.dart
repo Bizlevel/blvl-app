@@ -23,139 +23,171 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
   String? _selectedPackageId;
   int? _selectedAmount;
   String? _selectedLabel;
+  bool _faqExpanded = false;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Магазин GP')),
-      body: ListView.builder(
-        itemCount: 1,
-        padding: const EdgeInsets.all(16),
-        itemBuilder: (context, _) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Короткий вводный блок «Что такое GP»
-              const BizLevelCard(
-                padding: EdgeInsets.all(12),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    GpBalanceWidget(),
-                    SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        'GP — внутренняя валюта BizLevel: 1 GP = 1 сообщение в чате тренеров, также GP открывают новые этажи.',
-                        style: TextStyle(fontSize: 14),
-                      ),
+      body: LayoutBuilder(builder: (context, constraints) {
+        final bool isXs = constraints.maxWidth < 360;
+        // Устанавливаем дефолтный выбранный план (середина) если не выбрано
+        _selectedPackageId ??= 'gp_1400';
+        _selectedAmount ??= 9960;
+        _selectedLabel ??= 'РАЗГОН: 1400 GP';
+
+        return ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            // Вводный блок
+            const BizLevelCard(
+              padding: EdgeInsets.all(12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  GpBalanceWidget(),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'GP — внутренняя валюта BizLevel: 1 GP = 1 сообщение в чате тренеров, также GP открывают новые этажи.',
+                      style: TextStyle(fontSize: 14),
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 16),
-              Semantics(
-                  label: 'План СТАРТ, 300 GP',
-                  child: _GpPlanCard(
-                    title: 'СТАРТ:',
-                    gpLabel: '300',
-                    descriptionTitle: 'Идеально для:',
-                    bullets: const [
-                      'Обдумать идеи',
-                      'Быстрых консультаций',
-                      'Получить второе мнение',
-                    ],
-                    italicNote:
-                        'Каждый успешный бизнес начинался с первого шага',
-                    priceLabel: '₸3 000',
+            ),
+            const SizedBox(height: 12),
+            // Переключатель планов
+            Semantics(
+              label: 'Выбор плана',
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  ChoiceChip(
+                    label: const Text('СТАРТ'),
                     selected: _selectedPackageId == 'gp_300',
-                    onSelect: () {
+                    onSelected: (_) {
                       setState(() {
                         _selectedPackageId = 'gp_300';
                         _selectedAmount = 3000;
                         _selectedLabel = 'СТАРТ: 300 GP';
                       });
                     },
-                  )),
-              const SizedBox(height: 12),
-              Semantics(
-                  label: 'План РАЗГОН, 1400 GP',
-                  child: _GpPlanCard(
-                    title: 'РАЗГОН:',
-                    gpLabel: '1000 + 400 бонус',
-                    descriptionTitle: 'Достаточно чтобы:',
-                    bullets: const [
-                      'Поставить и достичь цели за 28 дней',
-                      '400+ персональных советов',
-                      'Открыть новые горизонты',
-                    ],
-                    italicNote: 'Выбор 80% предпринимателей',
-                    priceLabel: '₸9 960',
-                    highlight: true,
-                    ribbon: 'Хит',
+                  ),
+                  ChoiceChip(
+                    label: const Text('РАЗГОН'),
                     selected: _selectedPackageId == 'gp_1400',
-                    onSelect: () {
+                    onSelected: (_) {
                       setState(() {
                         _selectedPackageId = 'gp_1400';
                         _selectedAmount = 9960;
                         _selectedLabel = 'РАЗГОН: 1400 GP';
                       });
                     },
-                  )),
-              const SizedBox(height: 12),
-              Semantics(
-                  label: 'План ТРАНСФОРМАЦИЯ, 3000 GP',
-                  child: _GpPlanCard(
-                    title: 'ТРАНСФОРМАЦИЯ:',
-                    gpLabel: '2000 + 1000 бонус',
-                    descriptionTitle: 'Полная перезагрузка',
-                    bullets: const [
-                      'От хаоса к системе',
-                      'От идеи к масштабу',
-                      'От мечты к результату',
-                    ],
-                    italicNote: 'Для тех, кто настроен серьезно',
-                    priceLabel: '₸19 960',
-                    ribbon: 'Выгоднее всего',
+                  ),
+                  ChoiceChip(
+                    label: const Text('ТРАНСФОРМ'),
                     selected: _selectedPackageId == 'gp_3000',
-                    onSelect: () {
+                    onSelected: (_) {
                       setState(() {
                         _selectedPackageId = 'gp_3000';
                         _selectedAmount = 19960;
                         _selectedLabel = 'ТРАНСФОРМАЦИЯ: 3000 GP';
                       });
                     },
-                  )),
-              const SizedBox(height: 16),
-              // FAQ/доверие
-              const BizLevelCard(
-                padding: EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Вопросы и безопасность',
-                        style: TextStyle(
-                            fontWeight: FontWeight.w700, fontSize: 16)),
-                    SizedBox(height: 8),
-                    _FaqRow(
-                        icon: Icons.lock_outline,
-                        text:
-                            'Оплата защищена. Данные карт не хранятся в приложении.'),
-                    _FaqRow(
-                        icon: Icons.schedule_outlined,
-                        text:
-                            'GP зачисляются сразу после подтверждения покупки.'),
-                    _FaqRow(
-                        icon: Icons.help_outline,
-                        text:
-                            'Если GP не пришли — нажмите «Проверить» или обратитесь в поддержку.'),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            // Одна карточка выбранного плана
+            if (_selectedPackageId == 'gp_300')
+              Semantics(
+                label: 'План СТАРТ, 300 GP',
+                child: _GpPlanCard(
+                  title: 'СТАРТ:',
+                  gpLabel: '300',
+                  descriptionTitle: 'Идеально для:',
+                  bullets: const [
+                    'Обдумать идеи',
+                    'Быстрых консультаций',
+                    'Получить второе мнение',
                   ],
+                  italicNote: 'Каждый успешный бизнес начинался с первого шага',
+                  priceLabel: '₸3 000',
+                  selected: true,
+                  onSelect: () {},
                 ),
               ),
-              const SizedBox(height: 80),
-            ],
-          );
-        },
-      ),
+            if (_selectedPackageId == 'gp_1400')
+              Semantics(
+                label: 'План РАЗГОН, 1400 GP',
+                child: _GpPlanCard(
+                  title: 'РАЗГОН:',
+                  gpLabel: '1000 + 400 бонус',
+                  descriptionTitle: 'Достаточно чтобы:',
+                  bullets: const [
+                    'Поставить и достичь цели за 28 дней',
+                    '400+ персональных советов',
+                    'Открыть новые горизонты',
+                  ],
+                  italicNote: 'Выбор 80% предпринимателей',
+                  priceLabel: '₸9 960',
+                  highlight: true,
+                  ribbon: isXs ? null : 'Хит',
+                  selected: true,
+                  onSelect: () {},
+                ),
+              ),
+            if (_selectedPackageId == 'gp_3000')
+              Semantics(
+                label: 'План ТРАНСФОРМАЦИЯ, 3000 GP',
+                child: _GpPlanCard(
+                  title: 'ТРАНСФОРМАЦИЯ:',
+                  gpLabel: '2000 + 1000 бонус',
+                  descriptionTitle: 'Полная перезагрузка',
+                  bullets: const [
+                    'От хаоса к системе',
+                    'От идеи к масштабу',
+                    'От мечты к результату',
+                  ],
+                  italicNote: 'Для тех, кто настроен серьезно',
+                  priceLabel: '₸19 960',
+                  ribbon: isXs ? null : 'Выгоднее всего',
+                  selected: true,
+                  onSelect: () {},
+                ),
+              ),
+            const SizedBox(height: 12),
+            // FAQ свернут по умолчанию
+            BizLevelCard(
+              padding: const EdgeInsets.all(4),
+              child: ExpansionTile(
+                initiallyExpanded: _faqExpanded,
+                onExpansionChanged: (v) => setState(() => _faqExpanded = v),
+                title: const Text('Вопросы и безопасность'),
+                children: const [
+                  _FaqRow(
+                      icon: Icons.lock_outline,
+                      text:
+                          'Оплата защищена. Данные карт не хранятся в приложении.'),
+                  _FaqRow(
+                      icon: Icons.schedule_outlined,
+                      text:
+                          'GP зачисляются сразу после подтверждения покупки.'),
+                  _FaqRow(
+                      icon: Icons.help_outline,
+                      text:
+                          'Если GP не пришли — нажмите «Проверить» или обратитесь в поддержку.'),
+                ],
+              ),
+            ),
+            const SizedBox(height: 80),
+          ],
+        );
+      }),
       bottomNavigationBar: SafeArea(
         top: false,
         child: Container(
@@ -444,25 +476,26 @@ class _GpLabelText extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final parts = _splitBonus(label);
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(parts.$1,
-            style: (compact
-                    ? theme.textTheme.titleSmall
-                    : theme.textTheme.titleLarge)
-                ?.copyWith(fontWeight: FontWeight.w700)),
-        if (parts.$2 != null) ...[
-          const SizedBox(width: 4),
-          Text('+ ${parts.$2!.replaceFirst('+ ', '')}',
-              style: (compact
-                      ? theme.textTheme.titleSmall
-                      : theme.textTheme.titleLarge)
-                  ?.copyWith(
-                      fontStyle: FontStyle.italic,
-                      fontWeight: FontWeight.w600)),
+    final baseStyle =
+        (compact ? theme.textTheme.titleSmall : theme.textTheme.titleLarge)
+            ?.copyWith(fontWeight: FontWeight.w700);
+    final bonusStyle = (compact
+            ? theme.textTheme.titleSmall
+            : theme.textTheme.titleLarge)
+        ?.copyWith(fontStyle: FontStyle.italic, fontWeight: FontWeight.w600);
+    return RichText(
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      text: TextSpan(
+        children: [
+          TextSpan(text: parts.$1, style: baseStyle),
+          if (parts.$2 != null)
+            TextSpan(
+                text: ' + ${parts.$2!.replaceFirst('+ ', '')}',
+                style: bonusStyle),
         ],
-      ],
+        style: theme.textTheme.bodyMedium,
+      ),
     );
   }
 }

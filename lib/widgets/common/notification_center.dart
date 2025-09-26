@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
+import 'package:bizlevel/services/notification_log_service.dart';
 
 enum _BannerType { success, info, warn, error }
 
@@ -7,26 +8,34 @@ class NotificationCenter {
   NotificationCenter._();
 
   static void showSuccess(BuildContext context, String message,
-      {int ms = 3500}) {
-    _show(context, message, _BannerType.success, ms: ms);
+      {int ms = 3500, String? route}) {
+    _show(context, message, _BannerType.success, ms: ms, route: route);
   }
 
-  static void showInfo(BuildContext context, String message, {int ms = 3500}) {
-    _show(context, message, _BannerType.info, ms: ms);
+  static void showInfo(BuildContext context, String message,
+      {int ms = 3500, String? route}) {
+    _show(context, message, _BannerType.info, ms: ms, route: route);
   }
 
   static void showWarn(BuildContext context, String message,
-      {int ms = 3500, VoidCallback? onAction, String? actionLabel}) {
+      {int ms = 3500,
+      VoidCallback? onAction,
+      String? actionLabel,
+      String? route}) {
     _show(context, message, _BannerType.warn,
-        ms: ms, onAction: onAction, actionLabel: actionLabel);
+        ms: ms, onAction: onAction, actionLabel: actionLabel, route: route);
   }
 
-  static void showError(BuildContext context, String message, {int ms = 3500}) {
-    _show(context, message, _BannerType.error, ms: ms);
+  static void showError(BuildContext context, String message,
+      {int ms = 3500, String? route}) {
+    _show(context, message, _BannerType.error, ms: ms, route: route);
   }
 
   static void _show(BuildContext context, String message, _BannerType type,
-      {int ms = 3500, VoidCallback? onAction, String? actionLabel}) {
+      {int ms = 3500,
+      VoidCallback? onAction,
+      String? actionLabel,
+      String? route}) {
     final messenger = ScaffoldMessenger.of(context);
     messenger.hideCurrentMaterialBanner();
 
@@ -78,6 +87,20 @@ class NotificationCenter {
         message: 'notif_banner_shown:${type.name}',
         data: {'message': message},
       ));
+    } catch (_) {}
+    // Лог в локальный журнал
+    try {
+      NotificationLogService.instance.record(
+        kind: switch (type) {
+          _BannerType.success => NotificationKind.success,
+          _BannerType.info => NotificationKind.info,
+          _BannerType.warn => NotificationKind.warn,
+          _BannerType.error => NotificationKind.error,
+        },
+        message: message,
+        category: 'banner',
+        route: route,
+      );
     } catch (_) {}
     // Автозакрытие баннера через ms
     Future<void>.delayed(Duration(milliseconds: ms)).then((_) {

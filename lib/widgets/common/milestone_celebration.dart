@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:bizlevel/theme/color.dart';
+import 'package:bizlevel/services/notification_log_service.dart';
 
 class MilestoneCelebration extends StatefulWidget {
   const MilestoneCelebration({super.key, required this.onClose, this.gpGain});
@@ -22,6 +23,16 @@ class _MilestoneCelebrationState extends State<MilestoneCelebration>
     _controller = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 1600))
       ..forward();
+    // Лог события открытия
+    try {
+      NotificationLogService.instance.record(
+        kind: NotificationKind.success,
+        message: widget.gpGain != null
+            ? 'Бонус получен: +${widget.gpGain} GP'
+            : 'Праздничное уведомление',
+        category: 'celebration',
+      );
+    } catch (_) {}
   }
 
   @override
@@ -71,8 +82,13 @@ class _MilestoneCelebrationState extends State<MilestoneCelebration>
                     style:
                         TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
                 const SizedBox(height: 8),
-                const Text('Вы достигли вехи. Продолжайте в том же духе!',
-                    textAlign: TextAlign.center),
+                if (widget.gpGain != null)
+                  const Text('Вы получили бонус!',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontWeight: FontWeight.w600))
+                else
+                  const Text('Вы достигли вехи. Продолжайте в том же духе!',
+                      textAlign: TextAlign.center),
                 const SizedBox(height: 12),
                 if (widget.gpGain != null)
                   TweenAnimationBuilder<double>(

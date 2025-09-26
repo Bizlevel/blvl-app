@@ -435,9 +435,43 @@ TODO:
 +- Добавлен мини‑тур: группы /home→/goal→/tower c подсветкой ключевых элементов (GP, «Главные разделы», «Продолжить», «Моя цель», «Кристаллизация», «Прогресс», «Путь к цели», «Башня»).
 +- Улучшен тултип: корректные стрелки/позиционирование; клики по кнопкам не перехватываются фоном.
 +- Проброшены GlobalKey на целевые блоки; тексты шагов по draft‑2.md; применена миграция `gp_bonus_rules('onboarding_tour',30,true)` через supabase‑mcp; финальная кнопка «Получить бонус» начисляет 30 GP.
-
-# Задача 48.tour-fix: Мини‑тур — оркестратор и UX
+Задача 47.levels-standardization fix: Единый формат уровней
+- БД: добавлен `levels.floor_number` (DEFAULT 1), индекс `UNIQUE(floor_number, number)`, усилен `update_current_level` (clamp по max(number)+1); `users.current_level` нормализован до диапазона 0..max+1.
+- Edge `leo-chat`: max завершённый уровень считается по `levels.number` (JOIN), убран хардкод id→number.
+- Клиент: включён флаг `kUseFloorMapping=true` (dev), `fetchLevels` возвращает `floor_number`, `levelsProvider` учитывает `floor_access` по реальному этажу; `displayCode` формируется как FNN.
+Задача 47.tour-fix: Мини‑тур — оркестратор и UX
 - Введён оркестратор групп (pending_group) и последовательность home→goal→tower.
 - Улучшен Tooltip: индикатор шага, фолбэк якоря, a11y.
 - Подключён тур на Главной/Цели/Башне; бонус 30 GP после финиша.
 - Линты без критичных ошибок; миграция `users.onboarding_tour_version` подготовлена (требуется project_id для применения).
+- Все удалено из-за большого количества ошибок в ux. 
+Задача 47.gp-store-fix: Магазин GP — одноэкранный дизайн и фиксы overflow
+- Экран `GpStoreScreen` переведен на компактный одноэкранный дизайн: шапка с балансом, выбор плана через чипы (3 варианта), отображается только выбранный план, снизу sticky‑бар CTA.
+- Длинные лейблы и цены адаптированы под xs‑экраны (ellipsis/RichText), FAQ свёрнут в ExpansionTile.
+- Линтер чистый; проверено на ширинах 320–400 px — без overflow.
+Задача 47.fix - модификация: Цель — напоминания, «что дальше» и UX
+- Экран `Напоминания`: добавлен `NotificationsSettingsScreen` (`/notifications`) с выбором времени Пн/Ср/Пт и до 3 слотов на Вс; пересоздание расписания через `NotificationsService.rescheduleWeekly`.
+- RPC: `upsert_goal_version` и `fetch_goal_state` с валидациями последовательности/редактирования latest и возвратом `next_action`; репозиторий обновлен (RPC + dev‑fallback).
+- Цель v2: хинты и индикатор реалистичности роста (%). Чекпоинт: клиентские `recommendedChips` для незаполнённых полей.
+- «Что дальше»: `GoalScreen` использует `fetch_goal_state`; добавлен вход в `/notifications` в AppBar. Breadcrumb `goal_next_action_resolved` при авто‑переходе.
+Задача 47.bonus-system: Бонусы и уведомления
+- Supabase: деактивирован `onboarding_tour`; `gp_bonus_claim` усилили серверными проверками (profile/cases) и metadata; `update_current_level` начисляет +20 GP (идемпотентно, idempotency_key `bonus:level:<id>:<user>`).
+- Клиент: при завершении уровня показывается анимированное уведомление («Поздравляем! Вы получили бонус — 20 GP!») через `MilestoneCelebration`; при завершении третьего кейса вызывается `gp_bonus_claim('all_three_cases_completed')` и показывается уведомление на +200 GP.
+- Документация: в `bizlevel-concept.md` обновлён список бонусов (добавлен `level_completed`, удалён `onboarding_tour`).
++Задача 47.ai-skill: Навык «AI‑предприниматель»
++ - Supabase: добавлен навык в `public.skills`, создан индекс `idx_leo_messages_user_user_only`, функция и триггер `award_ai_skill_on_message` (начисление +1 за каждые 100 пользовательских сообщений; квизы и кейсы исключены архитектурно). Выполнен backfill.
++ - RPC: `update_current_level` возвращён учёт очков навыка за завершённый уровень (UPSERT в `user_skills` по `levels.skill_id`).
++ - Клиент: в `SkillsTreeView` добавлены цвет/иконка для нового `skill_id`.
++ - Линты/сборка: без ошибок; обратная совместимость сохранена.
+Задача 47 fix: iOS (Xcode 26) — восстановлен запуск
+ - Переинициализированы Pods; исправлен путь `GoogleService-Info.plist`; отключён `ENABLE_USER_SCRIPT_SANDBOXING`.
+ - Безопасная инициализация Firebase; пуши работают при наличии plist и Capability.
+ - Очищен DerivedData; проект собирается и запускается в Xcode 26.
++Задача 47.level-fix: Последовательность уровней и current_level
++ - Supabase: нормализован `users.current_level` по факту завершений (`user_progress` → max(levels.number)+1); создано представление `v_users_level_mismatch` для мониторинга расхождений.
++ - Клиент: в `MiniCaseScreen` добавлен guard — повышение уровня выполняется только если `current_level` пользователя меньше `after_level+1` и существует `level_id` целевого уровня.
++ - RPC `update_current_level`: используется как единственная точка изменения `current_level` (доп. клиентских пересчётов нет).
++ - Результат: после прохождения 10 уровней `current_level` корректно становится 11; регресс‑проверка — без сбоев.
++Задача 47.level-label-fix: Отображение "Ты на N уровне!"
++ - Исправлен метод `SupabaseService.resolveCurrentLevelNumber`: при числовом значении 0..max+1 трактуется как номер уровня (стандартизированный путь), legacy‑ветка по `level_id` используется только как fallback.
++ - Симптом: при `current_level=11` UI показывал «1 уровень» — теперь корректно «11 уровень».
