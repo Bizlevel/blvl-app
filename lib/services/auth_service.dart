@@ -1,9 +1,12 @@
 import 'dart:developer';
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:google_sign_in/google_sign_in.dart';
 
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bizlevel/services/gp_service.dart';
+import '../utils/env_helper.dart';
 
 // No longer importing SupabaseService directly to enable dependency injection.
 
@@ -180,6 +183,44 @@ class AuthService {
   /// Deprecated: Use updateProfile(avatarId: id) instead.
   Future<void> updateAvatar(int avatarId) async {
     await updateProfile(avatarId: avatarId);
+  }
+
+  /// Sign in with Google for Web and Mobile.
+  Future<AuthResponse> signInWithGoogle() async {
+    return _handleAuthCall(() async {
+      if (kIsWeb) {
+        final redirectTo = envOrDefine('WEB_REDIRECT_ORIGIN', defaultValue: '');
+        await _client.auth.signInWithOAuth(
+          OAuthProvider.google,
+          redirectTo: redirectTo.isNotEmpty ? redirectTo : null,
+        );
+        // На web произойдёт редирект, сессия подхватится onAuthStateChange
+        return AuthResponse(session: null, user: null);
+      } else if (Platform.isAndroid || Platform.isIOS) {
+        final googleWebClientId = envOrDefine('GOOGLE_WEB_CLIENT_ID');
+        final googleSignIn = GoogleSignIn(
+          serverClientId:
+              googleWebClientId.isNotEmpty ? googleWebClientId : null,
+        );
+        final account = await googleSignIn.signIn();
+        if (account == null) {
+          throw AuthFailure('Вход через Google отменён пользователем');
+        }
+        final auth = await account.authentication;
+        final idToken = auth.idToken;
+        final accessToken = auth.accessToken;
+        if (idToken == null || accessToken == null) {
+          throw AuthFailure('Не удалось получить токены Google');
+        }
+        final resp = await _client.auth.signInWithIdToken(
+          provider: OAuthProvider.google,
+          idToken: idToken,
+          accessToken: accessToken,
+        );
+        return resp;
+      }
+      throw AuthFailure('Платформа не поддерживается для входа через Google');
+    }, unknownErrorMessage: 'Неизвестная ошибка входа через Google');
   }
 }
 

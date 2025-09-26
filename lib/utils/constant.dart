@@ -16,3 +16,6 @@ const bool kEnableClientWeeklyReaction = true;
 // При false — сохраняется поведение «все уровни 1..10 на этаже 1»
 const bool kUseFloorMapping =
     true; // включено для dev-проверки FNN/гейтинга по этажу
+
+// Фича-флаг: показывать кнопки входа/регистрации через Google
+const bool kEnableGoogleAuth = true;

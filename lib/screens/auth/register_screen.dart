@@ -9,9 +9,11 @@ import '../../theme/color.dart' show AppColor;
 import '../../services/auth_service.dart';
 
 import '../../providers/auth_provider.dart';
+import '../../providers/login_controller.dart';
 import '../../widgets/custom_textfield.dart';
 // custom_image больше не используется для логотипа на этом экране
 import '../../theme/spacing.dart';
+import '../../utils/constant.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -202,6 +204,27 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           ),
         ),
         AppSpacing.gapH(AppSpacing.lg),
+        if (kEnableGoogleAuth) const _OrDivider(),
+        if (kEnableGoogleAuth) AppSpacing.gapH(AppSpacing.lg),
+        if (kEnableGoogleAuth)
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              icon: const Icon(Icons.login),
+              label: const Text('Регистрация через Google'),
+              onPressed: () {
+                ref.read(loginControllerProvider.notifier).signInWithGoogle();
+              },
+              style: OutlinedButton.styleFrom(
+                padding: AppSpacing.insetsSymmetric(v: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                side: const BorderSide(color: Color(0x33000000)),
+              ),
+            ),
+          ),
+        if (kEnableGoogleAuth) AppSpacing.gapH(AppSpacing.lg),
         TextButton(
           onPressed: () => context.go('/login'),
           child: const Text('Уже есть аккаунт? Войти'),
@@ -292,6 +315,24 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           onPressed: () => setState(() => _registrationSuccess = false),
           child: const Text('← Назад к регистрации'),
         ),
+      ],
+    );
+  }
+}
+
+class _OrDivider extends StatelessWidget {
+  const _OrDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        const Expanded(child: Divider(thickness: 0.5)),
+        Padding(
+          padding: AppSpacing.insetsSymmetric(h: 16),
+          child: const Text('или'),
+        ),
+        const Expanded(child: Divider(thickness: 0.5)),
       ],
     );
   }

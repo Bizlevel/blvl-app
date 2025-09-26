@@ -10,6 +10,7 @@ import '../../theme/color.dart' show AppColor;
 import '../../widgets/custom_textfield.dart';
 import '../../widgets/common/animated_button.dart';
 import '../../theme/spacing.dart';
+import '../../utils/constant.dart';
 
 class LoginScreen extends HookConsumerWidget {
   const LoginScreen({super.key});
@@ -164,6 +165,32 @@ class LoginScreen extends HookConsumerWidget {
                           ),
                         ),
                         AppSpacing.gapH(24),
+                        if (kEnableGoogleAuth) const _OrDivider(),
+                        if (kEnableGoogleAuth) AppSpacing.gapH(24),
+                        if (kEnableGoogleAuth)
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              icon: const Icon(Icons.login),
+                              label: const Text('Войти через Google'),
+                              onPressed: () {
+                                ref
+                                    .read(loginControllerProvider.notifier)
+                                    .signInWithGoogle();
+                              },
+                              style: OutlinedButton.styleFrom(
+                                padding: AppSpacing.insetsSymmetric(v: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                side: BorderSide(
+                                  color:
+                                      AppColor.textColor.withValues(alpha: 0.2),
+                                ),
+                              ),
+                            ),
+                          ),
+                        if (kEnableGoogleAuth) AppSpacing.gapH(32),
                         AnimatedButton(
                           label: 'Войти',
                           onPressed: isLoading ? null : submit,
@@ -255,6 +282,28 @@ class _SocialProofBlock extends StatelessWidget {
           textAlign: TextAlign.center,
           style: TextStyle(color: AppColor.onSurfaceSubtle),
         ),
+      ],
+    );
+  }
+}
+
+class _OrDivider extends StatelessWidget {
+  const _OrDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        const Expanded(child: Divider(thickness: 0.5)),
+        Padding(
+          padding: AppSpacing.insetsSymmetric(h: 16),
+          child: Text(
+            'или',
+            style: TextStyle(
+                color: AppColor.onSurfaceSubtle.withValues(alpha: 0.7)),
+          ),
+        ),
+        const Expanded(child: Divider(thickness: 0.5)),
       ],
     );
   }

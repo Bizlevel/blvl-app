@@ -19,6 +19,12 @@ String envOrDefine(String key, {String defaultValue = ''}) {
     case 'SUPABASE_ANON_KEY':
       return const String.fromEnvironment('SUPABASE_ANON_KEY',
           defaultValue: '');
+    case 'GOOGLE_WEB_CLIENT_ID':
+      return const String.fromEnvironment('GOOGLE_WEB_CLIENT_ID',
+          defaultValue: '');
+    case 'WEB_REDIRECT_ORIGIN':
+      return const String.fromEnvironment('WEB_REDIRECT_ORIGIN',
+          defaultValue: '');
     case 'SENTRY_DSN':
       return const String.fromEnvironment('SENTRY_DSN', defaultValue: '');
     case 'OPENAI_API_KEY':

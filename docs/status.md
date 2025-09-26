@@ -475,3 +475,13 @@ TODO:
 +Задача 47.level-label-fix: Отображение "Ты на N уровне!"
 + - Исправлен метод `SupabaseService.resolveCurrentLevelNumber`: при числовом значении 0..max+1 трактуется как номер уровня (стандартизированный путь), legacy‑ветка по `level_id` используется только как fallback.
 + - Симптом: при `current_level=11` UI показывал «1 уровень» — теперь корректно «11 уровень».
++Задача 48.google-auth: Подготовка Google Sign-In (iOS/Android/Web)
++- Добавлены кнопки входа/регистрации через Google на экранах логина/регистрации (фича-флаг `kEnableGoogleAuth`).
++- `AuthService.signInWithGoogle`: web (OAuth redirect), mobile (google_sign_in → signInWithIdToken). Секреты вынесены в EnvHelper (GOOGLE_WEB_CLIENT_ID/WEB_REDIRECT_ORIGIN).
++- Android: добавлен intent-filter для схемы Google в `AndroidManifest.xml`.
++- iOS: добавлен `CFBundleURLTypes` в `Info.plist`.
++- Зависимость: `google_sign_in:^6.2.1`. Линтеры — без ошибок (warnings только complexity).
++Задача 48.google-auth web-fix: Редирект на ephemeral порт
++- Симптом: после входа Google редирект шёл на `http://localhost:<ephemeral>`, страница «site can't be reached».
++- Причина: Flutter web стартует на случайном порту; Supabase OAuth требует стабильного origin.
++- Рекомендация: запускать `flutter run -d chrome --web-port 5173`, добавить `http://localhost:5173` в Supabase → Redirect URLs и прописать `WEB_REDIRECT_ORIGIN=http://localhost:5173` в `.env`.
