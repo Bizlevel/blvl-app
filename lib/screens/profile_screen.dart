@@ -8,17 +8,15 @@ import 'package:bizlevel/providers/auth_provider.dart';
 import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/theme/spacing.dart';
 import 'package:bizlevel/widgets/custom_image.dart';
-import 'package:bizlevel/widgets/stat_card.dart';
+// import 'package:bizlevel/widgets/stat_card.dart';
 // import 'package:bizlevel/widgets/setting_item.dart';
 import 'package:bizlevel/providers/levels_provider.dart';
-import 'package:bizlevel/providers/levels_repository_provider.dart';
 import 'package:bizlevel/models/user_model.dart';
 import 'package:go_router/go_router.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:io';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:bizlevel/providers/gp_providers.dart';
 import 'package:bizlevel/widgets/common/bizlevel_error.dart';
 import 'package:bizlevel/widgets/common/bizlevel_loading.dart';
@@ -385,207 +383,11 @@ class _BodyState extends ConsumerState<_Body> {
   // ignore: unused_field
   bool _isUploading = false;
 
-  String _pluralizeArtifacts(int n) {
-    final int nMod100 = n % 100;
-    if (nMod100 >= 11 && nMod100 <= 14) {
-      return 'Артефактов';
-    }
-    switch (n % 10) {
-      case 1:
-        return 'Артефакт';
-      case 2:
-      case 3:
-      case 4:
-        return 'Артефакта';
-      default:
-        return 'Артефактов';
-    }
-  }
+  // Плюрализация артефактов больше не используется
 
-  Future<void> _openArtifactUrl(String link) async {
-    try {
-      String url = link;
-      if (!url.startsWith('http')) {
-        final repo = ref.read(levelsRepositoryProvider);
-        final signed = await repo.getArtifactSignedUrl(url);
-        if (signed == null) {
-          if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Не удалось получить ссылку на файл')),
-          );
-          return;
-        }
-        url = signed;
-      }
-      final uri = Uri.parse(url);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Не удалось открыть ссылку')),
-        );
-      }
-    } catch (_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ошибка открытия файла')),
-      );
-    }
-  }
+  // Скачивание артефактов убрано — используйте экран /artifacts
 
-  Future<void> _openArtifactsModal() async {
-    if (widget.artifacts.isEmpty) {
-      if (!mounted) return;
-      await showModalBottomSheet<void>(
-        context: context,
-        backgroundColor: AppColor.surface,
-        builder: (ctx) {
-          return SizedBox(
-            height: 260,
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.inventory_2_outlined,
-                      size: 48, color: AppColor.onSurfaceSubtle),
-                  const SizedBox(height: 8),
-                  Text('Артефактов пока нет',
-                      style: Theme.of(ctx)
-                          .textTheme
-                          .titleMedium
-                          ?.copyWith(fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 4),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: Text(
-                      'Проходите уровни, чтобы открывать полезные материалы и шаблоны.',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(ctx)
-                          .textTheme
-                          .bodyMedium
-                          ?.copyWith(color: AppColor.onSurfaceSubtle),
-                    ),
-                  )
-                ],
-              ),
-            ),
-          );
-        },
-      );
-      return;
-    }
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppColor.surface,
-      builder: (ctx) {
-        return DraggableScrollableSheet(
-          expand: false,
-          minChildSize: 0.3,
-          maxChildSize: 0.9,
-          initialChildSize: 0.6,
-          builder: (context, scrollController) {
-            return Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.medium,
-                    vertical: AppSpacing.small,
-                  ),
-                  child: Row(
-                    children: [
-                      const Text(
-                        'Артефакты',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const Spacer(),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AppColor.primary.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          '${widget.artifacts.length} ${_pluralizeArtifacts(widget.artifacts.length)}',
-                          style: const TextStyle(color: AppColor.primary),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const Divider(height: 1),
-                Expanded(
-                  child: ListView.separated(
-                    controller: scrollController,
-                    itemCount: widget.artifacts.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1),
-                    itemBuilder: (context, index) {
-                      final a = widget.artifacts[index];
-                      final String title =
-                          (a['title'] as String?) ?? 'Артефакт';
-                      final String desc = (a['description'] as String?) ?? '';
-                      final String url = (a['url'] as String?) ?? '';
-                      final int? levelNumber = a['level'] as int?;
-                      final String subtitleLine = levelNumber == null
-                          ? desc
-                          : [
-                              if (desc.isNotEmpty) desc,
-                              'Уровень ${levelNumber.toString()}'
-                            ].where((e) => e.isNotEmpty).join(' • ');
-                      return ListTile(
-                        leading: ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: SizedBox(
-                            width: 40,
-                            height: 40,
-                            child: CustomImage(
-                              (a['image'] as String?) ?? '',
-                              radius: 8,
-                              width: 40,
-                              height: 40,
-                            ),
-                          ),
-                        ),
-                        title: Text(
-                          title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleMedium
-                              ?.copyWith(fontWeight: FontWeight.w600),
-                        ),
-                        subtitle: subtitleLine.isEmpty
-                            ? null
-                            : Text(
-                                subtitleLine,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style:
-                                    const TextStyle(color: AppColor.labelColor),
-                              ),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.download),
-                          color: AppColor.primary,
-                          onPressed: () => _openArtifactUrl(url),
-                        ),
-                        onTap: () => _openArtifactUrl(url),
-                      );
-                    },
-                  ),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
+  // Старый модал артефактов убран — вместо этого ведём на экран /artifacts
 
   Future<void> _openAboutMeModal() async {
     await showModalBottomSheet<void>(
@@ -628,7 +430,7 @@ class _BodyState extends ConsumerState<_Body> {
                   child: SingleChildScrollView(
                     controller: scrollController,
                     padding: const EdgeInsets.all(AppSpacing.medium),
-                    child: _AboutMeCard(user: widget.user, showTitle: false),
+                    child: _AboutMeCard(user: widget.user, showTitle: true),
                   ),
                 ),
               ],
@@ -759,8 +561,7 @@ class _BodyState extends ConsumerState<_Body> {
         children: [
           _buildProfile(),
           const SizedBox(height: AppSpacing.medium),
-          _buildRecord(),
-          const SizedBox(height: AppSpacing.medium),
+          // Блок статистики (уровень/артефакты) убран по новой спецификации
           skillsAsync.when(
             data: (skills) => SkillsTreeView(
                 skills: skills, currentLevel: widget.currentLevel),
@@ -832,26 +633,67 @@ class _BodyState extends ConsumerState<_Body> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Wrap(
-                    alignment: WrapAlignment.center,
-                    runSpacing: 8,
+                  Row(
                     children: [
-                      Text(
-                        widget.userName,
-                        style: Theme.of(context)
-                            .textTheme
-                            .headlineMedium
-                            ?.copyWith(fontWeight: FontWeight.w600),
+                      // Имя и уровень слева, занимают всё доступное пространство
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              widget.userName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .headlineMedium
+                                  ?.copyWith(fontWeight: FontWeight.w600),
+                            ),
+                            const SizedBox(height: 6),
+                            FutureBuilder<int>(
+                              future: SupabaseService.levelNumberFromId(
+                                  widget.currentLevel),
+                              builder: (context, snap) {
+                                final n = snap.data ?? 0;
+                                return Text(
+                                  'Уровень $n',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.copyWith(
+                                          color: AppColor.onSurfaceSubtle),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Кнопка справа с авто-скейлом (без overflow)
+                      SizedBox(
+                        height: 80,
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: OutlinedButton(
+                              onPressed: _openAboutMeModal,
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 6),
+                                minimumSize: const Size(0, 0),
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                side: BorderSide(
+                                    color: AppColor.primary
+                                        .withValues(alpha: 0.6)),
+                                foregroundColor: AppColor.primary,
+                              ),
+                              child: const _InfoButtonLabel(),
+                            ),
+                          ),
+                        ),
                       ),
                     ],
-                  ),
-                  const SizedBox(height: AppSpacing.small),
-                  Text(
-                    "BizLevel",
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodySmall
-                        ?.copyWith(color: AppColor.onSurfaceSubtle),
                   ),
                 ],
               ),
@@ -860,61 +702,7 @@ class _BodyState extends ConsumerState<_Body> {
         ));
   }
 
-  Widget _buildRecord() {
-    return Semantics(
-        label: 'Статистика профиля',
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(
-              child: FutureBuilder<int>(
-                future: SupabaseService.levelNumberFromId(widget.currentLevel),
-                builder: (context, snap) {
-                  final n = snap.data ?? 0;
-                  return StatCard(
-                    title: "$n Уровень",
-                    icon: Icons.work,
-                  );
-                },
-              ),
-            ),
-            const SizedBox(width: AppSpacing.small),
-            Expanded(
-              child: InkWell(
-                borderRadius: BorderRadius.circular(12),
-                onTap: _openAboutMeModal,
-                child: const Stack(
-                  children: [
-                    StatCard(
-                      title: 'Информация обо мне',
-                      icon: Icons.info_outline,
-                      showChevron: true,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(width: AppSpacing.small),
-            Expanded(
-              child: InkWell(
-                borderRadius: BorderRadius.circular(12),
-                onTap: _openArtifactsModal,
-                child: Stack(
-                  children: [
-                    // Stack будет принимать размер по ненапозиционированному ребёнку
-                    StatCard(
-                      title:
-                          "${widget.artifactsCount} ${_pluralizeArtifacts(widget.artifactsCount)}",
-                      icon: Icons.inventory_2_outlined,
-                      showChevron: true,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ));
-  }
+  // Блок статистики удалён (уровень показывается под именем; «Информация обо мне» вынесена в заголовок)
 
   // Premium кнопка удалена (этап 39.1)
 
@@ -1192,6 +980,31 @@ class _AboutMeCardState extends ConsumerState<_AboutMeCard> {
           ),
         ],
       ),
+    );
+  }
+
+  // Компактная двухстрочная надпись для кнопки в шапке
+}
+
+class _InfoButtonLabel extends StatelessWidget {
+  const _InfoButtonLabel();
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: const [
+        Text('Информация'),
+        SizedBox(height: 2),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('обо мне'),
+            SizedBox(width: 6),
+            Icon(Icons.chevron_right, size: 18),
+          ],
+        ),
+      ],
     );
   }
 }

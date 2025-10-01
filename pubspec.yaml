@@ -79,4 +79,5 @@ flutter:
     - assets/images/cases/
     - assets/images/street/
     - assets/images/lvls/
+    - assets/images/artefacts/
     - .env

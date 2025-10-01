@@ -467,21 +467,43 @@ TODO:
  - Переинициализированы Pods; исправлен путь `GoogleService-Info.plist`; отключён `ENABLE_USER_SCRIPT_SANDBOXING`.
  - Безопасная инициализация Firebase; пуши работают при наличии plist и Capability.
  - Очищен DerivedData; проект собирается и запускается в Xcode 26.
-+Задача 47.level-fix: Последовательность уровней и current_level
-+ - Supabase: нормализован `users.current_level` по факту завершений (`user_progress` → max(levels.number)+1); создано представление `v_users_level_mismatch` для мониторинга расхождений.
-+ - Клиент: в `MiniCaseScreen` добавлен guard — повышение уровня выполняется только если `current_level` пользователя меньше `after_level+1` и существует `level_id` целевого уровня.
-+ - RPC `update_current_level`: используется как единственная точка изменения `current_level` (доп. клиентских пересчётов нет).
-+ - Результат: после прохождения 10 уровней `current_level` корректно становится 11; регресс‑проверка — без сбоев.
-+Задача 47.level-label-fix: Отображение "Ты на N уровне!"
-+ - Исправлен метод `SupabaseService.resolveCurrentLevelNumber`: при числовом значении 0..max+1 трактуется как номер уровня (стандартизированный путь), legacy‑ветка по `level_id` используется только как fallback.
-+ - Симптом: при `current_level=11` UI показывал «1 уровень» — теперь корректно «11 уровень».
-+Задача 48.google-auth: Подготовка Google Sign-In (iOS/Android/Web)
-+- Добавлены кнопки входа/регистрации через Google на экранах логина/регистрации (фича-флаг `kEnableGoogleAuth`).
-+- `AuthService.signInWithGoogle`: web (OAuth redirect), mobile (google_sign_in → signInWithIdToken). Секреты вынесены в EnvHelper (GOOGLE_WEB_CLIENT_ID/WEB_REDIRECT_ORIGIN).
-+- Android: добавлен intent-filter для схемы Google в `AndroidManifest.xml`.
-+- iOS: добавлен `CFBundleURLTypes` в `Info.plist`.
-+- Зависимость: `google_sign_in:^6.2.1`. Линтеры — без ошибок (warnings только complexity).
-+Задача 48.google-auth web-fix: Редирект на ephemeral порт
-+- Симптом: после входа Google редирект шёл на `http://localhost:<ephemeral>`, страница «site can't be reached».
-+- Причина: Flutter web стартует на случайном порту; Supabase OAuth требует стабильного origin.
-+- Рекомендация: запускать `flutter run -d chrome --web-port 5173`, добавить `http://localhost:5173` в Supabase → Redirect URLs и прописать `WEB_REDIRECT_ORIGIN=http://localhost:5173` в `.env`.
+Задача 47.level-fix: Последовательность уровней и current_level
+- Supabase: нормализован `users.current_level` по факту завершений (`user_progress` → max(levels.number)+1); создано представление `v_users_level_mismatch` для мониторинга расхождений.
+- Клиент: в `MiniCaseScreen` добавлен guard — повышение уровня выполняется только если `current_level` пользователя меньше `after_level+1` и существует `level_id` целевого уровня.
+- RPC `update_current_level`: используется как единственная точка изменения `current_level` (доп. клиентских пересчётов нет).
+- Результат: после прохождения 10 уровней `current_level` корректно становится 11; регресс‑проверка — без сбоев.
+Задача 47.level-label-fix: Отображение "Ты на N уровне!"
+- Исправлен метод `SupabaseService.resolveCurrentLevelNumber`: при числовом значении 0..max+1 трактуется как номер уровня (стандартизированный путь), legacy‑ветка по `level_id` используется только как fallback.
+- Симптом: при `current_level=11` UI показывал «1 уровень» — теперь корректно «11 уровень».
+Задача 48.google-auth: Подготовка Google Sign-In (iOS/Android/Web)
+- Добавлены кнопки входа/регистрации через Google на экранах логина/регистрации (фича-флаг `kEnableGoogleAuth`).
+- `AuthService.signInWithGoogle`: web (OAuth redirect), mobile (google_sign_in → signInWithIdToken). Секреты вынесены в EnvHelper (GOOGLE_WEB_CLIENT_ID/WEB_REDIRECT_ORIGIN).
+- Android: добавлен intent-filter для схемы Google в `AndroidManifest.xml`.
+- iOS: добавлен `CFBundleURLTypes` в `Info.plist`.
+- Зависимость: `google_sign_in:^6.2.1`. Линтеры — без ошибок (warnings только complexity).
+Задача 48.google-auth web-fix: Редирект на ephemeral порт
+- Симптом: после входа Google редирект шёл на `http://localhost:<ephemeral>`, страница «site can't be reached».
+- Причина: Flutter web стартует на случайном порту; Supabase OAuth требует стабильного origin.
+- Рекомендация: запускать `flutter run -d chrome --web-port 5173`, добавить `http://localhost:5173` в Supabase → Redirect URLs и прописать `WEB_REDIRECT_ORIGIN=http://localhost:5173` в `.env`.
+
+# Этап 49: Артефакты и Профиль (UI/UX)
+- Задача 49.1: Экран «Артефакты»
+  - Добавлен отдельный экран `/artifacts` и вкладка в нижнем баре/десктоп‑навигации.
+  - Карточки из локальных ассетов `assets/images/artefacts/` (front/back) с гейтингом по прогрессу уровней 1–10.
+  - Состояния: заблокированные — затемнение + замок и подпись «Откроется после Уровня N»; разблокированные — мягкая тень и ненавязчивый хинт «Тапните».
+  - Viewer: полноэкранный просмотр с анимацией «переворота» (front/back), переключатели Front/Back, свайпы, предзагрузка обеих сторон.
+  - Адаптивная сетка: 2/3/4 колонки (xs/sm‑md/lg+); в AppBar бейдж «Собрано X/10».
+
+- Задача 49.2: Финальный блок уровня
+  - Заменён блок «Скачать артефакт» на компактное превью карточки (ограниченная ширина, без overflow), по тапу открывается Viewer.
+  - Текстовое описание артефакта сохранено; ссылки/скачивание больше не используются.
+
+- Задача 49.3: Профиль
+  - Убран блок артефактов и любые упоминания скачивания.
+  - В шапке: под именем показывается «Уровень N»; справа компактная Outlined‑кнопка «Информация / обо мне →» (двухстрочная), центрирована по высоте аватарки и без overflow.
+  - Карандаш редактирования закреплён справа от заголовка карточки «Информация обо мне» (как действие редактирования).
+
+- Техническое:
+  - Подключены ассеты `assets/images/artefacts/` в `pubspec.yaml`.
+  - Исправлены возможные RenderFlex overflow (в финальном блоке уровня — ограничение ширины; в шапке профиля — FittedBox/раскладка).
+  - В нижнем баре верифицирован маппинг вкладок: `['/home','/goal','/artifacts','/profile']`; области нажатия не перекрываются быстрым чатом.

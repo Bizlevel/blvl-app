@@ -13,6 +13,7 @@ import 'package:bizlevel/providers/auth_provider.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:bizlevel/screens/leo_dialog_screen.dart';
 import 'package:bizlevel/services/context_service.dart';
+import 'package:bizlevel/screens/artifacts_screen.dart';
 
 class AppShell extends ConsumerStatefulWidget {
   final Widget child;
@@ -23,7 +24,7 @@ class AppShell extends ConsumerStatefulWidget {
 }
 
 class _AppShellState extends ConsumerState<AppShell> {
-  static const _routes = ['/home', '/goal', '/profile'];
+  static const _routes = ['/home', '/goal', '/artifacts', '/profile'];
   PageController? _pageController;
   int _currentIndex = 0;
   bool _isSyncing = false;
@@ -64,10 +65,12 @@ class _AppShellState extends ConsumerState<AppShell> {
       }
     }
 
-    // Базовые табы только на точных путях '/home' | '/goal' | '/profile'.
+    // Базовые табы только на точных путях '/home' | '/goal' | '/artifacts' | '/profile'.
     // Вложенные маршруты (например, '/goal-checkpoint/:v') не должны попадать в PageView.
-    final bool isBaseRoute =
-        location == '/home' || location == '/goal' || location == '/profile';
+    final bool isBaseRoute = location == '/home' ||
+        location == '/goal' ||
+        location == '/artifacts' ||
+        location == '/profile';
 
     // Создаём/синхронизируем контроллер для PageView на базовых табах
     if (!isDesktop && isBaseRoute) {
@@ -122,7 +125,9 @@ class _AppShellState extends ConsumerState<AppShell> {
                           ? Icons.map
                           : index == 1
                               ? Icons.flag
-                              : Icons.person;
+                              : index == 2
+                                  ? Icons.inventory_2_outlined
+                                  : Icons.person;
                       return BottomBarItem(
                         icon,
                         isActive: activeTab == index,
@@ -134,7 +139,7 @@ class _AppShellState extends ConsumerState<AppShell> {
                                 child:
                                     _GoalSvgIcon(isActive: activeTab == index),
                               )
-                            : index == 2
+                            : index == 3
                                 ? Icon(
                                     icon,
                                     color: activeTab == index
@@ -156,14 +161,18 @@ class _AppShellState extends ConsumerState<AppShell> {
                             } catch (_) {}
                             Navigator.of(context).push(
                               MaterialPageRoute(
-                                builder: (_) => FutureBuilder<List<String?>>( 
+                                builder: (_) => FutureBuilder<List<String?>>(
                                   future: Future.wait([
                                     _buildUserContext(ref),
                                     _buildLevelContext(ref),
                                   ]),
                                   builder: (context, snap) {
-                                    final userCtx = (snap.data!=null) ? snap.data![0] : null;
-                                    final lvlCtx = (snap.data!=null) ? snap.data![1] : null;
+                                    final userCtx = (snap.data != null)
+                                        ? snap.data![0]
+                                        : null;
+                                    final lvlCtx = (snap.data != null)
+                                        ? snap.data![1]
+                                        : null;
                                     return LeoDialogScreen(
                                       userContext: userCtx,
                                       levelContext: lvlCtx,
@@ -187,6 +196,7 @@ class _AppShellState extends ConsumerState<AppShell> {
                   tabs: const [
                     {'icon': Icons.map, 'label': 'Главная'},
                     {'icon': Icons.flag, 'label': 'Цель'},
+                    {'icon': Icons.inventory_2_outlined, 'label': 'Артефакты'},
                     {'icon': Icons.person, 'label': 'Профиль'},
                   ],
                   activeIndex: activeTab,
@@ -214,6 +224,7 @@ class _AppShellState extends ConsumerState<AppShell> {
                   children: const [
                     MainStreetScreen(key: PageStorageKey('tab_home')),
                     _GoalTabGate(key: PageStorageKey('tab_goal')),
+                    ArtifactsScreen(key: PageStorageKey('tab_artifacts')),
                     ProfileScreen(key: PageStorageKey('tab_profile')),
                   ],
                 )

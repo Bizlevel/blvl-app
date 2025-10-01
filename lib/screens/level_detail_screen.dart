@@ -12,9 +12,8 @@ import 'package:bizlevel/screens/leo_dialog_screen.dart';
 import 'package:bizlevel/widgets/leo_quiz_widget.dart';
 import 'package:bizlevel/widgets/quiz_widget.dart';
 import 'package:bizlevel/utils/constant.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:bizlevel/widgets/artifact_viewer.dart';
 import 'package:bizlevel/providers/levels_provider.dart';
-import 'package:bizlevel/providers/levels_repository_provider.dart';
 import 'package:bizlevel/providers/auth_provider.dart';
 import 'package:bizlevel/widgets/common/bizlevel_text_field.dart';
 import 'package:bizlevel/services/auth_service.dart';
@@ -426,7 +425,7 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
             levelNumber: widget.levelNumber ?? widget.levelId,
           ),
       ],
-      _ArtifactBlock(levelId: widget.levelId),
+      _ArtifactBlock(levelId: widget.levelId, levelNumber: widget.levelNumber),
     ];
   }
 }
@@ -434,7 +433,8 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
 // Artifact ----------------------------------------------------------
 class _ArtifactBlock extends _PageBlock {
   final int levelId;
-  _ArtifactBlock({required this.levelId});
+  final int? levelNumber;
+  _ArtifactBlock({required this.levelId, this.levelNumber});
 
   Future<Map<String, dynamic>?> _fetchArtifact() async {
     final rows = await Supabase.instance.client
@@ -461,7 +461,6 @@ class _ArtifactBlock extends _PageBlock {
         final data = snapshot.data!;
         final title = (data['artifact_title'] as String?) ?? 'Артефакт';
         final description = (data['artifact_description'] as String?) ?? '';
-        final relativePath = data['artifact_url'] as String;
 
         return Padding(
           padding: const EdgeInsets.all(24),
@@ -480,27 +479,98 @@ class _ArtifactBlock extends _PageBlock {
               if (description.isNotEmpty)
                 Text(description, textAlign: TextAlign.center),
               const SizedBox(height: 24),
-              BizLevelButton(
-                label: 'Скачать',
-                icon: const Icon(Icons.download),
-                onPressed: () async {
-                  final repo = ProviderScope.containerOf(context, listen: false)
-                      .read(levelsRepositoryProvider);
-                  final url = await repo.getArtifactSignedUrl(relativePath);
-                  if (url != null && await canLaunchUrl(Uri.parse(url))) {
-                    await launchUrl(Uri.parse(url),
-                        mode: LaunchMode.externalApplication);
-                  } else {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                          content: Text(UIS.openArtifactFailed)));
-                    }
-                  }
-                },
-              ),
+              _ArtifactPreview(levelId: levelId, levelNumber: levelNumber),
             ],
           ),
         );
+      },
+    );
+  }
+}
+
+class _ArtifactPreview extends StatelessWidget {
+  const _ArtifactPreview({required this.levelId, this.levelNumber});
+  final int levelId;
+  final int? levelNumber;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget buildCard(int ln) {
+      if (ln < 1 || ln > 10) return const SizedBox.shrink();
+      final front = 'assets/images/artefacts/art-$ln-1.png';
+      final back = 'assets/images/artefacts/art-$ln-2.png';
+      return LayoutBuilder(builder: (context, constraints) {
+        final double maxW = constraints.maxWidth.isFinite
+            ? constraints.maxWidth
+            : MediaQuery.of(context).size.width;
+        final double cardWidth = (maxW * 0.55).clamp(0, 220);
+        return GestureDetector(
+          onTap: () {
+            Navigator.of(context).push(
+              PageRouteBuilder(
+                opaque: false,
+                barrierColor: Colors.black.withOpacity(0.85),
+                pageBuilder: (ctx, _, __) => ArtifactViewer(
+                  front: front,
+                  back: back,
+                ),
+              ),
+            );
+          },
+          child: Align(
+            alignment: Alignment.center,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: SizedBox(
+                width: cardWidth,
+                child: AspectRatio(
+                  aspectRatio: 3 / 4,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Image.asset(front, fit: BoxFit.cover),
+                      Positioned(
+                        right: 8,
+                        top: 8,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.5),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.touch_app,
+                                  color: Colors.white, size: 14),
+                              SizedBox(width: 4),
+                              Text('Тапните',
+                                  style: TextStyle(
+                                      color: Colors.white, fontSize: 12)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      });
+    }
+
+    if (levelNumber != null) {
+      return buildCard(levelNumber!);
+    }
+
+    return FutureBuilder<int>(
+      future: SupabaseService.levelNumberFromId(levelId),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const SizedBox.shrink();
+        return buildCard(snapshot.data ?? 0);
       },
     );
   }

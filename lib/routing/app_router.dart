@@ -20,6 +20,7 @@ import '../screens/gp_store_screen.dart';
 import '../screens/library/library_screen.dart';
 import '../screens/library/library_section_screen.dart';
 import '../screens/notifications_settings_screen.dart';
+import '../screens/artifacts_screen.dart';
 
 /// Riverpod provider that exposes the [GoRouter] instance used across the app.
 ///
@@ -52,6 +53,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/profile',
         builder: (context, state) => const ProfileScreen(),
+      ),
+      GoRoute(
+        path: '/artifacts',
+        builder: (context, state) => const ArtifactsScreen(),
       ),
       // BizLevel Tower overview (MVP)
       GoRoute(

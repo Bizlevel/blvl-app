@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/widgets/custom_image.dart';
 
@@ -16,20 +15,6 @@ class ArtifactCard extends StatelessWidget {
   final String description;
   final String image;
   final String url;
-
-  Future<void> _download() async {
-    String link = url;
-    if (!link.startsWith('http')) {
-      // Подписываем URL через Supabase (реализация добавляется в репозитории уровней)
-      try {
-        await Future<dynamic>.microtask(() => null);
-      } catch (_) {}
-    }
-    final uri = Uri.parse(link);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -83,11 +68,6 @@ class ArtifactCard extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 10),
-          IconButton(
-            icon: const Icon(Icons.download),
-            color: AppColor.primary,
-            onPressed: _download,
-          ),
         ],
       ),
     );
