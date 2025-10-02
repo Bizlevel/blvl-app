@@ -122,3 +122,39 @@ final usedToolsOptionsProvider = FutureProvider<List<String>>((ref) async {
   }
   return tools;
 });
+
+// ===== Daily Progress (28 дней) =====
+
+final dailyProgressListProvider =
+    FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  final repo = ref.read(goalsRepositoryProvider);
+  return repo.fetchDailyProgress();
+});
+
+final dailyProgressDayProvider =
+    FutureProvider.family<Map<String, dynamic>?, int>((ref, day) async {
+  final repo = ref.read(goalsRepositoryProvider);
+  return repo.fetchDailyDay(day);
+});
+
+final dailyStreakProvider = FutureProvider<int>((ref) async {
+  final list = await ref.watch(dailyProgressListProvider.future);
+  // Считаем от дня 1 до первого провала (pending/missed), без разрывов
+  final Map<int, String> map = <int, String>{};
+  for (final m in list) {
+    final int? d = m['day_number'] as int?;
+    if (d != null) {
+      map[d] = (m['completion_status'] ?? 'pending').toString();
+    }
+  }
+  int streak = 0;
+  for (int day = 1; day <= 28; day++) {
+    final s = map[day] ?? 'pending';
+    if (s == 'completed' || s == 'partial') {
+      streak += 1;
+    } else {
+      break;
+    }
+  }
+  return streak;
+});

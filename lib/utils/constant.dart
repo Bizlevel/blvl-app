@@ -12,6 +12,11 @@ const bool kEnableGoalChips = true;
 const bool kEnableClientGoalReactions = true;
 const bool kEnableClientWeeklyReaction = true;
 
+// Фича-флаг: включить 28-дневный режим на странице «Цель» (дневная карточка + календарь)
+const bool kEnableGoalDailyMode = true;
+// Фича-флаг: скрыть плавающий bubble чата на странице «Цель» (входы через контекстные кнопки)
+const bool kHideGoalBubbleOnGoal = true;
+
 // Фича-флаг: использовать реальный этаж уровня (floor_number) в клиентской логике
 // При false — сохраняется поведение «все уровни 1..10 на этаже 1»
 const bool kUseFloorMapping =

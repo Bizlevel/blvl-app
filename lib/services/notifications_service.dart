@@ -326,6 +326,72 @@ class NotificationsService {
     } catch (_) {}
   }
 
+  /// Ежедневные уведомления для 28-дневного режима: утро и вечер
+  Future<void> scheduleDailySprint({
+    (int, int) morning = const (9, 0),
+    (int, int) evening = const (19, 0),
+  }) async {
+    if (kIsWeb) return;
+    if (!_initialized) await initialize();
+    final ch = _channelsMeta['goal_reminder']!;
+    final android = AndroidNotificationDetails(
+      'goal_reminder',
+      ch.$1,
+      channelDescription: ch.$2,
+      importance: ch.$3,
+      priority: Priority.high,
+    );
+    final details = NotificationDetails(android: android);
+
+    // На каждый день недели создаём расписание morning/evening
+    const days = <int>[
+      DateTime.monday,
+      DateTime.tuesday,
+      DateTime.wednesday,
+      DateTime.thursday,
+      DateTime.friday,
+      DateTime.saturday,
+      DateTime.sunday,
+    ];
+    for (final wd in days) {
+      await _plugin.zonedSchedule(
+        3000 + wd, // уникальные ID
+        'День цели',
+        'Проверьте задачу дня на странице «Цель»',
+        _nextInstanceOf(weekday: wd, hour: morning.$1, minute: morning.$2),
+        details,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+        payload: '{"route":"/goal"}',
+      );
+      await _plugin.zonedSchedule(
+        4000 + wd,
+        'Итог дня',
+        'Отметьте результат дня на странице «Цель»',
+        _nextInstanceOf(weekday: wd, hour: evening.$1, minute: evening.$2),
+        details,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+        payload: '{"route":"/goal"}',
+      );
+    }
+  }
+
+  Future<void> cancelDailySprint() async {
+    if (kIsWeb) return;
+    if (!_initialized) await initialize();
+    // Диапазон ID 3000..4007 условно
+    for (int id = 3000; id <= 4007; id++) {
+      try {
+        await _plugin.cancel(id);
+      } catch (_) {}
+    }
+  }
+
   /// Отменяет существующее расписание еженедельных напоминаний (известные ID)
   Future<void> cancelWeeklyPlan() async {
     if (kIsWeb) {

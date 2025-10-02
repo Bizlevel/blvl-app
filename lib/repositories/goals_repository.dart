@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -138,6 +139,185 @@ class GoalsRepository {
       return Map<String, dynamic>.from(resp);
     }
     return <String, dynamic>{};
+  }
+
+  /// Универсальная RPC‑обёртка для статуса спринта.
+  Future<Map<String, dynamic>> _updateGoalSprint({
+    required String action, // 'start'|'complete'|'pause'|'resume'
+    DateTime? startDate,
+  }) async {
+    final String? iso = startDate?.toUtc().toIso8601String();
+    final resp = await _client.rpc('update_goal_sprint', params: {
+      'p_action': action,
+      if (iso != null) 'p_start_date': iso,
+    });
+    if (resp is Map) return Map<String, dynamic>.from(resp);
+    if (resp is List && resp.isNotEmpty) {
+      return Map<String, dynamic>.from(resp.first as Map);
+    }
+    return <String, dynamic>{};
+  }
+
+  /// Старт 28‑дневного режима (RPC → fallback: upsert version_data.start_date)
+  Future<Map<String, dynamic>> startSprint({DateTime? startDate}) async {
+    try {
+      return await _updateGoalSprint(
+          action: 'start', startDate: startDate ?? DateTime.now());
+    } catch (_) {
+      final String iso =
+          (startDate ?? DateTime.now().toUtc()).toIso8601String();
+      return upsertGoalField(version: 4, field: 'start_date', value: iso);
+    }
+  }
+
+  /// Завершение 28‑дневного режима (RPC, без fallback изменений данных)
+  Future<Map<String, dynamic>> completeSprint() async {
+    return _updateGoalSprint(action: 'complete');
+  }
+
+  /// 🆕 Проверяет серии выполненных дней и автоматически начисляет GP-бонусы (7/14/21/28)
+  Future<Map<String, dynamic>> checkAndGrantStreakBonus() async {
+    try {
+      final resp = await _client.rpc('check_and_grant_streak_bonus');
+      if (resp is Map) return Map<String, dynamic>.from(resp);
+      return <String, dynamic>{};
+    } catch (e) {
+      debugPrint('checkAndGrantStreakBonus error: $e');
+      return <String, dynamic>{};
+    }
+  }
+
+  /// Получить daily_progress пользователя (MVP): если в БД нет таблицы,
+  /// используем локальный Hive-кеш 'daily_progress_local'.
+  Future<List<Map<String, dynamic>>> fetchDailyProgress() async {
+    try {
+      final List rows = await _client
+          .from('daily_progress')
+          .select(
+              'id, user_id, day_number, date, task_text, completion_status, user_note, max_suggestion, created_at, updated_at')
+          .order('day_number', ascending: true);
+      return List<Map<String, dynamic>>.from(
+          rows.map((e) => Map<String, dynamic>.from(e as Map)));
+    } on PostgrestException {
+      // Fallback на локальный кэш
+      final Box cache = Hive.isBoxOpen('daily_progress_local')
+          ? Hive.box('daily_progress_local')
+          : await Hive.openBox('daily_progress_local');
+      final List data = (cache.get('items') as List?) ?? const <dynamic>[];
+      return List<Map<String, dynamic>>.from(
+          data.map((e) => Map<String, dynamic>.from(e as Map)));
+    } on SocketException {
+      final Box cache = Hive.isBoxOpen('daily_progress_local')
+          ? Hive.box('daily_progress_local')
+          : await Hive.openBox('daily_progress_local');
+      final List data = (cache.get('items') as List?) ?? const <dynamic>[];
+      return List<Map<String, dynamic>>.from(
+          data.map((e) => Map<String, dynamic>.from(e as Map)));
+    }
+  }
+
+  Future<Map<String, dynamic>?> fetchDailyDay(int dayNumber) async {
+    try {
+      final row = await _client
+          .from('daily_progress')
+          .select(
+              'id, user_id, day_number, date, task_text, completion_status, user_note, max_suggestion, created_at, updated_at')
+          .eq('day_number', dayNumber)
+          .maybeSingle();
+      return row == null ? null : Map<String, dynamic>.from(row);
+    } on PostgrestException {
+      final Box cache = Hive.isBoxOpen('daily_progress_local')
+          ? Hive.box('daily_progress_local')
+          : await Hive.openBox('daily_progress_local');
+      final List data = (cache.get('items') as List?) ?? const <dynamic>[];
+      for (final e in data) {
+        final m = Map<String, dynamic>.from(e as Map);
+        if ((m['day_number'] as int?) == dayNumber) return m;
+      }
+      return null;
+    } on SocketException {
+      final Box cache = Hive.isBoxOpen('daily_progress_local')
+          ? Hive.box('daily_progress_local')
+          : await Hive.openBox('daily_progress_local');
+      final List data = (cache.get('items') as List?) ?? const <dynamic>[];
+      for (final e in data) {
+        final m = Map<String, dynamic>.from(e as Map);
+        if ((m['day_number'] as int?) == dayNumber) return m;
+      }
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>> upsertDailyProgress({
+    required int dayNumber,
+    String? taskText,
+    String? status, // 'completed'|'partial'|'missed'|'pending'
+    String? note,
+    DateTime? date,
+  }) async {
+    final payload = <String, dynamic>{
+      'day_number': dayNumber,
+      if (taskText != null) 'task_text': taskText,
+      if (status != null) 'completion_status': status,
+      if (note != null) 'user_note': note,
+      if (date != null) 'date': date.toUtc().toIso8601String(),
+    };
+    try {
+      final upserted = await _client
+          .from('daily_progress')
+          .upsert(payload, onConflict: 'user_id,day_number')
+          .select()
+          .single();
+
+      // 🆕 Проверяем серии и автоначисляем GP-бонусы (если день выполнен)
+      if (status == 'completed' || status == 'partial') {
+        try {
+          await checkAndGrantStreakBonus();
+        } catch (e) {
+          // Игнорируем ошибки начисления бонусов - не критично
+          debugPrint('Streak bonus check failed: $e');
+        }
+      }
+
+      return Map<String, dynamic>.from(upserted);
+    } on PostgrestException {
+      // Локальный fallback: сохраняем в Hive и возвращаем сохранённое
+      final Box cache = Hive.isBoxOpen('daily_progress_local')
+          ? Hive.box('daily_progress_local')
+          : await Hive.openBox('daily_progress_local');
+      final List data = (cache.get('items') as List?)?.toList() ?? <dynamic>[];
+      bool found = false;
+      for (int i = 0; i < data.length; i++) {
+        final m = Map<String, dynamic>.from(data[i] as Map);
+        if ((m['day_number'] as int?) == dayNumber) {
+          m.addAll(payload);
+          data[i] = m;
+          found = true;
+          break;
+        }
+      }
+      if (!found) data.add(payload);
+      await cache.put('items', data);
+      return Map<String, dynamic>.from(payload);
+    } on SocketException {
+      final Box cache = Hive.isBoxOpen('daily_progress_local')
+          ? Hive.box('daily_progress_local')
+          : await Hive.openBox('daily_progress_local');
+      final List data = (cache.get('items') as List?)?.toList() ?? <dynamic>[];
+      bool found = false;
+      for (int i = 0; i < data.length; i++) {
+        final m = Map<String, dynamic>.from(data[i] as Map);
+        if ((m['day_number'] as int?) == dayNumber) {
+          m.addAll(payload);
+          data[i] = m;
+          found = true;
+          break;
+        }
+      }
+      if (!found) data.add(payload);
+      await cache.put('items', data);
+      return Map<String, dynamic>.from(payload);
+    }
   }
 
   /// Partial update of a single field in core_goals.version_data via RPC.
