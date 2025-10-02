@@ -12,6 +12,34 @@ class GoalsRepository {
   GoalsRepository(this._client);
 
   // ============================
+  // Generic кеширование (DRY)
+  // ============================
+
+  /// Generic метод для кеширования с offline-fallback
+  /// Устраняет дублирование паттерна try-cache-fallback в 6+ методах
+  Future<T?> _cachedQuery<T>({
+    required Box cache,
+    required String cacheKey,
+    required Future<T?> Function() query,
+    required T Function(dynamic) fromCache,
+  }) async {
+    try {
+      final data = await query();
+      if (data != null) {
+        await cache.put(cacheKey, data);
+      }
+      return data;
+    } on SocketException {
+      final cached = cache.get(cacheKey);
+      return cached == null ? null : fromCache(cached);
+    } catch (_) {
+      final cached = cache.get(cacheKey);
+      if (cached != null) return fromCache(cached);
+      rethrow;
+    }
+  }
+
+  // ============================
   // Goals (core_goals)
   // ============================
 
@@ -19,57 +47,41 @@ class GoalsRepository {
     final Box cache = Hive.box('goals');
     final String cacheKey = 'latest_$userId';
 
-    try {
-      final data = await _client
+    return _cachedQuery<Map<String, dynamic>>(
+      cache: cache,
+      cacheKey: cacheKey,
+      query: () => _client
           .from('core_goals')
           .select('id, user_id, version, goal_text, version_data, updated_at')
           .eq('user_id', userId)
           .order('version', ascending: false)
           .limit(1)
-          .maybeSingle();
-
-      if (data != null) {
-        await cache.put(cacheKey, data);
-      }
-      return data;
-    } on SocketException {
-      final cached = cache.get(cacheKey);
-      return cached == null ? null : Map<String, dynamic>.from(cached);
-    } catch (_) {
-      final cached = cache.get(cacheKey);
-      if (cached != null) {
-        return Map<String, dynamic>.from(cached);
-      }
-      rethrow;
-    }
+          .maybeSingle(),
+      fromCache: (cached) => Map<String, dynamic>.from(cached),
+    );
   }
 
   Future<List<Map<String, dynamic>>> fetchAllGoals(String userId) async {
     final Box cache = Hive.box('goals');
     final String cacheKey = 'all_$userId';
 
-    try {
-      final List data = await _client
-          .from('core_goals')
-          .select('id, user_id, version, goal_text, version_data, updated_at')
-          .eq('user_id', userId)
-          .order('version', ascending: true);
-
-      await cache.put(cacheKey, data);
-      return List<Map<String, dynamic>>.from(data);
-    } on SocketException {
-      final cached = cache.get(cacheKey);
-      if (cached != null) {
-        return List<Map<String, dynamic>>.from(cached);
-      }
-      rethrow;
-    } catch (_) {
-      final cached = cache.get(cacheKey);
-      if (cached != null) {
-        return List<Map<String, dynamic>>.from(cached);
-      }
-      rethrow;
-    }
+    final result = await _cachedQuery<List>(
+      cache: cache,
+      cacheKey: cacheKey,
+      query: () async {
+        final List data = await _client
+            .from('core_goals')
+            .select('id, user_id, version, goal_text, version_data, updated_at')
+            .eq('user_id', userId)
+            .order('version', ascending: true);
+        return data;
+      },
+      fromCache: (cached) => List.from(cached),
+    );
+    
+    return result == null 
+        ? <Map<String, dynamic>>[]
+        : List<Map<String, dynamic>>.from(result.map((e) => Map<String, dynamic>.from(e)));
   }
 
   /// Создать или обновить версию цели (upsert). user_id проставится триггером.
@@ -255,69 +267,87 @@ class GoalsRepository {
     String? note,
     DateTime? date,
   }) async {
-    final payload = <String, dynamic>{
+    final payload = _buildDailyProgressPayload(
+      dayNumber: dayNumber,
+      taskText: taskText,
+      status: status,
+      note: note,
+      date: date,
+    );
+
+    try {
+      final result = await _upsertDailyProgressRemote(payload);
+      await _checkStreakBonusIfCompleted(status);
+      return result;
+    } catch (e) {
+      return await _upsertDailyProgressLocal(payload, dayNumber);
+    }
+  }
+
+  /// Строит payload для daily_progress
+  Map<String, dynamic> _buildDailyProgressPayload({
+    required int dayNumber,
+    String? taskText,
+    String? status,
+    String? note,
+    DateTime? date,
+  }) {
+    return <String, dynamic>{
       'day_number': dayNumber,
       if (taskText != null) 'task_text': taskText,
       if (status != null) 'completion_status': status,
       if (note != null) 'user_note': note,
       if (date != null) 'date': date.toUtc().toIso8601String(),
     };
-    try {
-      final upserted = await _client
-          .from('daily_progress')
-          .upsert(payload, onConflict: 'user_id,day_number')
-          .select()
-          .single();
+  }
 
-      // 🆕 Проверяем серии и автоначисляем GP-бонусы (если день выполнен)
-      if (status == 'completed' || status == 'partial') {
-        try {
-          await checkAndGrantStreakBonus();
-        } catch (e) {
-          // Игнорируем ошибки начисления бонусов - не критично
-          debugPrint('Streak bonus check failed: $e');
-        }
-      }
+  /// Remote upsert в daily_progress
+  Future<Map<String, dynamic>> _upsertDailyProgressRemote(
+    Map<String, dynamic> payload,
+  ) async {
+    final upserted = await _client
+        .from('daily_progress')
+        .upsert(payload, onConflict: 'user_id,day_number')
+        .select()
+        .single();
+    return Map<String, dynamic>.from(upserted);
+  }
 
-      return Map<String, dynamic>.from(upserted);
-    } on PostgrestException {
-      // Локальный fallback: сохраняем в Hive и возвращаем сохранённое
-      final Box cache = Hive.isBoxOpen('daily_progress_local')
-          ? Hive.box('daily_progress_local')
-          : await Hive.openBox('daily_progress_local');
-      final List data = (cache.get('items') as List?)?.toList() ?? <dynamic>[];
-      bool found = false;
-      for (int i = 0; i < data.length; i++) {
-        final m = Map<String, dynamic>.from(data[i] as Map);
-        if ((m['day_number'] as int?) == dayNumber) {
-          m.addAll(payload);
-          data[i] = m;
-          found = true;
-          break;
-        }
+  /// Проверяет и начисляет GP-бонусы за серии выполненных дней
+  Future<void> _checkStreakBonusIfCompleted(String? status) async {
+    if (status == 'completed' || status == 'partial') {
+      try {
+        await checkAndGrantStreakBonus();
+      } catch (e) {
+        debugPrint('Streak bonus check failed: $e');
       }
-      if (!found) data.add(payload);
-      await cache.put('items', data);
-      return Map<String, dynamic>.from(payload);
-    } on SocketException {
-      final Box cache = Hive.isBoxOpen('daily_progress_local')
-          ? Hive.box('daily_progress_local')
-          : await Hive.openBox('daily_progress_local');
-      final List data = (cache.get('items') as List?)?.toList() ?? <dynamic>[];
-      bool found = false;
-      for (int i = 0; i < data.length; i++) {
-        final m = Map<String, dynamic>.from(data[i] as Map);
-        if ((m['day_number'] as int?) == dayNumber) {
-          m.addAll(payload);
-          data[i] = m;
-          found = true;
-          break;
-        }
-      }
-      if (!found) data.add(payload);
-      await cache.put('items', data);
-      return Map<String, dynamic>.from(payload);
     }
+  }
+
+  /// Fallback: сохранение в локальный Hive при отсутствии сети
+  Future<Map<String, dynamic>> _upsertDailyProgressLocal(
+    Map<String, dynamic> payload,
+    int dayNumber,
+  ) async {
+    final Box cache = Hive.isBoxOpen('daily_progress_local')
+        ? Hive.box('daily_progress_local')
+        : await Hive.openBox('daily_progress_local');
+    final List data = (cache.get('items') as List?)?.toList() ?? <dynamic>[];
+
+    bool found = false;
+    for (int i = 0; i < data.length; i++) {
+      final m = Map<String, dynamic>.from(data[i] as Map);
+      if ((m['day_number'] as int?) == dayNumber) {
+        m.addAll(payload);
+        data[i] = m;
+        found = true;
+        break;
+      }
+    }
+    if (!found) data.add(payload);
+
+    await cache.put('items', data);
+    return Map<String, dynamic>.from(payload);
   }
 
   /// Partial update of a single field in core_goals.version_data via RPC.
@@ -449,30 +479,21 @@ class GoalsRepository {
     final Box cache = Hive.box('weekly_progress');
     final String cacheKey = 'week_$weekNumber';
 
-    try {
-      final data = await _client
+    final result = await _cachedQuery<Map?>(
+      cache: cache,
+      cacheKey: cacheKey,
+      query: () => _client
           .from('weekly_progress')
           .select(
               'id, user_id, week_number, planned_actions, completed_actions, completion_status, metric_value, metric_progress_percent, max_feedback, chat_session_id, achievement, metric_actual, used_artifacts, consulted_leo, applied_techniques, key_insight, artifacts_details, consulted_benefit, techniques_details, created_at, updated_at')
           .eq('week_number', weekNumber)
           .order('created_at', ascending: false)
           .limit(1)
-          .maybeSingle();
+          .maybeSingle(),
+      fromCache: (cached) => Map.from(cached),
+    );
 
-      if (data != null) {
-        await cache.put(cacheKey, data);
-      }
-      return data == null ? null : Map<String, dynamic>.from(data);
-    } on SocketException {
-      final cached = cache.get(cacheKey);
-      return cached == null ? null : Map<String, dynamic>.from(cached);
-    } catch (_) {
-      final cached = cache.get(cacheKey);
-      if (cached != null) {
-        return Map<String, dynamic>.from(cached);
-      }
-      rethrow;
-    }
+    return result == null ? null : Map<String, dynamic>.from(result);
   }
 
   Future<Map<String, dynamic>> upsertWeek({
@@ -650,38 +671,25 @@ class GoalsRepository {
     final Box cache = Hive.box('quotes');
     const String cacheKey = 'active';
 
-    List<Map<String, dynamic>> active;
-    try {
-      // Запрос и явное приведение к типу List<Map<String, dynamic>>
-      final resp = await _client
-          .from('motivational_quotes')
-          .select('id, quote_text, author, category')
-          .eq('is_active', true);
-      final list = (resp as List)
-          .map((e) => Map<String, dynamic>.from(e as Map))
-          .toList();
-      active = list;
-      await cache.put(cacheKey, list);
-    } on SocketException {
-      final cached = cache.get(cacheKey);
-      if (cached == null) return null;
-      active = List<Map<String, dynamic>>.from(
-          (cached as List).map((e) => Map<String, dynamic>.from(e as Map)));
-    } on PostgrestException {
-      final cached = cache.get(cacheKey);
-      if (cached == null) return null;
-      active = List<Map<String, dynamic>>.from(
-          (cached as List).map((e) => Map<String, dynamic>.from(e as Map)));
-    } catch (_) {
-      final cached = cache.get(cacheKey);
-      // Не кидаем исключение: если кеш есть — используем, иначе вернём null ниже
-      active = cached == null
-          ? <Map<String, dynamic>>[]
-          : List<Map<String, dynamic>>.from(
-              (cached as List).map((e) => Map<String, dynamic>.from(e as Map)));
-    }
+    final result = await _cachedQuery<List>(
+      cache: cache,
+      cacheKey: cacheKey,
+      query: () async {
+        final resp = await _client
+            .from('motivational_quotes')
+            .select('id, quote_text, author, category')
+            .eq('is_active', true);
+        return (resp as List)
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
+      },
+      fromCache: (cached) => List<Map<String, dynamic>>.from(
+          (cached as List).map((e) => Map<String, dynamic>.from(e as Map))),
+    );
 
+    final active = result ?? <Map<String, dynamic>>[];
     if (active.isEmpty) return null;
+
     // Детерминированный выбор по UTC-дню: стабильная «цитата дня» без перезапуска
     final int dayIndex =
         DateTime.now().toUtc().difference(DateTime.utc(1970)).inDays;

@@ -1067,10 +1067,16 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
               chatId: null,
               systemPrompt:
                   'Режим трекера цели: обсуждаем версию v${ref.watch(goalScreenControllerProvider).selectedVersion} и прогресс спринтов. Будь краток, поддерживай фокус, предлагай следующий шаг.',
-              userContext: _buildTrackerUserContext(
-                ref.watch(goalScreenControllerProvider).versions,
-                ref.watch(goalScreenControllerProvider).selectedVersion,
-              ),
+              userContext: ref
+                  .read(goalScreenControllerProvider.notifier)
+                  .buildTrackerUserContext(
+                    achievement: _achievementCtrl.text.trim(),
+                    metricActual: _metricActualCtrl.text.trim(),
+                    usedArtifacts: _usedArtifacts,
+                    consultedLeo: _consultedLeo,
+                    appliedTechniques: _appliedTechniques,
+                    keyInsight: _keyInsightCtrl.text.trim(),
+                  ),
               levelContext: 'current_level: $currentLevel',
               bot: 'max',
             ),
@@ -1149,46 +1155,8 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
     );
   }
 
-  String _buildTrackerUserContext(
-      Map<int, Map<String, dynamic>> versions, int selectedVersion) {
-    final vData = (versions[selectedVersion]?['version_data'] as Map?) ?? {};
-    final sb = StringBuffer('goal_version: $selectedVersion\n');
-    if (selectedVersion == 1) {
-      sb.writeln('concrete_result: ${vData['concrete_result'] ?? ''}');
-      sb.writeln('main_pain: ${vData['main_pain'] ?? ''}');
-      sb.writeln('first_action: ${vData['first_action'] ?? ''}');
-    } else if (selectedVersion == 2) {
-      sb.writeln('concrete_result: ${vData['concrete_result'] ?? ''}');
-      sb.writeln('metric_type: ${vData['metric_type'] ?? ''}');
-      sb.writeln(
-          'current: ${vData['metric_current'] ?? ''} target: ${vData['metric_target'] ?? ''}');
-      sb.writeln('financial_goal: ${vData['financial_goal'] ?? ''}');
-    } else if (selectedVersion == 3) {
-      sb.writeln('goal_smart: ${vData['goal_smart'] ?? ''}');
-      sb.writeln('week1_focus: ${vData['week1_focus'] ?? ''}');
-      sb.writeln('week2_focus: ${vData['week2_focus'] ?? ''}');
-      sb.writeln('week3_focus: ${vData['week3_focus'] ?? ''}');
-      sb.writeln('week4_focus: ${vData['week4_focus'] ?? ''}');
-    } else {
-      sb.writeln('first_three_days: ${vData['first_three_days'] ?? ''}');
-      sb.writeln('start_date: ${vData['start_date'] ?? ''}');
-      sb.writeln(
-          'accountability_person: ${vData['accountability_person'] ?? ''}');
-      sb.writeln('readiness_score: ${vData['readiness_score'] ?? ''}');
-    }
-    // Последний чек-ин (если заполнен)
-    if (_achievementCtrl.text.isNotEmpty ||
-        _metricActualCtrl.text.isNotEmpty ||
-        _keyInsightCtrl.text.isNotEmpty) {
-      sb.writeln('last_sprint_achievement: ${_achievementCtrl.text.trim()}');
-      sb.writeln('last_sprint_metric_actual: ${_metricActualCtrl.text.trim()}');
-      sb.writeln('last_sprint_used_artifacts: $_usedArtifacts');
-      sb.writeln('last_sprint_consulted_leo: $_consultedLeo');
-      sb.writeln('last_sprint_applied_techniques: $_appliedTechniques');
-      sb.writeln('last_sprint_insight: ${_keyInsightCtrl.text.trim()}');
-    }
-    return sb.toString();
-  }
+  // 🗑️ Метод _buildTrackerUserContext удалён - используется метод из GoalScreenController
+  // Единственный источник истины для построения контекста
 
   // Удалены: _getVersionStatus/_getVersionTooltip не используются после упрощения UI переключателя
 
@@ -1328,10 +1296,16 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
         builder: (context) => ref.read(currentUserProvider).when(
               data: (user) => LeoDialogScreen(
                 chatId: null,
-                userContext: _buildTrackerUserContext(
-                      ref.watch(goalScreenControllerProvider).versions,
-                      ref.watch(goalScreenControllerProvider).selectedVersion,
-                    ) +
+                userContext: ref
+                        .read(goalScreenControllerProvider.notifier)
+                        .buildTrackerUserContext(
+                          achievement: _achievementCtrl.text.trim(),
+                          metricActual: _metricActualCtrl.text.trim(),
+                          usedArtifacts: _usedArtifacts,
+                          consultedLeo: _consultedLeo,
+                          appliedTechniques: _appliedTechniques,
+                          keyInsight: _keyInsightCtrl.text.trim(),
+                        ) +
                     _buildDailyChatContextTail(),
                 levelContext: 'current_level: ${user?.currentLevel ?? 0}',
                 bot: 'max',
