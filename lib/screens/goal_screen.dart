@@ -17,8 +17,11 @@ import 'package:bizlevel/screens/goal/widgets/goal_compact_card.dart';
 import 'package:bizlevel/screens/goal/widgets/crystallization_section.dart';
 // import 'package:bizlevel/screens/goal/widgets/progress_widget.dart'; // 🗑️ Удалён - виджет больше не используется
 import 'package:bizlevel/screens/goal/widgets/sprint_section.dart';
-import 'package:bizlevel/screens/goal/widgets/daily_card.dart';
-import 'package:bizlevel/screens/goal/widgets/daily_calendar.dart';
+// import 'package:bizlevel/screens/goal/widgets/daily_card.dart'; // 🗑️ Перенесён в DailySprint28Widget
+// import 'package:bizlevel/screens/goal/widgets/daily_calendar.dart'; // 🗑️ Перенесён в DailySprint28Widget
+import 'package:bizlevel/screens/goal/widgets/next_action_banner.dart';
+import 'package:bizlevel/screens/goal/widgets/version_navigation_chips.dart';
+import 'package:bizlevel/screens/goal/widgets/daily_sprint_28_widget.dart';
 import 'package:bizlevel/screens/goal/controller/goal_screen_controller.dart';
 import 'package:bizlevel/utils/constant.dart';
 import 'package:bizlevel/services/notifications_service.dart';
@@ -304,63 +307,9 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Мини-баннер «Что дальше?» под AppBar (mobile-first)
-                  FutureBuilder<Map<String, dynamic>>(
-                    future: ref.read(goalsRepositoryProvider).fetchGoalState(),
-                    builder: (context, snap) {
-                      if (!snap.hasData) return const SizedBox.shrink();
-                      final data = snap.data!;
-                      final String nextAction =
-                          (data['next_action'] as String?) ?? '';
-                      final int nextTarget =
-                          (data['next_action_target'] as int?) ?? 0;
-                      String title;
-                      VoidCallback? onTap;
-                      if (nextAction == 'goal_checkpoint' &&
-                          nextTarget >= 2 &&
-                          nextTarget <= 4) {
-                        title =
-                            'Что дальше: заполнить v$nextTarget на чекпоинте';
-                        onTap = () => GoRouter.of(context)
-                            .push('/goal-checkpoint/$nextTarget');
-                      } else if (nextAction == 'level_up') {
-                        // 🆕 Достигнут предел по уровню - нужно пройти больше уроков
-                        title =
-                            'Что дальше: пройти Уровень $currentLevel для открытия v$nextTarget';
-                        onTap = () => GoRouter.of(context)
-                            .push('/tower?scrollTo=$currentLevel');
-                      } else if (nextAction == 'weeks') {
-                        title = 'Что дальше: перейти к 28 дням';
-                        onTap = _scrollToSprintSection;
-                      } else {
-                        title = 'Что дальше: создать v1 на Уровне 1';
-                        onTap = () =>
-                            GoRouter.of(context).push('/tower?scrollTo=1');
-                      }
-                      return Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 10),
-                        margin: const EdgeInsets.only(bottom: 12),
-                        decoration: BoxDecoration(
-                          color: AppColor.primary.withValues(alpha: 0.06),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                              color: AppColor.primary.withValues(alpha: 0.3)),
-                        ),
-                        child: Row(children: [
-                          Expanded(
-                              child: Text(
-                            title,
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodyMedium
-                                ?.copyWith(fontWeight: FontWeight.w600),
-                          )),
-                          TextButton(
-                              onPressed: onTap, child: const Text('Перейти')),
-                        ]),
-                      );
-                    },
+                  NextActionBanner(
+                    currentLevel: currentLevel,
+                    onScrollToSprint: _scrollToSprintSection,
                   ),
                   // Мотивация от Макса
                   const MotivationCard(),
@@ -410,168 +359,11 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                           ),
                           const SizedBox(height: 8),
                           // Компактный гид по шагам: v1→v4→Недели
-                          Builder(builder: (context) {
-                            final hasV1 = gs.versions.containsKey(1);
-                            final hasV2 = gs.versions.containsKey(2);
-                            final hasV3 = gs.versions.containsKey(3);
-                            final hasV4 = gs.versions.containsKey(4);
-                            String currentStep;
-                            if (!hasV1) {
-                              currentStep = 'v1';
-                            } else if (!hasV2) {
-                              currentStep = 'v2';
-                            } else if (!hasV3) {
-                              currentStep = 'v3';
-                            } else if (!hasV4) {
-                              currentStep = 'v4';
-                            } else {
-                              currentStep = 'weeks';
-                            }
-
-                            Widget buildChip({
-                              required String label,
-                              required bool completed,
-                              required bool active,
-                              required bool locked,
-                              required VoidCallback? onTap,
-                            }) {
-                              final Color bg = locked
-                                  ? AppColor.surface
-                                  : (active
-                                      ? AppColor.primary.withValues(alpha: 0.08)
-                                      : Colors.white);
-                              final Color border = active
-                                  ? AppColor.primary
-                                  : (locked
-                                      ? AppColor.labelColor
-                                          .withValues(alpha: 0.4)
-                                      : AppColor.labelColor
-                                          .withValues(alpha: 0.3));
-                              final TextStyle? ts = Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.copyWith(
-                                    fontWeight: active
-                                        ? FontWeight.w700
-                                        : FontWeight.w500,
-                                    color: locked
-                                        ? AppColor.labelColor
-                                        : AppColor.textColor,
-                                  );
-                              return Padding(
-                                padding:
-                                    const EdgeInsets.only(right: 8, bottom: 6),
-                                child: InkWell(
-                                  onTap: locked ? null : onTap,
-                                  borderRadius: BorderRadius.circular(16),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 10, vertical: 6),
-                                    decoration: BoxDecoration(
-                                      color: bg,
-                                      borderRadius: BorderRadius.circular(16),
-                                      border: Border.all(color: border),
-                                      boxShadow: const [
-                                        BoxShadow(
-                                          color: Color(0x08000000),
-                                          blurRadius: 4,
-                                          offset: Offset(0, 2),
-                                        )
-                                      ],
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        if (completed)
-                                          const Padding(
-                                            padding: EdgeInsets.only(right: 4),
-                                            child: Icon(Icons.check_circle,
-                                                size: 16, color: Colors.green),
-                                          )
-                                        else if (locked)
-                                          const Padding(
-                                            padding: EdgeInsets.only(right: 4),
-                                            child: Icon(Icons.lock_outline,
-                                                size: 16, color: Colors.grey),
-                                          ),
-                                        Text(label, style: ts),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              );
-                            }
-
-                            void showLockedSnack(String msg) {
-                              ScaffoldMessenger.of(context)
-                                  .showSnackBar(SnackBar(content: Text(msg)));
-                            }
-
-                            return Wrap(
-                              children: [
-                                // v1
-                                buildChip(
-                                  label: 'v1',
-                                  completed: hasV1,
-                                  active: currentStep == 'v1',
-                                  locked: false,
-                                  onTap: () {
-                                    if (!hasV1) {
-                                      GoRouter.of(context)
-                                          .push('/tower?scrollTo=1');
-                                    }
-                                  },
-                                ),
-                                // v2
-                                buildChip(
-                                  label: 'v2',
-                                  completed: hasV2,
-                                  active: currentStep == 'v2',
-                                  locked: (!hasV1) || allowedMax < 2,
-                                  onTap: (!hasV1 || allowedMax < 2)
-                                      ? () => showLockedSnack(
-                                          'Откроется после Уровня 4')
-                                      : () => GoRouter.of(context)
-                                          .push('/goal-checkpoint/2'),
-                                ),
-                                // v3
-                                buildChip(
-                                  label: 'v3',
-                                  completed: hasV3,
-                                  active: currentStep == 'v3',
-                                  locked: (!hasV2) || allowedMax < 3,
-                                  onTap: (!hasV2 || allowedMax < 3)
-                                      ? () => showLockedSnack(
-                                          'Откроется после Уровня 7')
-                                      : () => GoRouter.of(context)
-                                          .push('/goal-checkpoint/3'),
-                                ),
-                                // v4
-                                buildChip(
-                                  label: 'v4',
-                                  completed: hasV4,
-                                  active: currentStep == 'v4',
-                                  locked: (!hasV3) || allowedMax < 4,
-                                  onTap: (!hasV3 || allowedMax < 4)
-                                      ? () => showLockedSnack(
-                                          'Откроется после Уровня 10')
-                                      : () => GoRouter.of(context)
-                                          .push('/goal-checkpoint/4'),
-                                ),
-                                // Weeks
-                                buildChip(
-                                  label: 'Недели',
-                                  completed: false,
-                                  active: currentStep == 'weeks',
-                                  locked: !hasV4,
-                                  onTap: !hasV4
-                                      ? () => showLockedSnack(
-                                          'Доступно после v4 «Финал»')
-                                      : () => _scrollToSprintSection(),
-                                ),
-                              ],
-                            );
-                          }),
+                          VersionNavigationChips(
+                            versions: gs.versions,
+                            allowedMaxVersion: allowedMax,
+                            onScrollToSprint: _scrollToSprintSection,
+                          ),
                           // Прогресс и «Что дальше» через fetch_goal_state
                           FutureBuilder<Map<String, dynamic>>(
                             future: ref
@@ -867,191 +659,11 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                         return const SizedBox.shrink();
                       }
 
-                      // Активные 28 дней: считаем текущий день (1..28)
-                      final int days =
-                          DateTime.now().toUtc().difference(startDate).inDays;
-                      final int currentDay = (days + 1).clamp(1, 28);
-
-                      return Padding(
-                        padding: const EdgeInsets.only(top: 16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Хедер дня с линейным прогрессом N/28
-                            Builder(builder: (context) {
-                              final int dayNum = currentDay;
-                              final int weekNum = ((dayNum - 1) ~/ 7) + 1;
-                              final double pct =
-                                  (dayNum / 28.0).clamp(0.0, 1.0);
-                              return Row(
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          'День $dayNum • Неделя $weekNum',
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .titleSmall
-                                              ?.copyWith(
-                                                  fontWeight: FontWeight.w700),
-                                        ),
-                                        const SizedBox(height: 6),
-                                        LinearProgressIndicator(
-                                          value: pct,
-                                          minHeight: 6,
-                                          backgroundColor: AppColor.surface,
-                                          color: AppColor.primary,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  IconButton(
-                                    tooltip: 'Настроить напоминания',
-                                    icon: const Icon(
-                                        Icons.notifications_active_outlined),
-                                    onPressed: () => GoRouter.of(context)
-                                        .push('/notifications'),
-                                  ),
-                                ],
-                              );
-                            }),
-                            // Карточка «Сегодня»
-                            Consumer(builder: (context, ref, _) {
-                              final listAsync =
-                                  ref.watch(dailyProgressListProvider);
-                              return listAsync.when(
-                                data: (list) {
-                                  final Map<int, String> statusByDay =
-                                      <int, String>{};
-                                  for (final m in list) {
-                                    final int? dn = m['day_number'] as int?;
-                                    if (dn != null) {
-                                      statusByDay[dn] =
-                                          (m['completion_status'] ?? 'pending')
-                                              .toString();
-                                    }
-                                  }
-                                  final String status =
-                                      statusByDay[currentDay] ?? 'pending';
-                                  // Задача дня из v3 weekN_focus | sprintN_goal
-                                  String taskText = '';
-                                  try {
-                                    final Map<String, dynamic> v3 =
-                                        ((gs.versions[3]?['version_data']
-                                                    as Map?)
-                                                ?.cast<String, dynamic>()) ??
-                                            const <String, dynamic>{};
-                                    final int w = ((currentDay - 1) ~/ 7) + 1;
-                                    final String key = 'week${w}_focus';
-                                    taskText =
-                                        (v3[key] ?? v3['sprint${w}_goal'] ?? '')
-                                            .toString();
-                                  } catch (_) {}
-                                  return DailyTodayCard(
-                                    dayNumber: currentDay,
-                                    taskText: taskText,
-                                    status: status,
-                                    onChangeStatus: (code) async {
-                                      await ref
-                                          .read(goalsRepositoryProvider)
-                                          .upsertDailyProgress(
-                                              dayNumber: currentDay,
-                                              status: code);
-                                      ref.invalidate(dailyProgressListProvider);
-                                    },
-                                    onSaveNote: (note) async {
-                                      await ref
-                                          .read(goalsRepositoryProvider)
-                                          .upsertDailyProgress(
-                                              dayNumber: currentDay,
-                                              note: note);
-                                    },
-                                  );
-                                },
-                                loading: () => const SizedBox.shrink(),
-                                error: (_, __) => const SizedBox.shrink(),
-                              );
-                            }),
-                            const SizedBox(height: 12),
-                            // Календарь 28 дней
-                            Consumer(builder: (context, ref, _) {
-                              final listAsync =
-                                  ref.watch(dailyProgressListProvider);
-                              return listAsync.when(
-                                data: (list) {
-                                  final Map<int, String> statusByDay =
-                                      <int, String>{};
-                                  for (final m in list) {
-                                    final int? dn = m['day_number'] as int?;
-                                    if (dn != null) {
-                                      statusByDay[dn] =
-                                          (m['completion_status'] ?? 'pending')
-                                              .toString();
-                                    }
-                                  }
-                                  return DailyCalendar28(
-                                    statusByDay: statusByDay,
-                                    onTapDay: (day) async {
-                                      final cur = statusByDay[day] ?? 'pending';
-                                      final next = cur == 'completed'
-                                          ? 'pending'
-                                          : 'completed';
-                                      await ref
-                                          .read(goalsRepositoryProvider)
-                                          .upsertDailyProgress(
-                                              dayNumber: day, status: next);
-                                      ref.invalidate(dailyProgressListProvider);
-                                    },
-                                  );
-                                },
-                                loading: () => const SizedBox.shrink(),
-                                error: (_, __) => const SizedBox.shrink(),
-                              );
-                            }),
-                            const SizedBox(height: 12),
-                            // Контекстные CTA: помощь Макса и завершение 28 дней
-                            Row(
-                              children: [
-                                TextButton(
-                                  onPressed: _openChatWithMax,
-                                  child: const Text('Нужна помощь от Макса'),
-                                ),
-                                const Spacer(),
-                                TextButton(
-                                  onPressed: () async {
-                                    try {
-                                      await ref
-                                          .read(goalsRepositoryProvider)
-                                          .completeSprint();
-                                      await NotificationsService.instance
-                                          .cancelDailySprint();
-                                      if (mounted) {
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(
-                                          const SnackBar(
-                                              content:
-                                                  Text('28 дней завершены')),
-                                        );
-                                      }
-                                    } catch (e) {
-                                      if (!mounted) return;
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
-                                        SnackBar(
-                                            content:
-                                                Text('Ошибка завершения: $e')),
-                                      );
-                                    }
-                                  },
-                                  child: const Text('Завершить 28 дней'),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
+                      // Активные 28 дней
+                      return DailySprint28Widget(
+                        startDate: startDate,
+                        versions: gs.versions,
+                        onOpenMaxChat: _openChatWithMax,
                       );
                     }),
                 ],

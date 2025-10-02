@@ -78,10 +78,11 @@ class GoalsRepository {
       },
       fromCache: (cached) => List.from(cached),
     );
-    
-    return result == null 
+
+    return result == null
         ? <Map<String, dynamic>>[]
-        : List<Map<String, dynamic>>.from(result.map((e) => Map<String, dynamic>.from(e)));
+        : List<Map<String, dynamic>>.from(
+            result.map((e) => Map<String, dynamic>.from(e)));
   }
 
   /// Создать или обновить версию цели (upsert). user_id проставится триггером.
