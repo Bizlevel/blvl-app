@@ -14,6 +14,8 @@ import 'package:bizlevel/providers/auth_provider.dart';
 import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/screens/leo_dialog_screen.dart';
 import 'package:bizlevel/providers/user_skills_provider.dart';
+import 'package:bizlevel/widgets/lesson_widget.dart'; // 🆕 Для видео
+import 'package:bizlevel/models/lesson_model.dart'; // 🆕 Для создания mock урока
 
 class MiniCaseScreen extends ConsumerStatefulWidget {
   final int caseId;
@@ -27,15 +29,29 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
   Map<String, dynamic>? _caseMeta;
   Map<String, dynamic>?
       _script; // intro/context/questions/final from mini_cases.script
-  // Флаг больше не используется (один блок)
   // ignore: unused_field
   bool _dialogOpened = false;
   bool _loading = true;
 
+  // 🆕 Для двухблоковой структуры
+  late PageController _pageController;
+  // ignore: unused_field
+  int _currentPage = 0; // Готово для индикатора блоков (будущее улучшение)
+  // ignore: unused_field
+  bool _videoWatched =
+      false; // Готово для блокировки кнопки до просмотра (будущее улучшение)
+
   @override
   void initState() {
     super.initState();
+    _pageController = PageController();
     _bootstrap();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
   }
 
   Future<void> _bootstrap() async {
@@ -64,7 +80,8 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
       final data = await Supabase.instance.client
           .from('mini_cases')
           .select(
-              'id, title, after_level, skill_name, estimated_minutes, script')
+              'id, title, after_level, skill_name, estimated_minutes, script, '
+              'vimeo_id, video_url') // 🆕 Добавлены поля для видео
           .eq('id', widget.caseId)
           .maybeSingle();
       if (!mounted) return;
@@ -107,58 +124,155 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
       backgroundColor: AppColor.appBgColor,
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.only(bottom: 24),
-              child: _buildDescriptionAndCTA(),
+          : PageView(
+              controller: _pageController,
+              physics:
+                  const NeverScrollableScrollPhysics(), // 🔒 Запретить свайпы
+              onPageChanged: (index) {
+                setState(() => _currentPage = index);
+                // Breadcrumb для аналитики
+                try {
+                  Sentry.addBreadcrumb(Breadcrumb(
+                    category: 'case',
+                    message: index == 0
+                        ? 'case_intro_block_opened'
+                        : 'case_video_block_opened',
+                    data: {'caseId': widget.caseId, 'blockIndex': index},
+                  ));
+                } catch (_) {}
+              },
+              children: [
+                _buildIntroBlock(), // Блок 1: Картинка + Описание + "Далее"
+                _buildVideoBlock(), // Блок 2: Видео + "Решить с Лео"
+              ],
             ),
     );
   }
 
-  // Блок интро больше не используется (оставлен для совместимости)
-
-  Widget _buildDescriptionAndCTA() {
+  /// 🆕 Блок 1: Intro (Картинка + короткое описание + кнопка "Далее")
+  Widget _buildIntroBlock() {
     final introText = _script?['intro'] is Map
         ? ((_script?['intro'] as Map)['text']?.toString() ?? '')
         : '';
-    final contextText = _script?['context'] is Map
-        ? ((_script?['context'] as Map)['text']?.toString() ?? '')
-        : '';
 
-    return Padding(
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const SizedBox(height: 12),
+
+          // Картинка
           _buildCaseImage(slot: 2),
+
           const SizedBox(height: 16),
+
+          // Короткое описание (только intro, без context)
           if (introText.isNotEmpty)
-            Text(introText,
-                style:
-                    const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-          if (introText.isNotEmpty) const SizedBox(height: 8),
-          Text(
-            contextText.isNotEmpty
-                ? contextText
-                : 'Сначала прочитайте вводные данные кейса и подготовьтесь к короткому диалогу с Лео. Важно отвечать в 2–3 предложениях.',
-          ),
-          const SizedBox(height: 12),
-          const SizedBox(height: 16),
+            Text(
+              introText,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          if (introText.isEmpty)
+            const Text(
+              'Прочитайте описание кейса и приготовьтесь к решению.',
+              style: TextStyle(fontSize: 16),
+            ),
+
+          const SizedBox(height: 24),
+
+          // Кнопка "Далее" → переход на Блок 2
           ElevatedButton.icon(
-            onPressed: _openDialog,
-            icon: const Icon(Icons.psychology_alt_outlined),
-            label: const Text('Решить с Лео'),
+            onPressed: () {
+              _pageController.nextPage(
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeInOut,
+              );
+            },
+            icon: const Icon(Icons.arrow_forward),
+            label: const Text('Далее'),
+            style: ElevatedButton.styleFrom(
+              minimumSize: const Size(double.infinity, 48),
+            ),
           ),
         ],
       ),
     );
   }
 
-  // Нижняя панель навигации удалена: один блок с CTA
+  /// 🆕 Блок 2: Видео + CTA "Решить с Лео"
+  Widget _buildVideoBlock() {
+    // Создаём фейковый LessonModel для переиспользования LessonWidget
+    final vimeoId = _caseMeta?['vimeo_id'] as String?;
+    final videoUrl = _caseMeta?['video_url'] as String?;
 
-  // Удалено: навигация по страницам больше не используется
+    final mockLesson = LessonModel(
+      id: widget.caseId * 1000, // Уникальный ID для избежания конфликтов
+      levelId: widget.caseId,
+      order: 1,
+      title: _caseMeta?['title'] as String? ?? 'Мини-кейс',
+      description: 'Посмотрите видео перед решением кейса',
+      videoUrl: videoUrl,
+      vimeoId: vimeoId,
+      durationMinutes: _caseMeta?['estimated_minutes'] as int? ?? 10,
+      quizQuestions: [],
+      correctAnswers: [],
+    );
 
-  // Удалено: навигация по страницам больше не используется
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Видео (занимает большую часть экрана)
+        Expanded(
+          child: LessonWidget(
+            lesson: mockLesson,
+            onWatched: () {
+              // Помечаем видео как просмотренное
+              setState(() => _videoWatched = true);
+            },
+          ),
+        ),
+
+        // Нижняя панель с кнопками
+        SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Кнопка "Решить с Лео"
+                ElevatedButton.icon(
+                  onPressed: _openDialog,
+                  icon: const Icon(Icons.psychology_alt_outlined),
+                  label: const Text('Решить с Лео'),
+                  style: ElevatedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 48),
+                  ),
+                ),
+
+                const SizedBox(height: 8),
+
+                // Кнопка "Назад" (опционально, чтобы вернуться к описанию)
+                TextButton.icon(
+                  onPressed: () {
+                    _pageController.previousPage(
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeInOut,
+                    );
+                  },
+                  icon: const Icon(Icons.arrow_back),
+                  label: const Text('Назад к описанию'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 
   Future<void> _openDialog() async {
     try {
