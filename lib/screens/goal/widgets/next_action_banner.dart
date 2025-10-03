@@ -6,7 +6,7 @@ import 'package:bizlevel/providers/goals_repository_provider.dart';
 import 'package:bizlevel/theme/color.dart';
 
 /// Баннер "Что дальше?" - показывает следующий шаг в кристаллизации цели
-/// 
+///
 /// Использует RPC fetch_goal_state для определения:
 /// - goal_checkpoint: переход на чекпоинт vN
 /// - level_up: нужно пройти уровень для разблокировки версии
@@ -27,11 +27,11 @@ class NextActionBanner extends ConsumerWidget {
       future: ref.read(goalsRepositoryProvider).fetchGoalState(),
       builder: (context, snap) {
         if (!snap.hasData) return const SizedBox.shrink();
-        
+
         final data = snap.data!;
         final String nextAction = (data['next_action'] as String?) ?? '';
         final int nextTarget = (data['next_action_target'] as int?) ?? 0;
-        
+
         final (String title, VoidCallback? onTap) = _buildActionData(
           context: context,
           nextAction: nextAction,
@@ -39,7 +39,7 @@ class NextActionBanner extends ConsumerWidget {
           currentLevel: currentLevel,
           onScrollToSprint: onScrollToSprint,
         );
-        
+
         return Container(
           width: double.infinity,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),

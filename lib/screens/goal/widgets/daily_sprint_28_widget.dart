@@ -10,7 +10,7 @@ import 'package:bizlevel/services/notifications_service.dart';
 import 'package:bizlevel/theme/color.dart';
 
 /// Виджет для отображения 28-дневного sprint режима
-/// 
+///
 /// Показывает:
 /// - Прогресс-бар "День N • Неделя W"
 /// - Карточку текущего дня с задачей и статусом

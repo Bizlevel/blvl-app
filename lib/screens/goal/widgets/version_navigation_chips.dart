@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:bizlevel/theme/color.dart';
 
 /// Компактная навигация между версиями цели (v1-v4) и неделями
-/// 
+///
 /// Отображает чипы с галочками для заполненных версий и замками для заблокированных
 class VersionNavigationChips extends StatelessWidget {
   const VersionNavigationChips({
@@ -121,9 +121,7 @@ class VersionNavigationChips extends StatelessWidget {
   }) {
     final Color bg = locked
         ? AppColor.surface
-        : (active
-            ? AppColor.primary.withValues(alpha: 0.08)
-            : Colors.white);
+        : (active ? AppColor.primary.withValues(alpha: 0.08) : Colors.white);
 
     final Color border = active
         ? AppColor.primary
