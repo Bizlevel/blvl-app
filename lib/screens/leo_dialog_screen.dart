@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:bizlevel/providers/leo_service_provider.dart';
 import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/widgets/leo_message_bubble.dart';
@@ -35,6 +36,8 @@ class LeoDialogScreen extends ConsumerStatefulWidget {
   final String?
       autoUserMessage; // при передаче — автоматически отправить это сообщение
   final bool skipSpend; // пропуск списаний GP для тонкой реакции
+  final String?
+      initialAssistantMessage; // первое сообщение от ассистента (для приветствия)
 
   const LeoDialogScreen({
     super.key,
@@ -54,6 +57,7 @@ class LeoDialogScreen extends ConsumerStatefulWidget {
     this.finalStory,
     this.autoUserMessage,
     this.skipSpend = false,
+    this.initialAssistantMessage,
   });
 
   @override
@@ -79,6 +83,8 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
 
   late final LeoService _leo;
   int _caseStepIndex = -1; // -1 когда не в сценарии или не начато
+  List<String> _serverRecommendedChips = [];
+  final Set<String> _dismissedChips = {};
 
   // Добавляем debounce для предотвращения дублей
   Timer? _debounceTimer;
@@ -102,9 +108,17 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
       _messages.add({'role': 'assistant', 'content': start});
       _caseStepIndex = 0;
     } else if (widget.bot == 'max' && _chatId == null && _messages.isEmpty) {
-      final String greeting = (widget.firstPrompt?.trim().isNotEmpty == true)
-          ? widget.firstPrompt!.trim()
-          : 'Я — Макс, трекер цели BizLevel. Помогаю кристаллизовать цель и держать темп 28 дней. Напишите, чего хотите добиться — предложу ближайший шаг.';
+      // Приоритет: пользовательское приветствие (initialAssistantMessage),
+      // затем firstPrompt, затем дефолтное
+      final String greeting;
+      if (widget.initialAssistantMessage?.trim().isNotEmpty == true) {
+        greeting = widget.initialAssistantMessage!.trim();
+      } else if (widget.firstPrompt?.trim().isNotEmpty == true) {
+        greeting = widget.firstPrompt!.trim();
+      } else {
+        greeting =
+            'Я — Макс, трекер цели BizLevel. Помогаю кристаллизовать цель и держать темп 28 дней. Напишите, чего хотите добиться — предложу ближайший шаг.';
+      }
       _messages.add({'role': 'assistant', 'content': greeting});
     }
     if (_chatId != null) {
@@ -259,6 +273,22 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
       );
 
       assistantMsg = response['message']['content'] as String? ?? '';
+      // Обновим серверные чипы, если пришли
+      try {
+        final chipsRaw = response['recommended_chips'];
+        if (chipsRaw is List) {
+          final next = chipsRaw
+              .map((e) => e?.toString() ?? '')
+              .where((s) => s.trim().isNotEmpty)
+              .cast<String>()
+              .toList();
+          if (mounted) {
+            setState(() {
+              _serverRecommendedChips = next;
+            });
+          }
+        }
+      } catch (_) {}
 
       if (!widget.caseMode) {
         await _leo.saveConversation(
@@ -335,7 +365,8 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
                     const Text(
                       'Кейс завершён',
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                     ),
                     const SizedBox(height: 12),
                     ElevatedButton(
@@ -571,6 +602,10 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
   }
 
   Widget _buildChipsRow() {
+    // Прячем только когда пользователь уже начал ввод
+    if (_inputFocus.hasFocus && _inputController.text.trim().isNotEmpty) {
+      return const SizedBox.shrink();
+    }
     final chips = _resolveRecommendedChips();
     if (chips.isEmpty) return const SizedBox.shrink();
     return Padding(
@@ -586,10 +621,30 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
                   ? Icons.help_outline
                   : Icons.lightbulb_outline,
               onTap: () {
+                // Breadcrumb: Применен совет (бот-специфично)
+                try {
+                  Sentry.addBreadcrumb(Breadcrumb(
+                    level: SentryLevel.info,
+                    category: widget.bot == 'max' ? 'goal' : 'leo',
+                    message: widget.bot == 'max'
+                        ? 'goal_checkpoint_max_suggestion_applied'
+                        : 'leo_suggestion_applied',
+                    data: {
+                      'suggestion_text': text.length > 50
+                          ? '${text.substring(0, 50)}...'
+                          : text,
+                      'bot': widget.bot,
+                    },
+                  ));
+                } catch (_) {}
+
                 _inputController.text = text;
                 _inputController.selection = TextSelection.fromPosition(
                     TextPosition(offset: _inputController.text.length));
                 _inputFocus.requestFocus();
+                setState(() {
+                  _dismissedChips.add(text);
+                });
               },
             ),
         ],
@@ -598,20 +653,21 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
   }
 
   List<String> _resolveRecommendedChips() {
-    if (widget.recommendedChips != null &&
-        widget.recommendedChips!.isNotEmpty) {
-      // Объединим серверные и локальные, удалив дубли и ограничив до 6 штук
-      final local = _localChipsFallback();
-      final merged = <String>{...widget.recommendedChips!, ...local}.toList();
-      if (merged.length > 6) return merged.sublist(0, 6);
-      return merged;
-    }
-    return _localChipsFallback();
+    final fromWidget = widget.recommendedChips ?? const [];
+    final fromServer = _serverRecommendedChips;
+    final local = _localChipsFallback();
+    final merged = <String>{...fromWidget, ...fromServer, ...local}
+        .where((e) => e.trim().isNotEmpty)
+        .where((e) => !_dismissedChips.contains(e))
+        .toList();
+    if (merged.length > 6) return merged.sublist(0, 6);
+    return merged;
   }
 
   List<String> _localChipsFallback() {
-    // Клиентский фолбэк: подбираем подсказки по версии цели в userContext
+    // Клиентский фолбэк
     if (widget.bot == 'max') {
+      // По версии цели в userContext
       final ctx = widget.userContext ?? '';
       final match = RegExp(r'goal_version:\s*(\d+)').firstMatch(ctx);
       final v = match != null ? int.tryParse(match.group(1) ?? '') : null;
@@ -626,22 +682,59 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
           ];
         case 2:
           return const [
-            'Неделя 1: Подготовка',
-            'Неделя 2: Запуск',
-            'Неделя 3: Масштабирование',
-            'Неделя 4: Оптимизация',
+            'Текущее значение метрики',
+            'Целевое значение',
+            'Реалистична ли цель?',
           ];
         case 3:
           return const [
+            'Неделя 1: фокус',
+            'Неделя 2: фокус',
+            'Неделя 3: фокус',
+            'Неделя 4: фокус',
+          ];
+        case 4:
+          return const [
             'Готовность 7/10',
-            'Начать завтра',
-            'Старт в понедельник',
+            'Назначить дату старта',
+            'Первый шаг завтра',
           ];
         default:
-          return const [];
+          // Общий старт без контекста
+          return const [
+            'Уточнить цель',
+            'Поставить метрику',
+            'Определить дату старта',
+            'Сформулировать ближайший шаг',
+          ];
       }
+    } else {
+      // Leo: базовый фолбэк по уровню
+      int lvl = 0;
+      try {
+        final lc = widget.levelContext ?? '';
+        final m1 = RegExp(r'level[_ ]?id\s*[:=]\s*(\d+)', caseSensitive: false)
+            .firstMatch(lc);
+        final m2 = RegExp(r'current_level\s*[:=]\s*(\d+)', caseSensitive: false)
+            .firstMatch(lc);
+        lvl = int.tryParse((m1?.group(1) ?? m2?.group(1) ?? '0')) ?? 0;
+      } catch (_) {}
+      if (lvl <= 0) {
+        return const [
+          'С чего начать (ур.1)',
+          'Объясни SMART просто',
+          'Пример из моей сферы',
+          'Дай микро‑шаг',
+        ];
+      }
+      return [
+        'Как применить на практике',
+        'Пример из моей сферы',
+        'Разобрать мою задачу',
+        'Дай микро‑шаг',
+        'Объясни тему ур.$lvl',
+      ];
     }
-    return const [];
   }
 }
 

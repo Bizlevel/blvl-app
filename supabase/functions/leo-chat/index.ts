@@ -8,6 +8,8 @@ import OpenAI from "https://deno.land/x/openai@v4.20.1/mod.ts";
 
 const personaCache = new Map();
 const ragCache = new Map();
+// Временный кеш для дедупликации чипов в рамках жизни процесса Edge (best-effort)
+const chipsSeenCache = new Map(); // key: `${userId}|${bot}` -> Map<label,{expiresAt:number}>
 
 function nowMs() {
   return Date.now();
@@ -33,6 +35,71 @@ function setCached(map, key, value, ttlMs) {
     value,
     expiresAt: nowMs() + ttlMs
   });
+}
+
+// ============================
+// Flags & Env
+// ============================
+function getBoolEnv(name, def = false) {
+  const v = (Deno.env.get(name) || '').trim().toLowerCase();
+  if (v === 'true' || v === '1' || v === 'yes') return true;
+  if (v === 'false' || v === '0' || v === 'no') return false;
+  return def;
+}
+
+function getIntEnv(name, def) {
+  const v = parseInt(Deno.env.get(name) || `${def}`);
+  return isFinite(v) ? v : def;
+}
+
+function getChipConfig() {
+  return {
+    enableMaxV2: getBoolEnv('MAX_CHIPS_V2', true),
+    enableLeoV1: getBoolEnv('LEO_CHIPS_V1', true),
+    maxCount: Math.max(1, Math.min(6, getIntEnv('CHIPS_MAX_COUNT', 6))),
+    sessionTtlMin: Math.max(5, getIntEnv('CHIPS_SESSION_TTL_MIN', 30)),
+    dailyDedup: getBoolEnv('CHIPS_DAILY_DEDUP', true)
+  };
+}
+
+function limitChips(chips, maxCount) {
+  const list = Array.isArray(chips) ? chips.filter(Boolean) : [];
+  return list.slice(0, Math.max(0, maxCount));
+}
+
+function dedupChipsForUser(userId, bot, chips, ttlMinutes) {
+  if (!userId) return chips;
+  const key = `${userId}|${bot}`;
+  let seen = chipsSeenCache.get(key);
+  const now = nowMs();
+  if (!seen) {
+    seen = new Map();
+    chipsSeenCache.set(key, seen);
+  } else {
+    // очистка просроченных
+    for (const [label, meta] of seen.entries()) {
+      if (!meta || meta.expiresAt <= now) seen.delete(label);
+    }
+  }
+  const out = [];
+  for (const label of chips) {
+    if (!label || typeof label !== 'string') continue;
+    if (!seen.has(label)) {
+      out.push(label);
+      seen.set(label, { expiresAt: now + ttlMinutes * 60 * 1000 });
+    }
+  }
+  return out;
+}
+
+function logChipsRendered(bot, labels) {
+  try {
+    console.log('BR chips_rendered', {
+      bot,
+      count: Array.isArray(labels) ? labels.length : 0,
+      labels: Array.isArray(labels) ? labels.slice(0, 6) : []
+    });
+  } catch (_) {}
 }
 
 function hashQuery(s) {
@@ -101,17 +168,27 @@ function sanitizeMaxResponse(content) {
 }
 
 // Функция расчета стоимости
-function calculateCost(usage, model = 'gpt-4.1-mini') {
+function calculateCost(usage, model = 'grok-4-fast-non-reasoning') {
   const inputTokens = usage?.prompt_tokens || 0;
   const outputTokens = usage?.completion_tokens || 0;
-  let inputCostPer1K = 0.0004; // GPT-4.1-mini по умолчанию
+  let inputCostPer1K = 0.0004; // defaults for GPT-4.1-mini
   let outputCostPer1K = 0.0016;
-  if (model === 'gpt-4.1') {
-    inputCostPer1K = 0.002;
-    outputCostPer1K = 0.008;
-  } else if (model === 'gpt-5-mini') {
-    inputCostPer1K = 0.00025;
-    outputCostPer1K = 0.002;
+  try {
+    if (typeof model === 'string' && model.startsWith('grok-')) {
+      // Позволяем конфигурировать стоимость для XAI через ENV
+      const envIn = parseFloat(Deno.env.get('XAI_INPUT_COST_PER_1K') || '0.001');
+      const envOut = parseFloat(Deno.env.get('XAI_OUTPUT_COST_PER_1K') || '0.003');
+      inputCostPer1K = isFinite(envIn) ? envIn : inputCostPer1K;
+      outputCostPer1K = isFinite(envOut) ? envOut : outputCostPer1K;
+    } else if (model === 'gpt-4.1') {
+      inputCostPer1K = 0.002;
+      outputCostPer1K = 0.008;
+    } else if (model === 'gpt-5-mini' || (typeof model === 'string' && model.startsWith('gpt-'))) {
+      inputCostPer1K = 0.00025;
+      outputCostPer1K = 0.002;
+    }
+  } catch (_) {
+    // keep defaults on any parsing error
   }
   const totalCost = (inputTokens * inputCostPer1K / 1000) + (outputTokens * outputCostPer1K / 1000);
   return Math.round(totalCost * 1000000) / 1000000; // Округляем до 6 знаков
@@ -247,7 +324,64 @@ const corsHeaders = {
 // Lazy init clients to avoid module-load failures if secrets are missing
 let supabaseAdmin = null;
 let supabaseAuth = null;
-let openai = null;
+
+/**
+ * Создает XAI клиента для Grok моделей
+ * Все боты используют только XAI (x.ai)
+ */
+function getOpenAIClient(model) {
+  const xaiKey = Deno.env.get("XAI_API_KEY");
+  
+  if (!xaiKey) {
+    throw new Error('XAI_API_KEY is required but not found in environment');
+  }
+  
+  console.log('INFO openai_client_created', {
+    model,
+    usingKey: 'XAI_API_KEY',
+    baseURL: 'https://api.x.ai/v1'
+  });
+  
+  return new OpenAI({
+    apiKey: xaiKey,
+    baseURL: "https://api.x.ai/v1"
+  });
+}
+
+/**
+ * Клиент OpenAI для эмбеддингов (RAG). Использует OPENAI_API_KEY и стандартный API.
+ */
+function getOpenAIEmbeddingsClient() {
+  const openaiKey = Deno.env.get('OPENAI_API_KEY');
+  if (!openaiKey) {
+    throw new Error('OPENAI_API_KEY is required for embeddings');
+  }
+  return new OpenAI({ apiKey: openaiKey });
+}
+
+/**
+ * Формирует параметры для chat.completions.create
+ * Все боты используют XAI (Grok), которые поддерживают только temperature=1
+ */
+function getChatCompletionParams(model, messages, options = {}) {
+  const baseParams = {
+    model,
+    messages
+  };
+  
+  // max_tokens поддерживается XAI
+  if (options.max_tokens !== undefined) {
+    baseParams.max_tokens = options.max_tokens;
+  }
+  
+  console.log('INFO chat_completion_params', {
+    model,
+    maxTokens: options.max_tokens,
+    note: 'temperature не передается (XAI использует дефолт=1)'
+  });
+  
+  return baseParams;
+}
 
 serve(async (req) => {
   // Handle CORS pre-flight
@@ -259,30 +393,30 @@ serve(async (req) => {
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
-  const openaiKey = Deno.env.get("OPENAI_API_KEY");
+  const xaiKey = Deno.env.get("XAI_API_KEY");
 
   console.log('INFO env_check', {
-    supabaseUrl: supabaseUrl?.substring(0, 30) + '...',
     hasServiceKey: Boolean(supabaseServiceKey),
     hasAnonKey: Boolean(supabaseAnonKey),
-    hasOpenaiKey: Boolean(openaiKey)
+    hasXaiKey: Boolean(xaiKey),
+    hasOpenAIKey: Boolean(Deno.env.get('OPENAI_API_KEY'))
   });
 
-  if (!supabaseUrl || !supabaseServiceKey || !openaiKey) {
+  if (!supabaseUrl || !supabaseServiceKey || !xaiKey) {
     console.error("ERR missing_env_vars", { 
       hasSupabaseUrl: Boolean(supabaseUrl),
       hasSupabaseServiceKey: Boolean(supabaseServiceKey),
       hasSupabaseAnonKey: Boolean(supabaseAnonKey),
-      hasOpenaiKey: Boolean(openaiKey)
+      hasXaiKey: Boolean(xaiKey)
     });
     return new Response(JSON.stringify({
         error: "Configuration error", 
-        details: "Missing required environment variables",
+        details: "Missing required environment variables (need XAI_API_KEY for Grok models)",
         missing: {
           supabaseUrl: !supabaseUrl,
           supabaseServiceKey: !supabaseServiceKey,
           supabaseAnonKey: !supabaseAnonKey,
-          openaiKey: !openaiKey
+          xaiKey: !xaiKey
         }
     }), {
       status: 500,
@@ -298,9 +432,6 @@ serve(async (req) => {
     if (!supabaseAuth) {
       supabaseAuth = createClient(supabaseUrl, supabaseAnonKey);
     }
-    if (!openai) {
-      openai = new OpenAI();
-    }
 
     // Read request body once to support additional parameters
     const body = await req.json();
@@ -308,13 +439,13 @@ serve(async (req) => {
     // TEMPORARY: Return version info to confirm deployment
     if (body?.version_check === true) {
       return new Response(JSON.stringify({
-          version: "v2.0-jwt-debug",
+          version: "v3.0-xai-only",
           timestamp: new Date().toISOString(),
           env_vars: {
             hasSupabaseUrl: Boolean(Deno.env.get("SUPABASE_URL")),
             hasServiceKey: Boolean(Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")),
             hasAnonKey: Boolean(Deno.env.get("SUPABASE_ANON_KEY")),
-            hasOpenaiKey: Boolean(Deno.env.get("OPENAI_API_KEY"))
+            hasXaiKey: Boolean(Deno.env.get("XAI_API_KEY"))
           }
       }), {
         status: 200,
@@ -344,13 +475,12 @@ serve(async (req) => {
 
     // ==============================
     // GOAL_COMMENT MODE (short reply to field save, no RAG, no GP spend)
-    // Disabled by default via feature flag
     // ==============================
     if (mode === 'goal_comment') {
-      const goalCommentFlag = (Deno.env.get('ENABLE_GOAL_COMMENT') || 'false').toLowerCase();
-      if (goalCommentFlag !== 'true') {
-        return new Response(null, { headers: corsHeaders });
-      }
+      console.log('[GOAL_COMMENT] Request received', { 
+        hasBody: Boolean(body),
+        bodyKeys: body ? Object.keys(body) : []
+      });
 
       try {
         // Вебхук приходит из БД-триггера с заголовком Authorization: Bearer <CRON_SECRET>
@@ -358,7 +488,15 @@ serve(async (req) => {
         const authHeader = req.headers.get('authorization') || '';
         const bearerOk = cronSecret && authHeader.startsWith('Bearer ') && authHeader.replace('Bearer ', '').trim() === cronSecret;
 
+        console.log('[GOAL_COMMENT] Auth check', {
+          hasCronSecret: Boolean(cronSecret && cronSecret.length > 0),
+          hasAuthHeader: Boolean(authHeader),
+          authType: authHeader ? (authHeader.startsWith('Bearer ') ? 'Bearer' : 'Other') : 'None',
+          isAuthorized: bearerOk
+        });
+
         if (!bearerOk) {
+          console.error('[GOAL_COMMENT] Unauthorized webhook attempt');
           return new Response(JSON.stringify({ error: 'unauthorized_webhook' }), {
             status: 401,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -371,11 +509,74 @@ serve(async (req) => {
         const fieldValue = body?.field_value ?? body?.fieldValue ?? null;
         const allFields = body?.all_fields ?? body?.allFields ?? {};
 
-        // Системный промпт (короткий стиль Макса)
-        const basePrompt = `Ты - Макс, трекер целей BizLevel. Отвечай по-русски, кратко (2–3 предложения), без вводных фраз.
+        console.log('[GOAL_COMMENT] Parsed event data', {
+          version,
+          fieldName,
+          hasFieldValue: fieldValue !== null && fieldValue !== undefined,
+          allFieldsKeys: allFields && typeof allFields === 'object' ? Object.keys(allFields) : [],
+          userId: body?.user_id
+        });
+
+        // Проверка: завершена ли версия полностью (milestone)
+        const isMilestone = (version, fields) => {
+          if (!fields || typeof fields !== 'object') return false;
+          
+          const hasValue = (key) => {
+            const val = fields[key];
+            return val !== null && val !== undefined && val !== '';
+          };
+
+          if (version === 2) {
+            return hasValue('concrete_result') && hasValue('metric_type') && 
+                   hasValue('metric_current') && hasValue('metric_target') && 
+                   hasValue('financial_goal');
+          } else if (version === 3) {
+            return hasValue('goal_smart') && hasValue('week1_focus') && 
+                   hasValue('week2_focus') && hasValue('week3_focus') && 
+                   hasValue('week4_focus');
+          } else if (version === 4) {
+            return hasValue('first_three_days') && hasValue('start_date') && 
+                   hasValue('accountability_person') && hasValue('readiness_score');
+          }
+          return false;
+        };
+
+        const isVersionComplete = isMilestone(version, allFields);
+        console.log('[GOAL_COMMENT] Milestone check', { version, isVersionComplete });
+
+        // Системный промпт: обычный или праздничный (milestone)
+        let basePrompt;
+        if (isVersionComplete) {
+          // MILESTONE PROMPT: Версия завершена! Праздничная реакция
+          const milestoneNames = {
+            2: 'Метрики',
+            3: 'План на 4 недели',
+            4: 'Готовность к старту'
+          };
+          const vName = milestoneNames[version] || `v${version}`;
+          
+          basePrompt = `Ты - Макс, трекер целей BizLevel. Отвечай по-русски.
+
+🎉 ВАЖНОЕ СОБЫТИЕ: пользователь ЗАВЕРШИЛ этап "${vName}"! Это milestone!
+
+ТВОЯ ЗАДАЧА:
+1. Поздравь с завершением этапа (кратко, искренне, 1-2 предложения)
+2. Подчеркни значимость: что теперь готово (метрика/план/готовность)
+3. Скажи, что дальше: ${version === 2 ? 'план на 4 недели' : version === 3 ? 'финальная подготовка' : 'запуск 28-дневного спринта!'}
+
+СТИЛЬ: Тёплый, мотивирующий, но без банальщины. Можешь 1-2 эмодзи (🎯 ✅ 💪).
+ДЛИНА: 3-4 предложения максимум.
+ЗАПРЕЩЕНО: «молодец», «отлично справился», вопросы «чем помочь».
+
+Сейчас заполнено: ${JSON.stringify(allFields).slice(0, 200)}`;
+        } else {
+          // ОБЫЧНЫЙ PROMPT: Комментарий к отдельному полю
+          basePrompt = `Ты - Макс, трекер целей BizLevel. Отвечай по-русски, кратко (2–3 предложения), без вводных фраз.
 КОНТЕКСТ: пользователь заполняет версию цели v${version}. Сейчас заполнено поле "${fieldName}".
 СТИЛЬ: простые слова, локальный контекст (Казахстан, тенге), на «ты». Структура ответа: 1) короткий комментарий к введённому значению; 2) подсказка или вопрос к следующему шагу; 3) (опционально) микро-совет.
+МОЖНО: 1 эмодзи, вводные фразы типа «Смотри», «Давай уточним».
 ЗАПРЕЩЕНО: общие фразы «отлично/молодец/правильно», вопросы «чем помочь?», лишние вводные.`;
+        }
 
         // Пользовательское сообщение для модели
         const userParts = [];
@@ -385,47 +586,116 @@ serve(async (req) => {
 
         // Рекомендованные чипы (по версии/следующим шагам)
         let recommended_chips;
-        if (version === 1) {
-          // v1: concrete_result → main_pain → first_action
-          if (fieldName === 'concrete_result') recommended_chips = [ 'Главная проблема', 'Что мешает сейчас?' ];
-          else if (fieldName === 'main_pain') recommended_chips = [ 'Действие на завтра', 'Начну с …' ];
-          else recommended_chips = [ 'Уточнить результат', 'Добавить цифру в цель' ];
-        } else if (version === 2) {
-          if (fieldName === 'metric_type') recommended_chips = [ 'Сколько сейчас?', 'Текущее значение' ];
-          else if (fieldName === 'metric_current') recommended_chips = [ 'Целевое значение', 'Хочу к концу месяца …' ];
-          else recommended_chips = [ 'Пересчитать % роста' ];
-        } else if (version === 3) {
-          recommended_chips = [ 'Неделя 1: фокус', 'Неделя 2: фокус', 'Неделя 3: фокус', 'Неделя 4: фокус' ];
-        } else if (version === 4) {
-          if (fieldName === 'readiness_score') recommended_chips = [ 'Дата старта', 'Начать в понедельник' ];
-          else if (fieldName === 'start_date') recommended_chips = [ 'Кому расскажу', 'Никому' ];
-          else if (fieldName === 'accountability_person') recommended_chips = [ 'План на 3 дня' ];
-          else recommended_chips = [ 'Готовность 7/10' ];
+        if (isVersionComplete) {
+          // MILESTONE: специальные чипы для завершенной версии
+          if (version === 2) {
+            recommended_chips = ['Перейти к плану на 4 недели', 'Еще раз проверю метрику'];
+          } else if (version === 3) {
+            recommended_chips = ['Финальная подготовка к старту', 'Уточнить план'];
+          } else if (version === 4) {
+            recommended_chips = ['Запустить 28 дней!', 'Еще раз о готовности'];
+          }
+        } else {
+          // Персонализированные чипы с учетом контекста пользователя
+          if (version === 1) {
+            // v1: concrete_result → main_pain → first_action
+            if (fieldName === 'concrete_result') {
+              // Если есть цель - подсказываем следующий шаг
+              recommended_chips = allFields?.concrete_result 
+                ? [ 'Что мешает достичь этого?', 'Главная проблема на пути' ]
+                : [ 'Главная проблема', 'Что мешает сейчас?' ];
+            } else if (fieldName === 'main_pain') {
+              recommended_chips = [ 'Первый шаг завтра', 'Начну с …' ];
+            } else {
+              recommended_chips = [ 'Уточнить результат', 'Добавить цифру в цель' ];
+            }
+          } else if (version === 2) {
+            if (fieldName === 'metric_type') {
+              // Если уже есть цель из v1 - предлагаем метрики в её контексте
+              const goalText = allFields?.concrete_result || '';
+              if (goalText.toLowerCase().includes('выручк') || goalText.toLowerCase().includes('доход')) {
+                recommended_chips = [ 'Текущая выручка', 'Сколько сейчас зарабатываю' ];
+              } else if (goalText.toLowerCase().includes('клиент') || goalText.toLowerCase().includes('заказ')) {
+                recommended_chips = [ 'Текущее кол-во клиентов', 'Сколько клиентов сейчас' ];
+              } else {
+                recommended_chips = [ 'Сколько сейчас?', 'Текущее значение' ];
+              }
+            } else if (fieldName === 'metric_current') {
+              recommended_chips = [ 'Целевое значение', 'Хочу к концу месяца …' ];
+            } else {
+              // metric_target заполнена - предлагаем перепроверить
+              recommended_chips = [ 'Пересчитать % роста', 'Реалистична ли цель?' ];
+            }
+          } else if (version === 3) {
+            // v3: адаптируем под номер недели
+            if (fieldName === 'week1_focus') {
+              recommended_chips = [ 'Неделя 2: фокус', 'Что делать во вторую неделю?' ];
+            } else if (fieldName === 'week2_focus') {
+              recommended_chips = [ 'Неделя 3: фокус', 'Что делать на третью неделю?' ];
+            } else if (fieldName === 'week3_focus') {
+              recommended_chips = [ 'Неделя 4: фокус', 'Финальная неделя' ];
+            } else {
+              recommended_chips = [ 'Неделя 1: фокус', 'Пересмотреть план' ];
+            }
+          } else if (version === 4) {
+            if (fieldName === 'readiness_score') {
+              const score = allFields?.readiness_score;
+              if (score && parseInt(score) >= 7) {
+                recommended_chips = [ 'Дата старта', 'Начать завтра!' ];
+              } else {
+                recommended_chips = [ 'Как повысить готовность?', 'Что еще нужно?' ];
+              }
+            } else if (fieldName === 'start_date') {
+              recommended_chips = [ 'Кому расскажу о цели', 'Поддержка близких' ];
+            } else if (fieldName === 'accountability_person') {
+              recommended_chips = [ 'План на первые 3 дня', 'С чего начнем?' ];
+            } else {
+              recommended_chips = [ 'Готовность 7/10', 'Уточнить дату старта' ];
+            }
+          }
         }
 
-        const apiKey = Deno.env.get('OPENAI_API_KEY');
-        if (!apiKey || apiKey.trim().length < 20) {
-          return new Response(JSON.stringify({ error: 'openai_config_error' }), {
-            status: 500,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          });
-        }
+        // XAI_API_KEY уже проверен в начале функции
+        const model = Deno.env.get('OPENAI_MODEL') || 'grok-4-fast-non-reasoning';
+        const openaiClient = getOpenAIClient(model);
         
-        const completion = await openai!.chat.completions.create({
-          model: Deno.env.get('OPENAI_MODEL') || 'gpt-4.1-mini',
+        const completionParams = getChatCompletionParams(model, [{
+          role: 'system',
+          content: basePrompt
+        }, {
+          role: 'user',
+          content: userParts.join('\n') || 'Новое поле сохранено'
+        }], {
           temperature: 0.3,
-          max_tokens: 120,
-          messages: [{
-            role: 'system',
-            content: basePrompt
-          }, {
-            role: 'user',
-            content: userParts.join('\n') || 'Новое поле сохранено'
-          }]
+          max_tokens: isVersionComplete ? 200 : 120 // Больше токенов для milestone-реакций
         });
+        
+        const completion = await openaiClient.chat.completions.create(completionParams);
 
         const assistantMessage = completion.choices[0].message;
         const usage = completion.usage;
+
+        console.log('[GOAL_COMMENT] OpenAI response generated', {
+          model: completion.model,
+          tokensUsed: usage?.total_tokens || 0,
+          messageLength: assistantMessage?.content?.length || 0,
+          hasRecommendedChips: Boolean(recommended_chips),
+          chipsCount: recommended_chips ? recommended_chips.length : 0
+        });
+
+        // Ограничение/дедуп/логирование (по флагам)
+        try {
+          const cfg = getChipConfig();
+          if (cfg.enableMaxV2) {
+            let chips = recommended_chips || [];
+            chips = dedupChipsForUser(body?.user_id || null, 'max', chips, cfg.sessionTtlMin);
+            chips = limitChips(chips, cfg.maxCount);
+            recommended_chips = chips.length ? chips : undefined;
+            if (recommended_chips) logChipsRendered('max', recommended_chips);
+          } else {
+            recommended_chips = undefined;
+          }
+        } catch (_) {}
 
         // Breadcrumbs (без PII)
         console.log('BR goal_comment_done', { version, fieldName, hasAllFields: Boolean(allFields) });
@@ -441,6 +711,11 @@ serve(async (req) => {
 
       } catch (e) {
         const short = (e?.message || String(e)).slice(0, 240);
+        console.error('[GOAL_COMMENT] Error occurred', { 
+          errorType: e?.name || 'Unknown',
+          errorMessage: short.slice(0, 120),
+          stack: e?.stack?.slice(0, 200)
+        });
         console.error('BR goal_comment_error', { details: short.slice(0, 120) });
         return new Response(JSON.stringify({
           error: 'goal_comment_error',
@@ -492,32 +767,42 @@ serve(async (req) => {
         if (usedTools.length) parts.push(`Инструменты: ${usedTools.join(', ')}`);
 
         // Recommended chips: next-week focus
-        const recommended_chips = [
+        let recommended_chips = [
           'Фокус следующей недели',
           'Как усилить результат',
           'Что мешает сейчас?'
         ];
 
-        const apiKey = Deno.env.get('OPENAI_API_KEY');
-        if (!apiKey || apiKey.trim().length < 20) {
-          return new Response(JSON.stringify({ error: 'openai_config_error' }), {
-            status: 500,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          });
-        }
+        // Ограничение/дедуп/логирование (по флагам)
+        try {
+          const cfg = getChipConfig();
+          if (cfg.enableMaxV2) {
+            let chips = recommended_chips || [];
+            chips = dedupChipsForUser(body?.user_id || null, 'max', chips, cfg.sessionTtlMin);
+            chips = limitChips(chips, cfg.maxCount);
+            recommended_chips = chips.length ? chips : undefined;
+            if (recommended_chips) logChipsRendered('max', recommended_chips);
+          } else {
+            recommended_chips = undefined;
+          }
+        } catch (_) {}
 
-        const completion = await openai!.chat.completions.create({
-          model: Deno.env.get('OPENAI_MODEL') || 'gpt-4.1-mini',
+        // XAI_API_KEY уже проверен в начале функции
+        const model = Deno.env.get('OPENAI_MODEL') || 'grok-4-fast-non-reasoning';
+        const openaiClient = getOpenAIClient(model);
+
+        const completionParams = getChatCompletionParams(model, [{
+          role: 'system',
+          content: basePrompt
+        }, {
+          role: 'user',
+          content: parts.join('\n') || 'Чек-ин сохранён'
+        }], {
           temperature: 0.3,
-          max_tokens: 120,
-          messages: [{
-            role: 'system',
-            content: basePrompt
-          }, {
-            role: 'user',
-            content: parts.join('\n') || 'Чек-ин сохранён'
-          }]
+          max_tokens: 120
         });
+
+        const completion = await openaiClient.chat.completions.create(completionParams);
 
         const assistantMessage = completion.choices[0].message;
         const usage = completion.usage;
@@ -573,30 +858,25 @@ serve(async (req) => {
           `Результат: ${isCorrect ? 'верно' : 'неверно'}`
         ].filter(Boolean).join('\n');
 
-        const apiKey = Deno.env.get("OPENAI_API_KEY");
-        if (!apiKey || apiKey.trim().length < 20) {
-          return new Response(JSON.stringify({ error: "openai_config_error" }), {
-            status: 500,
-            headers: { ...corsHeaders, "Content-Type": "application/json" }
-          });
-        }
+        // XAI_API_KEY уже проверен в начале функции
+        const model = Deno.env.get("OPENAI_MODEL") || "grok-4-fast-non-reasoning";
+        const openaiClient = getOpenAIClient(model);
 
-        const completion = await openai!.chat.completions.create({
-          model: Deno.env.get("OPENAI_MODEL") || "gpt-4.1-mini",
+        const completionParams = getChatCompletionParams(model, [{
+          role: "system",
+          content: systemPromptQuiz
+        }, {
+          role: "user",
+          content: userMsgParts
+        }], {
           temperature: 0.2,
-          max_tokens: Math.max(60, Math.min(300, maxTokens)),
-          messages: [{
-            role: "system",
-            content: systemPromptQuiz
-          }, {
-            role: "user",
-            content: userMsgParts
-          }]
+          max_tokens: Math.max(60, Math.min(300, maxTokens))
         });
+
+        const completion = await openaiClient.chat.completions.create(completionParams);
 
         const assistantMessage = completion.choices[0].message;
         const usage = completion.usage;
-        const model = Deno.env.get("OPENAI_MODEL") || "gpt-4.1-mini";
         const cost = calculateCost(usage, model);
         
         await saveAIMessageData(userId, null, null, usage, cost, model, 'quiz', 'quiz', supabaseAdmin!);
@@ -801,8 +1081,9 @@ serve(async (req) => {
     // Встроенный RAG: эмбеддинг + match_documents (с кешем)
     // RAG context (только для Leo, не для Max, не для case-mode)
     let ragContext = '';
-    // Определяем, нужен ли RAG, и выполняем его параллельно с загрузкой контекста
-    const shouldDoRAG = !isMax && !caseMode && typeof lastUserMessage === 'string' && lastUserMessage.trim().length > 0;
+    // RAG включается только для Лео, при наличии OPENAI_API_KEY и не в режимах case/quiz
+    const openaiEmbeddingsKey = (Deno.env.get('OPENAI_API_KEY') || '').trim();
+    const shouldDoRAG = (!isMax) && !caseMode && (mode !== 'quiz') && (openaiEmbeddingsKey.length > 0);
     let ragPromise = Promise.resolve('');
     if (shouldDoRAG) {
       // Проверяем, не относится ли вопрос к непройденным уровням
@@ -828,8 +1109,9 @@ serve(async (req) => {
       if (questionLevel > maxCompletedLevel) {
         ragPromise = Promise.resolve('');
       } else {
-        // Выполняем RAG параллельно с загрузкой контекста
-        ragPromise = performRAGQuery(lastUserMessage, levelContext, userId, ragCache, openai!, supabaseAdmin!).catch((e) => {
+        // Выполняем RAG параллельно с загрузкой контекста через OpenAI embeddings
+        const ragClient = getOpenAIEmbeddingsClient();
+        ragPromise = performRAGQuery(lastUserMessage, levelContext, userId, ragCache, ragClient, supabaseAdmin!).catch((e) => {
           console.error('ERR rag_query', { message: String(e).slice(0, 200) });
           return ''; // Graceful degradation
         });
@@ -1143,6 +1425,23 @@ ${levelContext && levelContext !== 'null' ? `\n## КОНТЕКСТ УРОКА:\n
 — Полностью включайся в работу только после того, как пользователь прошёл урок 4. До этого момента мягко мотивируй пройти первые четыре урока, не обсуждай цели подробно.
 — Обсуждай исключительно цели пользователя, их формулировку, уточнение, достижение и прогресс. Не помогай с материалами уроков, не объясняй их и не давай советов по ним.
 
+## СТИЛЬ ОБЩЕНИЯ:
+**Ты — живой, заинтересованный наставник, а не холодный робот.**
+
+РАЗРЕШЕНО (используй умеренно):
+— Эмоциональная реакция на достижения: «Отлично!», «Круто!», «Это прогресс!»
+— Поддержка при сложностях: «Понимаю, это непросто», «Ок, попробуем иначе»
+— Вводные фразы для плавности: «Смотри», «Давай разберём», «По сути»
+— 1-2 эмодзи там, где это усиливает смысл (🎯 для целей, 💪 для мотивации, ✅ для достижений)
+
+ЗАПРЕЩЕНО:
+— Избыточная эмоциональность («Супер-пупер!», куча восклицательных знаков!!!)
+— Фальшивая бодрость («Давай-давай!», «Ты молодец!» без причины)
+— Банальные мотивашки («Всё получится!», «Верь в себя!»)
+— Таблицы, сложная разметка
+
+**Баланс:** Профессионально + Человечно. Как опытный коллега, который искренне помогает.
+
 ## Адаптация под опыт пользователя:
 ${experienceModule}
 
@@ -1159,9 +1458,9 @@ ${localContextModule}
 — Отслеживай прогресс: спрашивай о выполнении предыдущих шагов, поддерживай пользователя в движении к цели.
 Запреты:
 — Категорически запрещено обсуждать, объяснять или помогать с материалами уроков, даже если пользователь просит об этом. Всегда мягко перенаправляй к самостоятельному изучению уроков.
-— Запрещено использовать таблицы, эмодзи, разметку, символы форматирования, кроме простого текста.
+— Запрещено использовать таблицы и сложную разметку. Эмодзи — 1-2 по делу, не больше.
 — Запрещено предлагать помощь вне темы целей, завершать ответы фразами типа: «Могу помочь с...», «Готов помочь...», «Могу объяснить ещё что-то?».
-— Не используй вводные фразы вежливости и приветствия: не начинай ответы с «Отличный вопрос!», «Понимаю...», «Конечно!», «Давайте разберёмся!», «Привет», «Здравствуйте» и т.п. Сразу переходи к сути.
+— Избегай банальных приветствий («Здравствуйте», «Добрый день»). Можешь использовать «Смотри», «Давай разберём» для плавности.
 Структура и стиль ответа:
 — Отвечай кратко, чётко, по делу, простым языком, без лишних слов.
 — Говори от первого лица.
@@ -1194,7 +1493,8 @@ ${levelContext && levelContext !== 'null' ? `Контекст экрана/ур�
 ${quoteBlock ? `Цитата дня: ${quoteBlock}\n` : ''}
 
 ## Правила формата:
-- Без таблиц, эмодзи и вводных фраз. 2–5 коротких абзацев или маркированный список.
+- 2–5 коротких абзацев или маркированный список. Без таблиц. Эмодзи — 1-2 по делу.
+- Можно использовать вводные фразы для плавности («Смотри», «Давай разберём»).
 - Всегда укажи один следующий шаг (микро‑действие) c реалистичным сроком в ближайшие 1–3 дня.
 - Если данных недостаточно — попроси уточнение по одному самому важному пункту.
 - Если у тебя не хватает информации из профиля, сообщи пользователю, что требуется заполнить информацию в профиле, при этом напомни ему, что от качества заполнения информации в профиле зависит качество работы пользователя с курсом.
@@ -1242,32 +1542,24 @@ ${quoteBlock ? `Цитата дня: ${quoteBlock}\n` : ''}
     }
 
     // --- Безопасный вызов OpenAI с валидацией конфигурации ---
-    const apiKey = Deno.env.get("OPENAI_API_KEY");
-    if (!apiKey || apiKey.trim().length < 20) {
-      console.error("OpenAI API key is not configured or too short");
-      return new Response(JSON.stringify({
-        error: "openai_config_error",
-        details: "OpenAI API key is missing or invalid"
-      }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" }
-      });
-    }
-
+    // XAI_API_KEY уже проверен в начале функции
+    
     try {
       // Compose chat with enhanced system prompt
-      const completion = await openai!.chat.completions.create({
-        model: Deno.env.get("OPENAI_MODEL") || "gpt-4.1-mini",
-        temperature: parseFloat(Deno.env.get("OPENAI_TEMPERATURE") || "0.4"),
-        messages: [{
-          role: "system",
-          content: systemPrompt
-        }, ...messages]
+      const model = Deno.env.get("OPENAI_MODEL") || "grok-4-fast-non-reasoning";
+      const openaiClient = getOpenAIClient(model);
+      
+      const completionParams = getChatCompletionParams(model, [{
+        role: "system",
+        content: systemPrompt
+      }, ...messages], {
+        temperature: parseFloat(Deno.env.get("OPENAI_TEMPERATURE") || "0.4")
       });
+      
+      const completion = await openaiClient.chat.completions.create(completionParams);
 
       let assistantMessage = completion.choices[0].message;
       const usage = completion.usage; // prompt/completion/total tokens
-      const model = Deno.env.get("OPENAI_MODEL") || "gpt-4.1-mini";
       const cost = calculateCost(usage, model);
 
       // Sanitize Max responses from emojis/tables just in case the model drifted
@@ -1290,6 +1582,69 @@ ${quoteBlock ? `Цитата дня: ${quoteBlock}\n` : ''}
         } else if (v === 4) {
           recommended_chips = ['Готовность 7/10', 'Начать завтра', 'Старт в понедельник'];
         }
+
+        // Ограничение/дедуп/логирование (по флагам)
+        try {
+          const cfg = getChipConfig();
+          if (cfg.enableMaxV2 && recommended_chips) {
+            let chips = recommended_chips || [];
+            chips = dedupChipsForUser(userId, 'max', chips, cfg.sessionTtlMin);
+            chips = limitChips(chips, cfg.maxCount);
+            recommended_chips = chips.length ? chips : undefined;
+            if (recommended_chips) logChipsRendered('max', recommended_chips);
+          } else if (!cfg.enableMaxV2) {
+            recommended_chips = undefined;
+          }
+        } catch (_) {}
+      } else {
+        // Лео: простые чипы по уровню/контексту (включаются фичефлагом)
+        try {
+          const cfg = getChipConfig();
+          if (cfg.enableLeoV1) {
+            let lvl = finalLevel || 0;
+            try {
+              if (levelContext && typeof levelContext === 'string') {
+                const m = levelContext.match(/level[_ ]?id\s*[:=]\s*(\d+)/i);
+                if (m) {
+                  const parsed = parseInt(m[1]);
+                  if (Number.isFinite(parsed)) lvl = Math.min(parsed, finalLevel || parsed);
+                }
+              } else if (levelContext && typeof levelContext === 'object') {
+                const lid = levelContext.level_id ?? levelContext.levelId;
+                if (lid != null) {
+                  const parsed = parseInt(String(lid));
+                  if (Number.isFinite(parsed)) lvl = Math.min(parsed, finalLevel || parsed);
+                }
+              }
+            } catch (_) {}
+
+            let chips = [] as string[];
+            if (!lvl || lvl <= 0) {
+              // Общий старт до определения уровня
+              chips = [
+                'С чего начать (ур.1)',
+                'Объясни SMART просто',
+                'Пример из моей сферы',
+                'Дай микро‑шаг',
+                'Ошибки и риски'
+              ];
+            } else {
+              // Таргетированные подсказки под пройденный/текущий уровень
+              chips = [
+                `Объясни тему ур.${lvl}`,
+                'Как применить на практике',
+                'Пример из моей сферы',
+                'Разобрать мою задачу',
+                'Дай микро‑шаг',
+                'Типичные ошибки'
+              ];
+            }
+            chips = dedupChipsForUser(userId, 'leo', chips, cfg.sessionTtlMin);
+            chips = limitChips(chips, cfg.maxCount);
+            recommended_chips = chips.length ? chips : undefined;
+            if (recommended_chips) logChipsRendered('leo', recommended_chips);
+          }
+        } catch (_) {}
       }
 
       // --- Сохранение в leo_messages (для включения триггера памяти) ---
