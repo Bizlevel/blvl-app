@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:bizlevel/theme/color.dart';
 
 /// Дневная карточка «Сегодня» для 28-дневного режима
-class DailyTodayCard extends StatelessWidget {
+class DailyTodayCard extends StatefulWidget {
   const DailyTodayCard({
     super.key,
     required this.dayNumber,
@@ -11,6 +11,7 @@ class DailyTodayCard extends StatelessWidget {
     required this.status,
     required this.onChangeStatus,
     required this.onSaveNote,
+    this.currentStreak = 0,
   });
 
   final int dayNumber; // 1..28
@@ -18,6 +19,56 @@ class DailyTodayCard extends StatelessWidget {
   final String status; // 'completed'|'partial'|'missed'|'pending'
   final void Function(String newStatus) onChangeStatus;
   final void Function(String note) onSaveNote;
+  final int currentStreak; // Текущая серия дней
+
+  @override
+  State<DailyTodayCard> createState() => _DailyTodayCardState();
+}
+
+class _DailyTodayCardState extends State<DailyTodayCard>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _animController;
+  late Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _animController = AnimationController(
+      duration: const Duration(milliseconds: 1200),
+      vsync: this,
+    );
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 1.15).animate(
+      CurvedAnimation(parent: _animController, curve: Curves.easeInOut),
+    );
+
+    // Запускаем анимацию при milestone (7/14/21/28)
+    if (_isMilestone(widget.currentStreak)) {
+      _animController.repeat(reverse: true);
+    }
+  }
+
+  @override
+  void didUpdateWidget(DailyTodayCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Если streak достиг milestone — запускаем анимацию
+    if (widget.currentStreak != oldWidget.currentStreak &&
+        _isMilestone(widget.currentStreak)) {
+      _animController.repeat(reverse: true);
+    } else if (!_isMilestone(widget.currentStreak)) {
+      _animController.stop();
+      _animController.value = 0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _animController.dispose();
+    super.dispose();
+  }
+
+  bool _isMilestone(int streak) {
+    return streak == 7 || streak == 14 || streak == 21 || streak == 28;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -36,19 +87,64 @@ class DailyTodayCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(children: [
-            Text('День $dayNumber из 28',
+            Text('День ${widget.dayNumber} из 28',
                 style: Theme.of(context)
                     .textTheme
-                    .titleSmall
-                    ?.copyWith(fontWeight: FontWeight.w700)),
+                    .titleMedium
+                    ?.copyWith(fontWeight: FontWeight.w800)),
             const Spacer(),
+            // Счётчик серии (streak) с анимацией при milestone
+            if (widget.currentStreak > 0)
+              ScaleTransition(
+                scale: _scaleAnimation,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.orange.shade400,
+                        Colors.red.shade400,
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: _isMilestone(widget.currentStreak)
+                        ? [
+                            BoxShadow(
+                              color: Colors.orange.withOpacity(0.5),
+                              blurRadius: 8,
+                              spreadRadius: 2,
+                            )
+                          ]
+                        : null,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        '🔥',
+                        style: TextStyle(fontSize: 14),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${widget.currentStreak}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
           ]),
           const SizedBox(height: 10),
           _segmentedStatus(context),
           const SizedBox(height: 10),
           Text('Задача дня', style: Theme.of(context).textTheme.bodySmall),
           const SizedBox(height: 4),
-          Text(taskText.isEmpty ? '—' : taskText,
+          Text(widget.taskText.isEmpty ? '—' : widget.taskText,
               style: Theme.of(context).textTheme.bodyMedium),
           const SizedBox(height: 12),
           TextField(
@@ -64,7 +160,7 @@ class DailyTodayCard extends StatelessWidget {
           Align(
             alignment: Alignment.centerRight,
             child: TextButton(
-              onPressed: () => onSaveNote(noteCtrl.text.trim()),
+              onPressed: () => widget.onSaveNote(noteCtrl.text.trim()),
               child: const Text('Сохранить'),
             ),
           ),
@@ -96,14 +192,14 @@ class DailyTodayCard extends StatelessWidget {
                 child: InkWell(
                   onTap: () {
                     HapticFeedback.lightImpact();
-                    onChangeStatus(items[i]['code']!);
+                    widget.onChangeStatus(items[i]['code']!);
                   },
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 120),
                     curve: Curves.easeInOutCubic,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: status == items[i]['code']
+                      color: widget.status == items[i]['code']
                           ? AppColor.primary.withValues(alpha: 0.08)
                           : Colors.transparent,
                       borderRadius: i == 0
@@ -121,7 +217,7 @@ class DailyTodayCard extends StatelessWidget {
                     child: Text(
                       items[i]['label']!,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            fontWeight: status == items[i]['code']
+                            fontWeight: widget.status == items[i]['code']
                                 ? FontWeight.w700
                                 : FontWeight.w500,
                           ),

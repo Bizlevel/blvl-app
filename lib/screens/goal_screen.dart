@@ -25,6 +25,7 @@ import 'package:bizlevel/screens/goal/widgets/daily_sprint_28_widget.dart';
 import 'package:bizlevel/screens/goal/controller/goal_screen_controller.dart';
 import 'package:bizlevel/utils/constant.dart';
 import 'package:bizlevel/services/notifications_service.dart';
+import 'package:bizlevel/utils/friendly_messages.dart';
 import 'package:bizlevel/providers/gp_providers.dart';
 
 class GoalScreen extends ConsumerStatefulWidget {
@@ -348,15 +349,50 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                                 ),
                           ),
                           const SizedBox(height: 8),
-                          GoalCompactCard(
-                            versions: gs.versions,
-                            expanded: _goalCardExpanded,
-                            onToggle: () => setState(
-                                () => _goalCardExpanded = !_goalCardExpanded),
-                            onOpenChat: _openChatWithMax,
-                            metricActual:
-                                double.tryParse(_metricActualCtrl.text.trim()),
-                          ),
+                          // Пустое состояние при отсутствии v1
+                          if (!gs.versions.containsKey(1))
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: AppColor.primary.withValues(alpha: 0.04),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color:
+                                      AppColor.primary.withValues(alpha: 0.2),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.flag_outlined,
+                                      color: Colors.black54),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      'Начните с v1 «Семя цели» — доступно на Уровне 1',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium,
+                                    ),
+                                  ),
+                                  TextButton(
+                                    onPressed: () => GoRouter.of(context)
+                                        .push('/tower?scrollTo=1'),
+                                    child: const Text('Открыть Уровень 1'),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          if (gs.versions.containsKey(1))
+                            GoalCompactCard(
+                              versions: gs.versions,
+                              expanded: _goalCardExpanded,
+                              onToggle: () => setState(
+                                  () => _goalCardExpanded = !_goalCardExpanded),
+                              onOpenChat: _openChatWithMax,
+                              metricActual: double.tryParse(
+                                  _metricActualCtrl.text.trim()),
+                            ),
                           const SizedBox(height: 8),
                           // Компактный гид по шагам: v1→v4→Недели
                           VersionNavigationChips(
@@ -364,64 +400,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                             allowedMaxVersion: allowedMax,
                             onScrollToSprint: _scrollToSprintSection,
                           ),
-                          // Прогресс и «Что дальше» через fetch_goal_state
-                          FutureBuilder<Map<String, dynamic>>(
-                            future: ref
-                                .read(goalsRepositoryProvider)
-                                .fetchGoalState(),
-                            builder: (context, snap) {
-                              final data =
-                                  snap.data ?? const <String, dynamic>{};
-                              final bool hasV1 =
-                                  (data['has_v1'] as bool?) ?? false;
-                              // hasV2, hasV3, hasV4 больше не нужны - прогресс-бар удалён
-                              final String nextAction =
-                                  (data['next_action'] as String?) ?? '';
-                              final int nextTarget =
-                                  (data['next_action_target'] as int?) ?? 0;
-                              String nextHint;
-                              VoidCallback? onCta;
-                              if (nextAction == 'goal_checkpoint' &&
-                                  nextTarget >= 2 &&
-                                  nextTarget <= 4) {
-                                nextHint =
-                                    'Заполните v$nextTarget на чекпоинте';
-                                onCta = () => GoRouter.of(context)
-                                    .push('/goal-checkpoint/$nextTarget');
-                              } else if (nextAction == 'level_up') {
-                                // 🆕 Достигнут предел по уровню
-                                nextHint =
-                                    'Пройдите Уровень $currentLevel для открытия v$nextTarget';
-                                onCta = () => GoRouter.of(context)
-                                    .push('/tower?scrollTo=$currentLevel');
-                              } else if (nextAction == 'weeks') {
-                                nextHint =
-                                    'Все версии заполнены — переходите к неделям';
-                                onCta = () => _scrollToSprintSection();
-                              } else {
-                                nextHint = !hasV1
-                                    ? 'Создайте v1 «Семя цели» на Уровне 1'
-                                    : 'Продолжайте к следующему шагу';
-                              }
-                              // 🗑️ Убран дублирующий прогресс-бар "Прогресс: N%"
-                              // т.к. уже есть галочки на кнопках версий
-                              return Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(nextHint,
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .bodyMedium),
-                                  ),
-                                  if (onCta != null)
-                                    TextButton(
-                                      onPressed: onCta,
-                                      child: const Text('Что дальше'),
-                                    ),
-                                ],
-                              );
-                            },
-                          ),
+                          // Блок «Что дальше» показан отдельным компонентом NextActionBanner сверху
                           const SizedBox(height: 16),
                           CrystallizationSection(
                             versions: gs.versions,
@@ -514,6 +493,12 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                       final bool v4Completed = (v4data['commitment'] == true ||
                           v4data['commitment'] == 'true');
 
+                      // Получаем данные v3 для preview задач
+                      final Map<String, dynamic> v3data =
+                          ((gs.versions[3]?['version_data'] as Map?)
+                                  ?.cast<String, dynamic>()) ??
+                              const <String, dynamic>{};
+
                       final String startIso =
                           (v4data['start_date'] ?? '').toString();
                       final DateTime? startDate =
@@ -591,6 +576,209 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                                   ],
                                 ),
                                 const SizedBox(height: 16),
+                                // Preview первых 3 задач из week1_focus
+                                Container(
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: AppColor.primary
+                                          .withValues(alpha: 0.1),
+                                    ),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            Icons.list_alt,
+                                            size: 20,
+                                            color: AppColor.primary,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            'Первые 3 дня (неделя 1):',
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .titleSmall
+                                                ?.copyWith(
+                                                  fontWeight: FontWeight.w600,
+                                                  color: AppColor.primary,
+                                                ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 12),
+                                      ...List.generate(3, (i) {
+                                        final dayNum = i + 1;
+                                        final week1Focus =
+                                            (v3data['week1_focus'] ??
+                                                    v3data['sprint1_goal'] ??
+                                                    '')
+                                                .toString();
+                                        return Padding(
+                                          padding:
+                                              const EdgeInsets.only(bottom: 8),
+                                          child: Row(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Container(
+                                                width: 24,
+                                                height: 24,
+                                                decoration: BoxDecoration(
+                                                  color: AppColor.primary
+                                                      .withValues(alpha: 0.1),
+                                                  shape: BoxShape.circle,
+                                                ),
+                                                child: Center(
+                                                  child: Text(
+                                                    '$dayNum',
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      color: AppColor.primary,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 12),
+                                              Expanded(
+                                                child: Text(
+                                                  week1Focus.isNotEmpty
+                                                      ? week1Focus
+                                                      : 'Задача будет сгенерирована',
+                                                  style: Theme.of(context)
+                                                      .textTheme
+                                                      .bodyMedium
+                                                      ?.copyWith(
+                                                        color: week1Focus
+                                                                .isNotEmpty
+                                                            ? Colors.black87
+                                                            : Colors.black45,
+                                                      ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                      }),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'Остальные 25 дней будут доступны по ходу спринта',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall
+                                            ?.copyWith(
+                                              color: Colors.black54,
+                                              fontStyle: FontStyle.italic,
+                                            ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                // Блок с GP-бонусами за серии
+                                Container(
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        Color(0xFFFFD700)
+                                            .withValues(alpha: 0.1),
+                                        Color(0xFFFFA500)
+                                            .withValues(alpha: 0.05),
+                                      ],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: Color(0xFFFFD700)
+                                          .withValues(alpha: 0.3),
+                                    ),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            Icons.emoji_events,
+                                            size: 20,
+                                            color: Color(0xFFFF8C00),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            '🎁 Бонусы за серии:',
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .titleSmall
+                                                ?.copyWith(
+                                                  fontWeight: FontWeight.w600,
+                                                  color: Color(0xFFFF8C00),
+                                                ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 12),
+                                      _buildStreakBonusRow(
+                                          context,
+                                          '7 дней подряд',
+                                          '+100 GP',
+                                          Icons.looks_one),
+                                      const SizedBox(height: 8),
+                                      _buildStreakBonusRow(
+                                          context,
+                                          '14 дней подряд',
+                                          '+250 GP',
+                                          Icons.looks_two),
+                                      const SizedBox(height: 8),
+                                      _buildStreakBonusRow(
+                                          context,
+                                          '21 день подряд',
+                                          '+500 GP',
+                                          Icons.looks_3),
+                                      const SizedBox(height: 8),
+                                      _buildStreakBonusRow(
+                                          context,
+                                          '28 дней подряд',
+                                          '+1000 GP',
+                                          Icons.looks_4),
+                                      const SizedBox(height: 8),
+                                      Divider(color: Colors.grey.shade300),
+                                      const SizedBox(height: 8),
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            Icons.stars,
+                                            size: 16,
+                                            color: Color(0xFFFF8C00),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              'Итого до 1850 GP за полный спринт!',
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .bodyMedium
+                                                  ?.copyWith(
+                                                    fontWeight: FontWeight.w700,
+                                                    color: Color(0xFFFF8C00),
+                                                  ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
                                 SizedBox(
                                   width: double.infinity,
                                   child: ElevatedButton(
@@ -599,6 +787,18 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                                         await ref
                                             .read(goalsRepositoryProvider)
                                             .startSprint();
+
+                                        // Breadcrumb: Спринт начат
+                                        Sentry.addBreadcrumb(Breadcrumb(
+                                          level: SentryLevel.info,
+                                          category: 'goal',
+                                          message: '28_days_started',
+                                          data: {
+                                            'timestamp': DateTime.now()
+                                                .toIso8601String(),
+                                          },
+                                        ));
+
                                         await NotificationsService.instance
                                             .scheduleDailySprint();
                                         if (mounted) {
@@ -609,12 +809,13 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                                           setState(() {});
                                           ScaffoldMessenger.of(context)
                                               .showSnackBar(
-                                            const SnackBar(
+                                            SnackBar(
                                               content: Text(
-                                                '🚀 Спринт начат! 28 задач сгенерированы.',
+                                                FriendlyMessages.sprintStarted,
                                               ),
                                               backgroundColor: AppColor.primary,
-                                              duration: Duration(seconds: 3),
+                                              duration:
+                                                  const Duration(seconds: 3),
                                             ),
                                           );
                                         }
@@ -623,7 +824,8 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                                         ScaffoldMessenger.of(context)
                                             .showSnackBar(
                                           SnackBar(
-                                            content: Text('Ошибка запуска: $e'),
+                                            content: Text(
+                                                FriendlyMessages.unknownError),
                                             backgroundColor: Colors.red,
                                           ),
                                         );
@@ -640,13 +842,36 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                                       ),
                                     ),
                                     child: const Text(
-                                      '🚀 Начать 28 дней к цели',
+                                      '🚀 Начать первую неделю',
                                       style: TextStyle(
                                         fontSize: 16,
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),
                                   ),
+                                ),
+                                const SizedBox(height: 12),
+                                // Disclaimer
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.info_outline,
+                                      size: 16,
+                                      color: Colors.black54,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'Спринт всегда можно приостановить',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(
+                                            color: Colors.black54,
+                                            fontStyle: FontStyle.italic,
+                                          ),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
@@ -660,10 +885,16 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                       }
 
                       // Активные 28 дней
+                      final bool sprintCompleted =
+                          (v4data['sprint_status']?.toString() == 'completed');
                       return DailySprint28Widget(
                         startDate: startDate,
                         versions: gs.versions,
-                        onOpenMaxChat: _openChatWithMax,
+                        onOpenMaxChat: (
+                                {String? autoMessage, List<String>? chips}) =>
+                            _openChatWithMax(
+                                autoMessage: autoMessage, chips: chips),
+                        completed: sprintCompleted,
                       );
                     }),
                 ],
@@ -886,8 +1117,8 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка сохранения итогов: $e')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(FriendlyMessages.saveError)));
     }
   }
 
@@ -1093,5 +1324,35 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
         } catch (_) {}
       }
     }
+  }
+
+  /// Helper для отображения строки с бонусом за серию
+  Widget _buildStreakBonusRow(BuildContext context, String streakText,
+      String bonusText, IconData icon) {
+    return Row(
+      children: [
+        Icon(
+          icon,
+          size: 18,
+          color: Color(0xFFFF8C00).withValues(alpha: 0.7),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            streakText,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Colors.black87,
+                ),
+          ),
+        ),
+        Text(
+          bonusText,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: Color(0xFFFF8C00),
+              ),
+        ),
+      ],
+    );
   }
 }

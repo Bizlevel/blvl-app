@@ -206,9 +206,18 @@ class _VersionTable extends StatelessWidget {
     late final List<List<String>> rows;
     if (version == 1) {
       rows = [
-        ['Основная цель', (vData['goal_initial'] ?? '').toString()],
-        ['Почему сейчас', (vData['goal_why'] ?? '').toString()],
-        ['Препятствие', (vData['main_obstacle'] ?? '').toString()],
+        [
+          'Основная цель',
+          (vData['concrete_result'] ?? vData['goal_initial'] ?? '').toString()
+        ],
+        [
+          'Почему сейчас',
+          (vData['main_pain'] ?? vData['goal_why'] ?? '').toString()
+        ],
+        [
+          'Препятствие',
+          (vData['first_action'] ?? vData['main_obstacle'] ?? '').toString()
+        ],
       ];
     } else if (version == 2) {
       rows = [
@@ -233,10 +242,22 @@ class _VersionTable extends StatelessWidget {
     } else if (version == 3) {
       rows = [
         ['SMART‑формулировка', (vData['goal_smart'] ?? '').toString()],
-        ['Спринт 1', (vData['sprint1_goal'] ?? '').toString()],
-        ['Спринт 2', (vData['sprint2_goal'] ?? '').toString()],
-        ['Спринт 3', (vData['sprint3_goal'] ?? '').toString()],
-        ['Спринт 4', (vData['sprint4_goal'] ?? '').toString()],
+        [
+          'Спринт 1',
+          (vData['week1_focus'] ?? vData['sprint1_goal'] ?? '').toString()
+        ],
+        [
+          'Спринт 2',
+          (vData['week2_focus'] ?? vData['sprint2_goal'] ?? '').toString()
+        ],
+        [
+          'Спринт 3',
+          (vData['week3_focus'] ?? vData['sprint3_goal'] ?? '').toString()
+        ],
+        [
+          'Спринт 4',
+          (vData['week4_focus'] ?? vData['sprint4_goal'] ?? '').toString()
+        ],
       ];
     } else {
       rows = [
@@ -255,9 +276,11 @@ class _VersionTable extends StatelessWidget {
         ],
         [
           'Готовность',
-          (vData['readiness_score'] ??
-                  ((vData['commitment'] ?? false) == true ? 8 : 5))
-              .toString()
+          (() {
+            final rs = vData['readiness_score'];
+            if (rs is num) return rs.toString();
+            return ((vData['commitment'] ?? false) == true) ? '8' : '5';
+          })()
         ],
       ];
     }
@@ -323,8 +346,8 @@ class _HistoryTimeline extends StatelessWidget {
         case 2:
           title = 'v2: Метрики';
           lines = [
-            'Метрика: ${(data['metric_name'] ?? '').toString()}',
-            'Сейчас: ${(data['metric_from'] ?? '').toString()} → Цель: ${(data['metric_to'] ?? '').toString()}',
+            'Метрика: ${(data['metric_type'] ?? data['metric_name'] ?? '').toString()}',
+            'Сейчас: ${(data['metric_current'] ?? data['metric_from'] ?? '').toString()} → Цель: ${(data['metric_target'] ?? data['metric_to'] ?? '').toString()}',
           ];
           break;
         case 3:
@@ -338,10 +361,16 @@ class _HistoryTimeline extends StatelessWidget {
         default:
           title = 'v4: Финал';
           lines = [
-            (data['final_what'] ?? '').toString(),
-            if ((data['final_when'] ?? '').toString().isNotEmpty)
-              'Старт: ${data['final_when']}',
-            'Готовность: ${((data['commitment'] ?? false) == true) ? 'Да' : 'Нет'}',
+            (data['first_three_days'] ?? data['final_what'] ?? '').toString(),
+            if ((data['start_date'] ?? data['final_when'] ?? '')
+                .toString()
+                .isNotEmpty)
+              'Старт: ${(data['start_date'] ?? data['final_when']).toString()}',
+            'Готовность: ${(() {
+              final rs = data['readiness_score'];
+              if (rs is num) return rs >= 7 ? 'Да' : 'Нет';
+              return ((data['commitment'] ?? false) == true) ? 'Да' : 'Нет';
+            })()}',
           ];
       }
 

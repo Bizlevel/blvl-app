@@ -29,23 +29,31 @@ class GoalCompactCard extends StatelessWidget {
         : <String, dynamic>{};
 
     final String title = latestVersion == 4
-        ? (data['final_what']?.toString() ?? 'Цель пока не сформулирована')
+        ? ((data['first_three_days'] ?? data['final_what'] ?? '')
+            .toString()
+            .trim())
         : latestVersion == 3
-            ? (data['goal_smart']?.toString() ?? 'Цель пока не сформулирована')
+            ? ((data['goal_smart'] ?? '').toString().trim())
             : latestVersion == 2
-                ? (data['goal_refined']?.toString() ??
-                    'Цель пока не сформулирована')
-                : (data['goal_initial']?.toString() ??
-                    'Цель пока не сформулирована');
+                ? ((data['concrete_result'] ?? data['goal_refined'] ?? '')
+                    .toString()
+                    .trim())
+                : ((data['concrete_result'] ?? data['goal_initial'] ?? '')
+                    .toString()
+                    .trim());
 
-    final String? metricName =
-        latestVersion >= 2 ? (data['metric_name'] as String?) : null;
-    final String? fromV =
-        latestVersion >= 2 ? data['metric_from']?.toString() : null;
-    final String? toV =
-        latestVersion >= 2 ? data['metric_to']?.toString() : null;
-    final String? startDate =
-        latestVersion >= 4 ? (data['final_when'] as String?) : null;
+    final String? metricName = latestVersion >= 2
+        ? (data['metric_type'] ?? data['metric_name'])?.toString()
+        : null;
+    final String? fromV = latestVersion >= 2
+        ? (data['metric_current'] ?? data['metric_from'])?.toString()
+        : null;
+    final String? toV = latestVersion >= 2
+        ? (data['metric_target'] ?? data['metric_to'])?.toString()
+        : null;
+    final String? startDate = latestVersion >= 4
+        ? (data['start_date'] ?? data['final_when'])?.toString()
+        : null;
     final int currentStage = latestVersion.clamp(1, 4);
     final int readinessScore = ((currentStage * 10) / 4).round();
 
@@ -79,12 +87,13 @@ class GoalCompactCard extends StatelessWidget {
               overflow: expanded ? TextOverflow.visible : TextOverflow.ellipsis,
             ),
             const SizedBox(height: 8),
-            LinearProgressIndicator(
-              value: progress,
-              minHeight: 8,
-              backgroundColor: Colors.grey.shade200,
-              color: AppColor.primary,
-            ),
+            if (fromV != null && toV != null && metricActual != null)
+              LinearProgressIndicator(
+                value: progress,
+                minHeight: 8,
+                backgroundColor: Colors.grey.shade200,
+                color: AppColor.primary,
+              ),
             const SizedBox(height: 8),
             if (metricName != null &&
                 metricName.isNotEmpty &&
@@ -95,10 +104,14 @@ class GoalCompactCard extends StatelessWidget {
             if (startDate != null && startDate.isNotEmpty)
               Text('Дней осталось: ${_daysLeft(startDate)} из 28',
                   style: Theme.of(context).textTheme.bodySmall),
-            Text('Готовность: $readinessScore/10',
-                style: Theme.of(context).textTheme.bodySmall),
-            Text('Статус: В процессе',
-                style: Theme.of(context).textTheme.bodySmall),
+            if (expanded) ...[
+              if (expanded) ...[
+                Text('Готовность: $readinessScore/10',
+                    style: Theme.of(context).textTheme.bodySmall),
+                Text('Статус: В процессе',
+                    style: Theme.of(context).textTheme.bodySmall),
+              ],
+            ],
             if (expanded) ...[
               const SizedBox(height: 12),
               if (latestVersion >= 3) ...[
@@ -185,4 +198,3 @@ class _GroupHeader extends StatelessWidget {
     );
   }
 }
-

@@ -697,6 +697,52 @@ class GoalsRepository {
     final int pick = dayIndex % active.length;
     return active[pick];
   }
+
+  /// Формирует контекст для Макса на основе данных версии цели
+  ///
+  /// Использование:
+  /// ```dart
+  /// final context = await goalsRepo.buildMaxContext(
+  ///   version: 2,
+  ///   versionData: {'concrete_result': 'Увеличить выручку...', ...}
+  /// );
+  /// ```
+  String buildMaxContext({
+    required int version,
+    required Map<String, dynamic> versionData,
+  }) {
+    final sb = StringBuffer('goal_version: $version\n');
+
+    if (version == 1) {
+      // v1: Семя цели
+      sb.writeln('concrete_result: ${versionData['concrete_result'] ?? ''}');
+      sb.writeln('main_pain: ${versionData['main_pain'] ?? ''}');
+      sb.writeln('first_action: ${versionData['first_action'] ?? ''}');
+    } else if (version == 2) {
+      // v2: Метрики
+      sb.writeln('concrete_result: ${versionData['concrete_result'] ?? ''}');
+      sb.writeln('metric_type: ${versionData['metric_type'] ?? ''}');
+      sb.writeln('metric_current: ${versionData['metric_current'] ?? ''}');
+      sb.writeln('metric_target: ${versionData['metric_target'] ?? ''}');
+      sb.writeln('financial_goal: ${versionData['financial_goal'] ?? ''}');
+    } else if (version == 3) {
+      // v3: План на 4 недели
+      sb.writeln('goal_smart: ${versionData['goal_smart'] ?? ''}');
+      sb.writeln('week1_focus: ${versionData['week1_focus'] ?? ''}');
+      sb.writeln('week2_focus: ${versionData['week2_focus'] ?? ''}');
+      sb.writeln('week3_focus: ${versionData['week3_focus'] ?? ''}');
+      sb.writeln('week4_focus: ${versionData['week4_focus'] ?? ''}');
+    } else if (version == 4) {
+      // v4: Готовность к старту
+      sb.writeln('first_three_days: ${versionData['first_three_days'] ?? ''}');
+      sb.writeln('start_date: ${versionData['start_date'] ?? ''}');
+      sb.writeln(
+          'accountability_person: ${versionData['accountability_person'] ?? ''}');
+      sb.writeln('readiness_score: ${versionData['readiness_score'] ?? 5}');
+    }
+
+    return sb.toString();
+  }
 }
 
 extension on GoalsRepository {

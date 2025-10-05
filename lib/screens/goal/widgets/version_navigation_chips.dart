@@ -136,50 +136,75 @@ class VersionNavigationChips extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.only(right: 8, bottom: 6),
-      child: InkWell(
-        onTap: locked ? null : onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: bg,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: border),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x08000000),
-                blurRadius: 4,
-                offset: Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (completed)
-                const Padding(
-                  padding: EdgeInsets.only(right: 4),
-                  child: Icon(
-                    Icons.check_circle,
-                    size: 16,
-                    color: Colors.green,
-                  ),
-                )
-              else if (locked)
-                const Padding(
-                  padding: EdgeInsets.only(right: 4),
-                  child: Icon(
-                    Icons.lock_outline,
-                    size: 16,
-                    color: Colors.grey,
-                  ),
+      child: Semantics(
+        button: true,
+        label: 'Версия $label'
+            '${completed ? ', заполнено' : ''}'
+            '${locked ? ', заблокировано' : ''}',
+        child: InkWell(
+          onTap: locked ? null : onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: border),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x08000000),
+                  blurRadius: 4,
+                  offset: Offset(0, 2),
                 ),
-              Text(label, style: ts),
-            ],
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (completed)
+                  const Padding(
+                    padding: EdgeInsets.only(right: 4),
+                    child: Icon(
+                      Icons.check_circle,
+                      size: 16,
+                      color: Colors.green,
+                    ),
+                  )
+                else if (locked)
+                  const Padding(
+                    padding: EdgeInsets.only(right: 4),
+                    child: Icon(
+                      Icons.lock_outline,
+                      size: 16,
+                      color: Colors.grey,
+                    ),
+                  ),
+                Row(
+                  children: [
+                    Text(label, style: ts),
+                    if (!completed &&
+                        !locked &&
+                        (label == 'v1' ||
+                            label == 'v2' ||
+                            label == 'v3' ||
+                            label == 'v4'))
+                      Padding(
+                        padding: const EdgeInsets.only(left: 6),
+                        child: Text(
+                          'Шаг ${label.substring(1)} из 4',
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: AppColor.labelColor,
+                                  ),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 }
-

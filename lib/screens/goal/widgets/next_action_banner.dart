@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 
 import 'package:bizlevel/providers/goals_repository_provider.dart';
 import 'package:bizlevel/theme/color.dart';
+import 'package:bizlevel/utils/goal_version_names.dart';
 
 /// Баннер "Что дальше?" - показывает следующий шаг в кристаллизации цели
 ///
@@ -32,7 +34,13 @@ class NextActionBanner extends ConsumerWidget {
         final String nextAction = (data['next_action'] as String?) ?? '';
         final int nextTarget = (data['next_action_target'] as int?) ?? 0;
 
-        final (String title, VoidCallback? onTap) = _buildActionData(
+        final (
+          String title,
+          String? progressLabel,
+          String? timeEstimate,
+          String ctaLabel,
+          VoidCallback? onTap
+        ) = _buildActionData(
           context: context,
           nextAction: nextAction,
           nextTarget: nextTarget,
@@ -54,16 +62,67 @@ class NextActionBanner extends ConsumerWidget {
           child: Row(
             children: [
               Expanded(
-                child: Text(
-                  title,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (progressLabel != null || timeEstimate != null) ...[
+                      Row(
+                        children: [
+                          if (progressLabel != null)
+                            Text(
+                              progressLabel,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
+                                    color: AppColor.primary,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                            ),
+                          if (progressLabel != null && timeEstimate != null)
+                            Text(
+                              ' • ',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
+                                    color: Colors.black54,
+                                  ),
+                            ),
+                          if (timeEstimate != null)
+                            Text(
+                              timeEstimate,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
+                                    color: Colors.black54,
+                                  ),
+                            ),
+                        ],
                       ),
+                      const SizedBox(height: 4),
+                    ],
+                    Text(
+                      title,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                  ],
                 ),
               ),
               TextButton(
-                onPressed: onTap,
-                child: const Text('Перейти'),
+                onPressed: () {
+                  Sentry.addBreadcrumb(Breadcrumb(
+                    category: 'ui',
+                    type: 'click',
+                    message: 'goal_next_action_tap',
+                    level: SentryLevel.info,
+                  ));
+                  if (onTap != null) onTap();
+                },
+                child: Text(ctaLabel),
               ),
             ],
           ),
@@ -72,8 +131,25 @@ class NextActionBanner extends ConsumerWidget {
     );
   }
 
+  /// Возвращает примерное время на заполнение версии
+  String? _getVersionTimeEstimate(int version) {
+    switch (version) {
+      case 1:
+        return '~2 мин';
+      case 2:
+        return '~3 мин';
+      case 3:
+        return '~5 мин';
+      case 4:
+        return '~2 мин';
+      default:
+        return null;
+    }
+  }
+
   /// Строит данные для кнопки действия на основе next_action
-  (String, VoidCallback?) _buildActionData({
+  /// Возвращает: (заголовок, прогресс-лейбл, оценка времени, CTA‑текст, callback)
+  (String, String?, String?, String, VoidCallback?) _buildActionData({
     required BuildContext context,
     required String nextAction,
     required int nextTarget,
@@ -82,32 +158,51 @@ class NextActionBanner extends ConsumerWidget {
   }) {
     switch (nextAction) {
       case 'goal_checkpoint':
-        if (nextTarget >= 2 && nextTarget <= 4) {
+        if (nextTarget >= 1 && nextTarget <= 4) {
+          final versionName = getGoalVersionName(nextTarget);
+          final progressLabel = 'Шаг $nextTarget из 4';
+          final timeEstimate = _getVersionTimeEstimate(nextTarget);
           return (
-            'Что дальше: заполнить v$nextTarget на чекпоинте',
+            'Что дальше: заполнить «$versionName»',
+            progressLabel,
+            timeEstimate,
+            'Заполнить',
             () => GoRouter.of(context).push('/goal-checkpoint/$nextTarget'),
           );
         }
         break;
 
       case 'level_up':
-        return (
-          'Что дальше: пройти Уровень $currentLevel для открытия v$nextTarget',
-          () => GoRouter.of(context).push('/tower?scrollTo=$currentLevel'),
-        );
+        if (nextTarget >= 1 && nextTarget <= 4) {
+          final versionName = getGoalVersionName(nextTarget);
+          final progressLabel = 'Шаг $nextTarget из 4';
+          return (
+            'Что дальше: пройти Уровень $currentLevel для открытия «$versionName»',
+            progressLabel,
+            null, // Нет оценки времени для прохождения уровня
+            'Открыть уровень',
+            () => GoRouter.of(context).push('/tower?scrollTo=$currentLevel'),
+          );
+        }
+        break;
 
       case 'weeks':
         return (
           'Что дальше: перейти к 28 дням',
+          null, // Нет прогресса для этапа спринтов
+          null,
+          'Перейти',
           onScrollToSprint,
         );
     }
 
-    // Дефолт: создать v1
+    // Дефолт: создать Семя цели
     return (
-      'Что дальше: создать v1 на Уровне 1',
+      'Что дальше: создать «${getGoalVersionName(1)}» на Уровне 1',
+      'Шаг 1 из 4',
+      '~2 мин',
+      'Открыть Уровень 1',
       () => GoRouter.of(context).push('/tower?scrollTo=1'),
     );
   }
 }
-
