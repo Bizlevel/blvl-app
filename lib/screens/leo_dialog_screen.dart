@@ -85,6 +85,8 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
   int _caseStepIndex = -1; // -1 когда не в сценарии или не начато
   List<String> _serverRecommendedChips = [];
   final Set<String> _dismissedChips = {};
+  bool _showScrollToBottom = false;
+  bool _showSuggestions = true; // управляет показом inline-подсказок
 
   // Добавляем debounce для предотвращения дублей
   Timer? _debounceTimer;
@@ -96,6 +98,17 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
     _leo = ref.read(leoServiceProvider);
     // Лимиты сообщений отключены (этап 39.1)
     _chatId = widget.chatId;
+    // Следим за позицией скролла для показа FAB «вниз»
+    _scrollController.addListener(() {
+      if (!_scrollController.hasClients) return;
+      final metrics = _scrollController.position;
+      final distFromBottom = (metrics.maxScrollExtent - metrics.pixels)
+          .clamp(0.0, double.infinity);
+      final show = distFromBottom > 200;
+      if (show != _showScrollToBottom && mounted) {
+        setState(() => _showScrollToBottom = show);
+      }
+    });
     // Автоприветствие: кейс → первый промпт задания; иначе Макс приветствие
     if (widget.caseMode && _chatId == null && _messages.isEmpty) {
       final String start = (widget.firstPrompt?.trim().isNotEmpty == true)
@@ -103,9 +116,17 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
           : 'Задание 1: Ответьте в 2–3 предложениях.';
       final preface = widget.casePreface?.trim();
       if (preface != null && preface.isNotEmpty) {
-        _messages.add({'role': 'assistant', 'content': preface});
+        _messages.add({
+          'role': 'assistant',
+          'content': preface,
+          'created_at': DateTime.now().toIso8601String(),
+        });
       }
-      _messages.add({'role': 'assistant', 'content': start});
+      _messages.add({
+        'role': 'assistant',
+        'content': start,
+        'created_at': DateTime.now().toIso8601String(),
+      });
       _caseStepIndex = 0;
     } else if (widget.bot == 'max' && _chatId == null && _messages.isEmpty) {
       // Приоритет: пользовательское приветствие (initialAssistantMessage),
@@ -119,7 +140,11 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
         greeting =
             'Я — Макс, трекер цели BizLevel. Помогаю кристаллизовать цель и держать темп 28 дней. Напишите, чего хотите добиться — предложу ближайший шаг.';
       }
-      _messages.add({'role': 'assistant', 'content': greeting});
+      _messages.add({
+        'role': 'assistant',
+        'content': greeting,
+        'created_at': DateTime.now().toIso8601String(),
+      });
     }
     if (_chatId != null) {
       _loadMessages();
@@ -169,7 +194,11 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
       _page += 1;
       // Reverse to chronological order и добавить только новые (по роли+контенту), чтобы не дублировать
       final chronological = fetched.reversed
-          .map((e) => {'role': e['role'], 'content': e['content']})
+          .map((e) => {
+                'role': e['role'],
+                'content': e['content'],
+                'created_at': e['created_at'],
+              })
           .toList();
       final existingKeys =
           _messages.map((m) => '${m['role']}::${m['content']}').toSet();
@@ -450,11 +479,30 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
           ],
         ),
       ),
-      body: Column(
-        children: [
-          Expanded(child: _buildMessageList()),
-          _buildInput(),
-        ],
+      body: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: Stack(
+          children: [
+            Column(
+              children: [
+                Expanded(child: _buildMessageList()),
+                _buildInput(),
+              ],
+            ),
+            // FAB «Вниз»
+            if (_showScrollToBottom)
+              Positioned(
+                right: 12,
+                bottom: 90,
+                child: FloatingActionButton.small(
+                  heroTag: 'chat_scroll_down',
+                  onPressed: _scrollToBottom,
+                  child: const Icon(Icons.arrow_downward),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -468,6 +516,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
         return false;
       },
       child: ListView.builder(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         controller: _scrollController,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         itemCount: _messages.length + (_hasMore ? 1 : 0) + (_isSending ? 1 : 0),
@@ -521,12 +570,32 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
             text: msg['content'] as String? ?? '',
             isUser: isUser,
           );
+          // Метка времени (компактно)
+          final ts = msg['created_at'] as String?;
+          final timeWidget = (ts != null)
+              ? Padding(
+                  padding: const EdgeInsets.only(top: 2, bottom: 4),
+                  child: Text(
+                    _formatTime(ts),
+                    style: Theme.of(context)
+                        .textTheme
+                        .labelSmall
+                        ?.copyWith(color: Colors.black45),
+                  ),
+                )
+              : const SizedBox.shrink();
           // Лёгкая анимация появления только для последних 6 элементов,
           // чтобы избежать нагрузки на длинные списки
           final bool animate = index >=
               ((_hasMore ? 1 : 0) + (_isSending ? 1 : 0) + _messages.length - 6)
                   .clamp(0, _messages.length + 2);
-          if (!animate) return bubble;
+          if (!animate) {
+            return Column(
+              crossAxisAlignment:
+                  isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+              children: [bubble, timeWidget],
+            );
+          }
           return TweenAnimationBuilder<double>(
             tween: Tween(begin: 0.0, end: 1.0),
             duration: const Duration(milliseconds: 300),
@@ -538,7 +607,11 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
                 child: child,
               ),
             ),
-            child: bubble,
+            child: Column(
+              crossAxisAlignment:
+                  isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+              children: [bubble, timeWidget],
+            ),
           );
         },
       ),
@@ -564,10 +637,12 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
                       focusNode: _inputFocus,
                       minLines: 1,
                       maxLines: 4,
+                      textInputAction: TextInputAction.send,
                       decoration: const InputDecoration(
                         hintText: 'Введите сообщение...',
                         border: OutlineInputBorder(),
                       ),
+                      onTapOutside: (_) => FocusScope.of(context).unfocus(),
                       // Отправка по Enter
                       onSubmitted: (text) {
                         if (text.trim().isNotEmpty && !_isSending) {
@@ -578,6 +653,14 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
                   ),
                 ),
                 const SizedBox(width: 8),
+                Semantics(
+                  label: 'Скрыть клавиатуру',
+                  button: true,
+                  child: IconButton(
+                    icon: const Icon(Icons.keyboard_hide),
+                    onPressed: () => FocusScope.of(context).unfocus(),
+                  ),
+                ),
                 _isSending
                     ? const SizedBox(
                         width: 24,
@@ -602,54 +685,121 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
   }
 
   Widget _buildChipsRow() {
-    // Прячем только когда пользователь уже начал ввод
-    if (_inputFocus.hasFocus && _inputController.text.trim().isNotEmpty) {
-      return const SizedBox.shrink();
+    // Скрываем при наборе текста или если пользователь свернул подсказки
+    if ((_inputFocus.hasFocus && _inputController.text.trim().isNotEmpty) ||
+        !_showSuggestions) {
+      return Align(
+        alignment: Alignment.centerLeft,
+        child: TextButton.icon(
+          onPressed: () => setState(() => _showSuggestions = true),
+          icon: const Icon(Icons.tips_and_updates_outlined, size: 18),
+          label: const Text('Показать подсказки'),
+        ),
+      );
     }
     final chips = _resolveRecommendedChips();
     if (chips.isEmpty) return const SizedBox.shrink();
+    final visible = chips.length > 4 ? chips.sublist(0, 4) : chips;
+    final hidden = chips.length > 4 ? chips.sublist(4) : const <String>[];
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: [
-          for (final text in chips)
-            _SuggestionCard(
-              text: text,
-              icon: text.contains('?')
-                  ? Icons.help_outline
-                  : Icons.lightbulb_outline,
-              onTap: () {
-                // Breadcrumb: Применен совет (бот-специфично)
-                try {
-                  Sentry.addBreadcrumb(Breadcrumb(
-                    level: SentryLevel.info,
-                    category: widget.bot == 'max' ? 'goal' : 'leo',
-                    message: widget.bot == 'max'
-                        ? 'goal_checkpoint_max_suggestion_applied'
-                        : 'leo_suggestion_applied',
-                    data: {
-                      'suggestion_text': text.length > 50
-                          ? '${text.substring(0, 50)}...'
-                          : text,
-                      'bot': widget.bot,
-                    },
-                  ));
-                } catch (_) {}
-
-                _inputController.text = text;
-                _inputController.selection = TextSelection.fromPosition(
-                    TextPosition(offset: _inputController.text.length));
-                _inputFocus.requestFocus();
-                setState(() {
-                  _dismissedChips.add(text);
-                });
-              },
-            ),
-        ],
+      child: SizedBox(
+        height: 40,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemBuilder: (context, i) {
+            if (i < visible.length) {
+              final text = visible[i];
+              return _SuggestionCard(
+                text: text,
+                icon: text.contains('?')
+                    ? Icons.help_outline
+                    : Icons.lightbulb_outline,
+                onTap: () {
+                  _applySuggestion(text);
+                },
+              );
+            }
+            // Кнопка «Ещё…»
+            return OutlinedButton.icon(
+              onPressed: () => _showMoreSuggestions(hidden),
+              icon: const Icon(Icons.more_horiz),
+              label: const Text('Ещё…'),
+            );
+          },
+          separatorBuilder: (_, __) => const SizedBox(width: 8),
+          itemCount: visible.length + (hidden.isNotEmpty ? 1 : 0),
+        ),
       ),
     );
+  }
+
+  void _applySuggestion(String text) {
+    try {
+      Sentry.addBreadcrumb(Breadcrumb(
+        level: SentryLevel.info,
+        category: widget.bot == 'max' ? 'goal' : 'leo',
+        message: widget.bot == 'max'
+            ? 'goal_checkpoint_max_suggestion_applied'
+            : 'leo_suggestion_applied',
+        data: {
+          'suggestion_text':
+              text.length > 50 ? '${text.substring(0, 50)}...' : text,
+          'bot': widget.bot,
+        },
+      ));
+    } catch (_) {}
+    _inputController.text = text;
+    _inputController.selection = TextSelection.fromPosition(
+        TextPosition(offset: _inputController.text.length));
+    _inputFocus.requestFocus();
+    setState(() {
+      _dismissedChips.add(text);
+      _showSuggestions = false;
+    });
+  }
+
+  Future<void> _showMoreSuggestions(List<String> hidden) async {
+    if (hidden.isEmpty) return;
+    // ignore: use_build_context_synchronously
+    await showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: ListView.separated(
+          padding: const EdgeInsets.all(16),
+          itemBuilder: (ctx, i) {
+            final text = hidden[i];
+            return ListTile(
+              leading: Icon(
+                text.contains('?')
+                    ? Icons.help_outline
+                    : Icons.lightbulb_outline,
+              ),
+              title: Text(text, maxLines: 2, overflow: TextOverflow.ellipsis),
+              onTap: () {
+                Navigator.of(ctx).pop();
+                _applySuggestion(text);
+              },
+            );
+          },
+          separatorBuilder: (_, __) => const Divider(height: 1),
+          itemCount: hidden.length,
+        ),
+      ),
+    );
+  }
+
+  String _formatTime(String ts) {
+    try {
+      final dt = DateTime.tryParse(ts);
+      if (dt == null) return '';
+      final hh = dt.hour.toString().padLeft(2, '0');
+      final mm = dt.minute.toString().padLeft(2, '0');
+      return '$hh:$mm';
+    } catch (_) {
+      return '';
+    }
   }
 
   List<String> _resolveRecommendedChips() {

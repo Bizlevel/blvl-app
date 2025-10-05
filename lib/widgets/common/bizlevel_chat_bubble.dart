@@ -47,10 +47,15 @@ class BizLevelChatBubble extends StatelessWidget {
               topRight: Radius.circular(isUser ? 0 : 12),
             ),
           ),
-          child: Text(
-            text,
-            style: TextStyle(color: fg, fontSize: 15),
-          ),
+          child: role == ChatBubbleRole.assistant
+              ? SelectableText(
+                  text,
+                  style: TextStyle(color: fg, fontSize: 15),
+                )
+              : Text(
+                  text,
+                  style: TextStyle(color: fg, fontSize: 15),
+                ),
         ),
       ],
     );

@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/providers/levels_provider.dart';
+import 'package:go_router/go_router.dart';
+import 'package:shimmer/shimmer.dart';
+import 'package:bizlevel/widgets/common/bizlevel_button.dart';
 
 /// Экран «Артефакты» (этап 1: каркас и маршрут)
 /// Далее будет добавлена сетка 3xN и просмотр карточек.
@@ -25,7 +28,7 @@ class ArtifactsScreen extends ConsumerWidget {
       ),
       backgroundColor: AppColor.appBgColor,
       body: levelsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const _ArtifactsSkeletonGrid(),
         error: (e, st) => Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
@@ -99,36 +102,45 @@ class ArtifactsScreen extends ConsumerWidget {
             );
           }).toList();
 
+          final allLocked = items.every((e) => e.isUnlocked != true);
           return Padding(
             padding: const EdgeInsets.all(16),
-            child: LayoutBuilder(builder: (context, c) {
-              final w = c.maxWidth;
-              int crossAxisCount = 3;
-              if (w < 380) crossAxisCount = 2;
-              if (w >= 1024) crossAxisCount = 4;
-              return GridView.builder(
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: crossAxisCount,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                  childAspectRatio: 3 / 4,
+            child: Column(
+              children: [
+                if (allLocked)
+                  _ArtifactsEmptyState(onOpenTower: () => context.go('/tower')),
+                Expanded(
+                  child: LayoutBuilder(builder: (context, c) {
+                    final w = c.maxWidth;
+                    int crossAxisCount = 3;
+                    if (w < 380) crossAxisCount = 2;
+                    if (w >= 1024) crossAxisCount = 4;
+                    return GridView.builder(
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: crossAxisCount,
+                        crossAxisSpacing: 12,
+                        mainAxisSpacing: 12,
+                        childAspectRatio: 3 / 4,
+                      ),
+                      itemCount: items.length,
+                      itemBuilder: (context, index) {
+                        final it = items[index];
+                        final hasAsset = it.front != null && it.back != null;
+                        final locked = !(it.isUnlocked == true);
+                        return _ArtifactTile(
+                          level: it.level,
+                          title: it.title,
+                          description: it.description,
+                          front: hasAsset ? it.front! : null,
+                          back: hasAsset ? it.back! : null,
+                          isLocked: locked,
+                        );
+                      },
+                    );
+                  }),
                 ),
-                itemCount: items.length,
-                itemBuilder: (context, index) {
-                  final it = items[index];
-                  final hasAsset = it.front != null && it.back != null;
-                  final locked = !(it.isUnlocked == true);
-                  return _ArtifactTile(
-                    level: it.level,
-                    title: it.title,
-                    description: it.description,
-                    front: hasAsset ? it.front! : null,
-                    back: hasAsset ? it.back! : null,
-                    isLocked: locked,
-                  );
-                },
-              );
-            }),
+              ],
+            ),
           );
         },
       ),
@@ -146,6 +158,7 @@ class _CollectedBadge extends ConsumerWidget {
             (l['level'] as int? ?? 0) >= 1 && (l['level'] as int? ?? 0) <= 10)
         .where((l) => (l['isCompleted'] as bool? ?? false))
         .length;
+    final progress = total == 0 ? 0.0 : collected / total;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
@@ -153,12 +166,36 @@ class _CollectedBadge extends ConsumerWidget {
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Colors.white.withOpacity(0.3)),
       ),
-      child: Text('Собрано $collected/$total'),
+      child: SizedBox(
+        width:
+            110, // фиксированная ширина, чтобы избежать бесконечных ограничений в AppBar actions
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('Собрано $collected/$total', textAlign: TextAlign.center),
+            const SizedBox(height: 4),
+            SizedBox(
+              height: 3,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(3),
+                child: LinearProgressIndicator(
+                  value: progress.clamp(0.0, 1.0),
+                  backgroundColor: Colors.white.withOpacity(0.15),
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    Colors.white.withOpacity(0.9),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
 
-class _ArtifactTile extends StatelessWidget {
+class _ArtifactTile extends StatefulWidget {
   const _ArtifactTile({
     required this.level,
     required this.title,
@@ -176,133 +213,170 @@ class _ArtifactTile extends StatelessWidget {
   final String? back;
 
   @override
+  State<_ArtifactTile> createState() => _ArtifactTileState();
+}
+
+class _ArtifactTileState extends State<_ArtifactTile> {
+  bool _hovered = false;
+
+  @override
   Widget build(BuildContext context) {
-    final image = front;
+    final image = widget.front;
     return Semantics(
-      label: 'Артефакт уровня $level',
-      button: !isLocked,
-      child: InkWell(
-        onTap: isLocked || image == null
-            ? null
-            : () {
-                Navigator.of(context).push(
-                  PageRouteBuilder(
-                    opaque: false,
-                    barrierColor: Colors.black.withOpacity(0.85),
-                    pageBuilder: (ctx, _, __) => _ArtifactFullscreen(
-                      front: front!,
-                      back: back!,
+      label: 'Артефакт уровня ${widget.level}',
+      button: !widget.isLocked,
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: AnimatedScale(
+          scale: _hovered ? 1.03 : 1.0,
+          duration: const Duration(milliseconds: 160),
+          curve: Curves.easeOut,
+          child: InkWell(
+            onTap: widget.isLocked || image == null
+                ? null
+                : () {
+                    Navigator.of(context).push(
+                      PageRouteBuilder(
+                        opaque: false,
+                        barrierColor: Colors.black.withOpacity(0.85),
+                        pageBuilder: (ctx, _, __) => _ArtifactFullscreen(
+                          front: widget.front!,
+                          back: widget.back!,
+                        ),
+                      ),
+                    );
+                  },
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColor.shadowColor.withValues(alpha: 0.08),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        if (image != null)
+                          Image.asset(image, fit: BoxFit.cover)
+                        else
+                          Container(color: AppColor.appBgColor),
+                        if (widget.isLocked) ...[
+                          Container(color: Colors.black.withOpacity(0.35)),
+                          const Positioned(
+                            right: 8,
+                            top: 8,
+                            child: Icon(Icons.lock, color: Colors.white),
+                          ),
+                          Positioned(
+                            left: 8,
+                            right: 8,
+                            bottom: 40,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.45),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                  'Откроется после Уровня ${widget.level}',
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                      color: Colors.white, fontSize: 12)),
+                            ),
+                          ),
+                          Positioned(
+                            left: 8,
+                            right: 8,
+                            bottom: 8,
+                            child: SizedBox(
+                              height: 34,
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor:
+                                      Colors.white.withOpacity(0.9),
+                                  foregroundColor: Colors.black,
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 6),
+                                ),
+                                onPressed: () => context
+                                    .go('/tower?scrollTo=${widget.level}'),
+                                child: const Text('К Башне'),
+                              ),
+                            ),
+                          ),
+                        ] else if (image != null)
+                          Positioned(
+                            right: 8,
+                            top: 8,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.5),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.touch_app,
+                                      color: Colors.white, size: 14),
+                                  SizedBox(width: 4),
+                                  Text('Тапните',
+                                      style: TextStyle(
+                                          color: Colors.white, fontSize: 12)),
+                                ],
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
-                );
-              },
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: AppColor.shadowColor.withValues(alpha: 0.08),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
+                  Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Уровень ${widget.level}',
+                            style: Theme.of(context)
+                                .textTheme
+                                .labelMedium
+                                ?.copyWith(color: AppColor.labelColor)),
+                        const SizedBox(height: 4),
+                        Text(widget.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleSmall
+                                ?.copyWith(fontWeight: FontWeight.w600)),
+                        if (widget.description.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(widget.description,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(color: AppColor.onSurfaceSubtle)),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    if (image != null)
-                      Image.asset(image, fit: BoxFit.cover)
-                    else
-                      Container(color: AppColor.appBgColor),
-                    if (isLocked) ...[
-                      Container(color: Colors.black.withOpacity(0.35)),
-                      const Positioned(
-                        right: 8,
-                        top: 8,
-                        child: Icon(Icons.lock, color: Colors.white),
-                      ),
-                      Positioned(
-                        left: 8,
-                        right: 8,
-                        bottom: 8,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.45),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text('Откроется после Уровня $level',
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                  color: Colors.white, fontSize: 12)),
-                        ),
-                      ),
-                    ] else if (image != null)
-                      Positioned(
-                        right: 8,
-                        top: 8,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.5),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.touch_app,
-                                  color: Colors.white, size: 14),
-                              SizedBox(width: 4),
-                              Text('Тапните',
-                                  style: TextStyle(
-                                      color: Colors.white, fontSize: 12)),
-                            ],
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Уровень $level',
-                        style: Theme.of(context)
-                            .textTheme
-                            .labelMedium
-                            ?.copyWith(color: AppColor.labelColor)),
-                    const SizedBox(height: 4),
-                    Text(title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleSmall
-                            ?.copyWith(fontWeight: FontWeight.w600)),
-                    if (description.isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      Text(description,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodySmall
-                              ?.copyWith(color: AppColor.onSurfaceSubtle)),
-                    ],
-                  ],
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -321,19 +395,18 @@ class _ArtifactFullscreen extends StatefulWidget {
 
 class _ArtifactFullscreenState extends State<_ArtifactFullscreen>
     with SingleTickerProviderStateMixin {
-  late bool _showFront = true;
+  // Текущее видимое лицо в состоянии покоя
+  bool _isFrontVisible = true;
   late AnimationController _ctrl;
-  late Animation<double> _anim;
+  bool _isClosing = false;
+  double _dragAccumulatedDy = 0;
 
   @override
   void initState() {
     super.initState();
     _ctrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 350),
-    );
-    _anim = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOutCubic),
+      duration: const Duration(milliseconds: 500),
     );
   }
 
@@ -346,15 +419,50 @@ class _ArtifactFullscreenState extends State<_ArtifactFullscreen>
   void _flip() async {
     if (_ctrl.isAnimating) return;
     await _ctrl.forward();
-    setState(() => _showFront = !_showFront);
+    setState(() => _isFrontVisible = !_isFrontVisible);
     _ctrl.reset();
+  }
+
+  double _currentAngle() => _ctrl.value * 3.1415926535; // 0..pi
+
+  void _onVerticalDragStart(DragStartDetails d) {
+    _dragAccumulatedDy = 0;
+  }
+
+  void _onVerticalDragUpdate(DragUpdateDetails d) {
+    if (_isClosing) return;
+    final dy = d.delta.dy;
+    if (dy > 0) {
+      _dragAccumulatedDy += dy;
+      if (_dragAccumulatedDy > 60) {
+        _close();
+      }
+    }
+  }
+
+  void _onVerticalDragEnd(DragEndDetails d) {
+    if (_isClosing) return;
+    final v = d.primaryVelocity ?? 0;
+    if (v > 800) {
+      _close();
+    }
+  }
+
+  void _close() {
+    if (_isClosing) return;
+    _isClosing = true;
+    if (mounted) {
+      Navigator.of(context).maybePop();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final image = _showFront ? widget.front : widget.back;
     return GestureDetector(
       onTap: _flip,
+      onVerticalDragStart: _onVerticalDragStart,
+      onVerticalDragUpdate: _onVerticalDragUpdate,
+      onVerticalDragEnd: _onVerticalDragEnd,
       child: Scaffold(
         backgroundColor: Colors.black.withOpacity(0.85),
         body: SafeArea(
@@ -362,22 +470,34 @@ class _ArtifactFullscreenState extends State<_ArtifactFullscreen>
             children: [
               Center(
                 child: AnimatedBuilder(
-                  animation: _anim,
+                  animation: _ctrl,
                   builder: (context, child) {
-                    final double angle = _anim.value * 3.14159; // 0..pi
-                    final bool pastHalf = angle > 3.14159 / 2;
-                    final double displayAngle = pastHalf
-                        ? 3.14159 - angle // зеркалим вторую половину
-                        : angle;
+                    final angle = _currentAngle();
+                    final bool firstHalf = angle <= 3.1415926535 / 2;
+                    final String img = firstHalf
+                        ? (_isFrontVisible ? widget.front : widget.back)
+                        : (_isFrontVisible ? widget.back : widget.front);
+                    final double displayAngle = firstHalf
+                        ? angle
+                        : 3.1415926535 - angle; // избегаем зеркала
                     return Transform(
                       alignment: Alignment.center,
                       transform: Matrix4.identity()
-                        ..setEntry(3, 2, 0.0015)
+                        ..setEntry(3, 2, 0.0012)
                         ..rotateY(displayAngle),
                       child: Container(
                         constraints: const BoxConstraints(maxWidth: 900),
+                        decoration: BoxDecoration(
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.25),
+                              blurRadius: 20,
+                              spreadRadius: 2,
+                            )
+                          ],
+                        ),
                         child: Image.asset(
-                          image,
+                          img,
                           fit: BoxFit.contain,
                         ),
                       ),
@@ -398,28 +518,132 @@ class _ArtifactFullscreenState extends State<_ArtifactFullscreen>
                 left: 0,
                 right: 0,
                 child: Center(
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.45),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.touch_app, color: Colors.white, size: 16),
-                        SizedBox(width: 6),
-                        Text('Тапните, чтобы перевернуть',
-                            style:
-                                TextStyle(color: Colors.white, fontSize: 13)),
-                      ],
-                    ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.45),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.touch_app,
+                                color: Colors.white, size: 16),
+                            const SizedBox(width: 6),
+                            const Text('Тапните или кнопка ниже',
+                                style: TextStyle(
+                                    color: Colors.white, fontSize: 13)),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        height: 40,
+                        child: BizLevelButton(
+                          label: 'Перевернуть',
+                          onPressed: _flip,
+                          variant: BizLevelButtonVariant.secondary,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               )
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ArtifactsSkeletonGrid extends StatelessWidget {
+  const _ArtifactsSkeletonGrid();
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: LayoutBuilder(builder: (context, c) {
+        final w = c.maxWidth;
+        int crossAxisCount = 3;
+        if (w < 380) crossAxisCount = 2;
+        if (w >= 1024) crossAxisCount = 4;
+        return GridView.builder(
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            childAspectRatio: 3 / 4,
+          ),
+          itemCount: 8,
+          itemBuilder: (context, index) {
+            return Shimmer.fromColors(
+              baseColor: Colors.grey.shade300,
+              highlightColor: Colors.grey.shade100,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            );
+          },
+        );
+      }),
+    );
+  }
+}
+
+class _ArtifactsEmptyState extends StatelessWidget {
+  const _ArtifactsEmptyState({required this.onOpenTower});
+  final VoidCallback onOpenTower;
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: AppColor.shadowColor.withValues(alpha: 0.06),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Артефактов пока нет',
+                style: Theme.of(context)
+                    .textTheme
+                    .titleMedium
+                    ?.copyWith(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 6),
+            Text(
+              'Проходите уровни, чтобы открывать карточки. Начните с Уровня 1 на Башне.',
+              style: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.copyWith(color: AppColor.onSurfaceSubtle),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              height: 40,
+              child: BizLevelButton(
+                label: 'К Башне',
+                onPressed: onOpenTower,
+              ),
+            )
+          ],
         ),
       ),
     );

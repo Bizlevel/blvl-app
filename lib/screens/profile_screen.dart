@@ -722,6 +722,7 @@ class _AboutMeCard extends ConsumerStatefulWidget {
 
 class _AboutMeCardState extends ConsumerState<_AboutMeCard> {
   bool _editing = false;
+  bool _expandedDetails = false;
 
   late final TextEditingController _nameCtrl =
       TextEditingController(text: widget.user.name);
@@ -816,6 +817,7 @@ class _AboutMeCardState extends ConsumerState<_AboutMeCard> {
               ))
           .toList();
 
+      final completion = _computeCompletion();
       return BizLevelCard(
         semanticsLabel: 'Информация обо мне',
         child: Column(
@@ -831,6 +833,39 @@ class _AboutMeCardState extends ConsumerState<_AboutMeCard> {
                             .titleMedium
                             ?.copyWith(fontWeight: FontWeight.w600)),
                   ),
+                Container(
+                  width: 130,
+                  margin: const EdgeInsets.only(right: 4),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        'Заполнено ${completion.$2}%',
+                        textAlign: TextAlign.right,
+                        style: Theme.of(context)
+                            .textTheme
+                            .labelSmall
+                            ?.copyWith(color: AppColor.onSurfaceSubtle),
+                      ),
+                      const SizedBox(height: 4),
+                      SizedBox(
+                        height: 3,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(3),
+                          child: LinearProgressIndicator(
+                            value: completion.$1,
+                            backgroundColor:
+                                AppColor.onSurfaceSubtle.withValues(alpha: 0.2),
+                            valueColor: const AlwaysStoppedAnimation(
+                              AppColor.primary,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
                 IconButton(
                   icon: const Icon(Icons.edit, color: AppColor.onSurfaceSubtle),
                   onPressed: () => setState(() => _editing = true),
@@ -840,14 +875,16 @@ class _AboutMeCardState extends ConsumerState<_AboutMeCard> {
             ),
             const SizedBox(height: 8),
             _kv('Как к вам обращаться', widget.user.name),
-            _kv('Кратко о себе', widget.user.about ?? '—'),
             _kv('Цель обучения', widget.user.goal ?? '—'),
             _kv('Сфера деятельности', widget.user.businessArea ?? '—'),
-            _kv('Уровень опыта', widget.user.experienceLevel ?? '—'),
-            _kv('Размер бизнеса', widget.user.businessSize ?? '—'),
-            _kv('Предпочитаемый стиль обучения',
-                widget.user.learningStyle ?? '—'),
-            _kv('Регион ведения бизнеса', widget.user.businessRegion ?? '—'),
+            if (_expandedDetails) ...[
+              _kv('Кратко о себе', widget.user.about ?? '—'),
+              _kv('Уровень опыта', widget.user.experienceLevel ?? '—'),
+              _kv('Размер бизнеса', widget.user.businessSize ?? '—'),
+              _kv('Предпочитаемый стиль обучения',
+                  widget.user.learningStyle ?? '—'),
+              _kv('Регион ведения бизнеса', widget.user.businessRegion ?? '—'),
+            ],
             if (chips.isNotEmpty) ...[
               const SizedBox(height: 8),
               Wrap(children: chips),
@@ -856,6 +893,17 @@ class _AboutMeCardState extends ConsumerState<_AboutMeCard> {
             const Text(
               'Чем подробнее вы заполните профиль, тем точнее советы Лео и Макса.',
               style: TextStyle(color: AppColor.onSurfaceSubtle),
+            ),
+            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                onPressed: () =>
+                    setState(() => _expandedDetails = !_expandedDetails),
+                child: Text(_expandedDetails
+                    ? 'Свернуть подробности'
+                    : 'Показать подробности'),
+              ),
             ),
           ],
         ),
@@ -891,13 +939,29 @@ class _AboutMeCardState extends ConsumerState<_AboutMeCard> {
           const SizedBox(height: 12),
           BizLevelTextField(label: 'Кратко о себе', controller: _aboutCtrl),
           const SizedBox(height: 12),
-          BizLevelTextField(label: 'Ваша цель обучения', controller: _goalCtrl),
+          BizLevelTextField(
+            label: 'Ваша цель обучения',
+            controller: _goalCtrl,
+            hint: 'Ключевой результат и зачем он вам',
+          ),
           const SizedBox(height: 12),
           BizLevelTextField(
-              label: 'Сфера деятельности', controller: _businessAreaCtrl),
+            label: 'Сфера деятельности',
+            controller: _businessAreaCtrl,
+            hint: 'Например: розница, услуги, производство',
+          ),
           const SizedBox(height: 12),
-          BizLevelTextField(
-              label: 'Уровень опыта', controller: _experienceLevelCtrl),
+          _ExperienceChips(
+            label: 'Уровень опыта',
+            value: _experienceLevelCtrl.text.isNotEmpty
+                ? _experienceLevelCtrl.text
+                : null,
+            options: const ['Начинающий', '1–3 года', '3–10 лет', '10+ лет'],
+            onChanged: (v) {
+              _experienceLevelCtrl.text = v ?? '';
+              setState(() {});
+            },
+          ),
           const SizedBox(height: 12),
           _DropdownLabeled(
             label: 'Размер бизнеса',
@@ -942,7 +1006,10 @@ class _AboutMeCardState extends ConsumerState<_AboutMeCard> {
           ),
           const SizedBox(height: 12),
           BizLevelTextField(
-              label: 'Регион ведения бизнеса', controller: _businessRegionCtrl),
+            label: 'Регион ведения бизнеса',
+            controller: _businessRegionCtrl,
+            hint: 'Город/область — влияет на советы',
+          ),
           const SizedBox(height: 16),
           Row(
             children: [
@@ -957,6 +1024,25 @@ class _AboutMeCardState extends ConsumerState<_AboutMeCard> {
         ],
       ),
     );
+  }
+
+  // Оценка заполненности профиля: возвращает (ratio 0..1, percent)
+  (double, int) _computeCompletion() {
+    final fields = <bool>[
+      widget.user.name.trim().isNotEmpty,
+      (widget.user.goal ?? '').trim().isNotEmpty,
+      (widget.user.about ?? '').trim().isNotEmpty,
+      (widget.user.businessArea ?? '').trim().isNotEmpty,
+      (widget.user.experienceLevel ?? '').trim().isNotEmpty,
+      (widget.user.businessSize ?? '').trim().isNotEmpty,
+      (widget.user.learningStyle ?? '').trim().isNotEmpty,
+      (widget.user.businessRegion ?? '').trim().isNotEmpty,
+      (widget.user.keyChallenges ?? const []).isNotEmpty,
+    ];
+    final filled = fields.where((e) => e).length;
+    final total = fields.length;
+    final ratio = total == 0 ? 0.0 : filled / total;
+    return (ratio, (ratio * 100).round());
   }
 
   Widget _kv(String label, String value) {
@@ -1018,6 +1104,75 @@ class _ChallengesEditor extends StatefulWidget {
   State<_ChallengesEditor> createState() => _ChallengesEditorState();
 }
 
+class _ExperienceChips extends StatelessWidget {
+  const _ExperienceChips({
+    required this.label,
+    required this.options,
+    required this.onChanged,
+    this.value,
+  });
+
+  final String label;
+  final List<String> options;
+  final String? value;
+  final ValueChanged<String?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: Theme.of(context)
+              .textTheme
+              .bodyMedium
+              ?.copyWith(fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: options.map((o) {
+            final isSelected = o == value;
+            return Semantics(
+              button: true,
+              selected: isSelected,
+              label: o,
+              child: GestureDetector(
+                onTap: () => onChanged(isSelected ? null : o),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? AppColor.primary.withValues(alpha: 0.1)
+                        : AppColor.surface,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isSelected
+                          ? AppColor.primary
+                          : AppColor.onSurfaceSubtle.withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: Text(
+                    o,
+                    style: TextStyle(
+                      color: isSelected ? AppColor.primary : AppColor.textColor,
+                      fontWeight:
+                          isSelected ? FontWeight.w600 : FontWeight.w400,
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+}
+
 class _DropdownLabeled extends StatelessWidget {
   const _DropdownLabeled({
     required this.label,
@@ -1071,8 +1226,8 @@ class _ChallengesEditorState extends State<_ChallengesEditor> {
     'Команда',
     'Конкуренты',
     'Масштабирование',
-    'Другое',
   ];
+  final List<String> _custom = [];
 
   late final Set<String> _selected = {...widget.initial};
 
@@ -1090,46 +1245,164 @@ class _ChallengesEditorState extends State<_ChallengesEditor> {
         Wrap(
           spacing: 8,
           runSpacing: 8,
-          children: _options.map((o) {
-            final isSelected = _selected.contains(o);
-            return GestureDetector(
-              onTap: () {
-                setState(() {
-                  if (isSelected) {
-                    _selected.remove(o);
-                  } else {
-                    _selected.add(o);
-                  }
-                });
-                widget.onChanged(_selected);
-              },
+          children: [
+            ..._options.map((o) {
+              final isSelected = _selected.contains(o);
+              return Semantics(
+                button: true,
+                selected: isSelected,
+                label: o,
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      if (isSelected) {
+                        _selected.remove(o);
+                      } else {
+                        _selected.add(o);
+                      }
+                    });
+                    widget.onChanged(_selected);
+                  },
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? AppColor.primary.withValues(alpha: 0.1)
+                          : AppColor.surface,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isSelected
+                            ? AppColor.primary
+                            : AppColor.onSurfaceSubtle.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Text(
+                      o,
+                      style: TextStyle(
+                        color:
+                            isSelected ? AppColor.primary : AppColor.textColor,
+                        fontWeight:
+                            isSelected ? FontWeight.w600 : FontWeight.w400,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }),
+            ..._custom.map((o) {
+              final isSelected = _selected.contains(o);
+              return Semantics(
+                button: true,
+                selected: isSelected,
+                label: o,
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      if (isSelected) {
+                        _selected.remove(o);
+                      } else {
+                        _selected.add(o);
+                      }
+                    });
+                    widget.onChanged(_selected);
+                  },
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? AppColor.primary.withValues(alpha: 0.1)
+                          : AppColor.surface,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isSelected
+                            ? AppColor.primary
+                            : AppColor.onSurfaceSubtle.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          o,
+                          style: TextStyle(
+                            color: isSelected
+                                ? AppColor.primary
+                                : AppColor.textColor,
+                            fontWeight:
+                                isSelected ? FontWeight.w600 : FontWeight.w400,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        const Icon(Icons.close,
+                            size: 14, color: AppColor.onSurfaceSubtle),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }),
+            GestureDetector(
+              onTap: _onAddCustomTap,
               child: Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: isSelected
-                      ? AppColor.primary.withValues(alpha: 0.1)
-                      : AppColor.surface,
+                  color: AppColor.surface,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: isSelected
-                        ? AppColor.primary
-                        : AppColor.onSurfaceSubtle.withValues(alpha: 0.3),
+                    color: AppColor.onSurfaceSubtle.withValues(alpha: 0.3),
                   ),
                 ),
-                child: Text(
-                  o,
-                  style: TextStyle(
-                    color: isSelected ? AppColor.primary : AppColor.textColor,
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                  ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.add, size: 16, color: AppColor.onSurfaceSubtle),
+                    SizedBox(width: 6),
+                    Text('Добавить своё'),
+                  ],
                 ),
               ),
-            );
-          }).toList(),
+            ),
+          ],
         ),
       ],
     );
+  }
+
+  Future<void> _onAddCustomTap() async {
+    final ctrl = TextEditingController();
+    final value = await showDialog<String>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('Свой вызов'),
+          content: TextField(
+            controller: ctrl,
+            decoration: const InputDecoration(hintText: 'Опишите кратко'),
+            autofocus: true,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Отмена'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(ctrl.text.trim()),
+              child: const Text('Добавить'),
+            ),
+          ],
+        );
+      },
+    );
+    if (value != null && value.isNotEmpty) {
+      setState(() {
+        _custom.add(value);
+        _selected.add(value);
+      });
+      widget.onChanged(_selected);
+    }
   }
 }
 
