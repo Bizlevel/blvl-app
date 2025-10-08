@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
-import 'package:bizlevel/utils/friendly_messages.dart';
 
 import 'package:bizlevel/providers/goals_providers.dart';
 import 'package:bizlevel/providers/goals_repository_provider.dart';
@@ -120,21 +119,14 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
       }
       // 43.25: Создать «оболочку» новой версии latest+1 при первом входе — только если версия доступна по уровню
       try {
-        final lvl = await ref.read(currentLevelNumberProvider.future);
+        final user = await ref.read(currentUserProvider.future);
+        final lvl = user?.currentLevel ?? 0;
         final allowedMax = _allowedMaxByLevel(lvl);
         final lockedByLevel = widget.version > allowedMax;
         if (!_versions.containsKey(widget.version) &&
             widget.version == _latestVersion + 1 &&
             !lockedByLevel) {
           try {
-            // Breadcrumb: Первый вход на чекпоинт
-            Sentry.addBreadcrumb(Breadcrumb(
-              level: SentryLevel.info,
-              category: 'goal',
-              message: 'goal_checkpoint_first_enter',
-              data: {'version': widget.version},
-            ));
-
             final repo = ref.read(goalsRepositoryProvider);
             await repo.upsertGoalVersion(
                 version: widget.version, goalText: '', versionData: {});
@@ -158,7 +150,7 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
       if (!mounted) return;
       setState(() => _loadFailed = true);
       ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text(FriendlyMessages.goalLoadError)));
+          const SnackBar(content: Text('Ошибка загрузки данных версии')));
     }
   }
 
@@ -174,36 +166,50 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
     if (version == 2) {
       final data = v(2) ?? v(1) ?? {};
       _goalRefinedCtrl.text = (data['concrete_result'] ??
-          (v(1)?['concrete_result'] ?? '')) as String;
-      _metricNameCtrl.text = (data['metric_type'] ?? '') as String;
-      _metricFromCtrl.text = ((data['metric_current'])?.toString() ?? '');
-      _metricToCtrl.text = ((data['metric_target'])?.toString() ?? '');
+          data['goal_refined'] ??
+          (v(1)?['goal_initial'] ?? '')) as String;
+      _metricNameCtrl.text =
+          (data['metric_type'] ?? data['metric_name'] ?? '') as String;
+      _metricFromCtrl.text =
+          ((data['metric_current'] ?? data['metric_from'])?.toString() ?? '');
+      _metricToCtrl.text =
+          ((data['metric_target'] ?? data['metric_to'])?.toString() ?? '');
       _financialGoalCtrl.text = (data['financial_goal']?.toString() ?? '');
     } else if (version == 3) {
       final data = v(3) ?? {};
       _goalSmartCtrl.text = (data['goal_smart'] ?? '') as String;
-      _s1Ctrl.text = (data['week1_focus'] ?? '') as String;
-      _s2Ctrl.text = (data['week2_focus'] ?? '') as String;
-      _s3Ctrl.text = (data['week3_focus'] ?? '') as String;
-      _s4Ctrl.text = (data['week4_focus'] ?? '') as String;
+      _s1Ctrl.text =
+          (data['week1_focus'] ?? data['sprint1_goal'] ?? '') as String;
+      _s2Ctrl.text =
+          (data['week2_focus'] ?? data['sprint2_goal'] ?? '') as String;
+      _s3Ctrl.text =
+          (data['week3_focus'] ?? data['sprint3_goal'] ?? '') as String;
+      _s4Ctrl.text =
+          (data['week4_focus'] ?? data['sprint4_goal'] ?? '') as String;
     } else if (version == 4) {
       final data = v(4) ?? {};
-      _finalWhatCtrl.text = (data['first_three_days'] ?? '') as String;
-      _finalWhenCtrl.text = (data['start_date'] ?? '') as String;
-      _finalHowCtrl.text = (data['accountability_person'] ?? '') as String;
+      _finalWhatCtrl.text =
+          (data['first_three_days'] ?? data['final_what'] ?? '') as String;
+      _finalWhenCtrl.text =
+          (data['start_date'] ?? data['final_when'] ?? '') as String;
+      _finalHowCtrl.text =
+          (data['accountability_person'] ?? data['final_how'] ?? '') as String;
       final dynamic rs = data['readiness_score'];
       if (rs is num) {
         _readinessScore = rs.toInt();
         _commitment = rs >= 7;
       } else {
         _readinessScore = null;
-        _commitment = false;
+        _commitment = (data['commitment'] ?? false) as bool;
       }
     } else if (version == 1) {
       final data = v(1) ?? {};
-      _goalInitialCtrl.text = (data['concrete_result'] ?? '') as String;
-      _goalWhyCtrl.text = (data['main_pain'] ?? '') as String;
-      _mainObstacleCtrl.text = (data['first_action'] ?? '') as String;
+      _goalInitialCtrl.text =
+          (data['concrete_result'] ?? data['goal_initial'] ?? '') as String;
+      _goalWhyCtrl.text =
+          (data['main_pain'] ?? data['goal_why'] ?? '') as String;
+      _mainObstacleCtrl.text =
+          (data['first_action'] ?? data['main_obstacle'] ?? '') as String;
     }
   }
 
@@ -269,23 +275,6 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
           'financial_goal': fin,
         };
         goalText = concrete;
-
-        // Breadcrumb: Заполнены поля v2
-        Sentry.addBreadcrumb(Breadcrumb(
-          level: SentryLevel.info,
-          category: 'goal',
-          message: 'goal_checkpoint_field_filled',
-          data: {
-            'version': widget.version,
-            'fields': [
-              'concrete_result',
-              'metric_type',
-              'metric_current',
-              'metric_target',
-              'financial_goal'
-            ],
-          },
-        ));
       } else if (widget.version == 3) {
         // Новые ключи v3
         versionData = {
@@ -296,23 +285,6 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
           'week4_focus': _s4Ctrl.text.trim(),
         };
         goalText = _goalSmartCtrl.text.trim();
-
-        // Breadcrumb: Заполнены поля v3
-        Sentry.addBreadcrumb(Breadcrumb(
-          level: SentryLevel.info,
-          category: 'goal',
-          message: 'goal_checkpoint_field_filled',
-          data: {
-            'version': widget.version,
-            'fields': [
-              'goal_smart',
-              'week1_focus',
-              'week2_focus',
-              'week3_focus',
-              'week4_focus'
-            ],
-          },
-        ));
       } else if (widget.version == 4) {
         // Новые ключи v4
         final int readiness = _readinessScore ?? (_commitment ? 8 : 5);
@@ -323,23 +295,6 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
           'readiness_score': readiness,
         };
         goalText = _finalWhatCtrl.text.trim();
-
-        // Breadcrumb: Заполнены поля v4
-        Sentry.addBreadcrumb(Breadcrumb(
-          level: SentryLevel.info,
-          category: 'goal',
-          message: 'goal_checkpoint_field_filled',
-          data: {
-            'version': widget.version,
-            'fields': [
-              'first_three_days',
-              'start_date',
-              'accountability_person',
-              'readiness_score'
-            ],
-            'readiness': readiness,
-          },
-        ));
       } else {
         // v1
         versionData = {
@@ -416,7 +371,7 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
       if (!mounted) return;
       setState(() => _saving = false);
       ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text(FriendlyMessages.saveError)));
+          .showSnackBar(SnackBar(content: Text('Ошибка сохранения: $e')));
     }
   }
 
@@ -454,20 +409,6 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
     if (widget.version == 3) return 8;
     if (widget.version == 4) return 11;
     return 1;
-  }
-
-  /// Приветственное сообщение от Макса для каждой версии
-  String _getWelcomeMessage() {
-    switch (widget.version) {
-      case 2:
-        return '''Привет! 👋 Начинаем этап «Метрики».\n\nЗдесь мы превращаем твою цель в измеримый результат. Заполни поля формы:\n• Конкретный результат\n• Метрика и текущее/целевое значения\n• Финансовая цель\n\nПо ходу я дам советы и задам уточняющие вопросы. Поехали! 🚀''';
-      case 3:
-        return '''Привет! 👋 Переходим к этапу «План на 4 недели».\n\nТеперь разобьём твою цель на 4 недельных фокуса. Каждая неделя — это конкретный шаг к результату.\n\nЗаполни SMART-формулировку и фокусы по неделям. Я помогу сделать их реалистичными и достижимыми! 💪''';
-      case 4:
-        return '''Привет! 👋 Финальный этап «Готовность к старту».\n\nОсталось зафиксировать:\n• План на первые 3 дня\n• Дату старта\n• Кому расскажешь о цели (для поддержки)\n• Твою готовность по шкале 1-10\n\nПосле этого запустим твои 28 дней! 🎯''';
-      default:
-        return 'Привет! Я — Макс, твой трекер целей. Заполни форму ниже, а я помогу советами и вопросами.';
-    }
   }
 
   String _buildUserContext() {
@@ -650,9 +591,8 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
                       ),
                     // Preflight-гейтинг версии по текущему уровню пользователя
                     Builder(builder: (context) {
-                      final lvl =
-                          ref.watch(currentLevelNumberProvider).asData?.value ??
-                              0;
+                      final userAsync = ref.watch(currentUserProvider);
+                      final lvl = userAsync.asData?.value?.currentLevel ?? 0;
                       final allowedMax = _allowedMaxByLevel(lvl);
                       final requiredLevel =
                           _requiredLevelForVersion(widget.version);
@@ -741,17 +681,10 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
                                       key: _embeddedChatKey,
                                       chatId: null,
                                       userContext: _buildUserContext(),
-                                      levelContext: () {
-                                        final n = ref
-                                            .read(currentLevelNumberProvider)
-                                            .asData
-                                            ?.value;
-                                        return 'level_number: ${n ?? (user?.currentLevel ?? 0)}';
-                                      }(),
+                                      levelContext:
+                                          'current_level_number: ${user?.currentLevel ?? 0}',
                                       bot: 'max',
                                       embedded: true,
-                                      initialAssistantMessage:
-                                          _getWelcomeMessage(),
                                       firstPrompt: widget.version == 2
                                           ? 'Сформулируем измеримую цель и метрику. Укажи текущее и целевое значения, затем финансовую цель.'
                                           : (widget.version == 3

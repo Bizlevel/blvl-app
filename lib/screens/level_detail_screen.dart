@@ -170,7 +170,10 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
                         barrierColor: Colors.black.withValues(alpha: 0.54),
                         builder: (_) => FractionallySizedBox(
                           heightFactor: 0.9,
-                          child: LeoDialogScreen(chatId: _chatId),
+                          child: LeoDialogScreen(
+                            chatId: _chatId,
+                            levelContext: 'current_level_number: ${widget.levelNumber ?? widget.levelId}',
+                          ),
                         ),
                       );
                     },
