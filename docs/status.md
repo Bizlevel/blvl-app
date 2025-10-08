@@ -586,3 +586,14 @@ TODO:
 - 52.fix-1: `LeoDialogScreen` — скрытие клавиатуры по жесту скролла (`keyboardDismissBehavior:onDrag`), по тапу вне поля (`onTapOutside`) и иконка «Скрыть клавиатуру». Добавлен FAB «Вниз» при отскролле.
 - 52.fix-2: Подсказки переведены в компактную горизонтальную ленту (1 строка, прокрутка) с кнопкой «Ещё…» (bottom‑sheet) и «Показать подсказки» при сворачивании.
 - 52.fix-3: Метки времени у сообщений (hh:mm), `SelectableText` для баблов ассистента. Пагинация/автоскролл и контракты LeoService без изменений. Линты чистые.
+
+# Этап 53: IAP покупки GP (StoreKit/Google Billing)
+- Клиент:
+  - Добавлен `in_app_purchase`, сервис `IapService` (запрос продуктов, покупка consumable), метод `GpService.verifyIapPurchase`.
+  - `GpStoreScreen`: для iOS/Android покупки через IAP, цены подставляются из стора; для Web — прежний фолбэк.
+  - Добавлены breadcrumbs Sentry: `gp_iap_products_loaded/gp_iap_purchase_*`, `gp_verify_*`, `gp_web_purchase_init`.
+- Сервер:
+  - Edge `gp-purchase-verify`: валидация iOS (verifyReceipt) и Android (Google Purchases), CORS/OPTIONS, коды ошибок, идемпотентное начисление через RPC `gp_purchase_verify`.
+  - Маппинг продуктов: gp_300=300, gp_1400=1400 (1000+400 бонус), gp_3000=3000.
+- Безопасность:
+  - Ключи Apple/Google выносятся в Supabase Edge Secrets (не в репозиторий). Требуются: APPLE_ISSUER_ID/APPLE_KEY_ID/APPLE_PRIVATE_KEY, GOOGLE_SERVICE_ACCOUNT_JSON, ANDROID_PACKAGE_NAME.
