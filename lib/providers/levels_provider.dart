@@ -190,8 +190,14 @@ final nextLevelToContinueProvider =
             orElse: () => null,
           );
   final bool currDone = currentRow?['isCompleted'] as bool? ?? false;
-  final int desiredNumber =
+  final int maxLevel = levels
+      .map<int>((l) => (l['level'] as int? ?? 0))
+      .fold<int>(0, (a, b) => a > b ? a : b);
+  int desiredNumber =
       currDone ? (userCurrentLevelNumber + 1) : userCurrentLevelNumber;
+  if (desiredNumber > maxLevel) {
+    desiredNumber = maxLevel; // выход за пределы: ведём к последнему уровню
+  }
   Map<String, dynamic> candidate = levels.firstWhere(
     (l) => (l['level'] as int? ?? -1) == desiredNumber,
     orElse: () => currentRow ?? levels.first,
@@ -207,7 +213,7 @@ final nextLevelToContinueProvider =
     'requiresPremium': false,
     'isLocked': isLocked,
     'targetScroll': levelNumber,
-    'label': levelNumber == 0 ? 'Ресепшн' : 'Уровень $levelNumber',
+    'label': 'Уровень $levelNumber',
   };
 });
 

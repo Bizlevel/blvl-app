@@ -1,3 +1,13 @@
+## 2025-10-08 — Goal sprint sync & UX fixes
+
+- Данные: добавлены `sprint_status`, `sprint_start_date` в выборку `fetchAllGoals`; провайдеры теперь получают эти поля.
+- UI: `SprintSection` и `GoalCompactCard` используют `sprint_start_date`; «Дней осталось» считается от серверной даты; вывод статуса спринта; показывается `readiness_score` из v4.
+- Daily: после `startSprint()` автоматически вызывается автозаполнение `daily_progress.task_text` из `v3 week*_focus`.
+- Weekly: в форме чек‑ина показан «Прогресс к цели: N%» на основе метрики v2.
+- Edge: в `leo-chat` заменено `sprint_number` → `week_number` для `weekly_progress`.
+- Контроллер: расчёт текущей недели и задач переведён на `sprint_start_date` и ключи `week*_focus`.
+
+Проверка: сборка без ошибок; линтер — только предупреждения о сложности в `GoalsRepository` (неблокирующие). 
 # Этап 30: Правки по UX/UI
 Задача 30.1: На уровне 0 реализован режим «просмотр/редактирование» формы профиля. Состояние контроллеров поднято в `LevelDetailScreen`, значения префиллятся из `currentUserProvider`, после сохранения поля остаются и переходят в read‑only. Добавлена серая иконка «Редактировать», включающая режим редактирования. Линты чистые, функционал протестирован.
 Задача 30.2: На странице `GoalScreen` добавлен режим «просмотр/редактирование» для версий v1–v4: по умолчанию сохранённая версия открывается read‑only, автосохранение отключено; добавлена серая иконка «Редактировать» для последней версии; кнопка «Сохранить» активна только в режиме редактирования. Линты чистые.
@@ -597,3 +607,26 @@ TODO:
   - Маппинг продуктов: gp_300=300, gp_1400=1400 (1000+400 бонус), gp_3000=3000.
 - Безопасность:
   - Ключи Apple/Google выносятся в Supabase Edge Secrets (не в репозиторий). Требуются: APPLE_ISSUER_ID/APPLE_KEY_ID/APPLE_PRIVATE_KEY, GOOGLE_SERVICE_ACCOUNT_JSON, ANDROID_PACKAGE_NAME.
+
+## Fix: Стандартизация уровней и навигации (после Этапа 53)
+- Добавлен `currentLevelNumberProvider` (нормализация номера уровня из `users.current_level`).
+- UI переведён на нормализованный уровень (`GoalScreen`, `GoalCheckpointScreen`, `ProfileScreen`, `AppShell`).
+- `ContextService`: `userContext/levelContext` теперь отдают `level_number` (+ `level_id`, если доступен).
+- `nextLevelToContinueProvider`: обработка выхода за max (ведёт к последнему уровню), убран лейбл «Ресепшн».
+- CTA «Перейти на Уровень 1» ведёт в `/tower?scrollTo=1` (надёжная навигация).
+- Добавлен фича‑флаг `kNormalizeCurrentLevel` (по умолчанию true) для поэтапного включения.
+- Наблюдаемость: breadcrumb `client_level_mismatch` при подозрительном `users.current_level`.
+- Аудит Supabase: `v_users_level_mismatch` → 0 расхождений.
+
+# Этап 54: Цель — консолидация спринта и Макса (финальные правки)
+- Данные: `GoalsRepository.fetchAllGoals` расширен полями `sprint_status/sprint_start_date`; провайдеры получают актуальные значения без дублирования JSON‑ключей.
+- UI:
+  - `SprintSection`: заголовок недель выводит дату старта из `sprint_start_date`.
+  - `GoalCompactCard`: «Дней осталось» считается от `sprint_start_date`; показ локализованного статуса спринта; `readiness_score` берётся из v4.
+  - `CheckInForm`: добавлен индикатор «Прогресс к цели: N%» на основе v2 (current/target) и факта за неделю.
+  - `GoalScreen`: источники дат/статусов приведены к серверным полям; корректно определяются старт/завершение 28 дней.
+- Контроллер: `currentWeekNumber()` и `getWeekGoalFromV3()` переведены на `sprint_start_date` и ключи `week*_focus` (с fallback на старые ключи при наличии).
+- Daily: после успешного `startSprint()` вызывается автозаполнение `daily_progress.task_text` из `v3 week*_focus` (без перезаписи существующих задач).
+- Edge: в `supabase/functions/leo-chat/index.ts` заменено `sprint_number` → `week_number` для выборки `weekly_progress` и формирования спринт‑блока в контексте Макса.
+- Документация: добавлен краткий отчёт (этот раздел) и сводка «2025‑10‑08 — Goal sprint sync & UX fixes».
+- Линтер/сборка: проект собирается; предупреждения — только по сложности в `GoalsRepository` (неблокирующие).

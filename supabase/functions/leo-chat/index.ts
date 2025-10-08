@@ -1222,7 +1222,7 @@ serve(async (req) => {
           queries.push(supabaseAdmin!.from('core_goals').select('version, goal_text, version_data, updated_at').eq('user_id', userId).order('version', { ascending: false }).limit(1).then(result => ({ type: 'goal', result })).catch(e => ({ type: 'goal', error: e })));
         }
         if (needsLoading.sprint) {
-          queries.push(supabaseAdmin!.from('weekly_progress').select('sprint_number, achievement, metric_actual, created_at').eq('user_id', userId).order('created_at', { ascending: false }).limit(1).then(result => ({ type: 'sprint', result })).catch(e => ({ type: 'sprint', error: e })));
+          queries.push(supabaseAdmin!.from('weekly_progress').select('week_number, achievement, metric_actual, created_at').eq('user_id', userId).order('created_at', { ascending: false }).limit(1).then(result => ({ type: 'sprint', result })).catch(e => ({ type: 'sprint', error: e })));
         }
         if (needsLoading.reminders) {
           queries.push(supabaseAdmin!.from('reminder_checks').select('day_number, reminder_text, is_completed').eq('user_id', userId).eq('is_completed', false).order('day_number', { ascending: true }).limit(5).then(result => ({ type: 'reminders', result })).catch(e => ({ type: 'reminders', error: e })));
@@ -1265,8 +1265,8 @@ serve(async (req) => {
             case 'sprint':
               if (Array.isArray(result.data) && result.data.length > 0) {
                 const p = result.data[0];
-          sprintBlock = `Спринт: ${p?.sprint_number ?? ''}. Итоги: ${p?.achievement ?? ''}. Метрика (факт): ${p?.metric_actual ?? ''}`;
-        }
+                sprintBlock = `Неделя: ${p?.week_number ?? ''}. Итоги: ${p?.achievement ?? ''}. Метрика (факт): ${p?.metric_actual ?? ''}`;
+              }
               setCachedContext(sprintCacheKey, sprintBlock);
               break;
             case 'reminders':

@@ -24,7 +24,6 @@ import 'package:bizlevel/widgets/common/bizlevel_button.dart';
 import 'package:bizlevel/widgets/common/gp_balance_widget.dart';
 import 'package:bizlevel/widgets/common/bizlevel_card.dart';
 import 'package:bizlevel/widgets/common/bizlevel_text_field.dart';
-import 'package:bizlevel/services/supabase_service.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -334,7 +333,9 @@ class ProfileScreen extends ConsumerWidget {
                 user: user,
                 userName: user.name,
                 avatarId: user.avatarId,
-                currentLevel: user.currentLevel,
+                currentLevel:
+                    ref.watch(currentLevelNumberProvider).asData?.value ??
+                        user.currentLevel,
                 messagesLeft: gp,
                 artifactsCount: artifactsCount,
                 artifacts: artifacts,
@@ -651,21 +652,20 @@ class _BodyState extends ConsumerState<_Body> {
                                   ?.copyWith(fontWeight: FontWeight.w600),
                             ),
                             const SizedBox(height: 6),
-                            FutureBuilder<int>(
-                              future: SupabaseService.levelNumberFromId(
-                                  widget.currentLevel),
-                              builder: (context, snap) {
-                                final n = snap.data ?? 0;
-                                return Text(
-                                  'Уровень $n',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .bodySmall
-                                      ?.copyWith(
-                                          color: AppColor.onSurfaceSubtle),
-                                );
-                              },
-                            ),
+                            Builder(builder: (context) {
+                              final n = ref
+                                      .watch(currentLevelNumberProvider)
+                                      .asData
+                                      ?.value ??
+                                  widget.currentLevel;
+                              return Text(
+                                'Уровень $n',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(color: AppColor.onSurfaceSubtle),
+                              );
+                            }),
                           ],
                         ),
                       ),

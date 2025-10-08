@@ -27,11 +27,13 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
   String? _selectedLabel;
   bool _faqExpanded = false;
   final Map<String, ProductDetails> _productMap = {};
+  final Map<String, Map<String, dynamic>> _serverPricing = {};
 
   @override
   void initState() {
     super.initState();
     _loadIapProducts();
+    _loadServerPricing();
   }
 
   Future<void> _loadIapProducts() async {
@@ -66,10 +68,48 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
     } catch (_) {}
   }
 
+  Future<void> _loadServerPricing() async {
+    try {
+      // Web или универсальный fallback — читаем витрину KZT
+      final rows = await Supabase.instance.client
+          .from('store_pricing')
+          .select('product_id, amount_kzt, amount_gp, bonus_gp, title')
+          .eq('is_active', true);
+      final list = List<Map<String, dynamic>>.from(
+          rows.map((e) => Map<String, dynamic>.from(e as Map)));
+      if (!mounted) return;
+      setState(() {
+        for (final r in list) {
+          _serverPricing[r['product_id'] as String] = r;
+        }
+      });
+    } catch (_) {}
+  }
+
   String _priceLabelFor(String productId, String fallback) {
-    final p = _productMap[productId];
-    if (p != null && p.price.isNotEmpty) return p.price;
+    final platform = IapService.currentPlatform();
+    if (platform == 'ios' || platform == 'android') {
+      final p = _productMap[productId];
+      if (p != null && p.price.isNotEmpty) return p.price;
+    }
+    final sp = _serverPricing[productId];
+    if (sp != null) {
+      final amount = (sp['amount_kzt'] as num?)?.toInt() ?? 0;
+      if (amount > 0) return '₸${_fmtKzt(amount)}';
+    }
     return fallback;
+  }
+
+  String _fmtKzt(int amount) {
+    // Простое форматирование: 19960 -> 19 960
+    final s = amount.toString();
+    final buf = StringBuffer();
+    for (int i = 0; i < s.length; i++) {
+      buf.write(s[i]);
+      final left = s.length - i - 1;
+      if (left > 0 && left % 3 == 0) buf.write(' ');
+    }
+    return buf.toString();
   }
 
   @override
@@ -80,7 +120,8 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
         final bool isXs = constraints.maxWidth < 360;
         // Устанавливаем дефолтный выбранный план (середина) если не выбрано
         _selectedPackageId ??= 'bizlevelgp_1000';
-        _selectedAmount ??= 9960;
+        _selectedAmount ??=
+            (_serverPricing['bizlevelgp_1000']?['amount_kzt'] as int?) ?? 9960;
         _selectedLabel ??= 'РАЗГОН: 1400 GP';
 
         return ListView(

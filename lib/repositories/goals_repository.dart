@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
+import 'package:sentry/sentry.dart';
 
 /// Репозиторий для работы с фичей «Цель»: версии цели, спринты, напоминания, цитаты.
 ///
@@ -52,7 +54,8 @@ class GoalsRepository {
       cacheKey: cacheKey,
       query: () => _client
           .from('core_goals')
-          .select('id, user_id, version, goal_text, version_data, updated_at')
+          .select(
+              'id, user_id, version, goal_text, version_data, updated_at, sprint_status, sprint_start_date')
           .eq('user_id', userId)
           .order('version', ascending: false)
           .limit(1)
@@ -71,7 +74,8 @@ class GoalsRepository {
       query: () async {
         final List data = await _client
             .from('core_goals')
-            .select('id, user_id, version, goal_text, version_data, updated_at')
+            .select(
+                'id, user_id, version, goal_text, version_data, updated_at, sprint_status, sprint_start_date')
             .eq('user_id', userId)
             .order('version', ascending: true);
         return data;
@@ -173,14 +177,13 @@ class GoalsRepository {
 
   /// Старт 28‑дневного режима (RPC → fallback: upsert version_data.start_date)
   Future<Map<String, dynamic>> startSprint({DateTime? startDate}) async {
+    final resp = await _updateGoalSprint(
+        action: 'start', startDate: startDate ?? DateTime.now());
+    // После старта — автозаполнение задач дня из v3 (лениво на клиенте)
     try {
-      return await _updateGoalSprint(
-          action: 'start', startDate: startDate ?? DateTime.now());
-    } catch (_) {
-      final String iso =
-          (startDate ?? DateTime.now().toUtc()).toIso8601String();
-      return upsertGoalField(version: 4, field: 'start_date', value: iso);
-    }
+      await backfillDailyTasksFromV3();
+    } catch (_) {}
+    return resp;
   }
 
   /// Завершение 28‑дневного режима (RPC, без fallback изменений данных)
@@ -192,10 +195,28 @@ class GoalsRepository {
   Future<Map<String, dynamic>> checkAndGrantStreakBonus() async {
     try {
       final resp = await _client.rpc('check_and_grant_streak_bonus');
-      if (resp is Map) return Map<String, dynamic>.from(resp);
+      if (resp is Map) {
+        try {
+          Sentry.addBreadcrumb(Breadcrumb(
+            category: 'goal',
+            level: SentryLevel.info,
+            message: 'streak_bonus_checked',
+            data: resp.map((k, v) => MapEntry(k.toString(), v)),
+          ));
+        } catch (_) {}
+        return Map<String, dynamic>.from(resp);
+      }
       return <String, dynamic>{};
     } catch (e) {
       debugPrint('checkAndGrantStreakBonus error: $e');
+      try {
+        Sentry.addBreadcrumb(Breadcrumb(
+          category: 'goal',
+          level: SentryLevel.warning,
+          message: 'streak_bonus_check_failed',
+          data: {'error': e.toString()},
+        ));
+      } catch (_) {}
       return <String, dynamic>{};
     }
   }
@@ -226,6 +247,55 @@ class GoalsRepository {
       final List data = (cache.get('items') as List?) ?? const <dynamic>[];
       return List<Map<String, dynamic>>.from(
           data.map((e) => Map<String, dynamic>.from(e as Map)));
+    }
+  }
+
+  /// Заполняет daily_progress.task_text из week*_focus версии v3
+  /// Не перезаписывает существующие task_text.
+  Future<void> backfillDailyTasksFromV3() async {
+    try {
+      final String? userId = _client.auth.currentUser?.id;
+      if (userId == null) return;
+
+      // 1) Получаем v3.version_data
+      final Map<String, dynamic>? v3row = await _client
+          .from('core_goals')
+          .select('version, version_data')
+          .eq('user_id', userId)
+          .eq('version', 3)
+          .order('updated_at', ascending: false)
+          .limit(1)
+          .maybeSingle();
+      final Map<String, dynamic> v3data = (v3row?['version_data'] is Map)
+          ? Map<String, dynamic>.from(v3row!['version_data'] as Map)
+          : const <String, dynamic>{};
+
+      if (v3data.isEmpty) return;
+
+      // 2) Получаем уже созданные daily_progress
+      final existing = await fetchDailyProgress();
+      final Map<int, String> hasTask = <int, String>{};
+      for (final m in existing) {
+        final int? d = m['day_number'] as int?;
+        if (d != null) {
+          hasTask[d] = (m['task_text'] ?? '').toString();
+        }
+      }
+
+      // 3) Для 1..28 устанавливаем task_text из соответствующего weekN_focus, если пусто
+      for (int day = 1; day <= 28; day++) {
+        final bool empty = (hasTask[day] ?? '').trim().isEmpty;
+        if (!empty) continue;
+        final int week = ((day - 1) ~/ 7) + 1;
+        final String key = 'week${week}_focus';
+        final String text = (v3data[key] ?? '').toString().trim();
+        if (text.isEmpty) continue;
+        // Обновляем только task_text
+        await upsertDailyProgress(dayNumber: day, taskText: text);
+      }
+    } catch (e) {
+      // swallow — не критично для UX
+      debugPrint('backfillDailyTasksFromV3 error: $e');
     }
   }
 

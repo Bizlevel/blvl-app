@@ -30,21 +30,27 @@ class ContextService {
     if (user.businessRegion?.isNotEmpty == true) {
       parts.add('Регион: ${user.businessRegion}');
     }
-    // Важно: текущий уровень включаем для персонализации в двух видах
-    final levelNum = await SupabaseService.levelNumberFromId(user.currentLevel);
-    parts.add('Текущий уровень: $levelNum (level_id: ${user.currentLevel})');
+    // Текущий уровень: используем нормализованный номер и, если возможно, id
+    final levelNum =
+        await SupabaseService.resolveCurrentLevelNumber(user.currentLevel);
+    final levelId = await SupabaseService.levelIdFromNumber(levelNum);
+    if (levelId != null) {
+      parts.add('Текущий уровень: $levelNum (level_id: $levelId)');
+    } else {
+      parts.add('Текущий уровень: $levelNum');
+    }
     return parts.isNotEmpty ? parts.join('. ') : null;
   }
 
   /// Builds levelContext string. Server can parse `level_id: <id>`.
   static Future<String?> buildLevelContext(UserModel? user) async {
     if (user == null) return null;
-    final int levelId = user.currentLevel;
-    final int levelNum = await SupabaseService.levelNumberFromId(levelId);
-    // Используем чёткий формат, который сервер умеет парсить через regex
-    // и дополняем человекочитаемым номером
-    return 'level_id: $levelId, current_level_number: $levelNum';
+    final int levelNum =
+        await SupabaseService.resolveCurrentLevelNumber(user.currentLevel);
+    final int? levelId = await SupabaseService.levelIdFromNumber(levelNum);
+    if (levelId != null) {
+      return 'level_number: $levelNum, level_id: $levelId';
+    }
+    return 'level_number: $levelNum';
   }
 }
-
-

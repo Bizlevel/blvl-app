@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:bizlevel/providers/gp_providers.dart';
 import 'package:bizlevel/widgets/common/milestone_celebration.dart';
 
 import 'package:bizlevel/providers/cases_provider.dart';
@@ -505,6 +506,11 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
 
         final newlyGranted = before == null && after != null;
         if (newlyGranted && mounted) {
+          try {
+            // Инвалидация баланса после начисления бонуса
+            // ignore: unused_result
+            ProviderScope.containerOf(context).invalidate(gpBalanceProvider);
+          } catch (_) {}
           showDialog(
             context: context,
             barrierDismissible: true,

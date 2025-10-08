@@ -152,9 +152,10 @@ class GoalScreenController extends StateNotifier<GoalScreenState> {
     final v2 =
         (state.versions[2]?['version_data'] as Map?)?.cast<String, dynamic>() ??
             {};
-    final String? metricName = (v2['metric_name'] ?? '') as String?;
-    final double? from = double.tryParse('${v2['metric_from'] ?? ''}'.trim());
-    final double? to = double.tryParse('${v2['metric_to'] ?? ''}'.trim());
+    final String? metricName = (v2['metric_type'] ?? '') as String?;
+    final double? from =
+        double.tryParse('${v2['metric_current'] ?? ''}'.trim());
+    final double? to = double.tryParse('${v2['metric_target'] ?? ''}'.trim());
     return (metricName, from, to);
   }
 
@@ -183,11 +184,13 @@ class GoalScreenController extends StateNotifier<GoalScreenState> {
   }
 
   int currentWeekNumber() {
-    final v4 =
+    final Map<String, dynamic> v4 =
         (state.versions[4]?['version_data'] as Map?)?.cast<String, dynamic>() ??
-            {};
-    final String when = (v4['final_when'] ?? '').toString();
-    final start = DateTime.tryParse(when)?.toUtc();
+            const <String, dynamic>{};
+    final String when =
+        (state.versions[4]?['sprint_start_date'] ?? v4['start_date'] ?? '')
+            .toString();
+    final DateTime? start = DateTime.tryParse(when)?.toUtc();
     if (start == null) return 1;
     final int days = DateTime.now().toUtc().difference(start).inDays;
     final int week = (days ~/ 7) + 1;
@@ -198,13 +201,8 @@ class GoalScreenController extends StateNotifier<GoalScreenState> {
     final v3 =
         (state.versions[3]?['version_data'] as Map?)?.cast<String, dynamic>() ??
             {};
-    final key = switch (week) {
-      1 => 'sprint1_goal',
-      2 => 'sprint2_goal',
-      3 => 'sprint3_goal',
-      _ => 'sprint4_goal',
-    };
-    return (v3[key] ?? '').toString();
+    final String key = 'week${week}_focus';
+    return (v3[key] ?? v3['sprint${week}_goal'] ?? '').toString();
   }
 
   String getVersionLabel(int version) {
@@ -239,26 +237,27 @@ class GoalScreenController extends StateNotifier<GoalScreenState> {
         (state.versions[state.selectedVersion]?['version_data'] as Map?) ?? {};
     final sb = StringBuffer('goal_version: ${state.selectedVersion}\n');
     if (state.selectedVersion == 1) {
-      sb.writeln('goal_initial: ${vData['goal_initial'] ?? ''}');
-      sb.writeln('goal_why: ${vData['goal_why'] ?? ''}');
-      sb.writeln('main_obstacle: ${vData['main_obstacle'] ?? ''}');
+      sb.writeln('concrete_result: ${vData['concrete_result'] ?? ''}');
+      sb.writeln('main_pain: ${vData['main_pain'] ?? ''}');
+      sb.writeln('first_action: ${vData['first_action'] ?? ''}');
     } else if (state.selectedVersion == 2) {
-      sb.writeln('goal_refined: ${vData['goal_refined'] ?? ''}');
-      sb.writeln('metric: ${vData['metric_name'] ?? ''}');
+      sb.writeln('concrete_result: ${vData['concrete_result'] ?? ''}');
+      sb.writeln('metric_type: ${vData['metric_type'] ?? ''}');
       sb.writeln(
-          'from: ${vData['metric_from'] ?? ''} to: ${vData['metric_to'] ?? ''}');
+          'metric_current: ${vData['metric_current'] ?? ''} metric_target: ${vData['metric_target'] ?? ''}');
       sb.writeln('financial_goal: ${vData['financial_goal'] ?? ''}');
     } else if (state.selectedVersion == 3) {
       sb.writeln('goal_smart: ${vData['goal_smart'] ?? ''}');
-      sb.writeln('sprint1: ${vData['sprint1_goal'] ?? ''}');
-      sb.writeln('sprint2: ${vData['sprint2_goal'] ?? ''}');
-      sb.writeln('sprint3: ${vData['sprint3_goal'] ?? ''}');
-      sb.writeln('sprint4: ${vData['sprint4_goal'] ?? ''}');
+      sb.writeln('week1_focus: ${vData['week1_focus'] ?? ''}');
+      sb.writeln('week2_focus: ${vData['week2_focus'] ?? ''}');
+      sb.writeln('week3_focus: ${vData['week3_focus'] ?? ''}');
+      sb.writeln('week4_focus: ${vData['week4_focus'] ?? ''}');
     } else {
-      sb.writeln('final_what: ${vData['final_what'] ?? ''}');
-      sb.writeln('final_when: ${vData['final_when'] ?? ''}');
-      sb.writeln('final_how: ${vData['final_how'] ?? ''}');
-      sb.writeln('commitment: ${vData['commitment'] ?? false}');
+      sb.writeln('first_three_days: ${vData['first_three_days'] ?? ''}');
+      sb.writeln('start_date: ${vData['start_date'] ?? ''}');
+      sb.writeln(
+          'accountability_person: ${vData['accountability_person'] ?? ''}');
+      sb.writeln('readiness_score: ${vData['readiness_score'] ?? ''}');
     }
     if (achievement.isNotEmpty ||
         metricActual.isNotEmpty ||
