@@ -12,6 +12,12 @@ from typing import List, Dict, Any
 import hashlib
 from datetime import datetime
 
+# Загружаем переменные окружения из .env
+from dotenv import load_dotenv
+# Ищем .env в корне проекта (на 2 уровня выше)
+env_path = Path(__file__).parent.parent.parent / '.env'
+load_dotenv(env_path)
+
 class SupabaseMigrator:
     def __init__(self, supabase_url: str, supabase_key: str, openai_api_key: str):
         self.supabase_url = supabase_url
@@ -338,18 +344,23 @@ async def main():
     
     # Загружаем переменные окружения
     supabase_url = os.getenv('SUPABASE_URL')
-    supabase_key = os.getenv('SUPABASE_ANON_KEY')
+    # Используем SERVICE_ROLE_KEY для создания таблиц (требуются админские права)
+    supabase_key = os.getenv('SUPABASE_SERVICE_ROLE_KEY') or os.getenv('SUPABASE_ANON_KEY')
     openai_api_key = os.getenv('OPENAI_API_KEY')
     
     if not all([supabase_url, supabase_key, openai_api_key]):
         print("❌ Необходимо установить переменные окружения:")
-        print("SUPABASE_URL, SUPABASE_ANON_KEY, OPENAI_API_KEY")
+        print("SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (или SUPABASE_ANON_KEY), OPENAI_API_KEY")
         return
     
     async with SupabaseMigrator(supabase_url, supabase_key, openai_api_key) as migrator:
         try:
-            # 1. Создаем таблицы
-            await migrator.create_tables()
+            print("🚀 Начинаем миграцию данных...")
+            print("⚠️ Убедитесь, что таблицы lesson_facts и lesson_metadata уже созданы в Supabase!\n")
+            
+            # Таблицы уже созданы вручную через SQL Editor
+            # 1. Создаем таблицы - ПРОПУСКАЕМ
+            # await migrator.create_tables()
             
             # 2. Загружаем метаданные уроков
             await migrator.load_lesson_metadata()
@@ -357,13 +368,18 @@ async def main():
             # 3. Загружаем факты с эмбеддингами
             await migrator.load_facts()
             
-            # 4. Создаем функции поиска
-            await migrator.create_search_functions()
+            # 4. Создаем функции поиска - делаем вручную через SQL
+            print("\n⚠️ Не забудьте создать функции поиска через SQL Editor:")
+            print("   - search_lesson_facts()")
+            print("   - search_by_level()")
             
-            print("🎉 Миграция завершена успешно!")
+            print("\n🎉 Миграция данных завершена успешно!")
+            print(f"📊 Проверьте таблицы lesson_facts и lesson_metadata в Supabase")
             
         except Exception as e:
             print(f"❌ Ошибка миграции: {e}")
+            import traceback
+            traceback.print_exc()
 
 if __name__ == "__main__":
     asyncio.run(main())

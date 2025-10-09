@@ -1394,15 +1394,107 @@ serve(async (req)=>{
       try {
         // Параллельная загрузка памяти (семантический top-k) и сводок чатов
         const [memoriesResult, summariesResult] = await Promise.all([
-          supabaseAdmin.from('user_memories').select('content, updated_at').eq('user_id', userId).order('updated_at', {
-            ascending: false
-          }).limit(5).then((result)=>({
-              type: 'memories',
-              result
-            })).catch((e)=>({
-              type: 'memories',
-              error: e
-            })),
+          // Vector search for relevant memories
+          (async () => {
+            try {
+              const embeddingModel = Deno.env.get("OPENAI_EMBEDDING_MODEL") || "text-embedding-3-small";
+              const embeddingResponse = await openaiInstance.embeddings.create({
+                input: lastUserMessage,
+                model: embeddingModel
+              });
+              const queryEmbedding = embeddingResponse.data[0].embedding;
+
+              // Step 1: Search in active memories first
+              const { data: activeMemories, error: vectorError } = await supabaseAdmin.rpc('match_user_memories', {
+                query_embedding: queryEmbedding,
+                match_threshold: 0.7, // Lower threshold for broader matching
+                match_count: 5,
+                user_id_filter: userId
+              });
+
+              let allMemories = activeMemories || [];
+
+              // Step 2: If we have less than 3 active memories, search in archive
+              if (allMemories.length < 3) {
+                try {
+                  const { data: archiveMemories, error: archiveError } = await supabaseAdmin.rpc('match_memory_archive', {
+                    query_embedding: queryEmbedding,
+                    match_threshold: 0.6, // Lower threshold for archive (broader matching)
+                    match_count: 3 - allMemories.length, // Fill up to 3 total
+                    user_id_filter: userId
+                  });
+
+                  if (archiveMemories && archiveMemories.length > 0) {
+                    // Convert archive format to memory format and add to results
+                    const archiveAsMemories = archiveMemories.map(am => ({
+                      id: am.archive_id,
+                      content: am.content,
+                      similarity: am.similarity,
+                      from_archive: true
+                    }));
+
+                    allMemories = [...allMemories, ...archiveAsMemories];
+
+                    // Log archive access and potentially unarchive important memories
+                    for (const archiveMemory of archiveMemories) {
+                      // Increment access count
+                      await supabaseAdmin
+                        .from('memory_archive')
+                        .update({ access_count: archiveMemory.access_count + 1 })
+                        .eq('id', archiveMemory.archive_id)
+                        .catch(err => console.warn('Failed to update archive access count:', err));
+
+                      // Auto-unarchive if accessed more than 3 times (becomes "important")
+                      if (archiveMemory.access_count >= 2 && archiveMemory.similarity > 0.8) {
+                        try {
+                          await supabaseAdmin.rpc('unarchive_memory', {
+                            memory_archive_id: archiveMemory.archive_id
+                          });
+                          console.log(`Auto-unarchived important memory: ${archiveMemory.archive_id}`);
+                        } catch (unarchiveErr) {
+                          console.warn('Failed to auto-unarchive memory:', unarchiveErr);
+                        }
+                      }
+                    }
+                  }
+                } catch (archiveError) {
+                  console.warn('Archive search failed:', archiveError.message);
+                  // Continue with active memories only
+                }
+              }
+
+              // Log memory usage for weight calculation (only for active memories)
+              const activeMemoriesForLogging = allMemories.filter(m => !m.from_archive);
+              if (activeMemoriesForLogging.length > 0) {
+                await supabaseAdmin.from('memory_usage_logs').insert(
+                  activeMemoriesForLogging.map(m => ({
+                    memory_id: m.id,
+                    user_id: userId,
+                    query_text: lastUserMessage.substring(0, 500), // Limit text length
+                    found_similarity: m.similarity
+                  }))
+                ).catch(err => console.warn('Failed to log memory usage:', err));
+              }
+
+              return {
+                type: 'memories',
+                result: { data: allMemories }
+              };
+            } catch (e) {
+              // Fallback to simple recent memories if vector search fails
+              console.warn('Vector search failed, using fallback:', e.message);
+              const fallbackResult = await supabaseAdmin
+                .from('user_memories')
+                .select('content, updated_at')
+                .eq('user_id', userId)
+                .order('updated_at', { ascending: false })
+                .limit(5);
+              return {
+                type: 'memories',
+                result: fallbackResult
+              };
+            }
+          })(),
           supabaseAdmin.from('leo_chats').select('summary').eq('user_id', userId).eq('bot', isMax ? 'max' : 'leo').not('summary', 'is', null).order('updated_at', {
             ascending: false
           }).limit(3).then((result)=>({

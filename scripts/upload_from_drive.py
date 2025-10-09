@@ -311,6 +311,25 @@ class DriveUploader:
         """Обработка одного файла"""
         logger.info(f"Обрабатываю файл: {file_name}")
         
+        # Проверяем, есть ли уже этот файл в базе
+        try:
+            existing = self.supabase.table('documents')\
+                .select('id')\
+                .eq('metadata->>file_id', file_id)\
+                .limit(1)\
+                .execute()
+            
+            if existing.data and len(existing.data) > 0:
+                logger.info(f"⚠️ Файл {file_name} уже в базе, удаляю старую версию...")
+                # Удаляем все чанки этого файла перед загрузкой новой версии
+                delete_result = self.supabase.table('documents')\
+                    .delete()\
+                    .eq('metadata->>file_id', file_id)\
+                    .execute()
+                logger.info(f"✅ Удалено {len(delete_result.data) if delete_result.data else 0} старых чанков")
+        except Exception as e:
+            logger.warning(f"Ошибка проверки существующего файла: {e}")
+        
         # Скачиваем файл
         temp_file_path = self._download_file(file_id, file_name)
         if not temp_file_path:
@@ -338,6 +357,18 @@ class DriveUploader:
                     'chunk_index': i,
                     'total_chunks': len(chunks)
                 }
+                
+                # Автопарсинг level_id из названия файла
+                import re
+                level_match = re.match(r'Level\s+(\d+)', file_name, re.IGNORECASE)
+                if level_match:
+                    metadata['level_id'] = int(level_match.group(1))
+                    logger.info(f"Извлечён level_id={metadata['level_id']} из названия '{file_name}'")
+                else:
+                    # Все файлы, не подходящие под "Level N" → level_id=0 (доступно всем)
+                    metadata['level_id'] = 0
+                    logger.info(f"Установлен level_id=0 для общедоступного документа '{file_name}'")
+                
                 # Эвристики заголовков/секций/тегов из исходного текста (для первого чанка)
                 if i == 0:
                     base_meta = self._extract_headings_and_tags(text)
