@@ -37,7 +37,7 @@ class _MainStreetScreenState extends ConsumerState<MainStreetScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Padding(
+                const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: Row(
                     children: [
@@ -55,7 +55,7 @@ class _MainStreetScreenState extends ConsumerState<MainStreetScreen> {
                   child: Center(
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 900),
-                      child: Padding(
+                      child: const Padding(
                         padding: EdgeInsets.symmetric(horizontal: 16),
                         child: _MainActionsGrid(),
                       ),

@@ -37,17 +37,36 @@ async function extractAndUpsertMemoriesForUser(
     return 0;
   }
 
-  const transcript = chatMessages
-    .filter((m) => m && typeof m.content === 'string' && m.content.trim().length > 0)
-    .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
-    .join("\n");
+  // 1) Фильтрация качества: только сообщения пользователя, длина >= 50, без односложных ответов
+  const meaningful = chatMessages
+    .filter((m) => m && m.role === 'user' && typeof m.content === 'string')
+    .map((m) => ({ ...m, content: (m.content || '').trim() }))
+    .filter((m) => m.content.length >= 50)
+    .filter((m) => !/^\s*(да|нет|ок|спасибо|привет)\b/i.test(m.content));
 
-  const extractPrompt = `Ты аналитик. Извлеки максимум ${maxMemories} кратких фактов о пользователе для долговременной памяти.
-Правила:
-- Только факты, полезные для персонализации: цели, предпочтения, ограничения, стиль, опыт, бизнес-контекст
-- Один факт — одна короткая строка (5–20 слов), без местоимений, без частных цитат
-- Без PII (e-mail, телефоны)
-- Ответ строго в JSON-массиве строк: ["факт 1", "факт 2", ...]
+  if (meaningful.length === 0) {
+    console.log('⚠️ No meaningful user messages (>=50 chars)');
+    return 0;
+  }
+
+  const transcript = meaningful
+    .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
+    .join('\n');
+
+  const extractPrompt = `Ты аналитик BizLevel. Извлеки максимум ${maxMemories} БИЗНЕС-фактов о пользователе.
+
+ПРИОРИТЕТ 1 (сначала):
+- Главная бизнес-цель (месяц) и ключевая метрика (база/цель)
+- Сфера/ниша и размер команды/стадия
+- Главная боль/препятствие сейчас
+
+ПРИОРИТЕТ 2:
+- ЦА/каналы/инструменты, планы ближайших недель
+
+ФОРМАТ:
+- Один факт — одна короткая строка (5–20 слов)
+- Без местоимений, без цитат, без PII (email/телефоны)
+- Ответ строго JSON-массивом строк: ["факт 1", "факт 2", ...]
 
 Диалог:
 ${transcript}`;
@@ -123,6 +142,35 @@ ${transcript}`;
     }
 
     console.log(`✅ Successfully saved ${rows.length} memories to database`);
+
+    // 4) Гарантируем лимит «горячих» записей (HOT_MEM_LIMIT, дефолт 50)
+    const hotLimit = parseInt(Deno.env.get('HOT_MEM_LIMIT') || '50');
+    if (Number.isFinite(hotLimit) && hotLimit > 0) {
+      // Получаем все записи пользователя с сортировкой по updated_at desc
+      const { data: allMem, error: selErr } = await supabaseAdmin
+        .from('user_memories')
+        .select('id, user_id, content, created_at')
+        .eq('user_id', userId)
+        .order('updated_at', { ascending: false });
+      if (!selErr && Array.isArray(allMem) && allMem.length > hotLimit) {
+        const extras = allMem.slice(hotLimit); // хвост к архиву
+        const extraIds = extras.map((r) => r.id);
+        try {
+          if (extras.length > 0) {
+            // Перенос в архив
+            const payload = extras.map((r) => ({ user_id: r.user_id, content: r.content, created_at: r.created_at }));
+            const { error: insArcErr } = await supabaseAdmin.from('memory_archive').insert(payload);
+            if (insArcErr) console.error('❌ archive insert error:', insArcErr.message);
+            // Удаление из горячего слоя
+            const { error: delErr } = await supabaseAdmin.from('user_memories').delete().in('id', extraIds);
+            if (delErr) console.error('❌ hot trim delete error:', delErr.message);
+          }
+        } catch (e) {
+          console.error('💥 hot trim exception:', e?.message || String(e));
+        }
+      }
+    }
+
     return rows.length;
   } catch (error) {
     console.error('💥 Error in memory extraction:', error);

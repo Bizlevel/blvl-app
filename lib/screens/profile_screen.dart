@@ -146,7 +146,7 @@ class ProfileScreen extends ConsumerWidget {
               final int levelNum = (lvl['level'] as int? ?? 0);
               // Для обложек артефактов используем локальные assets lvls/level_X.png
               final String assetCover = levelNum >= 1 && levelNum <= 10
-                  ? 'assets/images/lvls/level_${levelNum}.png'
+                  ? 'assets/images/lvls/level_$levelNum.png'
                   : (lvl['image'] ?? '');
               return {
                 'title': lvl['artifact_title'] ?? 'Артефакт',
@@ -1076,10 +1076,10 @@ class _InfoButtonLabel extends StatelessWidget {
   const _InfoButtonLabel();
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return const Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.end,
-      children: const [
+      children: [
         Text('Информация'),
         SizedBox(height: 2),
         Row(

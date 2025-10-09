@@ -676,7 +676,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                                     children: [
                                       Row(
                                         children: [
-                                          Icon(
+                                          const Icon(
                                             Icons.list_alt,
                                             size: 20,
                                             color: AppColor.primary,
@@ -720,7 +720,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                                                 child: Center(
                                                   child: Text(
                                                     '$dayNum',
-                                                    style: TextStyle(
+                                                    style: const TextStyle(
                                                       fontSize: 12,
                                                       fontWeight:
                                                           FontWeight.w600,
@@ -771,9 +771,9 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                                   decoration: BoxDecoration(
                                     gradient: LinearGradient(
                                       colors: [
-                                        Color(0xFFFFD700)
+                                        const Color(0xFFFFD700)
                                             .withValues(alpha: 0.1),
-                                        Color(0xFFFFA500)
+                                        const Color(0xFFFFA500)
                                             .withValues(alpha: 0.05),
                                       ],
                                       begin: Alignment.topLeft,
@@ -781,7 +781,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                                     ),
                                     borderRadius: BorderRadius.circular(12),
                                     border: Border.all(
-                                      color: Color(0xFFFFD700)
+                                      color: const Color(0xFFFFD700)
                                           .withValues(alpha: 0.3),
                                     ),
                                   ),
@@ -791,7 +791,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                                     children: [
                                       Row(
                                         children: [
-                                          Icon(
+                                          const Icon(
                                             Icons.emoji_events,
                                             size: 20,
                                             color: Color(0xFFFF8C00),
@@ -804,7 +804,8 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                                                 .titleSmall
                                                 ?.copyWith(
                                                   fontWeight: FontWeight.w600,
-                                                  color: Color(0xFFFF8C00),
+                                                  color:
+                                                      const Color(0xFFFF8C00),
                                                 ),
                                           ),
                                         ],
@@ -838,7 +839,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                                       const SizedBox(height: 8),
                                       Row(
                                         children: [
-                                          Icon(
+                                          const Icon(
                                             Icons.stars,
                                             size: 16,
                                             color: Color(0xFFFF8C00),
@@ -852,7 +853,8 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                                                   .bodyMedium
                                                   ?.copyWith(
                                                     fontWeight: FontWeight.w700,
-                                                    color: Color(0xFFFF8C00),
+                                                    color:
+                                                        const Color(0xFFFF8C00),
                                                   ),
                                             ),
                                           ),
@@ -892,13 +894,12 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                                           setState(() {});
                                           ScaffoldMessenger.of(context)
                                               .showSnackBar(
-                                            SnackBar(
+                                            const SnackBar(
                                               content: Text(
                                                 FriendlyMessages.sprintStarted,
                                               ),
                                               backgroundColor: AppColor.primary,
-                                              duration:
-                                                  const Duration(seconds: 3),
+                                              duration: Duration(seconds: 3),
                                             ),
                                           );
                                         }
@@ -906,7 +907,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                                         if (!mounted) return;
                                         ScaffoldMessenger.of(context)
                                             .showSnackBar(
-                                          SnackBar(
+                                          const SnackBar(
                                             content: Text(
                                                 FriendlyMessages.unknownError),
                                             backgroundColor: Colors.red,
@@ -938,7 +939,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    Icon(
+                                    const Icon(
                                       Icons.info_outline,
                                       size: 16,
                                       color: Colors.black54,
@@ -1020,9 +1021,9 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
             top: false,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 color: Colors.white,
-                boxShadow: const [
+                boxShadow: [
                   BoxShadow(
                       color: Color(0x14000000),
                       blurRadius: 6,
@@ -1093,7 +1094,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
   // _build7DayTimeline/_buildDayDot удалены — в новой версии не используются
 
   Future<void> _loadSprintIfAny(int sprintNumber) async {
-    final existing = await ref.read(sprintProvider(sprintNumber).future);
+    final existing = await ref.read(weekProvider(sprintNumber).future);
     if (existing == null) {
       _achievementCtrl.text = '';
       _metricActualCtrl.text = '';
@@ -1153,8 +1154,8 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
       }
       final String techniquesSummary = checks.join(', ');
 
-      await repo.upsertSprint(
-        sprintNumber: _selectedSprint,
+      await repo.upsertWeek(
+        weekNumber: _selectedSprint,
         achievement: _achievementCtrl.text.trim().isEmpty
             ? null
             : _achievementCtrl.text.trim(),
@@ -1204,8 +1205,8 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(FriendlyMessages.saveError)));
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text(FriendlyMessages.saveError)));
     }
   }
 
@@ -1391,7 +1392,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
               _autoReactionsFired.add(key);
               _openChatWithMax(
                 autoMessage:
-                    'low_activity_ping: Уже ${misses} дня(ей) без активности. Что мешает?',
+                    'low_activity_ping: Уже $misses дня(ей) без активности. Что мешает?',
                 chips: _dailyRecommendedChips(),
               );
             }
@@ -1412,7 +1413,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
         Icon(
           icon,
           size: 18,
-          color: Color(0xFFFF8C00).withValues(alpha: 0.7),
+          color: const Color(0xFFFF8C00).withValues(alpha: 0.7),
         ),
         const SizedBox(width: 10),
         Expanded(
@@ -1427,7 +1428,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
           bonusText,
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 fontWeight: FontWeight.w700,
-                color: Color(0xFFFF8C00),
+                color: const Color(0xFFFF8C00),
               ),
         ),
       ],

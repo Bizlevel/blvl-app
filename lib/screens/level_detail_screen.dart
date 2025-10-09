@@ -167,7 +167,7 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
                         context: context,
                         isScrollControlled: true,
                         backgroundColor: AppColor.surface,
-                        barrierColor: Colors.black54,
+                        barrierColor: Colors.black.withValues(alpha: 0.54),
                         builder: (_) => FractionallySizedBox(
                           heightFactor: 0.9,
                           child: LeoDialogScreen(chatId: _chatId),
@@ -533,7 +533,7 @@ class _ArtifactPreview extends StatelessWidget {
             Navigator.of(context).push(
               PageRouteBuilder(
                 opaque: false,
-                barrierColor: Colors.black.withOpacity(0.85),
+                barrierColor: Colors.black.withValues(alpha: 0.85),
                 pageBuilder: (ctx, _, __) => ArtifactViewer(
                   front: front,
                   back: back,
@@ -560,7 +560,7 @@ class _ArtifactPreview extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.5),
+                            color: Colors.black.withValues(alpha: 0.5),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: const Row(

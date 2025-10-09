@@ -158,7 +158,7 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
       if (!mounted) return;
       setState(() => _loadFailed = true);
       ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(FriendlyMessages.goalLoadError)));
+          const SnackBar(content: Text(FriendlyMessages.goalLoadError)));
     }
   }
 
@@ -416,7 +416,7 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
       if (!mounted) return;
       setState(() => _saving = false);
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(FriendlyMessages.saveError)));
+          .showSnackBar(const SnackBar(content: Text(FriendlyMessages.saveError)));
     }
   }
 

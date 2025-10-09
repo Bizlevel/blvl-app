@@ -24,11 +24,11 @@ final goalVersionsProvider =
   return repo.fetchAllGoals(user.id);
 });
 
-// Текущий спринт (по номеру)
-final sprintProvider = FutureProvider.family<Map<String, dynamic>?, int>(
-    (ref, sprintNumber) async {
+// Текущая неделя (по номеру)
+final weekProvider =
+    FutureProvider.family<Map<String, dynamic>?, int>((ref, weekNumber) async {
   final repo = ref.read(goalsRepositoryProvider);
-  return repo.fetchSprint(sprintNumber);
+  return repo.fetchWeek(weekNumber);
 });
 
 // Поток напоминаний

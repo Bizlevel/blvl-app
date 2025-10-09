@@ -152,7 +152,7 @@ class _CollectedBadge extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final levels = ref.watch(levelsProvider).value ?? const [];
-    final total = 10;
+    const total = 10;
     final collected = levels
         .where((l) =>
             (l['level'] as int? ?? 0) >= 1 && (l['level'] as int? ?? 0) <= 10)
@@ -162,9 +162,9 @@ class _CollectedBadge extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.15),
+        color: Colors.white.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withOpacity(0.3)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
       ),
       child: SizedBox(
         width:
@@ -181,9 +181,9 @@ class _CollectedBadge extends ConsumerWidget {
                 borderRadius: BorderRadius.circular(3),
                 child: LinearProgressIndicator(
                   value: progress.clamp(0.0, 1.0),
-                  backgroundColor: Colors.white.withOpacity(0.15),
+                  backgroundColor: Colors.white.withValues(alpha: 0.15),
                   valueColor: AlwaysStoppedAnimation<Color>(
-                    Colors.white.withOpacity(0.9),
+                    Colors.white.withValues(alpha: 0.9),
                   ),
                 ),
               ),
@@ -239,7 +239,7 @@ class _ArtifactTileState extends State<_ArtifactTile> {
                     Navigator.of(context).push(
                       PageRouteBuilder(
                         opaque: false,
-                        barrierColor: Colors.black.withOpacity(0.85),
+                        barrierColor: Colors.black.withValues(alpha: 0.85),
                         pageBuilder: (ctx, _, __) => _ArtifactFullscreen(
                           front: widget.front!,
                           back: widget.back!,
@@ -272,7 +272,8 @@ class _ArtifactTileState extends State<_ArtifactTile> {
                         else
                           Container(color: AppColor.appBgColor),
                         if (widget.isLocked) ...[
-                          Container(color: Colors.black.withOpacity(0.35)),
+                          Container(
+                              color: Colors.black.withValues(alpha: 0.35)),
                           const Positioned(
                             right: 8,
                             top: 8,
@@ -286,7 +287,7 @@ class _ArtifactTileState extends State<_ArtifactTile> {
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 8, vertical: 6),
                               decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.45),
+                                color: Colors.black.withValues(alpha: 0.45),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
@@ -305,7 +306,7 @@ class _ArtifactTileState extends State<_ArtifactTile> {
                               child: ElevatedButton(
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor:
-                                      Colors.white.withOpacity(0.9),
+                                      Colors.white.withValues(alpha: 0.9),
                                   foregroundColor: Colors.black,
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 12, vertical: 6),
@@ -324,7 +325,7 @@ class _ArtifactTileState extends State<_ArtifactTile> {
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.5),
+                                color: Colors.black.withValues(alpha: 0.5),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: const Row(
@@ -464,7 +465,7 @@ class _ArtifactFullscreenState extends State<_ArtifactFullscreen>
       onVerticalDragUpdate: _onVerticalDragUpdate,
       onVerticalDragEnd: _onVerticalDragEnd,
       child: Scaffold(
-        backgroundColor: Colors.black.withOpacity(0.85),
+        backgroundColor: Colors.black.withValues(alpha: 0.85),
         body: SafeArea(
           child: Stack(
             children: [
@@ -490,7 +491,7 @@ class _ArtifactFullscreenState extends State<_ArtifactFullscreen>
                         decoration: BoxDecoration(
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.25),
+                              color: Colors.black.withValues(alpha: 0.25),
                               blurRadius: 20,
                               spreadRadius: 2,
                             )
@@ -525,16 +526,16 @@ class _ArtifactFullscreenState extends State<_ArtifactFullscreen>
                         padding: const EdgeInsets.symmetric(
                             horizontal: 12, vertical: 8),
                         decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.45),
+                          color: Colors.black.withValues(alpha: 0.45),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: Row(
+                        child: const Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.touch_app,
+                            Icon(Icons.touch_app,
                                 color: Colors.white, size: 16),
-                            const SizedBox(width: 6),
-                            const Text('Тапните или кнопка ниже',
+                            SizedBox(width: 6),
+                            Text('Тапните или кнопка ниже',
                                 style: TextStyle(
                                     color: Colors.white, fontSize: 13)),
                           ],

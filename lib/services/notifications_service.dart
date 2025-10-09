@@ -130,9 +130,7 @@ class NotificationsService {
           }
         } catch (_) {}
       }
-      if (route == null) {
-        route = await getLaunchRoute();
-      }
+      route ??= await getLaunchRoute();
       return route;
     } catch (_) {
       return null;
@@ -449,7 +447,7 @@ class NotificationsService {
     );
     final NotificationDetails details = NotificationDetails(android: android);
 
-    Future<void> _scheduleIf(
+    Future<void> scheduleIf(
         {required (int, int)? time,
         required int id,
         required int weekday,
@@ -470,7 +468,7 @@ class NotificationsService {
       );
     }
 
-    await _scheduleIf(
+    await scheduleIf(
       time: mon,
       id: 1001,
       weekday: DateTime.monday,
@@ -478,7 +476,7 @@ class NotificationsService {
       body: 'Откройте страницу «Цель» и уточните план недели',
     );
 
-    await _scheduleIf(
+    await scheduleIf(
       time: wed,
       id: 1002,
       weekday: DateTime.wednesday,
@@ -486,7 +484,7 @@ class NotificationsService {
       body: 'Проверьте цель и отметьте прогресс',
     );
 
-    await _scheduleIf(
+    await scheduleIf(
       time: fri,
       id: 1003,
       weekday: DateTime.friday,

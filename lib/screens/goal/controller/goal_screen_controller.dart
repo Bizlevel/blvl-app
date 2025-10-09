@@ -86,7 +86,7 @@ class GoalScreenController extends StateNotifier<GoalScreenState> {
 
   Future<Map<String, dynamic>?> loadSprintIfAny(int sprintNumber) async {
     try {
-      final dynamic data = await _ref.read(sprintProvider(sprintNumber).future);
+      final dynamic data = await _ref.read(weekProvider(sprintNumber).future);
       if (data == null) return null;
       if (data is Map<String, dynamic>) return data;
       if (data is Map) return Map<String, dynamic>.from(data);
@@ -109,8 +109,8 @@ class GoalScreenController extends StateNotifier<GoalScreenState> {
     String? techniquesDetails,
   }) async {
     final repo = _ref.read(goalsRepositoryProvider);
-    await repo.upsertSprint(
-      sprintNumber: sprintNumber,
+    await repo.upsertWeek(
+      weekNumber: sprintNumber,
       achievement: (achievement == null || achievement.trim().isEmpty)
           ? null
           : achievement.trim(),

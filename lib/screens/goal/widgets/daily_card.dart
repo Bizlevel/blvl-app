@@ -111,7 +111,7 @@ class _DailyTodayCardState extends State<DailyTodayCard>
                     boxShadow: _isMilestone(widget.currentStreak)
                         ? [
                             BoxShadow(
-                              color: Colors.orange.withOpacity(0.5),
+                              color: Colors.orange.withValues(alpha: 0.5),
                               blurRadius: 8,
                               spreadRadius: 2,
                             )

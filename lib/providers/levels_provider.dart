@@ -41,7 +41,7 @@ final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
 
   bool previousCompleted = false;
 
-  int _floorForLevelJson(Map<String, dynamic> json, LevelModel level) {
+  int floorForLevelJson(Map<String, dynamic> json, LevelModel level) {
     // При активном флаге используем floor_number из API, иначе считаем, что все уровни на этаже 1
     if (kUseFloorMapping) {
       final v = json['floor_number'];
@@ -51,7 +51,7 @@ final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
     return 1;
   }
 
-  bool _isFreeOnFloor(int floor, int number) {
+  bool isFreeOnFloor(int floor, int number) {
     // Для этажа 1 бесплатны 0..3; для остальных этажей по умолчанию всё платно
     if (floor == 1) return number <= 3;
     return false;
@@ -59,7 +59,7 @@ final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
 
   return rows.map((json) {
     final level = LevelModel.fromJson(json);
-    final floor = _floorForLevelJson(json, level);
+    final floor = floorForLevelJson(json, level);
 
     // Определяем, завершён ли текущий уровень пользователем
     final progressArr = json['user_progress'] as List?;
@@ -75,7 +75,7 @@ final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
     } else {
       // Доступ по этажу: бесплатные на этаже — всегда; иначе нужен floor_access
       final bool hasAccess =
-          _isFreeOnFloor(floor, level.number) || unlockedFloors.contains(floor);
+          isFreeOnFloor(floor, level.number) || unlockedFloors.contains(floor);
       isAccessible = hasAccess && previousCompleted;
     }
 
@@ -107,7 +107,7 @@ final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
       'isCompleted': isCompleted,
       'isCurrent': level.number == userCurrentLevelNumber,
       'lockReason': isLocked
-          ? (!_isFreeOnFloor(floor, level.number) &&
+          ? (!isFreeOnFloor(floor, level.number) &&
                   !unlockedFloors.contains(floor)
               ? 'Требуются GP'
               : 'Завершите предыдущий уровень')

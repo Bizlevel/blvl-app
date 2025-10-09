@@ -148,8 +148,9 @@ class _NotificationsSettingsScreenState
                                           .showSnackBar(SnackBar(
                                               content: Text('Ошибка: $e')));
                                     } finally {
-                                      if (mounted)
+                                      if (mounted) {
                                         setState(() => _saving = false);
+                                      }
                                     }
                                   },
                             variant: BizLevelButtonVariant.primary,

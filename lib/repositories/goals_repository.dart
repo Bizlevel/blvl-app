@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
-import 'package:sentry/sentry.dart';
 
 /// Репозиторий для работы с фичей «Цель»: версии цели, спринты, напоминания, цитаты.
 ///

@@ -265,7 +265,7 @@ class DailySprint28Widget extends ConsumerWidget {
                       children: [
                         Text('Статус: ${statusByDay[day] ?? '—'}'),
                         const SizedBox(height: 8),
-                        Text('Заметка:'),
+                        const Text('Заметка:'),
                         const SizedBox(height: 4),
                         Text((noteByDay[day] ?? '').isEmpty
                             ? '—'
