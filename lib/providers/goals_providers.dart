@@ -31,6 +31,13 @@ final weekProvider =
   return repo.fetchWeek(weekNumber);
 });
 
+// Sprint provider (alias for weekProvider for backward compatibility)
+final sprintProvider =
+    FutureProvider.family<Map<String, dynamic>?, int>((ref, sprintNumber) async {
+  final repo = ref.read(goalsRepositoryProvider);
+  return repo.fetchSprint(sprintNumber);
+});
+
 // Поток напоминаний
 final remindersStreamProvider =
     StreamProvider<List<Map<String, dynamic>>>((ref) async* {
