@@ -648,3 +648,18 @@ TODO:
   - Включить decay‑механизм по `relevance_score` и плановый weekly `persona_summary` (cron) для «тёплой» памяти.
   - Метрики: покрытие семантических попаданий, средняя длина контекста, доля фолбэков.
   
+## 2025-10-10 — Синхронизация с origin/main
+
+Выполнено:
+- Слит `origin/main` → `prelaunch` (ort): подтянуты новые иконки приложений, изменения Android/iOS конфигов, добавлен `assets/icon_1024.png`.
+- `flutter pub get`: зависимости установлены; проверено наличие `in_app_purchase: ^3.1.11` в `pubspec.yaml`.
+- `pod install --repo-update`: Pods обновлены (Sentry 8.52.1, Firebase 11.15.0); предупреждения CocoaPods по `ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES` и `PODS_ROOT` (оставлено без изменений, сборка не блокируется).
+
+Незакоммиченные изменения после установки:
+- iOS: `ios/Podfile.lock`.
+- Flutter: `pubspec.lock`.
+
+Рекомендации:
+- Закоммитить lock-файлы для воспроизводимой сборки.
+- В отдельной задаче выровнять настройки iOS таргета (`$(inherited)` для предупреждений CocoaPods).
+  
