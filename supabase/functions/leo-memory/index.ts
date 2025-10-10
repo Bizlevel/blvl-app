@@ -143,6 +143,38 @@ ${transcript}`;
     }
 
     console.log(`✅ Successfully saved ${memories.length} memories with embeddings to database`);
+    
+    // Архивация "хвоста" если записей больше лимита
+    try {
+      const maxPerUser = parseInt(Deno.env.get('LEO_MEMORY_MAX_PER_USER') || '50');
+      const { data: allMemories, error: countErr } = await supabaseAdmin
+        .from('user_memories')
+        .select('id, content, relevance_score, updated_at')
+        .eq('user_id', userId)
+        .order('relevance_score', { ascending: true })
+        .order('updated_at', { ascending: true });
+
+      if (countErr) {
+        console.error('❌ Error counting memories:', countErr.message);
+      } else if (allMemories && allMemories.length > maxPerUser) {
+        const toArchive = allMemories.length - maxPerUser;
+        const tail = allMemories.slice(0, toArchive);
+        
+        // Переносим в архив
+        const archiveRows = tail.map(m => ({
+          user_id: userId,
+          content: m.content
+        }));
+        
+        await supabaseAdmin.from('memory_archive').insert(archiveRows);
+        await supabaseAdmin.from('user_memories').delete().in('id', tail.map(m => m.id));
+        
+        console.log(`📦 Archived ${tail.length} old memories (limit: ${maxPerUser}, had: ${allMemories.length})`);
+      }
+    } catch (archiveErr) {
+      console.error('❌ Archiving error (non-critical):', archiveErr);
+    }
+    
     return memories.length;
   } catch (error) {
     console.error('💥 Error in memory extraction:', error);
