@@ -238,8 +238,8 @@ class _GoalTabGate extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(currentUserProvider).asData?.value;
-    final currentLevel = user?.currentLevel ?? 0;
+    final currentLevel =
+        ref.watch(currentLevelNumberProvider).asData?.value ?? 0;
     final allowed = currentLevel >= 2;
     if (!allowed) {
       return Center(

@@ -1121,22 +1121,67 @@ serve(async (req) => {
     // Дожидаемся выполнения RAG запроса
     ragContext = await ragPromise;
 
-    // Последние личные заметки пользователя (память) - загружаем параллельно
+    // Последние личные заметки пользователя (память)
     let memoriesText = '';
     let recentSummaries = '';
+    // Метаданные памяти для метрик
+    let memMeta = { fallback: false, hitCount: 0, requested: 0 };
     if (userId) {
       try {
-        // Параллельная загрузка памяти и сводок чатов
+        // Параллельная загрузка памяти (семантический top-k) и сводок чатов
         const [memoriesResult, summariesResult] = await Promise.all([
-          supabaseAdmin!.from('user_memories').select('content, updated_at').eq('user_id', userId).order('updated_at', { ascending: false }).limit(5).then(result => ({ type: 'memories', result })).catch(e => ({ type: 'memories', error: e })),
+          (async () => {
+            try {
+              const enableSemantic = (Deno.env.get('ENABLE_SEMANTIC_MEMORIES') || 'true').toLowerCase() === 'true';
+              const k = parseInt(Deno.env.get('MEM_TOPK') || '5');
+              const thr = parseFloat(Deno.env.get('MEM_MATCH_THRESHOLD') || '0.35');
+              const clampK = Number.isFinite(k) && k > 0 ? k : 5;
+              memMeta.requested = clampK;
+              if (enableSemantic && lastUserMessage && (Deno.env.get('OPENAI_API_KEY') || '').trim().length > 0) {
+                const embClient = getOpenAIEmbeddingsClient();
+                const emb = await embClient.embeddings.create({
+                  model: Deno.env.get('OPENAI_EMBEDDING_MODEL') || 'text-embedding-3-small',
+                  input: lastUserMessage
+                });
+                const queryEmbedding = emb.data[0].embedding;
+                const { data: hits, error: memErr } = await (supabaseAdmin as any).rpc('match_user_memories', {
+                  query_embedding: queryEmbedding,
+                  p_user_id: userId,
+                  match_threshold: thr,
+                  match_count: clampK
+                });
+                if (memErr) {
+                  console.error('ERR match_user_memories', { message: memErr.message });
+                  memMeta.fallback = true;
+                  // фолбэк — последние
+                  const fb = await supabaseAdmin!.from('user_memories').select('id, content, updated_at').eq('user_id', userId).order('updated_at', { ascending: false }).limit(clampK);
+                  return { type: 'memories', result: fb };
+                }
+                memMeta.hitCount = Array.isArray(hits) ? hits.length : 0;
+                // Обновим счётчики доступа
+                try {
+                  const ids = Array.isArray(hits) ? hits.map((h: any) => h.id) : [];
+                  if (ids.length) await (supabaseAdmin as any).rpc('touch_user_memories', { p_ids: ids });
+                } catch (_) {}
+                return { type: 'memories', result: { data: (hits || []).map((h: any) => ({ content: h.content })) } };
+              } else {
+                const fb = await supabaseAdmin!.from('user_memories').select('content, updated_at').eq('user_id', userId).order('updated_at', { ascending: false }).limit(clampK);
+                return { type: 'memories', result: fb };
+              }
+            } catch (e) {
+              console.error('ERR semantic_memory_block', { message: String(e).slice(0, 200) });
+              const fb = await supabaseAdmin!.from('user_memories').select('content, updated_at').eq('user_id', userId).order('updated_at', { ascending: false }).limit(5);
+              return { type: 'memories', result: fb };
+            }
+          })(),
           supabaseAdmin!.from('leo_chats').select('summary').eq('user_id', userId).eq('bot', isMax ? 'max' : 'leo').not('summary', 'is', null).order('updated_at', { ascending: false }).limit(3).then(result => ({ type: 'summaries', result })).catch(e => ({ type: 'summaries', error: e }))
         ]);
 
         // Обрабатываем результаты памяти
         if (memoriesResult.type === 'memories' && !memoriesResult.error) {
           const memories = memoriesResult.result.data;
-        if (memories && memories.length > 0) {
-            memoriesText = memories.map((m) => `• ${m.content}`).join('\n');
+          if (memories && memories.length > 0) {
+            memoriesText = memories.map((m: any) => `• ${m.content}`).join('\n');
           }
         } else if (memoriesResult.error) {
           console.error('ERR user_memories', { message: String(memoriesResult.error).slice(0, 200) });
@@ -1158,6 +1203,61 @@ serve(async (req) => {
         console.error('ERR memory_parallel_loading', { message: String(e).slice(0, 200) });
       }
     }
+
+    // --- Token caps и микросжатие контекстных блоков ---
+    try {
+      const personaCap = parseInt(Deno.env.get('PERSONA_MAX_TOKENS') || '400');
+      const memCap = parseInt(Deno.env.get('MEM_MAX_TOKENS') || '500');
+      const summCap = parseInt(Deno.env.get('SUMM_MAX_TOKENS') || '400');
+      const userCap = parseInt(Deno.env.get('USERCTX_MAX_TOKENS') || '500');
+      const globalCap = parseInt(Deno.env.get('CONTEXT_MAX_TOKENS') || '2200');
+
+      if (personaSummary) personaSummary = limitByTokens(personaSummary, Number.isFinite(personaCap) && personaCap > 0 ? personaCap : 400);
+      if (memoriesText) memoriesText = limitByTokens(memoriesText, Number.isFinite(memCap) && memCap > 0 ? memCap : 500);
+      if (recentSummaries) recentSummaries = limitByTokens(recentSummaries, Number.isFinite(summCap) && summCap > 0 ? summCap : 400);
+      if (userContextText) userContextText = limitByTokens(userContextText, Number.isFinite(userCap) && userCap > 0 ? userCap : 500);
+
+      // Глобальное ограничение — равномерное масштабирование
+      const blocks = [
+        { key: 'persona', text: personaSummary },
+        { key: 'memories', text: memoriesText },
+        { key: 'summaries', text: recentSummaries },
+        { key: 'rag', text: ragContext },
+        { key: 'user', text: userContextText }
+      ];
+      const tokenCounts = blocks.map(b => approximateTokenCount(b.text || ''));
+      const totalTokens = tokenCounts.reduce((a, b) => a + b, 0);
+      if (Number.isFinite(globalCap) && globalCap > 0 && totalTokens > globalCap) {
+        const ratio = globalCap / totalTokens;
+        for (let i = 0; i < blocks.length; i++) {
+          const allowed = Math.max(0, Math.floor(tokenCounts[i] * ratio));
+          blocks[i].text = limitByTokens(blocks[i].text || '', allowed);
+        }
+        // Назначаем обратно
+        personaSummary = blocks[0].text || '';
+        memoriesText = blocks[1].text || '';
+        recentSummaries = blocks[2].text || '';
+        ragContext = blocks[3].text || '';
+        userContextText = blocks[4].text || '';
+        console.log('BR context_scaled', { totalTokens, globalCap, ratio: Math.round(ratio * 1000) / 1000 });
+      }
+
+      // Метрики контекста и семантики
+      console.log('BR context_tokens', {
+        persona: approximateTokenCount(personaSummary || ''),
+        memories: approximateTokenCount(memoriesText || ''),
+        summaries: approximateTokenCount(recentSummaries || ''),
+        rag: approximateTokenCount(ragContext || ''),
+        user: approximateTokenCount(userContextText || '')
+      });
+      if (memMeta.requested > 0) {
+        const hitRate = memMeta.hitCount / memMeta.requested;
+        console.log('BR semantic_hit_rate', { requested: memMeta.requested, hit: memMeta.hitCount, hitRate: Math.round(hitRate * 1000) / 1000 });
+      }
+      if (memMeta.fallback) {
+        console.log('BR memory_fallback', { used: true });
+      }
+    } catch (_) {}
 
     console.log('INFO request_meta', {
       messages_count: Array.isArray(messages) ? messages.length : 0,
@@ -1222,7 +1322,7 @@ serve(async (req) => {
           queries.push(supabaseAdmin!.from('core_goals').select('version, goal_text, version_data, updated_at').eq('user_id', userId).order('version', { ascending: false }).limit(1).then(result => ({ type: 'goal', result })).catch(e => ({ type: 'goal', error: e })));
         }
         if (needsLoading.sprint) {
-          queries.push(supabaseAdmin!.from('weekly_progress').select('sprint_number, achievement, metric_actual, created_at').eq('user_id', userId).order('created_at', { ascending: false }).limit(1).then(result => ({ type: 'sprint', result })).catch(e => ({ type: 'sprint', error: e })));
+          queries.push(supabaseAdmin!.from('weekly_progress').select('week_number, achievement, metric_actual, created_at').eq('user_id', userId).order('created_at', { ascending: false }).limit(1).then(result => ({ type: 'sprint', result })).catch(e => ({ type: 'sprint', error: e })));
         }
         if (needsLoading.reminders) {
           queries.push(supabaseAdmin!.from('reminder_checks').select('day_number, reminder_text, is_completed').eq('user_id', userId).eq('is_completed', false).order('day_number', { ascending: true }).limit(5).then(result => ({ type: 'reminders', result })).catch(e => ({ type: 'reminders', error: e })));
@@ -1265,8 +1365,8 @@ serve(async (req) => {
             case 'sprint':
               if (Array.isArray(result.data) && result.data.length > 0) {
                 const p = result.data[0];
-          sprintBlock = `Спринт: ${p?.sprint_number ?? ''}. Итоги: ${p?.achievement ?? ''}. Метрика (факт): ${p?.metric_actual ?? ''}`;
-        }
+                sprintBlock = `Неделя: ${p?.week_number ?? ''}. Итоги: ${p?.achievement ?? ''}. Метрика (факт): ${p?.metric_actual ?? ''}`;
+              }
               setCachedContext(sprintCacheKey, sprintBlock);
               break;
             case 'reminders':

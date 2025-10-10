@@ -349,6 +349,42 @@ class GpService {
     }
   }
 
+  /// Верификация покупки через IAP (App Store / Google Play)
+  /// platform: 'ios' | 'android'
+  /// token: iOS receipt (base64) либо Android purchaseToken
+  Future<int> verifyIapPurchase({
+    required String platform,
+    required String productId,
+    required String token,
+  }) async {
+    final session = _client.auth.currentSession;
+    if (session == null) throw GpFailure('Не авторизован');
+    try {
+      final resp = await _edgeDio.post('/gp-purchase-verify',
+          data: jsonEncode({
+            'platform': platform,
+            'product_id': productId,
+            'token': token,
+          }),
+          options: Options(
+              headers: _edgeHeadersAnonWithUserJwt(session, json: true)));
+      if (resp.statusCode == 200 && resp.data is Map<String, dynamic>) {
+        final m = Map<String, dynamic>.from(resp.data);
+        return (m['balance_after'] as num?)?.toInt() ?? 0;
+      }
+      throw GpFailure('Не удалось подтвердить покупку');
+    } on DioException catch (e) {
+      if (e.error is SocketException) {
+        throw GpFailure('Нет соединения с интернетом');
+      }
+      await _capture(e);
+      throw GpFailure('Ошибка сети при подтверждении покупки');
+    } catch (e) {
+      await _capture(e);
+      throw GpFailure('Не удалось подтвердить покупку');
+    }
+  }
+
   Future<int> unlockFloor({
     required int floorNumber,
     required String idempotencyKey,

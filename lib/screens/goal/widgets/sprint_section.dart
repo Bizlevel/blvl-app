@@ -149,13 +149,10 @@ class SprintSection extends StatelessWidget {
           // Хедер текущей недели: «Неделя N из 4 с {датой старта из v4}»
           AppSpacing.gapH(8),
           Builder(builder: (context) {
-            final Map<String, dynamic> v4 =
-                (versions[4]?['version_data'] as Map?)
-                        ?.cast<String, dynamic>() ??
-                    const <String, dynamic>{};
-            final String startDate = (v4['start_date'] ?? '').toString().trim();
-            final String title =
-                'Неделя $selectedSprint из 4${startDate.isNotEmpty ? ' с $startDate' : ''}';
+            final String startDate =
+                (versions[4]?['sprint_start_date'] ?? '').toString().trim();
+            final String title = 'Неделя $selectedSprint из 4'
+                '${startDate.isNotEmpty ? ' с $startDate' : ''}';
             return Text(
               title,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(

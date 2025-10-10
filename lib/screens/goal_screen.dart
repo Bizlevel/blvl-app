@@ -26,7 +26,7 @@ import 'package:bizlevel/screens/goal/controller/goal_screen_controller.dart';
 import 'package:bizlevel/utils/constant.dart';
 import 'package:bizlevel/services/notifications_service.dart';
 import 'package:bizlevel/utils/friendly_messages.dart';
-import 'package:bizlevel/providers/gp_providers.dart';
+// import 'package:bizlevel/providers/gp_providers.dart'; // streak claim removed; keep provider unused
 
 class GoalScreen extends ConsumerStatefulWidget {
   const GoalScreen({super.key});
@@ -95,7 +95,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
 
   // Авто‑реакции/бонусы: в рамках сессии защищаемся от повторных триггеров
   static final Set<String> _autoReactionsFired = <String>{};
-  static final Set<int> _bonusesClaimedInSession = <int>{};
+  // static final Set<int> _bonusesClaimedInSession = <int>{}; // no direct client-claim
 
   @override
   void initState() {
@@ -227,9 +227,10 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
   Widget build(BuildContext context) {
     // Перемещено в MotivationCard
 
-    // Определяем максимально доступную версию на основе текущего уровня пользователя
+    // Определяем максимально доступную версию на основе нормализованного номера уровня пользователя
     final currentUserAsync = ref.watch(currentUserProvider);
-    final int currentLevel = currentUserAsync.asData?.value?.currentLevel ?? 0;
+    final currentLevelAsync = ref.watch(currentLevelNumberProvider);
+    final int currentLevel = currentLevelAsync.asData?.value ?? 0;
     int allowedMaxVersion(int lvl) {
       if (lvl >= 11) return 4; // после Уровня 10
       if (lvl >= 8) return 3; // после Уровня 7
@@ -393,6 +394,75 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                               metricActual: double.tryParse(
                                   _metricActualCtrl.text.trim()),
                             ),
+                          // Безопасные inline‑правки заголовка цели для актуальной версии (v1/v2)
+                          Builder(builder: (context) {
+                            final latest = gs.versions.keys.isEmpty
+                                ? 0
+                                : gs.versions.keys
+                                    .reduce((a, b) => a > b ? a : b);
+                            if (latest != 1 && latest != 2) {
+                              return const SizedBox.shrink();
+                            }
+                            final TextEditingController ctrl = latest == 1
+                                ? _goalInitialCtrl
+                                : _goalRefinedCtrl;
+                            return Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: TextField(
+                                      controller: ctrl,
+                                      maxLines: 1,
+                                      decoration: const InputDecoration(
+                                        hintText: 'Короткий заголовок цели',
+                                        isDense: true,
+                                        border: OutlineInputBorder(),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  ElevatedButton(
+                                    onPressed: () async {
+                                      final text = ctrl.text.trim();
+                                      if (text.length < 5) {
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          const SnackBar(
+                                              content: Text(
+                                                  'Минимум 5 символов для заголовка')),
+                                        );
+                                        return;
+                                      }
+                                      try {
+                                        await ref
+                                            .read(goalsRepositoryProvider)
+                                            .upsertGoalField(
+                                              version: latest,
+                                              field: 'concrete_result',
+                                              value: text,
+                                            );
+                                        await ref
+                                            .read(goalScreenControllerProvider
+                                                .notifier)
+                                            .loadVersions();
+                                        setState(() {});
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(const SnackBar(
+                                                content: Text('Сохранено')));
+                                      } catch (_) {
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(const SnackBar(
+                                                content: Text(
+                                                    'Не удалось сохранить')));
+                                      }
+                                    },
+                                    child: const Text('Сохранить'),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }),
                           const SizedBox(height: 8),
                           // Компактный гид по шагам: v1→v4→Недели
                           VersionNavigationChips(
@@ -444,8 +514,12 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                         ((gs.versions[4]?['version_data'] as Map?)
                                 ?.cast<String, dynamic>()) ??
                             const <String, dynamic>{};
-                    final bool dailyStarted =
-                        (v4data['start_date']?.toString().isNotEmpty ?? false);
+                    final bool dailyStarted = ((gs.versions[4]
+                                ?['sprint_start_date'] ??
+                            v4data['start_date'] ??
+                            '')
+                        .toString()
+                        .isNotEmpty);
                     if (dailyStarted) return const SizedBox.shrink();
                     return SprintSection(
                       versions: gs.versions,
@@ -485,13 +559,18 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                       final gs = ref.watch(goalScreenControllerProvider);
                       final hasV4 = gs.versions.containsKey(4);
 
-                      // Проверяем что v4 полностью заполнена (commitment=true)
+                      // Готовность: по readiness_score >=7
                       final Map<String, dynamic> v4data =
                           ((gs.versions[4]?['version_data'] as Map?)
                                   ?.cast<String, dynamic>()) ??
                               const <String, dynamic>{};
-                      final bool v4Completed = (v4data['commitment'] == true ||
-                          v4data['commitment'] == 'true');
+                      final int readiness = int.tryParse(
+                              (v4data['readiness_score'] ?? '').toString()) ??
+                          (v4data['commitment'] == true ||
+                                  v4data['commitment'] == 'true'
+                              ? 8
+                              : 0);
+                      final bool v4Completed = readiness >= 7;
 
                       // Получаем данные v3 для preview задач
                       final Map<String, dynamic> v3data =
@@ -499,8 +578,12 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                                   ?.cast<String, dynamic>()) ??
                               const <String, dynamic>{};
 
-                      final String startIso =
-                          (v4data['start_date'] ?? '').toString();
+                      // Источник старта: prefer server field sprint_start_date
+                      final String startIso = (gs.versions[4]
+                                  ?['sprint_start_date'] ??
+                              v4data['start_date'] ??
+                              '')
+                          .toString();
                       final DateTime? startDate =
                           DateTime.tryParse(startIso)?.toUtc();
 
@@ -593,7 +676,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                                     children: [
                                       Row(
                                         children: [
-                                          Icon(
+                                          const Icon(
                                             Icons.list_alt,
                                             size: 20,
                                             color: AppColor.primary,
@@ -637,7 +720,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                                                 child: Center(
                                                   child: Text(
                                                     '$dayNum',
-                                                    style: TextStyle(
+                                                    style: const TextStyle(
                                                       fontSize: 12,
                                                       fontWeight:
                                                           FontWeight.w600,
@@ -688,9 +771,9 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                                   decoration: BoxDecoration(
                                     gradient: LinearGradient(
                                       colors: [
-                                        Color(0xFFFFD700)
+                                        const Color(0xFFFFD700)
                                             .withValues(alpha: 0.1),
-                                        Color(0xFFFFA500)
+                                        const Color(0xFFFFA500)
                                             .withValues(alpha: 0.05),
                                       ],
                                       begin: Alignment.topLeft,
@@ -698,7 +781,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                                     ),
                                     borderRadius: BorderRadius.circular(12),
                                     border: Border.all(
-                                      color: Color(0xFFFFD700)
+                                      color: const Color(0xFFFFD700)
                                           .withValues(alpha: 0.3),
                                     ),
                                   ),
@@ -708,7 +791,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                                     children: [
                                       Row(
                                         children: [
-                                          Icon(
+                                          const Icon(
                                             Icons.emoji_events,
                                             size: 20,
                                             color: Color(0xFFFF8C00),
@@ -721,7 +804,8 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                                                 .titleSmall
                                                 ?.copyWith(
                                                   fontWeight: FontWeight.w600,
-                                                  color: Color(0xFFFF8C00),
+                                                  color:
+                                                      const Color(0xFFFF8C00),
                                                 ),
                                           ),
                                         ],
@@ -755,7 +839,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                                       const SizedBox(height: 8),
                                       Row(
                                         children: [
-                                          Icon(
+                                          const Icon(
                                             Icons.stars,
                                             size: 16,
                                             color: Color(0xFFFF8C00),
@@ -769,7 +853,8 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                                                   .bodyMedium
                                                   ?.copyWith(
                                                     fontWeight: FontWeight.w700,
-                                                    color: Color(0xFFFF8C00),
+                                                    color:
+                                                        const Color(0xFFFF8C00),
                                                   ),
                                             ),
                                           ),
@@ -809,13 +894,12 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                                           setState(() {});
                                           ScaffoldMessenger.of(context)
                                               .showSnackBar(
-                                            SnackBar(
+                                            const SnackBar(
                                               content: Text(
                                                 FriendlyMessages.sprintStarted,
                                               ),
                                               backgroundColor: AppColor.primary,
-                                              duration:
-                                                  const Duration(seconds: 3),
+                                              duration: Duration(seconds: 3),
                                             ),
                                           );
                                         }
@@ -823,7 +907,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                                         if (!mounted) return;
                                         ScaffoldMessenger.of(context)
                                             .showSnackBar(
-                                          SnackBar(
+                                          const SnackBar(
                                             content: Text(
                                                 FriendlyMessages.unknownError),
                                             backgroundColor: Colors.red,
@@ -855,7 +939,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    Icon(
+                                    const Icon(
                                       Icons.info_outline,
                                       size: 16,
                                       color: Colors.black54,
@@ -885,8 +969,12 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                       }
 
                       // Активные 28 дней
-                      final bool sprintCompleted =
-                          (v4data['sprint_status']?.toString() == 'completed');
+                      final String sprintStatus = (gs.versions[4]
+                                  ?['sprint_status'] ??
+                              v4data['sprint_status'] ??
+                              '')
+                          .toString();
+                      final bool sprintCompleted = sprintStatus == 'completed';
                       return DailySprint28Widget(
                         startDate: startDate,
                         versions: gs.versions,
@@ -920,7 +1008,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                     appliedTechniques: _appliedTechniques,
                     keyInsight: _keyInsightCtrl.text.trim(),
                   ),
-              levelContext: 'current_level: $currentLevel',
+              levelContext: 'level_number: $currentLevel',
               bot: 'max',
             ),
           ),
@@ -933,9 +1021,9 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
             top: false,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 color: Colors.white,
-                boxShadow: const [
+                boxShadow: [
                   BoxShadow(
                       color: Color(0x14000000),
                       blurRadius: 6,
@@ -1006,7 +1094,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
   // _build7DayTimeline/_buildDayDot удалены — в новой версии не используются
 
   Future<void> _loadSprintIfAny(int sprintNumber) async {
-    final existing = await ref.read(sprintProvider(sprintNumber).future);
+    final existing = await ref.read(weekProvider(sprintNumber).future);
     if (existing == null) {
       _achievementCtrl.text = '';
       _metricActualCtrl.text = '';
@@ -1066,8 +1154,8 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
       }
       final String techniquesSummary = checks.join(', ');
 
-      await repo.upsertSprint(
-        sprintNumber: _selectedSprint,
+      await repo.upsertWeek(
+        weekNumber: _selectedSprint,
         achievement: _achievementCtrl.text.trim().isEmpty
             ? null
             : _achievementCtrl.text.trim(),
@@ -1117,8 +1205,8 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(FriendlyMessages.saveError)));
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text(FriendlyMessages.saveError)));
     }
   }
 
@@ -1150,7 +1238,10 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                           keyInsight: _keyInsightCtrl.text.trim(),
                         ) +
                     _buildDailyChatContextTail(),
-                levelContext: 'current_level: ${user?.currentLevel ?? 0}',
+                levelContext: () {
+                  final n = ref.read(currentLevelNumberProvider).asData?.value;
+                  return 'level_number: ${n ?? (user?.currentLevel ?? 0)}';
+                }(),
                 bot: 'max',
                 // После сохранения чек‑ина отправляем тонкую реакцию Макса
                 autoUserMessage: autoMessage ??
@@ -1301,7 +1392,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
               _autoReactionsFired.add(key);
               _openChatWithMax(
                 autoMessage:
-                    'low_activity_ping: Уже ${misses} дня(ей) без активности. Что мешает?',
+                    'low_activity_ping: Уже $misses дня(ей) без активности. Что мешает?',
                 chips: _dailyRecommendedChips(),
               );
             }
@@ -1310,20 +1401,8 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
       }
     }
 
-    // Бонусы за серии: 7/14/21/28 — сервер обработает идемпотентно
-    if (_dailyModeActive()) {
-      final s = _currentDayWeekTask();
-      if (<int>{7, 14, 21, 28}.contains(s.day) &&
-          !_bonusesClaimedInSession.contains(s.day)) {
-        _bonusesClaimedInSession.add(s.day);
-        try {
-          await ref
-              .read(gpServiceProvider)
-              .claimBonus(ruleKey: 'streak_${s.day}');
-          // Баланс обновится через провайдер фоном
-        } catch (_) {}
-      }
-    }
+    // Бонусы за серии: начисляются на сервере через RPC check_and_grant_streak_bonus
+    // Клиентский прямой claim удалён, чтобы исключить дублирование и рассинхронизацию ключей
   }
 
   /// Helper для отображения строки с бонусом за серию
@@ -1334,7 +1413,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
         Icon(
           icon,
           size: 18,
-          color: Color(0xFFFF8C00).withValues(alpha: 0.7),
+          color: const Color(0xFFFF8C00).withValues(alpha: 0.7),
         ),
         const SizedBox(width: 10),
         Expanded(
@@ -1349,7 +1428,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
           bonusText,
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 fontWeight: FontWeight.w700,
-                color: Color(0xFFFF8C00),
+                color: const Color(0xFFFF8C00),
               ),
         ),
       ],

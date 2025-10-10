@@ -5,6 +5,7 @@ import 'package:bizlevel/providers/lessons_provider.dart';
 import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/services/supabase_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:sentry_flutter/sentry_flutter.dart' as sentry;
 import 'package:bizlevel/providers/lesson_progress_provider.dart';
 import 'package:bizlevel/widgets/lesson_widget.dart';
 import 'package:bizlevel/screens/leo_dialog_screen.dart';
@@ -166,7 +167,7 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
                         context: context,
                         isScrollControlled: true,
                         backgroundColor: AppColor.surface,
-                        barrierColor: Colors.black54,
+                        barrierColor: Colors.black.withValues(alpha: 0.54),
                         builder: (_) => FractionallySizedBox(
                           heightFactor: 0.9,
                           child: LeoDialogScreen(chatId: _chatId),
@@ -185,6 +186,18 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
                     onPressed: _isLevelCompleted(lessons)
                         ? () async {
                             try {
+                              // breadcrumb: попытка завершения уровня
+                              try {
+                                sentry.Sentry.addBreadcrumb(sentry.Breadcrumb(
+                                  category: 'level',
+                                  level: sentry.SentryLevel.info,
+                                  message: 'level_complete_attempt',
+                                  data: {
+                                    'levelId': widget.levelId,
+                                    'levelNumber': widget.levelNumber
+                                  },
+                                ));
+                              } catch (_) {}
                               await SupabaseService.completeLevel(
                                   widget.levelId);
                               // Обновляем карту уровней
@@ -192,6 +205,17 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
                               ref.invalidate(currentUserProvider);
                               // Инвалидация навыков для обновления древа навыков в профиле
                               ref.invalidate(userSkillsProvider);
+                              try {
+                                sentry.Sentry.addBreadcrumb(sentry.Breadcrumb(
+                                  category: 'level',
+                                  level: sentry.SentryLevel.info,
+                                  message: 'level_completed',
+                                  data: {
+                                    'levelId': widget.levelId,
+                                    'levelNumber': widget.levelNumber
+                                  },
+                                ));
+                              } catch (_) {}
                               if (context.mounted) {
                                 // Праздничное уведомление о бонусе за уровень (+20 GP)
                                 await showDialog(
@@ -509,7 +533,7 @@ class _ArtifactPreview extends StatelessWidget {
             Navigator.of(context).push(
               PageRouteBuilder(
                 opaque: false,
-                barrierColor: Colors.black.withOpacity(0.85),
+                barrierColor: Colors.black.withValues(alpha: 0.85),
                 pageBuilder: (ctx, _, __) => ArtifactViewer(
                   front: front,
                   back: back,
@@ -536,7 +560,7 @@ class _ArtifactPreview extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.5),
+                            color: Colors.black.withValues(alpha: 0.5),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: const Row(
@@ -936,7 +960,8 @@ class _ProfileFormBlock extends _PageBlock {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text(UIS.firstStepDone)),
                       );
-                      Navigator.of(context).pop();
+                      // Надёжная навигация: в башню к Уровню 1
+                      GoRouter.of(context).go('/tower?scrollTo=1');
                     } catch (e) {
                       if (!context.mounted) return;
                       ScaffoldMessenger.of(context).showSnackBar(

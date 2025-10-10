@@ -97,10 +97,10 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
             ),
           ],
         ),
-        actions: [
+        actions: const [
           Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: const Center(child: GpBalanceWidget()),
+            padding: EdgeInsets.only(right: 12),
+            child: Center(child: GpBalanceWidget()),
           )
         ],
         backgroundColor: AppColor.appBarColor,

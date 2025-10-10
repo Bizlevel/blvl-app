@@ -24,3 +24,6 @@ const bool kUseFloorMapping =
 
 // Фича-флаг: показывать кнопки входа/регистрации через Google
 const bool kEnableGoogleAuth = true;
+
+// Фича‑флаг нормализации current_level (поэтапное включение/rollback)
+const bool kNormalizeCurrentLevel = true;

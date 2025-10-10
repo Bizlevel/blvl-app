@@ -120,8 +120,7 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
       }
       // 43.25: Создать «оболочку» новой версии latest+1 при первом входе — только если версия доступна по уровню
       try {
-        final user = await ref.read(currentUserProvider.future);
-        final lvl = user?.currentLevel ?? 0;
+        final lvl = await ref.read(currentLevelNumberProvider.future);
         final allowedMax = _allowedMaxByLevel(lvl);
         final lockedByLevel = widget.version > allowedMax;
         if (!_versions.containsKey(widget.version) &&
@@ -159,7 +158,7 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
       if (!mounted) return;
       setState(() => _loadFailed = true);
       ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(FriendlyMessages.goalLoadError)));
+          const SnackBar(content: Text(FriendlyMessages.goalLoadError)));
     }
   }
 
@@ -175,50 +174,36 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
     if (version == 2) {
       final data = v(2) ?? v(1) ?? {};
       _goalRefinedCtrl.text = (data['concrete_result'] ??
-          data['goal_refined'] ??
-          (v(1)?['goal_initial'] ?? '')) as String;
-      _metricNameCtrl.text =
-          (data['metric_type'] ?? data['metric_name'] ?? '') as String;
-      _metricFromCtrl.text =
-          ((data['metric_current'] ?? data['metric_from'])?.toString() ?? '');
-      _metricToCtrl.text =
-          ((data['metric_target'] ?? data['metric_to'])?.toString() ?? '');
+          (v(1)?['concrete_result'] ?? '')) as String;
+      _metricNameCtrl.text = (data['metric_type'] ?? '') as String;
+      _metricFromCtrl.text = ((data['metric_current'])?.toString() ?? '');
+      _metricToCtrl.text = ((data['metric_target'])?.toString() ?? '');
       _financialGoalCtrl.text = (data['financial_goal']?.toString() ?? '');
     } else if (version == 3) {
       final data = v(3) ?? {};
       _goalSmartCtrl.text = (data['goal_smart'] ?? '') as String;
-      _s1Ctrl.text =
-          (data['week1_focus'] ?? data['sprint1_goal'] ?? '') as String;
-      _s2Ctrl.text =
-          (data['week2_focus'] ?? data['sprint2_goal'] ?? '') as String;
-      _s3Ctrl.text =
-          (data['week3_focus'] ?? data['sprint3_goal'] ?? '') as String;
-      _s4Ctrl.text =
-          (data['week4_focus'] ?? data['sprint4_goal'] ?? '') as String;
+      _s1Ctrl.text = (data['week1_focus'] ?? '') as String;
+      _s2Ctrl.text = (data['week2_focus'] ?? '') as String;
+      _s3Ctrl.text = (data['week3_focus'] ?? '') as String;
+      _s4Ctrl.text = (data['week4_focus'] ?? '') as String;
     } else if (version == 4) {
       final data = v(4) ?? {};
-      _finalWhatCtrl.text =
-          (data['first_three_days'] ?? data['final_what'] ?? '') as String;
-      _finalWhenCtrl.text =
-          (data['start_date'] ?? data['final_when'] ?? '') as String;
-      _finalHowCtrl.text =
-          (data['accountability_person'] ?? data['final_how'] ?? '') as String;
+      _finalWhatCtrl.text = (data['first_three_days'] ?? '') as String;
+      _finalWhenCtrl.text = (data['start_date'] ?? '') as String;
+      _finalHowCtrl.text = (data['accountability_person'] ?? '') as String;
       final dynamic rs = data['readiness_score'];
       if (rs is num) {
         _readinessScore = rs.toInt();
         _commitment = rs >= 7;
       } else {
         _readinessScore = null;
-        _commitment = (data['commitment'] ?? false) as bool;
+        _commitment = false;
       }
     } else if (version == 1) {
       final data = v(1) ?? {};
-      _goalInitialCtrl.text =
-          (data['concrete_result'] ?? data['goal_initial'] ?? '') as String;
-      _goalWhyCtrl.text =
-          (data['main_pain'] ?? data['goal_why'] ?? '') as String;
-      _mainObstacleCtrl.text =
-          (data['first_action'] ?? data['main_obstacle'] ?? '') as String;
+      _goalInitialCtrl.text = (data['concrete_result'] ?? '') as String;
+      _goalWhyCtrl.text = (data['main_pain'] ?? '') as String;
+      _mainObstacleCtrl.text = (data['first_action'] ?? '') as String;
     }
   }
 
@@ -431,7 +416,7 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
       if (!mounted) return;
       setState(() => _saving = false);
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(FriendlyMessages.saveError)));
+          .showSnackBar(const SnackBar(content: Text(FriendlyMessages.saveError)));
     }
   }
 
@@ -665,8 +650,9 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
                       ),
                     // Preflight-гейтинг версии по текущему уровню пользователя
                     Builder(builder: (context) {
-                      final userAsync = ref.watch(currentUserProvider);
-                      final lvl = userAsync.asData?.value?.currentLevel ?? 0;
+                      final lvl =
+                          ref.watch(currentLevelNumberProvider).asData?.value ??
+                              0;
                       final allowedMax = _allowedMaxByLevel(lvl);
                       final requiredLevel =
                           _requiredLevelForVersion(widget.version);
@@ -755,8 +741,13 @@ class _GoalCheckpointScreenState extends ConsumerState<GoalCheckpointScreen> {
                                       key: _embeddedChatKey,
                                       chatId: null,
                                       userContext: _buildUserContext(),
-                                      levelContext:
-                                          'current_level: ${user?.currentLevel ?? 0}',
+                                      levelContext: () {
+                                        final n = ref
+                                            .read(currentLevelNumberProvider)
+                                            .asData
+                                            ?.value;
+                                        return 'level_number: ${n ?? (user?.currentLevel ?? 0)}';
+                                      }(),
                                       bot: 'max',
                                       embedded: true,
                                       initialAssistantMessage:

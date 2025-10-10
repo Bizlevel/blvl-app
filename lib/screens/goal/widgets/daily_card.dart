@@ -111,7 +111,7 @@ class _DailyTodayCardState extends State<DailyTodayCard>
                     boxShadow: _isMilestone(widget.currentStreak)
                         ? [
                             BoxShadow(
-                              color: Colors.orange.withOpacity(0.5),
+                              color: Colors.orange.withValues(alpha: 0.5),
                               blurRadius: 8,
                               spreadRadius: 2,
                             )
@@ -134,6 +134,15 @@ class _DailyTodayCardState extends State<DailyTodayCard>
                           fontSize: 14,
                         ),
                       ),
+                      const SizedBox(width: 8),
+                      Text(
+                        _bonusHint(widget.currentStreak),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                        ),
+                      )
                     ],
                   ),
                 ),
@@ -167,6 +176,23 @@ class _DailyTodayCardState extends State<DailyTodayCard>
         ],
       ),
     );
+  }
+
+  String _bonusHint(int streak) {
+    // Подсказки о бонусах GP на milestone
+    if (streak < 7) return '';
+    switch (streak) {
+      case 7:
+        return '+100 GP';
+      case 14:
+        return '+250 GP';
+      case 21:
+        return '+500 GP';
+      case 28:
+        return '+1000 GP';
+      default:
+        return '';
+    }
   }
 
   // _statusChip был заменён на сегмент‑переключатель

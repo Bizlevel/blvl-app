@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:bizlevel/providers/gp_providers.dart';
 import 'package:bizlevel/services/gp_service.dart';
+import 'package:bizlevel/services/iap_service.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -11,6 +12,7 @@ import 'package:bizlevel/widgets/common/bizlevel_card.dart';
 import 'package:bizlevel/widgets/common/bizlevel_button.dart';
 import 'package:bizlevel/widgets/common/gp_balance_widget.dart';
 import 'package:bizlevel/theme/color.dart' show AppColor;
+import 'package:in_app_purchase/in_app_purchase.dart';
 
 class GpStoreScreen extends ConsumerStatefulWidget {
   const GpStoreScreen({super.key});
@@ -24,6 +26,91 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
   int? _selectedAmount;
   String? _selectedLabel;
   bool _faqExpanded = false;
+  final Map<String, ProductDetails> _productMap = {};
+  final Map<String, Map<String, dynamic>> _serverPricing = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadIapProducts();
+    _loadServerPricing();
+  }
+
+  Future<void> _loadIapProducts() async {
+    try {
+      final platform = IapService.currentPlatform();
+      if (platform == 'ios' || platform == 'android') {
+        final iap = IapService.instance;
+        if (await iap.isAvailable()) {
+          final resp = await iap.queryProducts({
+            'bizlevelgp_300',
+            'bizlevelgp_1000',
+            'bizlevelgp_2000',
+          });
+          try {
+            await Sentry.addBreadcrumb(Breadcrumb(
+              message: 'gp_iap_products_loaded',
+              data: {
+                'found': resp.productDetails.map((e) => e.id).toList(),
+                'not_found': resp.notFoundIDs,
+              },
+            ));
+          } catch (_) {}
+          if (mounted) {
+            setState(() {
+              for (final p in resp.productDetails) {
+                _productMap[p.id] = p;
+              }
+            });
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _loadServerPricing() async {
+    try {
+      // Web или универсальный fallback — читаем витрину KZT
+      final rows = await Supabase.instance.client
+          .from('store_pricing')
+          .select('product_id, amount_kzt, amount_gp, bonus_gp, title')
+          .eq('is_active', true);
+      final list = List<Map<String, dynamic>>.from(
+          rows.map((e) => Map<String, dynamic>.from(e as Map)));
+      if (!mounted) return;
+      setState(() {
+        for (final r in list) {
+          _serverPricing[r['product_id'] as String] = r;
+        }
+      });
+    } catch (_) {}
+  }
+
+  String _priceLabelFor(String productId, String fallback) {
+    final platform = IapService.currentPlatform();
+    if (platform == 'ios' || platform == 'android') {
+      final p = _productMap[productId];
+      if (p != null && p.price.isNotEmpty) return p.price;
+    }
+    final sp = _serverPricing[productId];
+    if (sp != null) {
+      final amount = (sp['amount_kzt'] as num?)?.toInt() ?? 0;
+      if (amount > 0) return '₸${_fmtKzt(amount)}';
+    }
+    return fallback;
+  }
+
+  String _fmtKzt(int amount) {
+    // Простое форматирование: 19960 -> 19 960
+    final s = amount.toString();
+    final buf = StringBuffer();
+    for (int i = 0; i < s.length; i++) {
+      buf.write(s[i]);
+      final left = s.length - i - 1;
+      if (left > 0 && left % 3 == 0) buf.write(' ');
+    }
+    return buf.toString();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -32,8 +119,9 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
       body: LayoutBuilder(builder: (context, constraints) {
         final bool isXs = constraints.maxWidth < 360;
         // Устанавливаем дефолтный выбранный план (середина) если не выбрано
-        _selectedPackageId ??= 'gp_1400';
-        _selectedAmount ??= 9960;
+        _selectedPackageId ??= 'bizlevelgp_1000';
+        _selectedAmount ??=
+            (_serverPricing['bizlevelgp_1000']?['amount_kzt'] as int?) ?? 9960;
         _selectedLabel ??= 'РАЗГОН: 1400 GP';
 
         return ListView(
@@ -67,10 +155,10 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
                 children: [
                   ChoiceChip(
                     label: const Text('СТАРТ'),
-                    selected: _selectedPackageId == 'gp_300',
+                    selected: _selectedPackageId == 'bizlevelgp_300',
                     onSelected: (_) {
                       setState(() {
-                        _selectedPackageId = 'gp_300';
+                        _selectedPackageId = 'bizlevelgp_300';
                         _selectedAmount = 3000;
                         _selectedLabel = 'СТАРТ: 300 GP';
                       });
@@ -78,10 +166,10 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
                   ),
                   ChoiceChip(
                     label: const Text('РАЗГОН'),
-                    selected: _selectedPackageId == 'gp_1400',
+                    selected: _selectedPackageId == 'bizlevelgp_1000',
                     onSelected: (_) {
                       setState(() {
-                        _selectedPackageId = 'gp_1400';
+                        _selectedPackageId = 'bizlevelgp_1000';
                         _selectedAmount = 9960;
                         _selectedLabel = 'РАЗГОН: 1400 GP';
                       });
@@ -89,10 +177,10 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
                   ),
                   ChoiceChip(
                     label: const Text('ТРАНСФОРМ'),
-                    selected: _selectedPackageId == 'gp_3000',
+                    selected: _selectedPackageId == 'bizlevelgp_2000',
                     onSelected: (_) {
                       setState(() {
-                        _selectedPackageId = 'gp_3000';
+                        _selectedPackageId = 'bizlevelgp_2000';
                         _selectedAmount = 19960;
                         _selectedLabel = 'ТРАНСФОРМАЦИЯ: 3000 GP';
                       });
@@ -103,7 +191,7 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
             ),
             const SizedBox(height: 12),
             // Одна карточка выбранного плана
-            if (_selectedPackageId == 'gp_300')
+            if (_selectedPackageId == 'bizlevelgp_300')
               Semantics(
                 label: 'План СТАРТ, 300 GP',
                 child: _GpPlanCard(
@@ -116,12 +204,12 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
                     'Получить второе мнение',
                   ],
                   italicNote: 'Каждый успешный бизнес начинался с первого шага',
-                  priceLabel: '₸3 000',
+                  priceLabel: _priceLabelFor('bizlevelgp_300', '₸3 000'),
                   selected: true,
                   onSelect: () {},
                 ),
               ),
-            if (_selectedPackageId == 'gp_1400')
+            if (_selectedPackageId == 'bizlevelgp_1000')
               Semantics(
                 label: 'План РАЗГОН, 1400 GP',
                 child: _GpPlanCard(
@@ -134,14 +222,14 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
                     'Открыть новые горизонты',
                   ],
                   italicNote: 'Выбор 80% предпринимателей',
-                  priceLabel: '₸9 960',
+                  priceLabel: _priceLabelFor('bizlevelgp_1000', '₸9 960'),
                   highlight: true,
                   ribbon: isXs ? null : 'Хит',
                   selected: true,
                   onSelect: () {},
                 ),
               ),
-            if (_selectedPackageId == 'gp_3000')
+            if (_selectedPackageId == 'bizlevelgp_2000')
               Semantics(
                 label: 'План ТРАНСФОРМАЦИЯ, 3000 GP',
                 child: _GpPlanCard(
@@ -154,7 +242,7 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
                     'От мечты к результату',
                   ],
                   italicNote: 'Для тех, кто настроен серьезно',
-                  priceLabel: '₸19 960',
+                  priceLabel: _priceLabelFor('bizlevelgp_2000', '₸19 960'),
                   ribbon: isXs ? null : 'Выгоднее всего',
                   selected: true,
                   onSelect: () {},
@@ -203,7 +291,7 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
                   label: _selectedLabel == null ? 'Выберите пакет' : 'Оплатить',
                   onPressed: _selectedPackageId == null
                       ? null
-                      : () => _startPurchase(
+                      : () => _startPurchaseIapOrWeb(
                             context,
                             ref,
                             _selectedPackageId!,
@@ -258,14 +346,87 @@ Future<void> _verifyLastPurchase(BuildContext context) async {
   }
 }
 
-Future<void> _startPurchase(
+Future<void> _startPurchaseIapOrWeb(
   BuildContext context,
   WidgetRef ref,
   String packageId,
   int amountKzt,
 ) async {
   try {
+    // Попытка IAP на iOS/Android
+    if (IapService.currentPlatform() == 'ios' ||
+        IapService.currentPlatform() == 'android') {
+      final iap = IapService.instance;
+      final available = await iap.isAvailable();
+      if (available) {
+        final resp = await iap.queryProducts({packageId});
+        if (resp.notFoundIDs.isEmpty && resp.productDetails.isNotEmpty) {
+          final product = resp.productDetails.first;
+          try {
+            await Sentry.addBreadcrumb(Breadcrumb(
+              message: 'gp_iap_purchase_started',
+              data: {
+                'productId': product.id,
+                'platform': IapService.currentPlatform()
+              },
+            ));
+          } catch (_) {}
+          final purchase = await iap.buyConsumableOnce(product);
+          if (purchase != null && purchase.status == PurchaseStatus.purchased) {
+            try {
+              await Sentry.addBreadcrumb(Breadcrumb(
+                message: 'gp_iap_purchase_purchased',
+                data: {'productId': product.id},
+              ));
+            } catch (_) {}
+            final gp = GpService(Supabase.instance.client);
+            final token = purchase.verificationData.serverVerificationData;
+            final platform = IapService.currentPlatform();
+            try {
+              await Sentry.addBreadcrumb(Breadcrumb(
+                message: 'gp_verify_started',
+                data: {'productId': product.id, 'platform': platform},
+              ));
+            } catch (_) {}
+            final balance = await gp.verifyIapPurchase(
+              platform: platform,
+              productId: product.id,
+              token: token,
+            );
+            try {
+              await Sentry.addBreadcrumb(Breadcrumb(
+                message: 'gp_verify_success',
+                data: {'productId': product.id, 'balance_after': balance},
+              ));
+            } catch (_) {}
+            if (!context.mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Покупка подтверждена, баланс: $balance')),
+            );
+            final container = ProviderScope.containerOf(context);
+            container.invalidate(gpBalanceProvider);
+            return;
+          }
+          try {
+            await Sentry.addBreadcrumb(Breadcrumb(
+              message: 'gp_iap_purchase_not_purchased',
+              data: {
+                'productId': product.id,
+                'status': purchase?.status.toString()
+              },
+            ));
+          } catch (_) {}
+        }
+      }
+    }
+    // Фолбэк: текущий web/mock флоу
     final gp = GpService(Supabase.instance.client);
+    try {
+      await Sentry.addBreadcrumb(Breadcrumb(
+        message: 'gp_web_purchase_init',
+        data: {'productId': packageId},
+      ));
+    } catch (_) {}
     final init = await gp.initPurchase(packageId: packageId, provider: 'epay');
     final urlStr = init['payment_url'] ?? '';
     final purchaseId = init['purchase_id'] ?? '';

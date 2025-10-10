@@ -109,6 +109,48 @@ class CheckInForm extends StatelessWidget {
                   );
                 }),
                 const SizedBox(height: 12),
+                // Прогресс недели в % относительно цели v2
+                Consumer(builder: (context, ref, _) {
+                  final allAsync = ref.watch(goalVersionsProvider);
+                  return allAsync.maybeWhen(
+                    data: (all) {
+                      try {
+                        final Map<int, Map<String, dynamic>> map = {
+                          for (final m in all)
+                            (m['version'] as int): Map<String, dynamic>.from(m)
+                        };
+                        final Map<String, dynamic> v2 =
+                            (map[2]?['version_data'] as Map?)
+                                    ?.cast<String, dynamic>() ??
+                                const <String, dynamic>{};
+                        final double? from = double.tryParse(
+                            '${v2['metric_current'] ?? ''}'.trim());
+                        final double? to = double.tryParse(
+                            '${v2['metric_target'] ?? ''}'.trim());
+                        final double? current =
+                            double.tryParse(metricActualCtrl.text.trim());
+                        if (from != null &&
+                            to != null &&
+                            current != null &&
+                            to != from) {
+                          final double pct =
+                              ((current - from) / (to - from)).clamp(0.0, 1.0) *
+                                  100;
+                          final value = pct.isNaN ? 0 : pct;
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 6),
+                            child: Text(
+                              'Прогресс к цели: ${value.toStringAsFixed(0)}%',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          );
+                        }
+                      } catch (_) {}
+                      return const SizedBox.shrink();
+                    },
+                    orElse: () => const SizedBox.shrink(),
+                  );
+                }),
                 _LabeledField(
                   label: 'Главный инсайт недели',
                   child: CustomTextBox(

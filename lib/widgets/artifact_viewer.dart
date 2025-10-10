@@ -64,7 +64,7 @@ class _ArtifactViewerState extends State<ArtifactViewer>
       },
       onTap: _flip,
       child: Scaffold(
-        backgroundColor: Colors.black.withOpacity(0.85),
+        backgroundColor: Colors.black.withValues(alpha: 0.85),
         body: SafeArea(
           child: Stack(
             children: [
@@ -108,7 +108,7 @@ class _ArtifactViewerState extends State<ArtifactViewer>
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.45),
+                    color: Colors.black.withValues(alpha: 0.45),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
@@ -142,7 +142,7 @@ class _ArtifactViewerState extends State<ArtifactViewer>
                     padding:
                         const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.45),
+                      color: Colors.black.withValues(alpha: 0.45),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Row(
@@ -180,10 +180,10 @@ class _ChipToggle extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: active ? Colors.white : Colors.white.withOpacity(0.15),
+          color: active ? Colors.white : Colors.white.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(20),
-          border:
-              Border.all(color: Colors.white.withOpacity(active ? 0.0 : 0.5)),
+          border: Border.all(
+              color: Colors.white.withValues(alpha: active ? 0.0 : 0.5)),
         ),
         child: Text(
           label,
