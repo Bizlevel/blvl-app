@@ -351,10 +351,10 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                           const SizedBox(height: 8),
                           // Пустое состояние при отсутствии v1
                           if (!gs.versions.containsKey(1))
-                            Container(
+                                  Container(
                               width: double.infinity,
                               padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
+                                    decoration: BoxDecoration(
                                 color: AppColor.primary.withValues(alpha: 0.04),
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
@@ -370,12 +370,12 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                                   Expanded(
                                     child: Text(
                                       'Начните с v1 «Семя цели» — доступно на Уровне 1',
-                                      style: Theme.of(context)
-                                          .textTheme
+                                        style: Theme.of(context)
+                                            .textTheme
                                           .bodyMedium,
-                                    ),
                                   ),
-                                  TextButton(
+                                  ),
+                                    TextButton(
                                     onPressed: () => GoRouter.of(context)
                                         .push('/tower?scrollTo=1'),
                                     child: const Text('Открыть Уровень 1'),
@@ -903,13 +903,13 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
           ),
         ),
         if (!kHideGoalBubbleOnGoal)
-          Positioned(
-            right: 16,
-            bottom: 16,
-            child: FloatingChatBubble(
-              chatId: null,
-              systemPrompt:
-                  'Режим трекера цели: обсуждаем версию v${ref.watch(goalScreenControllerProvider).selectedVersion} и прогресс спринтов. Будь краток, поддерживай фокус, предлагай следующий шаг.',
+        Positioned(
+          right: 16,
+          bottom: 16,
+          child: FloatingChatBubble(
+            chatId: null,
+            systemPrompt:
+                'Режим трекера цели: обсуждаем версию v${ref.watch(goalScreenControllerProvider).selectedVersion} и прогресс спринтов. Будь краток, поддерживай фокус, предлагай следующий шаг.',
               userContext: ref
                   .read(goalScreenControllerProvider.notifier)
                   .buildTrackerUserContext(
@@ -919,9 +919,9 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                     consultedLeo: _consultedLeo,
                     appliedTechniques: _appliedTechniques,
                     keyInsight: _keyInsightCtrl.text.trim(),
-                  ),
-              levelContext: 'current_level: $currentLevel',
-              bot: 'max',
+            ),
+            levelContext: 'current_level: $currentLevel',
+            bot: 'max',
             ),
           ),
         // Sticky нижняя панель CTA
@@ -1155,7 +1155,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                 // После сохранения чек‑ина отправляем тонкую реакцию Макса
                 autoUserMessage: autoMessage ??
                     (_sprintSaved
-                        ? 'weekly_checkin: Неделя $_selectedSprint; Итог: ${_achievementCtrl.text.trim()}; Метрика: ${_metricActualCtrl.text.trim()}'
+                    ? 'weekly_checkin: Неделя $_selectedSprint; Итог: ${_achievementCtrl.text.trim()}; Метрика: ${_metricActualCtrl.text.trim()}'
                         : null),
                 skipSpend: _sprintSaved || autoMessage != null,
                 recommendedChips: chips ??
