@@ -662,4 +662,10 @@ TODO:
 Рекомендации:
 - Закоммитить lock-файлы для воспроизводимой сборки.
 - В отдельной задаче выровнять настройки iOS таргета (`$(inherited)` для предупреждений CocoaPods).
+
+## 2025-10-10 — Выравнивание настроек с опубликованной `main`
+
+- Приняты версии из `origin/main` для: `ios/Runner/Info.plist`, `pubspec.yaml`, `pubspec.lock`, `ios/Podfile.lock`.
+- Выполнены `flutter pub get` и `pod install --repo-update`.
+- Цель: локальная `prelaunch` теперь использует те же опубликованные настройки, что и `main`.
   
