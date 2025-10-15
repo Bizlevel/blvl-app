@@ -1,11 +1,4 @@
-## 2025-10-08 — Goal sprint sync & UX fixes
 
-- Данные: добавлены `sprint_status`, `sprint_start_date` в выборку `fetchAllGoals`; провайдеры теперь получают эти поля.
-- UI: `SprintSection` и `GoalCompactCard` используют `sprint_start_date`; «Дней осталось» считается от серверной даты; вывод статуса спринта; показывается `readiness_score` из v4.
-- Daily: после `startSprint()` автоматически вызывается автозаполнение `daily_progress.task_text` из `v3 week*_focus`.
-- Weekly: в форме чек‑ина показан «Прогресс к цели: N%» на основе метрики v2.
-- Edge: в `leo-chat` заменено `sprint_number` → `week_number` для `weekly_progress`.
-- Контроллер: расчёт текущей недели и задач переведён на `sprint_start_date` и ключи `week*_focus`.
 
 Проверка: сборка без ошибок; линтер — только предупреждения о сложности в `GoalsRepository` (неблокирующие). 
 # Этап 30: Правки по UX/UI
@@ -648,24 +641,29 @@ TODO:
   - Включить decay‑механизм по `relevance_score` и плановый weekly `persona_summary` (cron) для «тёплой» памяти.
   - Метрики: покрытие семантических попаданий, средняя длина контекста, доля фолбэков.
   
-## 2025-10-10 — Синхронизация с origin/main
+## 2025-10-08 — Goal sprint sync & UX fixes
+- Данные: добавлены `sprint_status`, `sprint_start_date` в выборку `fetchAllGoals`; провайдеры теперь получают эти поля.
+- UI: `SprintSection` и `GoalCompactCard` используют `sprint_start_date`; «Дней осталось» считается от серверной даты; вывод статуса спринта; показывается `readiness_score` из v4.
+- Daily: после `startSprint()` автоматически вызывается автозаполнение `daily_progress.task_text` из `v3 week*_focus`.
+- Weekly: в форме чек‑ина показан «Прогресс к цели: N%» на основе метрики v2.
+- Edge: в `leo-chat` заменено `sprint_number` → `week_number` для `weekly_progress`.
+- Контроллер: расчёт текущей недели и задач переведён на `sprint_start_date` и ключи `week*_focus`.
 
-Выполнено:
-- Слит `origin/main` → `prelaunch` (ort): подтянуты новые иконки приложений, изменения Android/iOS конфигов, добавлен `assets/icon_1024.png`.
-- `flutter pub get`: зависимости установлены; проверено наличие `in_app_purchase: ^3.1.11` в `pubspec.yaml`.
-- `pod install --repo-update`: Pods обновлены (Sentry 8.52.1, Firebase 11.15.0); предупреждения CocoaPods по `ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES` и `PODS_ROOT` (оставлено без изменений, сборка не блокируется).
+## 2025-10-13 — Видео: переход на Bunny Stream
+- Клиент:
+  - `LessonWidget` переведён на единый источник `video_url` (Bunny HLS или Supabase Storage). Ветки Vimeo и временные override удалены. Web воспроизводит HLS через локальный `web/hls_player.html` (hls.js); iOS/Android/Desktop — через `video_player`.
+  - При пустом `video_url` урок помечается как просмотренный (временно до полной миграции данных).
+- Данные:
+  - Переход выполняется заменой `public.lessons.video_url` на HLS‑ссылки Bunny (`…/playlist.m3u8`). Схема БД не менялась.
+- Требования к окружению:
+  - В Bunny разрешён dev‑origin (localhost:port) в hotlink/Shield для HLS, иначе возможен 403.
+- Проверка:
+  - Web/iOS/Android: урок 1.1 проигрывается с Bunny; Sentry без PII; overflow отсутствуют.
 
-Незакоммиченные изменения после установки:
-- iOS: `ios/Podfile.lock`.
-- Flutter: `pubspec.lock`.
-
-Рекомендации:
-- Закоммитить lock-файлы для воспроизводимой сборки.
-- В отдельной задаче выровнять настройки iOS таргета (`$(inherited)` для предупреждений CocoaPods).
-
-## 2025-10-10 — Выравнивание настроек с опубликованной `main`
-
-- Приняты версии из `origin/main` для: `ios/Runner/Info.plist`, `pubspec.yaml`, `pubspec.lock`, `ios/Podfile.lock`.
-- Выполнены `flutter pub get` и `pod install --repo-update`.
-- Цель: локальная `prelaunch` теперь использует те же опубликованные настройки, что и `main`.
-  
+## 2025-10-14 — Мониторинг Sentry (bizlevel-flutter)
+- Проверена интеграция sentry-mcp: доступ к орг. `bizlevel`, проект `bizlevel-flutter` найден.
+- DSN сконфигурирован через `envOrDefine('SENTRY_DSN')` в `lib/main.dart`, `SentryFlutter.init` задаёт `environment` и `release`.
+- iOS: `Podfile` содержит `Sentry/HybridSDK` (8.52.1); Android — без плагина Sentry Gradle, но для Dart‑стека это не требуется.
+- В Sentry видны релизы и события: последний релиз `bizlevel@1.0.7+7`, есть события до 2025‑10‑14 05:37Z. Ошибки при списке событий через API не мешают выводу по релизам.
+- Рекомендации: при необходимости нативной символикации добавить загрузку dSYM (iOS) и маппингов ProGuard (Android); настроить `sentry-cli` токен в CI для `scripts/sentry_check.sh`.
+Статус: интеграция работает, логи видны.

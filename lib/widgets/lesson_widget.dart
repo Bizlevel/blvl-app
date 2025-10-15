@@ -1,15 +1,13 @@
-// Vimeo/WebView support
+// Video playback via video_url (Bunny HLS or Supabase Storage)
 import 'package:bizlevel/providers/lessons_repository_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:chewie/chewie.dart';
 import 'dart:async';
-import 'package:flutter/foundation.dart'
-    show kIsWeb, defaultTargetPlatform, TargetPlatform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:bizlevel/models/lesson_model.dart';
 import 'package:video_player/video_player.dart';
-import 'package:webview_flutter/webview_flutter.dart';
 import 'package:bizlevel/compat/ui_stub.dart'
     if (dart.library.html) 'dart:ui_web' as ui;
 // ignore: avoid_web_libraries_in_flutter
@@ -29,15 +27,13 @@ class LessonWidget extends ConsumerStatefulWidget {
 class _LessonWidgetState extends ConsumerState<LessonWidget> {
   VideoPlayerController? _videoController;
   ChewieController? _chewieController;
-  late final WebViewController _webViewController;
   bool _initialized = false;
   bool _progressSent = false;
   bool _controlsVisible = true;
   Timer? _hideTimer;
 
-  // For iframe/WebView playback
-  String? _embedUrl;
-  bool _useWebView = false;
+  // For Web iframe playback (local helper page with hls.js)
+  String? _webIframeUrl;
 
   @override
   void initState() {
@@ -57,55 +53,34 @@ class _LessonWidgetState extends ConsumerState<LessonWidget> {
 
   Future<void> _initPlayer() async {
     try {
-      // Choose video source: Vimeo > Supabase Storage
+      // Choose video source: video_url only (Bunny HLS or Supabase Storage)
       String directUrl;
-      if (widget.lesson.vimeoId != null && widget.lesson.vimeoId!.isNotEmpty) {
-        final embed =
-            'https://player.vimeo.com/video/${widget.lesson.vimeoId}?byline=0&portrait=0&playsinline=1';
-        // For Web – use iframe; for iOS – use WebView; otherwise fallback to direct player
-        if (kIsWeb) {
-          _embedUrl = embed;
-          _initialized = true;
-          setState(() {});
-          // Нет возможности трекать воспроизведение iframe → сразу помечаем просмотренным
-          _autoMarkWatched();
-          return;
-        }
-        if (defaultTargetPlatform == TargetPlatform.iOS ||
-            defaultTargetPlatform == TargetPlatform.android) {
-          _embedUrl = embed;
-          _useWebView = true;
-          _webViewController = WebViewController()
-            ..setJavaScriptMode(JavaScriptMode.unrestricted)
-            ..loadRequest(Uri.parse(_embedUrl!));
+      if (widget.lesson.videoUrl != null &&
+          widget.lesson.videoUrl!.isNotEmpty) {
+        final repo = ref.read(lessonsRepositoryProvider);
+        final signed = await repo.getVideoSignedUrl(widget.lesson.videoUrl!);
+        if (signed == null) {
           _initialized = true;
           setState(() {});
           _autoMarkWatched();
           return;
         }
-        // Desktop fallback: try to use video_player (may fail if Vimeo forbids)
-        directUrl = embed;
+        directUrl = signed;
       } else {
-        // Fallback to Supabase Storage signed URL если указан путь
-        if (widget.lesson.videoUrl != null &&
-            widget.lesson.videoUrl!.isNotEmpty) {
-          final repo = ref.read(lessonsRepositoryProvider);
-          final signed = await repo.getVideoSignedUrl(widget.lesson.videoUrl!);
-          if (signed == null) {
-            // Нет видео → помечаем как просмотренное и показываем заглушку
-            _initialized = true;
-            setState(() {});
-            _autoMarkWatched();
-            return;
-          }
-          directUrl = signed;
-        } else {
-          // Нет источника видео – помечаем просмотренным и выходим
-          _initialized = true;
-          setState(() {});
-          _autoMarkWatched();
-          return;
-        }
+        _initialized = true;
+        setState(() {});
+        _autoMarkWatched();
+        return;
+      }
+
+      // Web HLS via local helper page (hls.js) inside iframe
+      if (kIsWeb && _looksLikeHls(directUrl)) {
+        final encoded = Uri.encodeComponent(directUrl);
+        _webIframeUrl = '/hls_player.html?src=' + encoded;
+        _initialized = true;
+        setState(() {});
+        _autoMarkWatched();
+        return;
       }
 
       // Use video_player for remaining cases
@@ -140,6 +115,8 @@ class _LessonWidgetState extends ConsumerState<LessonWidget> {
       });
     }
   }
+
+  // bunny test helper removed (logic in _initPlayer)
 
   void _listener() {
     final position = _videoController!.value.position;
@@ -192,15 +169,15 @@ class _LessonWidgetState extends ConsumerState<LessonWidget> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    // Web iframe playback
-    if (kIsWeb && _embedUrl != null) {
-      final viewId = 'vimeo-${widget.lesson.vimeoId}';
+    // Web iframe playback (HLS)
+    if (kIsWeb && _webIframeUrl != null) {
+      final viewId = 'hls-web-${widget.lesson.levelId}-${widget.lesson.order}';
       // ignore: undefined_prefixed_name
       ui.platformViewRegistry.registerViewFactory(viewId, (int id) {
         final iframe = html.IFrameElement()
-          ..src = _embedUrl!
           ..style.border = 'none'
           ..allowFullscreen = true;
+        iframe.src = _webIframeUrl!;
         return iframe;
       });
 
@@ -236,49 +213,7 @@ class _LessonWidgetState extends ConsumerState<LessonWidget> {
       );
     }
 
-    // iOS/Android WebView playback
-    if (_useWebView) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Expanded(
-            child: LayoutBuilder(builder: (context, constraints) {
-              const ratio = 9 / 16;
-              double maxH = constraints.maxHeight;
-              double maxW = constraints.maxWidth;
-              double h = maxW / ratio;
-              double w = maxW;
-              if (h > maxH) {
-                h = maxH;
-                w = h * ratio;
-              }
-              return Center(
-                child: SizedBox(
-                  width: w,
-                  height: h,
-                  child: WebViewWidget(controller: _webViewController),
-                ),
-              );
-            }),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Text(widget.lesson.description,
-                style: const TextStyle(fontSize: 14)),
-          ),
-        ],
-      );
-    }
-
-    if (kIsWeb) {
-      // Fallback: video_player widget (should rarely reach here)
-      return AspectRatio(
-        aspectRatio: _videoController!.value.aspectRatio == 0
-            ? 9 / 16
-            : _videoController!.value.aspectRatio,
-        child: VideoPlayer(_videoController!),
-      );
-    }
+    // No explicit Web fallback here; other formats handled below
 
     if (_videoController == null || _chewieController == null) {
       return Center(
@@ -439,4 +374,6 @@ class _LessonWidgetState extends ConsumerState<LessonWidget> {
       ],
     );
   }
+
+  bool _looksLikeHls(String url) => url.contains('.m3u8');
 }
