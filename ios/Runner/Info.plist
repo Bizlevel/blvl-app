@@ -27,7 +27,15 @@
 			<string>Editor</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>com.googleusercontent.apps.1094397921402-o18r96t64iloastkode24ejof7j4iman</string>
+				<string>com.googleusercontent.apps.355423136369-rv6g5rhcjionialj4ho5pvbmvss6gk9h</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>bizlevel.kz</string>
 			</array>
 		</dict>
 	</array>
