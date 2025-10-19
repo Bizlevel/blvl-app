@@ -390,6 +390,54 @@ class NotificationsService {
     }
   }
 
+  /// Новое: Ежедневное напоминание о практике (Пн/Ср/Пт в 19:00)
+  Future<void> scheduleDailyPracticeReminder({int hour = 19}) async {
+    if (kIsWeb) return;
+    if (!_initialized) await initialize();
+    final ch = _channelsMeta['goal_reminder']!;
+    final android = AndroidNotificationDetails(
+      'goal_reminder',
+      ch.$1,
+      channelDescription: ch.$2,
+      importance: ch.$3,
+      priority: Priority.high,
+    );
+    final details = NotificationDetails(android: android);
+    // Mon/Wed/Fri
+    for (final wd in const [
+      DateTime.monday,
+      DateTime.wednesday,
+      DateTime.friday
+    ]) {
+      await _plugin.zonedSchedule(
+        9000 + wd,
+        'Время практики',
+        'Загляни в «Цель» и отметь действие сегодня',
+        _nextInstanceOf(weekday: wd, hour: hour, minute: 0),
+        details,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+        payload: '{"route":"/goal"}',
+      );
+    }
+  }
+
+  Future<void> cancelDailyPracticeReminder() async {
+    if (kIsWeb) return;
+    if (!_initialized) await initialize();
+    for (final wd in const [
+      DateTime.monday,
+      DateTime.wednesday,
+      DateTime.friday
+    ]) {
+      try {
+        await _plugin.cancel(9000 + wd);
+      } catch (_) {}
+    }
+  }
+
   /// Отменяет существующее расписание еженедельных напоминаний (известные ID)
   Future<void> cancelWeeklyPlan() async {
     if (kIsWeb) {

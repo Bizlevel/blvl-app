@@ -14,14 +14,7 @@ class NotificationsSettingsScreen extends ConsumerStatefulWidget {
 
 class _NotificationsSettingsScreenState
     extends ConsumerState<NotificationsSettingsScreen> {
-  TimeOfDay _mon = const TimeOfDay(hour: 9, minute: 0);
-  TimeOfDay _wed = const TimeOfDay(hour: 14, minute: 0);
-  TimeOfDay _fri = const TimeOfDay(hour: 16, minute: 0);
-  final List<TimeOfDay> _sunSlots = <TimeOfDay>[
-    const TimeOfDay(hour: 10, minute: 0),
-    const TimeOfDay(hour: 13, minute: 0),
-    const TimeOfDay(hour: 18, minute: 0)
-  ];
+  TimeOfDay _fri = const TimeOfDay(hour: 19, minute: 0);
   bool _saving = false;
 
   Future<void> _pickTime(BuildContext context, TimeOfDay initial,
@@ -73,75 +66,38 @@ class _NotificationsSettingsScreenState
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Text('Еженедельные напоминания',
+                        Text('Ежедневное напоминание о практике',
                             style: Theme.of(context)
                                 .textTheme
                                 .titleMedium
                                 ?.copyWith(fontWeight: FontWeight.w600)),
                         const SizedBox(height: 12),
                         _RowTimePicker(
-                          label: 'Пн — план недели',
-                          value: _fmt(_mon),
-                          onTap: () => _pickTime(
-                              context, _mon, (v) => setState(() => _mon = v)),
-                        ),
-                        _RowTimePicker(
-                          label: 'Ср — середина недели',
-                          value: _fmt(_wed),
-                          onTap: () => _pickTime(
-                              context, _wed, (v) => setState(() => _wed = v)),
-                        ),
-                        _RowTimePicker(
-                          label: 'Пт — напоминание',
+                          label: 'Время напоминания',
                           value: _fmt(_fri),
                           onTap: () => _pickTime(
                               context, _fri, (v) => setState(() => _fri = v)),
                         ),
-                        const SizedBox(height: 8),
-                        Text('Вс — чекин (до 3 напоминаний)',
-                            style: Theme.of(context).textTheme.bodySmall),
-                        const SizedBox(height: 8),
-                        Wrap(spacing: 8, runSpacing: 8, children: [
-                          for (int i = 0; i < _sunSlots.length; i++)
-                            _SunChip(
-                              time: _fmt(_sunSlots[i]),
-                              onTap: () => _pickTime(context, _sunSlots[i],
-                                  (v) => setState(() => _sunSlots[i] = v)),
-                              onRemove: _sunSlots.length > 1
-                                  ? () => setState(() => _sunSlots.removeAt(i))
-                                  : null,
-                            ),
-                          if (_sunSlots.length < 3)
-                            ActionChip(
-                              label: const Text('Добавить'),
-                              onPressed: () => setState(() => _sunSlots
-                                  .add(const TimeOfDay(hour: 12, minute: 0))),
-                            ),
-                        ]),
                         const SizedBox(height: 16),
                         SizedBox(
                           height: 44,
                           child: BizLevelButton(
-                            label: 'Сохранить напоминания',
+                            label: 'Сохранить',
                             onPressed: _saving
                                 ? null
                                 : () async {
                                     setState(() => _saving = true);
                                     try {
                                       await NotificationsService.instance
-                                          .rescheduleWeekly(
-                                        mon: (_mon.hour, _mon.minute),
-                                        wed: (_wed.hour, _wed.minute),
-                                        fri: (_fri.hour, _fri.minute),
-                                        sunTimes: _sunSlots
-                                            .map(((t) => (t.hour, t.minute)))
-                                            .toList(),
-                                      );
+                                          .cancelWeeklyPlan();
+                                      await NotificationsService.instance
+                                          .scheduleDailyPracticeReminder(
+                                              hour: _fri.hour);
                                       if (!mounted) return;
                                       ScaffoldMessenger.of(context)
                                           .showSnackBar(const SnackBar(
                                               content: Text(
-                                                  'Расписание обновлено')));
+                                                  'Напоминание обновлено')));
                                     } catch (e) {
                                       if (!mounted) return;
                                       ScaffoldMessenger.of(context)
@@ -187,21 +143,6 @@ class _RowTimePicker extends StatelessWidget {
           TextButton(onPressed: onTap, child: Text(value)),
         ],
       ),
-    );
-  }
-}
-
-class _SunChip extends StatelessWidget {
-  const _SunChip({required this.time, required this.onTap, this.onRemove});
-  final String time;
-  final VoidCallback onTap;
-  final VoidCallback? onRemove;
-  @override
-  Widget build(BuildContext context) {
-    return InputChip(
-      label: Text(time),
-      onPressed: onTap,
-      onDeleted: onRemove,
     );
   }
 }

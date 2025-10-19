@@ -54,6 +54,9 @@ Future<void> main() async {
   await Hive.openBox('levels');
   await Hive.openBox('lessons');
   await Hive.openBox('goals');
+  // Кэш новой модели цели и журнала применений
+  await Hive.openBox('user_goal');
+  await Hive.openBox('practice_log');
   await Hive.openBox('weekly_progress');
   await Hive.openBox('quotes');
   await Hive.openBox('gp');
@@ -64,7 +67,7 @@ Future<void> main() async {
     final String timeZoneName = await FlutterTimezone.getLocalTimezone();
     tz.setLocalLocation(tz.getLocation(timeZoneName));
     await NotificationsService.instance.initialize();
-    await NotificationsService.instance.scheduleWeeklyPlan();
+    // Убрали недельные напоминания; остаются ежедневные напоминания практики на экране настроек
     // Открываем лог уведомлений
     await Hive.openBox('notifications');
   } catch (_) {}

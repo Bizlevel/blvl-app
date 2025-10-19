@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 import 'package:bizlevel/widgets/custom_textfield.dart';
 import 'package:bizlevel/providers/goals_providers.dart';
 
@@ -60,23 +59,14 @@ class CheckInForm extends StatelessWidget {
             if (isDesktop)
               Row(children: [
                 Expanded(
-                  child: Consumer(builder: (context, ref, _) {
-                    final metricAsync = ref.watch(metricLabelProvider);
-                    final String dynamicLabel = metricAsync.maybeWhen(
-                      data: (s) => (s == null || s.isEmpty)
-                          ? 'Ключевая метрика (факт)'
-                          : 'Ключевая метрика — $s (факт)',
-                      orElse: () => 'Ключевая метрика (факт)',
-                    );
-                    return _LabeledField(
-                      label: dynamicLabel,
-                      child: CustomTextBox(
-                        controller: metricActualCtrl,
-                        keyboardType: TextInputType.number,
-                        hint: 'Фактическое значение',
-                      ),
-                    );
-                  }),
+                  child: _LabeledField(
+                    label: 'Ключевая метрика (факт)',
+                    child: CustomTextBox(
+                      controller: metricActualCtrl,
+                      keyboardType: TextInputType.number,
+                      hint: 'Фактическое значение',
+                    ),
+                  ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -91,66 +81,16 @@ class CheckInForm extends StatelessWidget {
               ])
             else
               Column(children: [
-                Consumer(builder: (context, ref, _) {
-                  final metricAsync = ref.watch(metricLabelProvider);
-                  final String dynamicLabel = metricAsync.maybeWhen(
-                    data: (s) => (s == null || s.isEmpty)
-                        ? 'Ключевая метрика (факт)'
-                        : 'Ключевая метрика — $s (факт)',
-                    orElse: () => 'Ключевая метрика (факт)',
-                  );
-                  return _LabeledField(
-                    label: dynamicLabel,
-                    child: CustomTextBox(
-                      controller: metricActualCtrl,
-                      keyboardType: TextInputType.number,
-                      hint: 'Фактическое значение',
-                    ),
-                  );
-                }),
+                _LabeledField(
+                  label: 'Ключевая метрика (факт)',
+                  child: CustomTextBox(
+                    controller: metricActualCtrl,
+                    keyboardType: TextInputType.number,
+                    hint: 'Фактическое значение',
+                  ),
+                ),
                 const SizedBox(height: 12),
-                // Прогресс недели в % относительно цели v2
-                Consumer(builder: (context, ref, _) {
-                  final allAsync = ref.watch(goalVersionsProvider);
-                  return allAsync.maybeWhen(
-                    data: (all) {
-                      try {
-                        final Map<int, Map<String, dynamic>> map = {
-                          for (final m in all)
-                            (m['version'] as int): Map<String, dynamic>.from(m)
-                        };
-                        final Map<String, dynamic> v2 =
-                            (map[2]?['version_data'] as Map?)
-                                    ?.cast<String, dynamic>() ??
-                                const <String, dynamic>{};
-                        final double? from = double.tryParse(
-                            '${v2['metric_current'] ?? ''}'.trim());
-                        final double? to = double.tryParse(
-                            '${v2['metric_target'] ?? ''}'.trim());
-                        final double? current =
-                            double.tryParse(metricActualCtrl.text.trim());
-                        if (from != null &&
-                            to != null &&
-                            current != null &&
-                            to != from) {
-                          final double pct =
-                              ((current - from) / (to - from)).clamp(0.0, 1.0) *
-                                  100;
-                          final value = pct.isNaN ? 0 : pct;
-                          return Padding(
-                            padding: const EdgeInsets.only(top: 6),
-                            child: Text(
-                              'Прогресс к цели: ${value.toStringAsFixed(0)}%',
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                          );
-                        }
-                      } catch (_) {}
-                      return const SizedBox.shrink();
-                    },
-                    orElse: () => const SizedBox.shrink(),
-                  );
-                }),
+                // Прогресс недели: удалён (версии цели больше не используются)
                 _LabeledField(
                   label: 'Главный инсайт недели',
                   child: CustomTextBox(

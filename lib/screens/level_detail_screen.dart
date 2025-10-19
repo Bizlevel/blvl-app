@@ -19,8 +19,8 @@ import 'package:bizlevel/providers/auth_provider.dart';
 import 'package:bizlevel/widgets/common/bizlevel_text_field.dart';
 import 'package:bizlevel/services/auth_service.dart';
 import 'package:bizlevel/providers/user_skills_provider.dart';
-import 'package:bizlevel/providers/goals_repository_provider.dart';
-import 'package:bizlevel/providers/goals_providers.dart';
+// import 'package:bizlevel/providers/goals_repository_provider.dart';
+// import 'package:bizlevel/providers/goals_providers.dart';
 import 'package:go_router/go_router.dart';
 import 'package:bizlevel/widgets/common/breadcrumb.dart';
 import 'package:bizlevel/widgets/common/bizlevel_button.dart';
@@ -426,8 +426,7 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
             if (mounted) {
               setState(() => _goalV1Saved = true);
               // Инвалидация провайдеров целей для синхронизации страницы «Цель»
-              ref.invalidate(goalLatestProvider);
-              ref.invalidate(goalVersionsProvider);
+              // legacy invalidates removed
             }
           },
         ),
@@ -610,7 +609,7 @@ class _GoalV1Block extends _PageBlock {
   final VoidCallback onSaved;
   _GoalV1Block({required this.onSaved});
 
-  bool _isValid(String v) => v.trim().length >= 10;
+  // bool _isValid(String v) => v.trim().length >= 10;
 
   @override
   Widget build(BuildContext context, int index) {
@@ -619,7 +618,9 @@ class _GoalV1Block extends _PageBlock {
     final TextEditingController mainObstacleCtrl = TextEditingController();
 
     return Consumer(builder: (context, ref, _) {
-      final versionsAsync = ref.watch(goalVersionsProvider);
+      // legacy versions provider removed
+      final versionsAsync = const AsyncValue<List<Map<String, dynamic>>>.data(
+          <Map<String, dynamic>>[]);
       return versionsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, __) => Center(child: Text('Ошибка загрузки цели: $e')),
@@ -636,99 +637,77 @@ class _GoalV1Block extends _PageBlock {
             mainObstacleCtrl.text = (data['main_obstacle'] ?? '') as String;
           }
 
-          Future<void> save() async {
-            final repo = ref.read(goalsRepositoryProvider);
-            final bool exists = byVersion.containsKey(1);
-            final String goalText = goalInitialCtrl.text.trim();
-            final Map<String, dynamic> versionData = {
-              'goal_initial': goalInitialCtrl.text.trim(),
-              'goal_why': goalWhyCtrl.text.trim(),
-              'main_obstacle': mainObstacleCtrl.text.trim(),
-            };
-            if (!_isValid(versionData['goal_initial'] as String) ||
-                !_isValid(versionData['goal_why'] as String) ||
-                !_isValid(versionData['main_obstacle'] as String)) {
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                  content: Text('Заполните все поля (минимум 10 символов)')));
-              return;
-            }
-            try {
-              if (exists) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                      content: Text(
-                          'Вы уже сохраняли Набросок цели ранее. Редактировать возможно на странице «Цель».')));
-                }
-                onSaved();
-                return;
-              } else {
-                await repo.upsertGoalVersion(
-                  version: 1,
-                  goalText: goalText,
-                  versionData: versionData,
-                );
-              }
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Набросок цели сохранён')));
-              }
-              onSaved();
-            } catch (e) {
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Ошибка сохранения: $e')));
-              }
-            }
-          }
+          // legacy save() удалён — вместо формы показываем CTA
 
           return SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Center(
-                  child: Text(
-                    'Набросок цели',
-                    style: Theme.of(context)
-                        .textTheme
-                        .headlineSmall
-                        ?.copyWith(fontWeight: FontWeight.w700),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: AppColor.shadow,
+                        blurRadius: 10,
+                        offset: Offset(0, 6),
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(height: 16),
-                const Text('Основная цель'),
-                const SizedBox(height: 6),
-                BizLevelTextField(
-                  hint: 'Чего хочу достичь за 28 дней',
-                  controller: goalInitialCtrl,
-                ),
-                const SizedBox(height: 16),
-                const Text('Почему сейчас'),
-                const SizedBox(height: 6),
-                BizLevelTextField(
-                  hint: 'Почему это важно именно сейчас*',
-                  controller: goalWhyCtrl,
-                ),
-                const SizedBox(height: 16),
-                const Text('Препятствие'),
-                const SizedBox(height: 6),
-                BizLevelTextField(
-                  hint: 'Главное препятствие*',
-                  controller: mainObstacleCtrl,
-                ),
-                const SizedBox(height: 24),
-                BizLevelButton(
-                  label: 'Сохранить Набросок цели',
-                  onPressed: save,
-                  fullWidth: true,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'После сохранения вы сможете завершить уровень и редактировать Набросок на странице «Цель».',
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodySmall
-                      ?.copyWith(color: AppColor.labelColor),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Куда дальше?',
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Сформулируйте цель и начните дневник применений на странице «Цель». Это поможет Максу давать точные рекомендации.',
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: BizLevelButton(
+                          label: 'Открыть страницу «Цель»',
+                          onPressed: () {
+                            GoRouter.of(context).push('/goal');
+                            onSaved();
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      const Divider(height: 24),
+                      Text(
+                        'Артефакт: Ядро целей',
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Откройте артефакт «Ядро целей», чтобы пошагово сформулировать первую цель. Это поможет Максу давать точные рекомендации.',
+                      ),
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: OutlinedButton.icon(
+                          onPressed: () =>
+                              GoRouter.of(context).push('/artifacts'),
+                          icon: const Icon(Icons.auto_stories_outlined),
+                          label: const Text('Открыть артефакт'),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),

@@ -10,6 +10,7 @@ import 'package:bizlevel/widgets/leo_message_bubble.dart';
 import 'package:bizlevel/widgets/typing_indicator.dart';
 import 'package:bizlevel/services/leo_service.dart';
 import 'package:bizlevel/providers/gp_providers.dart';
+import 'package:go_router/go_router.dart';
 
 /// Dialog screen for chatting with Leo assistant.
 /// Supports pagination (30 messages per page), unread counter reset,
@@ -87,6 +88,14 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
   final Set<String> _dismissedChips = {};
   bool _showScrollToBottom = false;
   bool _showSuggestions = true; // управляет показом inline-подсказок
+  List<String> get _defaultGoalChips {
+    if (widget.bot != 'max') return const [];
+    return const [
+      'Подскажи реалистичный темп',
+      'Как выбрать финансовую метрику?',
+      'Какие действия усилят прогресс за 7 дней?'
+    ];
+  }
 
   // Добавляем debounce для предотвращения дублей
   Timer? _debounceTimer;
@@ -98,6 +107,10 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
     _leo = ref.read(leoServiceProvider);
     // Лимиты сообщений отключены (этап 39.1)
     _chatId = widget.chatId;
+    // если подсказок нет, скрываем ленту
+    if (_serverRecommendedChips.isEmpty && _defaultGoalChips.isEmpty) {
+      _showSuggestions = false;
+    }
     // Следим за позицией скролла для показа FAB «вниз»
     _scrollController.addListener(() {
       if (!_scrollController.hasClients) return;
@@ -138,7 +151,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
         greeting = widget.firstPrompt!.trim();
       } else {
         greeting =
-            'Я — Макс, трекер цели BizLevel. Помогаю кристаллизовать цель и держать темп 28 дней. Напишите, чего хотите добиться — предложу ближайший шаг.';
+            'Я — Макс, трекер цели BizLevel. Помогаю кристаллизовать цель и двигаться к ней. Напишите, чего хотите добиться — предложу ближайший шаг.';
       }
       _messages.add({
         'role': 'assistant',
@@ -295,6 +308,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
         userContext: cleanUserContext,
         levelContext: cleanLevelContext,
         bot: widget.bot,
+        chatId: _chatId,
         // GP‑политика: в mentor-mode все сообщения бесплатные,
         // в обычном режиме только авто‑сообщения бесплатные
         skipSpend: widget.skipSpend,
@@ -735,6 +749,17 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
   }
 
   void _applySuggestion(String text) {
+    // Эвристика: если подсказка предлагает открыть артефакт/материал — ведём на экран артефактов
+    final lower = text.toLowerCase();
+    if (lower.contains('артефакт') || lower.startsWith('открыть:')) {
+      try {
+        GoRouter.of(context).push('/artifacts');
+        return;
+      } catch (e) {
+        // ignore: avoid_print
+        print('Error navigating to artifacts: $e');
+      }
+    }
     try {
       Sentry.addBreadcrumb(Breadcrumb(
         level: SentryLevel.info,

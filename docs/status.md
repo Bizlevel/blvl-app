@@ -1,3 +1,16 @@
+- Мини‑гайд статусов L1/L4/L7 и уведомлений:
+  - Статусы чекпоинтов берутся из `user_goal`: L1 — заполнены `goal_text` и базовые метрики; L4 — заполнен `financial_focus`; L7 — есть `action_plan_note` (последнее решение).
+  - NextActionBanner ориентируется на `goalStateProvider(l1Done/l4Done/l7Done)` и ведёт по маршруту L1→L4→L7→Журнал.
+  - Уведомления: каналы `goal_reminder/gp_economy/education/chat_messages`. Login: `scheduleWeeklyPlan + scheduleDailyPracticeReminder`; Logout: `cancelWeeklyPlan + cancelDailyPracticeReminder + cancelDailySprint`. Все payload ведут на `/goal`.
+## 2025-10-16 BizLevel Goal refactor (edge+client)
+
+- GoalScreen: добавлен ввод/сохранение `target_date` (datepicker), прогресс‑бар и «Осталось N дней».
+- GoalsRepository: для веб добавлен глобальный `apikey` (через `SupabaseService`), запросы `practice_log` работают без 404 (web PostgREST).
+- Leo Edge (`supabase/functions/leo-chat`): контекст Макса переведён на `user_goal` + последние `practice_log` (вместо `core_goals`/`weekly_progress`). `goal_comment`/`weekly_checkin` → 410 Gone.
+- Башня: возвращены узлы `goal_checkpoint` после уровней 1/4/7, по тапу открывается чат Макса; статусы completion вычисляются от `user_goal`/`practice_log`.
+- Уровень 1 (конец): убрана форма «Набросок цели», добавлен CTA «Открыть страницу Цель».
+- Убраны/заглушены остатки: `NextActionBanner`, `DailySprint28Widget` и 28‑дневные ссылки.
+
 
 
 Проверка: сборка без ошибок; линтер — только предупреждения о сложности в `GoalsRepository` (неблокирующие). 
@@ -667,3 +680,50 @@ TODO:
 - В Sentry видны релизы и события: последний релиз `bizlevel@1.0.7+7`, есть события до 2025‑10‑14 05:37Z. Ошибки при списке событий через API не мешают выводу по релизам.
 - Рекомендации: при необходимости нативной символикации добавить загрузку dSYM (iOS) и маппингов ProGuard (Android); настроить `sentry-cli` токен в CI для `scripts/sentry_check.sh`.
 Статус: интеграция работает, логи видны.
+
+## 2025-10-16 — Упрощение «Цели»: единая цель и журнал применений
+- Клиент:
+  - Страница «Цель» переведена на единую модель: редактируемая цель (goal_text/metric*/readiness) + журнал применений (practice_log). Удалены версии v1–v4, недельные спринты и 28‑дневный режим.
+  - Убраны фичефлаги weekly/daily/chips/hideBubble и зависимый UI.
+  - Башня: чекпоинты цели больше не гейтят прогресс; по тапу открывается чат Макса.
+  - LeoDialog: добавлен CTA «Открыть артефакт…» (эвристика) → маршрут /artifacts.
+  - Уведомления: добавлены ежедневные напоминания практики (Пн/Ср/Пт 19:00) вместо расписания 28 дней.
+- Репозитории/провайдеры:
+  - Добавлены `userGoalProvider`/`practiceLogProvider`, CRUD и агрегаты (daysApplied/topTools).
+  - Удалены/не используются провайдеры версий/weekly.
+- Edge:
+  - `leo-chat`: режимы `weekly_checkin` и `goal_comment` отключены (410 Gone). Контекст формируется из user_goal/practice_log.
+- БД (Supabase):
+  - Создана `public.user_goal` (RLS owner-only, updated_at, unique(user_id)).
+  - `daily_progress` переименована в `practice_log` (+ applied_tools[], note, applied_at). Индексы по user_id, applied_at.
+  - Миграция `core_goals` → `user_goal` и удаление `core_goals`.
+  - Удалены `weekly_progress`, `goal_checkpoint_progress` и связанные RPC/триггеры.
+  - Добавлен бонус `gp_bonus_rules('daily_application',5)` и RPC `gp_claim_daily_application()`.
+
+### 2025-10-16 — Чекпоинты L1/L4/L7, агрегаторы и тесты (эта сессия)
+- Реализованы экраны чекпоинтов: `CheckpointL1Screen` (мастер 4 шага), `CheckpointL4Screen` (финфокус), `CheckpointL7Screen` (проверка реальности Z/W).
+- Навигация: добавлены маршруты `/checkpoint/l1`, `/checkpoint/l4`, `/checkpoint/l7`, башня ведёт на мастер вместо чата.
+- Репозиторий: добавлены агрегаторы practice_log — `aggregatePracticeLog`, `computeRecentPace(Z)`, `computeRequiredPace(W)`; запросы на Web включают `apikey`.
+- Тесты: добавлены `checkpoint_l7_screen_test` (smoke UI) и `practice_log_aggregate_test` (агрегации/математика Z/W).
+- Наблюдаемость: breadcrumbs для действий чекпоинтов (`l4_add_fin_metric/l4_keep_as_is`, l7‑выборы) без PII.
+- Линтер: предупреждения сведены к информационным; критичных ошибок нет.
+
+## 2025-10-17 — Связка Цель ⇆ Чекпоинты ⇆ Журнал
+- БД: добавлены поля `financial_focus`, `action_plan_note` в `public.user_goal`; индекс `ix_practice_log_user_applied_at(user_id, applied_at desc)`.
+- Репозиторий: `fetchUserGoal/upsertUserGoal` поддерживают новые поля; добавлен `computeGoalProgressPercent`; breadcrumb `practice_entry_saved`.
+- Провайдеры: `goalStateProvider(l1Done/l4Done/l7Done)` для NextActionBanner.
+- UI «Цель»: статус‑чипы L1/L4/L7, строка «Финфокус», баннер «Что дальше?» (L1→L4→L7→Журнал), хинт влияния записи на метрику.
+- Чекпоинты: превью «Моя цель» в L1/L4/L7; L7 сохраняет решение в `action_plan_note` и пишет системную запись в `practice_log`.
+- Башня: узлы `goal_checkpoint` ведут на `/checkpoint/l1|l4|l7`.
+- LeoService: обычный чат списывает 1 GP, авто‑сообщения/кейс — без списания; стабильность сохранена.
+- Безопасность БД: включены RLS+SELECT‑политики для `lesson_metadata/lesson_facts/package_items`; `v_users_level_mismatch` переведён на security_invoker; зафиксирован `search_path=public` у функций из Advisors.
+- Уведомления: при login пересоздаём расписания (`weekly plan`, `daily practice`), при logout — отменяем; маршрутизация на `/goal`.
+- Чат: пробрасываем `chatId` в `sendMessageWithRAG` для идемпотентности списаний GP.
+- Башня: подписи чекпоинтов обновлены на L1/L4/L7.
+- Цель: человекочитаемый остаток дней до дедлайна.
+
+### Задача bl-journey-10 fix
+- Починил навигацию CTA L1/L4/L7 на `GoRouter.push` вместо `Navigator.pushNamed`.
+- Устранил падение `Flexible` внутри `Wrap` на экране `goal_screen.dart` (замена на `ConstrainedBox`).
+- Статусы `L1/L4/L7` на «Цели»: L1 считается выполненной при наличии `goal_text` и `metric_type`; L4 после сохранения инвалидации `userGoalProvider` и возврат на `/goal`.
+- Журнал: чипы навыков заменены на выпадающий список «Выбрать навык» (один выбор); в блоке «Вся история» отображаются только 3 записи, формат даты `dd-аббр-YYYY`, кнопка «Вся история →» ведёт на `/goal/history`.
