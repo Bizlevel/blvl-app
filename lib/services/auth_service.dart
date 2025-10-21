@@ -72,9 +72,10 @@ class AuthService {
         try {
           final notif = NotificationsService.instance;
           await notif.initialize();
+          // Чистим старые типы расписаний и ставим единое напоминание практики (Пн/Ср/Пт)
           await notif.cancelWeeklyPlan();
+          await notif.cancelDailySprint();
           await notif.cancelDailyPracticeReminder();
-          await notif.scheduleWeeklyPlan();
           await notif.scheduleDailyPracticeReminder();
         } catch (_) {}
       }

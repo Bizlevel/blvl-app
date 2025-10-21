@@ -39,6 +39,8 @@ class LeoDialogScreen extends ConsumerStatefulWidget {
   final bool skipSpend; // пропуск списаний GP для тонкой реакции
   final String?
       initialAssistantMessage; // первое сообщение от ассистента (для приветствия)
+  final List<String>?
+      initialAssistantMessages; // несколько приветственных сообщений ассистента
 
   const LeoDialogScreen({
     super.key,
@@ -59,6 +61,7 @@ class LeoDialogScreen extends ConsumerStatefulWidget {
     this.autoUserMessage,
     this.skipSpend = false,
     this.initialAssistantMessage,
+    this.initialAssistantMessages,
   });
 
   @override
@@ -142,22 +145,28 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
       });
       _caseStepIndex = 0;
     } else if (widget.bot == 'max' && _chatId == null && _messages.isEmpty) {
-      // Приоритет: пользовательское приветствие (initialAssistantMessage),
-      // затем firstPrompt, затем дефолтное
-      final String greeting;
-      if (widget.initialAssistantMessage?.trim().isNotEmpty == true) {
-        greeting = widget.initialAssistantMessage!.trim();
+      // Приоритет: список приветствий → пользовательское приветствие → firstPrompt → дефолт
+      final List<String> greetings = [];
+      if (widget.initialAssistantMessages != null &&
+          widget.initialAssistantMessages!.isNotEmpty) {
+        greetings.addAll(widget.initialAssistantMessages!
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty));
+      } else if (widget.initialAssistantMessage?.trim().isNotEmpty == true) {
+        greetings.add(widget.initialAssistantMessage!.trim());
       } else if (widget.firstPrompt?.trim().isNotEmpty == true) {
-        greeting = widget.firstPrompt!.trim();
+        greetings.add(widget.firstPrompt!.trim());
       } else {
-        greeting =
-            'Я — Макс, трекер цели BizLevel. Помогаю кристаллизовать цель и двигаться к ней. Напишите, чего хотите добиться — предложу ближайший шаг.';
+        greetings.add(
+            'Я — Макс, трекер цели BizLevel. Помогаю кристаллизовать цель и двигаться к ней. Напишите, чего хотите добиться — предложу ближайший шаг.');
       }
-      _messages.add({
-        'role': 'assistant',
-        'content': greeting,
-        'created_at': DateTime.now().toIso8601String(),
-      });
+      for (final g in greetings) {
+        _messages.add({
+          'role': 'assistant',
+          'content': g,
+          'created_at': DateTime.now().toIso8601String(),
+        });
+      }
     }
     if (_chatId != null) {
       _loadMessages();

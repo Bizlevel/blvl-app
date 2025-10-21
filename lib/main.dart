@@ -57,7 +57,7 @@ Future<void> main() async {
   // Кэш новой модели цели и журнала применений
   await Hive.openBox('user_goal');
   await Hive.openBox('practice_log');
-  await Hive.openBox('weekly_progress');
+  // Удалено: weekly_progress бокс (legacy)
   await Hive.openBox('quotes');
   await Hive.openBox('gp');
 
