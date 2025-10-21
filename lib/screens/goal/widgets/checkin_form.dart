@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:bizlevel/widgets/custom_textfield.dart';
 import 'package:bizlevel/providers/goals_providers.dart';
+import 'package:bizlevel/widgets/common/bizlevel_button.dart';
 
 class CheckInForm extends StatelessWidget {
   const CheckInForm({
@@ -170,9 +171,10 @@ class CheckInForm extends StatelessWidget {
               children: [
                 SizedBox(
                   height: 44,
-                  child: ElevatedButton.icon(
+                  child: BizLevelButton(
+                    size: BizLevelButtonSize.sm,
                     icon: const Icon(Icons.checklist),
-                    label: const Text('📝 Записать итоги недели'),
+                    label: '📝 Записать итоги недели',
                     onPressed: onSave,
                   ),
                 ),
@@ -180,9 +182,11 @@ class CheckInForm extends StatelessWidget {
                   const SizedBox(width: 12),
                   SizedBox(
                     height: 44,
-                    child: OutlinedButton.icon(
+                    child: BizLevelButton(
+                      size: BizLevelButtonSize.sm,
+                      variant: BizLevelButtonVariant.outline,
                       icon: const Icon(Icons.chat_bubble_outline),
-                      label: const Text('Обсудить с Максом'),
+                      label: 'Обсудить с Максом',
                       onPressed: onOpenChat,
                     ),
                   ),

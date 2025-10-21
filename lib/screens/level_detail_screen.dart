@@ -28,6 +28,8 @@ import 'package:bizlevel/theme/ui_strings.dart';
 import 'package:bizlevel/theme/spacing.dart';
 import 'package:bizlevel/widgets/common/milestone_celebration.dart';
 import 'package:bizlevel/providers/gp_providers.dart';
+import 'package:bizlevel/widgets/common/bizlevel_card.dart';
+import 'package:bizlevel/theme/typography.dart';
 
 /// Shows a level as full-screen blocks (Intro → Lesson → Quiz → …).
 class LevelDetailScreen extends ConsumerStatefulWidget {
@@ -644,20 +646,7 @@ class _GoalV1Block extends _PageBlock {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: AppColor.shadow,
-                        blurRadius: 10,
-                        offset: Offset(0, 6),
-                      ),
-                    ],
-                  ),
+                BizLevelCard(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -1053,10 +1042,8 @@ class _IntroBlock extends _PageBlock {
                     Text(
                       title,
                       textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: Theme.of(context).textTheme.headlineLarge ??
+                          AppTypography.textTheme.headlineLarge,
                     ),
                     const SizedBox(height: 12),
                     Padding(
@@ -1064,7 +1051,7 @@ class _IntroBlock extends _PageBlock {
                       child: Text(
                         description,
                         textAlign: TextAlign.center,
-                        style: const TextStyle(fontSize: 16),
+                        style: Theme.of(context).textTheme.bodyLarge,
                       ),
                     ),
                   ],

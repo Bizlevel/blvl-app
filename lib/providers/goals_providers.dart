@@ -125,9 +125,8 @@ final practiceLogAggregatesProvider =
 
 final goalStateProvider = FutureProvider<Map<String, dynamic>>((ref) async {
   final goal = await ref.watch(userGoalProvider.future);
-  final bool l1Done = goal != null &&
-      (goal['goal_text'] ?? '').toString().trim().isNotEmpty &&
-      (goal['metric_type'] ?? '').toString().trim().isNotEmpty;
+  final bool l1Done =
+      goal != null && (goal['goal_text'] ?? '').toString().trim().isNotEmpty;
 
   final bool l4Done = goal != null &&
       (goal['financial_focus'] ?? '').toString().trim().isNotEmpty;

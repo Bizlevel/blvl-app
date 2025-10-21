@@ -5,6 +5,10 @@ import 'package:bizlevel/providers/goals_providers.dart';
 import 'package:bizlevel/screens/leo_dialog_screen.dart';
 import 'package:go_router/go_router.dart';
 import 'package:bizlevel/widgets/reminders_settings_sheet.dart';
+import 'package:bizlevel/widgets/common/bizlevel_card.dart';
+import 'package:bizlevel/widgets/common/bizlevel_button.dart';
+import 'package:bizlevel/theme/spacing.dart';
+import 'package:bizlevel/theme/color.dart';
 
 class CheckpointL7Screen extends ConsumerWidget {
   const CheckpointL7Screen({super.key});
@@ -54,12 +58,12 @@ class CheckpointL7Screen extends ConsumerWidget {
     final rc = practice == null ? '' : _recentSkillsComment(practice);
     return <String>[
       [
-        'Привет!',
+        'Привет! Это Макс.',
         'Твоя цель $g.',
         if (rc.isNotEmpty) rc,
       ].join('\n'),
       'Регулярность — ключ к результату. Напоминания помогут удерживать фокус, а навыки презентации и планирования усилят прогресс.',
-      'Хочешь настроить напоминания? Можешь также задать любой вопрос.'
+      'Настрой напоминания, чтобы каждый день двигаться к цели. \n Есть сложности с достижением твоей цели?'
     ];
   }
 
@@ -93,7 +97,7 @@ class CheckpointL7Screen extends ConsumerWidget {
           ].join('\n');
 
           return Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(AppSpacing.lg),
             child: Column(
               children: [
                 // Чат (как в L4)
@@ -105,45 +109,44 @@ class CheckpointL7Screen extends ConsumerWidget {
                     if (h > 800) h = 800;
                     return SizedBox(
                       height: h,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          border: Border.all(color: Colors.black12),
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.03),
-                              blurRadius: 6,
-                              offset: const Offset(0, 2),
-                            )
+                      child: BizLevelCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const _CheckpointHeader(title: 'Чекпоинт L7'),
+                            const SizedBox(height: 8),
+                            Expanded(
+                              child: LeoDialogScreen(
+                                bot: 'max',
+                                chatId: null,
+                                embedded: true,
+                                skipSpend: false,
+                                userContext: userCtx,
+                                levelContext: '',
+                                initialAssistantMessages: initialMsgs,
+                              ),
+                            ),
                           ],
-                        ),
-                        child: LeoDialogScreen(
-                          bot: 'max',
-                          chatId: null,
-                          embedded: true,
-                          skipSpend: false,
-                          userContext: userCtx,
-                          levelContext: '',
-                          initialAssistantMessages: initialMsgs,
                         ),
                       ),
                     );
                   },
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.md),
                 // Кнопки действий
                 Row(
                   children: [
                     Expanded(
-                      child: ElevatedButton(
+                      child: BizLevelButton(
+                        label: 'Настроить напоминания',
                         onPressed: () => showRemindersSettingsSheet(context),
-                        child: const Text('Настроить напоминания'),
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: AppSpacing.md),
                     Expanded(
-                      child: OutlinedButton(
+                      child: BizLevelButton(
+                        variant: BizLevelButtonVariant.outline,
+                        label: 'Завершить чекпоинт →',
                         onPressed: () {
                           try {
                             Sentry.addBreadcrumb(Breadcrumb(
@@ -152,9 +155,8 @@ class CheckpointL7Screen extends ConsumerWidget {
                               level: SentryLevel.info,
                             ));
                           } catch (_) {}
-                          GoRouter.of(context).push('/goal');
+                          GoRouter.of(context).push('/tower');
                         },
-                        child: const Text('Завершить чекпоинт →'),
                       ),
                     ),
                   ],
@@ -163,6 +165,53 @@ class CheckpointL7Screen extends ConsumerWidget {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+class _CheckpointHeader extends StatelessWidget {
+  final String title;
+  const _CheckpointHeader({required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColor.primary,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          const CircleAvatar(
+            radius: 16,
+            backgroundImage: AssetImage('assets/images/avatars/avatar_max.png'),
+            backgroundColor: AppColor.onPrimary,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            'Макс',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600, color: AppColor.onPrimary),
+          ),
+          const Spacer(),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppColor.surface,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Text(
+              title,
+              style: const TextStyle(
+                color: AppColor.onSurface,
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

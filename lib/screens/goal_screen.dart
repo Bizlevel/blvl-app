@@ -11,7 +11,7 @@ import 'package:bizlevel/screens/goal/widgets/motivation_card.dart';
 // import 'package:bizlevel/providers/goals_repository_provider.dart';
 import 'package:bizlevel/utils/constant.dart';
 // import 'package:bizlevel/widgets/floating_chat_bubble.dart';
-import 'package:bizlevel/providers/auth_provider.dart';
+// import 'package:bizlevel/providers/auth_provider.dart';
 import 'package:bizlevel/screens/leo_dialog_screen.dart';
 // import 'package:bizlevel/screens/goal/widgets/goal_compact_card.dart';
 // import 'package:bizlevel/screens/goal/widgets/crystallization_section.dart';
@@ -19,7 +19,7 @@ import 'package:bizlevel/screens/leo_dialog_screen.dart';
 // import 'package:bizlevel/screens/goal/widgets/sprint_section.dart';
 // import 'package:bizlevel/screens/goal/widgets/daily_card.dart'; // 🗑️ Перенесён в DailySprint28Widget
 // import 'package:bizlevel/screens/goal/widgets/daily_calendar.dart'; // 🗑️ Перенесён в DailySprint28Widget
-import 'package:bizlevel/screens/goal/widgets/next_action_banner.dart';
+// import 'package:bizlevel/screens/goal/widgets/next_action_banner.dart';
 import 'package:bizlevel/screens/goal/widgets/practice_journal_section.dart';
 // import 'package:bizlevel/screens/goal/widgets/goal_compact_card.dart';
 // import 'package:bizlevel/screens/goal/widgets/version_navigation_chips.dart';
@@ -208,24 +208,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
               children: [
                 const MotivationCard(),
                 const SizedBox(height: 16),
-                // Что дальше? (баннер)
-                Consumer(builder: (context, ref, _) {
-                  final levelNumAsync = ref.watch(currentLevelNumberProvider);
-                  return levelNumAsync.when(
-                    data: (n) => NextActionBanner(
-                      currentLevel: n,
-                      onScrollToSprint: () {
-                        final ctx = _journalSectionKey.currentContext;
-                        if (ctx != null) {
-                          Scrollable.ensureVisible(ctx,
-                              duration: const Duration(milliseconds: 300));
-                        }
-                      },
-                    ),
-                    loading: () => const SizedBox.shrink(),
-                    error: (_, __) => const SizedBox.shrink(),
-                  );
-                }),
+                // Что дальше? (баннер) — удалён по новой спецификации
                 const SizedBox(height: 16),
 
                 // Моя цель (редактируемая)
@@ -235,7 +218,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
 
                 // Журнал применений
                 Container(
-                  key: _journalSectionKey,
+                    key: _journalSectionKey,
                     child: const PracticeJournalSection()),
               ],
             ),

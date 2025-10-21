@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
-import 'package:bizlevel/theme/color.dart';
 
 import 'package:bizlevel/providers/goals_providers.dart';
 import 'package:bizlevel/providers/goals_repository_provider.dart';
 import 'package:bizlevel/screens/leo_dialog_screen.dart';
 import 'package:bizlevel/widgets/reminders_settings_sheet.dart';
+import 'package:bizlevel/widgets/common/bizlevel_button.dart';
+import 'package:bizlevel/widgets/common/bizlevel_card.dart';
+import 'package:bizlevel/theme/spacing.dart';
 
 class PracticeJournalSection extends ConsumerStatefulWidget {
   const PracticeJournalSection({super.key});
@@ -34,20 +36,8 @@ class _PracticeJournalSectionState
     final practiceAsync = ref.watch(practiceLogProvider);
     final toolsAsync = ref.watch(usedToolsOptionsProvider);
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: AppColor.shadowColor.withValues(alpha: 0.08),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
+    return BizLevelCard(
+      padding: AppSpacing.insetsAll(AppSpacing.lg),
       child: Stack(
         children: [
           Column(
@@ -202,7 +192,8 @@ class _PracticeJournalSectionState
               const SizedBox(height: 8),
               Align(
                 alignment: Alignment.centerLeft,
-                child: ElevatedButton(
+                child: BizLevelButton(
+                  label: 'Сохранить запись',
                   onPressed: () async {
                     try {
                       final repo = ref.read(goalsRepositoryProvider);
@@ -256,7 +247,6 @@ class _PracticeJournalSectionState
                           .showSnackBar(SnackBar(content: Text('Ошибка: $e')));
                     }
                   },
-                  child: const Text('Сохранить запись'),
                 ),
               ),
               const SizedBox(height: 8),
@@ -373,13 +363,14 @@ class _PracticeJournalSectionState
                               Text(fmt((m['applied_at'] ?? '').toString())),
                         ),
                       const SizedBox(height: 8),
-                      TextButton(
+                      BizLevelButton(
+                        variant: BizLevelButtonVariant.text,
+                        label: 'Вся история →',
                         onPressed: () {
                           try {
                             GoRouter.of(context).push('/goal/history');
                           } catch (_) {}
                         },
-                        child: const Text('Вся история →'),
                       ),
                     ],
                   );

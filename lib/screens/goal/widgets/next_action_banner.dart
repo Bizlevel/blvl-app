@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:bizlevel/providers/goals_providers.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:go_router/go_router.dart';
+import 'package:bizlevel/widgets/common/bizlevel_button.dart';
+import 'package:bizlevel/widgets/common/bizlevel_card.dart';
+import 'package:bizlevel/theme/spacing.dart';
 
 /// Баннер "Что дальше?" (новая модель)
 /// Логика:
@@ -87,36 +90,35 @@ class NextActionBanner extends ConsumerWidget {
 
         if (cta.isEmpty) return const SizedBox.shrink();
 
-        return Container(
-          width: double.infinity,
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
+        return Padding(
+          padding: AppSpacing.insetsSymmetric(v: AppSpacing.sm),
+          child: BizLevelCard(
+            padding: AppSpacing.insetsAll(AppSpacing.lg),
             color: Colors.blue.shade50,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            children: [
-              const Icon(Icons.flag_circle_outlined, color: Colors.blue),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  title,
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Flexible(
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerRight,
-                  child: TextButton(
-                    onPressed: onTap,
-                    child: Text(cta),
+            child: Row(
+              children: [
+                const Icon(Icons.flag_circle_outlined, color: Colors.blue),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: Theme.of(context).textTheme.bodyMedium,
                   ),
                 ),
-              ),
-            ],
+                const SizedBox(width: 8),
+                Flexible(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerRight,
+                    child: BizLevelButton(
+                      variant: BizLevelButtonVariant.text,
+                      label: cta,
+                      onPressed: onTap,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       },

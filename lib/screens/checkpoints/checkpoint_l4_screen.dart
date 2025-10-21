@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-// sentry import не требуется здесь
 import 'package:bizlevel/providers/goals_providers.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:bizlevel/screens/leo_dialog_screen.dart';
+import 'package:go_router/go_router.dart';
+import 'package:bizlevel/widgets/common/bizlevel_card.dart';
+import 'package:bizlevel/widgets/common/bizlevel_button.dart';
+import 'package:bizlevel/theme/spacing.dart';
+import 'package:bizlevel/theme/color.dart';
 
 class CheckpointL4Screen extends ConsumerStatefulWidget {
   const CheckpointL4Screen({super.key});
@@ -106,7 +110,7 @@ class _CheckpointL4ScreenState extends ConsumerState<CheckpointL4Screen> {
           ].join('\n');
 
           return Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(AppSpacing.lg),
             child: Column(
               children: [
                 // Чат
@@ -118,46 +122,44 @@ class _CheckpointL4ScreenState extends ConsumerState<CheckpointL4Screen> {
                     if (h > 800) h = 800;
                     return SizedBox(
                       height: h,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          border: Border.all(color: Colors.black12),
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.03),
-                              blurRadius: 6,
-                              offset: const Offset(0, 2),
-                            )
+                      child: BizLevelCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const _CheckpointHeader(title: 'Чекпоинт L4'),
+                            const SizedBox(height: 8),
+                            Expanded(
+                              child: LeoDialogScreen(
+                                bot: 'max',
+                                chatId: null,
+                                embedded: true,
+                                skipSpend: false,
+                                userContext: userCtx,
+                                levelContext: '',
+                                initialAssistantMessages: initialMsgs,
+                                onAssistantMessage: (msg) async {
+                                  try {
+                                    await Sentry.addBreadcrumb(Breadcrumb(
+                                      category: 'checkpoint',
+                                      message: 'l4_dialog_message',
+                                      level: SentryLevel.info,
+                                    ));
+                                  } catch (_) {}
+                                },
+                              ),
+                            ),
                           ],
-                        ),
-                        child: LeoDialogScreen(
-                          bot: 'max',
-                          chatId: null,
-                          embedded: true,
-                          skipSpend: false,
-                          userContext: userCtx,
-                          levelContext: '',
-                          initialAssistantMessages: initialMsgs,
-                          onAssistantMessage: (msg) async {
-                            try {
-                              await Sentry.addBreadcrumb(Breadcrumb(
-                                category: 'checkpoint',
-                                message: 'l4_dialog_message',
-                                level: SentryLevel.info,
-                              ));
-                            } catch (_) {}
-                          },
                         ),
                       ),
                     );
                   },
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.md),
                 // Кнопка «Завершить чекпоинт →»
                 SizedBox(
                   width: double.infinity,
-                  child: ElevatedButton(
+                  child: BizLevelButton(
+                    label: 'Завершить чекпоинт →',
                     onPressed: () async {
                       try {
                         await Sentry.addBreadcrumb(Breadcrumb(
@@ -167,15 +169,61 @@ class _CheckpointL4ScreenState extends ConsumerState<CheckpointL4Screen> {
                         ));
                       } catch (_) {}
                       if (!mounted) return;
-                      Navigator.of(context).pushNamed('/goal');
+                      GoRouter.of(context).push('/tower');
                     },
-                    child: const Text('Завершить чекпоинт →'),
                   ),
                 ),
               ],
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+class _CheckpointHeader extends StatelessWidget {
+  final String title;
+  const _CheckpointHeader({required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColor.primary,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          const CircleAvatar(
+            radius: 16,
+            backgroundImage: AssetImage('assets/images/avatars/avatar_max.png'),
+            backgroundColor: AppColor.onPrimary,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            'Макс',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600, color: AppColor.onPrimary),
+          ),
+          const Spacer(),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppColor.surface,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Text(
+              title,
+              style: const TextStyle(
+                color: AppColor.onSurface,
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
