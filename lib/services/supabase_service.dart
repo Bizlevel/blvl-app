@@ -10,6 +10,7 @@ class SupabaseService {
   SupabaseService();
 
   static bool _initialized = false;
+  static String _anonKey = '';
 
   /// Инициализирует Supabase. Вызывать один раз при старте приложения.
   static Future<void> initialize() async {
@@ -20,6 +21,11 @@ class SupabaseService {
         url: envOrDefine('SUPABASE_URL'),
         anonKey: envOrDefine('SUPABASE_ANON_KEY'),
       );
+      _anonKey = envOrDefine('SUPABASE_ANON_KEY');
+      // Глобально добавляем apikey для PostgREST (важно для Web)
+      try {
+        Supabase.instance.client.rest.headers['apikey'] = _anonKey;
+      } catch (_) {}
     } on AssertionError {
       // Already initialized in current isolate (tests may initialize globally)
     }
@@ -29,6 +35,8 @@ class SupabaseService {
 
   /// Экспортирует [SupabaseClient] для внешнего использования.
   SupabaseClient get client => Supabase.instance.client;
+
+  static String get anonKey => _anonKey;
 
   // Cached mapping: level_id -> levels.number
   static Map<int, int>? _levelIdToNumber;

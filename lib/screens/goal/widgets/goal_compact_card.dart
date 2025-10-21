@@ -1,210 +1,206 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 
-import 'package:bizlevel/theme/color.dart';
+import 'package:bizlevel/providers/goals_providers.dart';
+import 'package:bizlevel/providers/goals_repository_provider.dart';
+import 'package:bizlevel/screens/leo_dialog_screen.dart';
+import 'package:bizlevel/widgets/common/bizlevel_button.dart';
+import 'package:bizlevel/widgets/common/bizlevel_card.dart';
+import 'package:bizlevel/theme/spacing.dart';
 
-class GoalCompactCard extends StatelessWidget {
-  const GoalCompactCard({
-    super.key,
-    required this.versions,
-    required this.expanded,
-    required this.onToggle,
-    required this.onOpenChat,
-    this.metricActual,
-  });
-
-  final Map<int, Map<String, dynamic>> versions;
-  final bool expanded;
-  final VoidCallback onToggle;
-  final VoidCallback onOpenChat;
-  final double? metricActual;
+class GoalCompactCard extends ConsumerStatefulWidget {
+  const GoalCompactCard({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final hasAny = versions.isNotEmpty;
-    final latestVersion =
-        hasAny ? versions.keys.reduce((a, b) => a > b ? a : b) : 0;
-    final data = hasAny
-        ? Map<String, dynamic>.from(
-            (versions[latestVersion]?['version_data'] as Map?) ?? {})
-        : <String, dynamic>{};
-
-    final String title = latestVersion == 4
-        ? ((data['first_three_days'] ?? '').toString().trim())
-        : latestVersion == 3
-            ? ((data['goal_smart'] ?? '').toString().trim())
-            : latestVersion == 2
-                ? ((data['concrete_result'] ?? '').toString().trim())
-                : ((data['concrete_result'] ?? '').toString().trim());
-
-    final String? metricName =
-        latestVersion >= 2 ? (data['metric_type'])?.toString() : null;
-    final String? fromV =
-        latestVersion >= 2 ? (data['metric_current'])?.toString() : null;
-    final String? toV =
-        latestVersion >= 2 ? (data['metric_target'])?.toString() : null;
-    final String? startDate = latestVersion >= 4
-        ? (versions[4]?['sprint_start_date'])?.toString()
-        : null;
-    final Map<String, dynamic> v4 =
-        (versions[4]?['version_data'] as Map?)?.cast<String, dynamic>() ??
-            const <String, dynamic>{};
-    final int readinessScore =
-        int.tryParse('${v4['readiness_score'] ?? ''}') ?? 0;
-    final String sprintStatus =
-        (versions[4]?['sprint_status'] ?? '').toString().trim();
-
-    final double progress = _calcOverallProgressPercent(versions, metricActual);
-
-    return InkWell(
-      onTap: onToggle,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: AppColor.shadowColor.withValues(alpha: 0.08),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title.isEmpty ? 'Цель пока не сформулирована' : title,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-              maxLines: expanded ? null : 1,
-              overflow: expanded ? TextOverflow.visible : TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 8),
-            if (fromV != null && toV != null && metricActual != null)
-              LinearProgressIndicator(
-                value: progress,
-                minHeight: 8,
-                backgroundColor: Colors.grey.shade200,
-                color: AppColor.primary,
-              ),
-            const SizedBox(height: 8),
-            if (metricName != null &&
-                metricName.isNotEmpty &&
-                fromV != null &&
-                toV != null)
-              Text('Метрика: $metricName • Сейчас: $fromV → Цель: $toV',
-                  style: Theme.of(context).textTheme.bodySmall),
-            if (startDate != null && startDate.isNotEmpty)
-              Text('Дней осталось: ${_daysLeft(startDate)} из 28',
-                  style: Theme.of(context).textTheme.bodySmall),
-            if (expanded) ...[
-              if (expanded) ...[
-                Text('Готовность: $readinessScore/10',
-                    style: Theme.of(context).textTheme.bodySmall),
-                if (sprintStatus.isNotEmpty)
-                  Text('Статус: ${_statusRu(sprintStatus)}',
-                      style: Theme.of(context).textTheme.bodySmall),
-              ],
-            ],
-            if (expanded) ...[
-              const SizedBox(height: 12),
-              if (latestVersion >= 3) ...[
-                const _GroupHeader('План по неделям'),
-                _bullet(context, 'Неделя 1: ${data['week1_focus'] ?? '—'}'),
-                _bullet(context, 'Неделя 2: ${data['week2_focus'] ?? '—'}'),
-                _bullet(context, 'Неделя 3: ${data['week3_focus'] ?? '—'}'),
-                _bullet(context, 'Неделя 4: ${data['week4_focus'] ?? '—'}'),
-                const SizedBox(height: 8),
-              ],
-              Align(
-                alignment: Alignment.centerLeft,
-                child: OutlinedButton.icon(
-                  icon: const Icon(Icons.chat_bubble_outline),
-                  label: const Text('Обсудить с Максом'),
-                  onPressed: onOpenChat,
-                ),
-              )
-            ]
-          ],
-        ),
-      ),
-    );
-  }
-
-  static Widget _bullet(BuildContext context, String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('• '),
-          Expanded(
-            child: Text(text, style: Theme.of(context).textTheme.bodySmall),
-          ),
-        ],
-      ),
-    );
-  }
-
-  static double _calcOverallProgressPercent(
-      Map<int, Map<String, dynamic>> versions, double? metricActual) {
-    final v2 =
-        (versions[2]?['version_data'] as Map?)?.cast<String, dynamic>() ?? {};
-    final double? from =
-        double.tryParse('${v2['metric_current'] ?? ''}'.trim());
-    final double? to = double.tryParse('${v2['metric_target'] ?? ''}'.trim());
-    final double? current = metricActual;
-    if (from != null && to != null && current != null && to != from) {
-      final pct = ((current - from) / (to - from)).clamp(0.0, 1.0);
-      return pct.isNaN ? 0.0 : pct;
-    }
-    return 0.0;
-  }
-
-  static int _daysLeft(String startDateIso) {
-    try {
-      final start = DateTime.tryParse(startDateIso)?.toUtc();
-      if (start == null) return 28;
-      final diff = DateTime.now().toUtc().difference(start).inDays;
-      final left = 28 - diff;
-      return left.clamp(0, 28);
-    } catch (_) {
-      return 28;
-    }
-  }
-
-  static String _statusRu(String s) {
-    switch (s) {
-      case 'active':
-        return 'В процессе';
-      case 'completed':
-        return 'Завершён';
-      case 'paused':
-        return 'Пауза';
-      default:
-        return 'Не начат';
-    }
-  }
+  ConsumerState<GoalCompactCard> createState() => _GoalCompactCardState();
 }
 
-class _GroupHeader extends StatelessWidget {
-  const _GroupHeader(this.title);
+class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
+  final TextEditingController _goalCtrl = TextEditingController();
+  final TextEditingController _metricCurrentCtrl = TextEditingController();
+  final TextEditingController _metricTargetCtrl = TextEditingController();
+  final TextEditingController _targetDateCtrl = TextEditingController();
+  DateTime? _selectedTargetDate;
+  bool _isEditing = false;
 
-  final String title;
+  @override
+  void dispose() {
+    _goalCtrl.dispose();
+    _metricCurrentCtrl.dispose();
+    _metricTargetCtrl.dispose();
+    _targetDateCtrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Text(
-        title,
-        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w600,
-              color: AppColor.primary,
-            ),
+    final userGoalAsync = ref.watch(userGoalProvider);
+    return BizLevelCard(
+      padding: AppSpacing.insetsAll(AppSpacing.lg),
+      child: userGoalAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (_, __) => const Text('Не удалось загрузить цель'),
+        data: (goal) {
+          if (goal != null) {
+            _goalCtrl.text = (goal['goal_text'] ?? '').toString();
+            _metricCurrentCtrl.text = (goal['metric_current'] ?? '').toString();
+            _metricTargetCtrl.text = (goal['metric_target'] ?? '').toString();
+            final String td = (goal['target_date'] ?? '').toString();
+            try {
+              final dt = DateTime.tryParse(td)?.toLocal();
+              _selectedTargetDate = dt;
+              _targetDateCtrl.text =
+                  dt == null ? '' : dt.toIso8601String().split('T').first;
+            } catch (_) {
+              _selectedTargetDate = null;
+              _targetDateCtrl.text = '';
+            }
+          }
+
+          final metricType = (goal?['metric_type'] ?? '').toString();
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Моя цель',
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleLarge
+                      ?.copyWith(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 12),
+              if (goal == null || (goal['goal_text'] ?? '').toString().isEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.flag_outlined, color: Colors.black54),
+                      const SizedBox(width: 8),
+                      const Expanded(
+                          child: Text(
+                              'Пока цель не задана. Начните с простого описания и метрики.')),
+                    ],
+                  ),
+                ),
+              // Нередактируемое представление
+              if (!_isEditing)
+                Text(
+                  _goalCtrl.text.isEmpty ? 'Цель не задана' : _goalCtrl.text,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              // Режим редактирования — только поле описания и (опц.) дедлайн
+              if (_isEditing) ...[
+                TextField(
+                  controller: _goalCtrl,
+                  decoration: const InputDecoration(
+                      labelText: 'Короткое описание цели'),
+                ),
+                const SizedBox(height: 8),
+                Row(children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _targetDateCtrl,
+                      readOnly: true,
+                      decoration: InputDecoration(
+                        labelText: 'Дедлайн (YYYY-MM-DD) — необязательно',
+                        suffixIcon: IconButton(
+                          icon: const Icon(Icons.calendar_today),
+                          onPressed: () async {
+                            final now = DateTime.now();
+                            final initial = _selectedTargetDate ?? now;
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: initial,
+                              firstDate: now,
+                              lastDate: now.add(const Duration(days: 365 * 3)),
+                            );
+                            if (picked != null) {
+                              setState(() {
+                                _selectedTargetDate = picked;
+                                _targetDateCtrl.text = picked
+                                    .toLocal()
+                                    .toIso8601String()
+                                    .split('T')
+                                    .first;
+                              });
+                            }
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+                ]),
+              ],
+              const SizedBox(height: 8),
+              const SizedBox(height: 12),
+              Row(children: [
+                if (!_isEditing)
+                  BizLevelButton(
+                    variant: BizLevelButtonVariant.text,
+                    label: 'Редактировать',
+                    onPressed: () => setState(() => _isEditing = true),
+                  )
+                else ...[
+                  BizLevelButton(
+                    label: 'Сохранить',
+                    onPressed: () async {
+                      try {
+                        try {
+                          Sentry.addBreadcrumb(Breadcrumb(
+                              category: 'goal',
+                              message: 'goal_edit_saved',
+                              level: SentryLevel.info));
+                        } catch (_) {}
+                        final repo = ref.read(goalsRepositoryProvider);
+                        await repo.upsertUserGoal(
+                          goalText: _goalCtrl.text.trim(),
+                          targetDate: _selectedTargetDate,
+                        );
+                        ref.invalidate(userGoalProvider);
+                        if (!mounted) return;
+                        setState(() => _isEditing = false);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Цель сохранена')));
+                      } catch (e) {
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Ошибка: $e')));
+                      }
+                    },
+                  ),
+                  const SizedBox(width: 12),
+                  BizLevelButton(
+                    variant: BizLevelButtonVariant.text,
+                    label: 'Отмена',
+                    onPressed: () => setState(() => _isEditing = false),
+                  ),
+                ],
+                const SizedBox(width: 12),
+                BizLevelButton(
+                  icon: const Icon(Icons.chat_bubble_outline),
+                  label: 'Обсудить с Максом',
+                  onPressed: () {
+                    Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) => LeoDialogScreen(
+                        bot: 'max',
+                        chatId: null,
+                        userContext: [
+                          'goal_text: ${_goalCtrl.text.trim()}',
+                          if (metricType.isNotEmpty) 'metric_type: $metricType',
+                          if (_metricCurrentCtrl.text.trim().isNotEmpty)
+                            'metric_current: ${_metricCurrentCtrl.text.trim()}',
+                          if (_metricTargetCtrl.text.trim().isNotEmpty)
+                            'metric_target: ${_metricTargetCtrl.text.trim()}',
+                        ].join('\n'),
+                        levelContext: '',
+                      ),
+                    ));
+                  },
+                ),
+              ]),
+            ],
+          );
+        },
       ),
     );
   }

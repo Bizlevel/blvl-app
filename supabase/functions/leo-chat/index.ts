@@ -477,254 +477,10 @@ serve(async (req) => {
     // GOAL_COMMENT MODE (short reply to field save, no RAG, no GP spend)
     // ==============================
     if (mode === 'goal_comment') {
-      console.log('[GOAL_COMMENT] Request received', { 
-        hasBody: Boolean(body),
-        bodyKeys: body ? Object.keys(body) : []
+      return new Response(JSON.stringify({ error: 'goal_comment_gone' }), {
+        status: 410,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
-
-      try {
-        // Вебхук приходит из БД-триггера с заголовком Authorization: Bearer <CRON_SECRET>
-        const cronSecret = (Deno.env.get('CRON_SECRET') || '').trim();
-        const authHeader = req.headers.get('authorization') || '';
-        const bearerOk = cronSecret && authHeader.startsWith('Bearer ') && authHeader.replace('Bearer ', '').trim() === cronSecret;
-
-        console.log('[GOAL_COMMENT] Auth check', {
-          hasCronSecret: Boolean(cronSecret && cronSecret.length > 0),
-          hasAuthHeader: Boolean(authHeader),
-          authType: authHeader ? (authHeader.startsWith('Bearer ') ? 'Bearer' : 'Other') : 'None',
-          isAuthorized: bearerOk
-        });
-
-        if (!bearerOk) {
-          console.error('[GOAL_COMMENT] Unauthorized webhook attempt');
-          return new Response(JSON.stringify({ error: 'unauthorized_webhook' }), {
-            status: 401,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          });
-        }
-
-        // Данные события: версия и поле
-        const version = Number.isFinite(body?.version) ? Number(body.version) : Number(body?.goalVersion);
-        const fieldName = typeof body?.field_name === 'string' ? body.field_name : typeof body?.fieldName === 'string' ? body.fieldName : '';
-        const fieldValue = body?.field_value ?? body?.fieldValue ?? null;
-        const allFields = body?.all_fields ?? body?.allFields ?? {};
-
-        console.log('[GOAL_COMMENT] Parsed event data', {
-          version,
-          fieldName,
-          hasFieldValue: fieldValue !== null && fieldValue !== undefined,
-          allFieldsKeys: allFields && typeof allFields === 'object' ? Object.keys(allFields) : [],
-          userId: body?.user_id
-        });
-
-        // Проверка: завершена ли версия полностью (milestone)
-        const isMilestone = (version, fields) => {
-          if (!fields || typeof fields !== 'object') return false;
-          
-          const hasValue = (key) => {
-            const val = fields[key];
-            return val !== null && val !== undefined && val !== '';
-          };
-
-          if (version === 2) {
-            return hasValue('concrete_result') && hasValue('metric_type') && 
-                   hasValue('metric_current') && hasValue('metric_target') && 
-                   hasValue('financial_goal');
-          } else if (version === 3) {
-            return hasValue('goal_smart') && hasValue('week1_focus') && 
-                   hasValue('week2_focus') && hasValue('week3_focus') && 
-                   hasValue('week4_focus');
-          } else if (version === 4) {
-            return hasValue('first_three_days') && hasValue('start_date') && 
-                   hasValue('accountability_person') && hasValue('readiness_score');
-          }
-          return false;
-        };
-
-        const isVersionComplete = isMilestone(version, allFields);
-        console.log('[GOAL_COMMENT] Milestone check', { version, isVersionComplete });
-
-        // Системный промпт: обычный или праздничный (milestone)
-        let basePrompt;
-        if (isVersionComplete) {
-          // MILESTONE PROMPT: Версия завершена! Праздничная реакция
-          const milestoneNames = {
-            2: 'Метрики',
-            3: 'План на 4 недели',
-            4: 'Готовность к старту'
-          };
-          const vName = milestoneNames[version] || `v${version}`;
-          
-          basePrompt = `Ты - Макс, трекер целей BizLevel. Отвечай по-русски.
-
-🎉 ВАЖНОЕ СОБЫТИЕ: пользователь ЗАВЕРШИЛ этап "${vName}"! Это milestone!
-
-ТВОЯ ЗАДАЧА:
-1. Поздравь с завершением этапа (кратко, искренне, 1-2 предложения)
-2. Подчеркни значимость: что теперь готово (метрика/план/готовность)
-3. Скажи, что дальше: ${version === 2 ? 'план на 4 недели' : version === 3 ? 'финальная подготовка' : 'запуск 28-дневного спринта!'}
-
-СТИЛЬ: Тёплый, мотивирующий, но без банальщины. Можешь 1-2 эмодзи (🎯 ✅ 💪).
-ДЛИНА: 3-4 предложения максимум.
-ЗАПРЕЩЕНО: «молодец», «отлично справился», вопросы «чем помочь».
-
-Сейчас заполнено: ${JSON.stringify(allFields).slice(0, 200)}`;
-        } else {
-          // ОБЫЧНЫЙ PROMPT: Комментарий к отдельному полю
-          basePrompt = `Ты - Макс, трекер целей BizLevel. Отвечай по-русски, кратко (2–3 предложения), без вводных фраз.
-КОНТЕКСТ: пользователь заполняет версию цели v${version}. Сейчас заполнено поле "${fieldName}".
-СТИЛЬ: простые слова, локальный контекст (Казахстан, тенге), на «ты». Структура ответа: 1) короткий комментарий к введённому значению; 2) подсказка или вопрос к следующему шагу; 3) (опционально) микро-совет.
-МОЖНО: 1 эмодзи, вводные фразы типа «Смотри», «Давай уточним».
-ЗАПРЕЩЕНО: общие фразы «отлично/молодец/правильно», вопросы «чем помочь?», лишние вводные.`;
-        }
-
-        // Пользовательское сообщение для модели
-        const userParts = [];
-        if (fieldName) userParts.push(`Поле: ${fieldName}`);
-        if (fieldValue !== null && fieldValue !== undefined) userParts.push(`Значение: ${typeof fieldValue === 'string' ? fieldValue : JSON.stringify(fieldValue)}`);
-        if (allFields && typeof allFields === 'object') userParts.push(`Все поля версии: ${JSON.stringify(allFields)}`);
-
-        // Рекомендованные чипы (по версии/следующим шагам)
-        let recommended_chips;
-        if (isVersionComplete) {
-          // MILESTONE: специальные чипы для завершенной версии
-          if (version === 2) {
-            recommended_chips = ['Перейти к плану на 4 недели', 'Еще раз проверю метрику'];
-          } else if (version === 3) {
-            recommended_chips = ['Финальная подготовка к старту', 'Уточнить план'];
-          } else if (version === 4) {
-            recommended_chips = ['Запустить 28 дней!', 'Еще раз о готовности'];
-          }
-        } else {
-          // Персонализированные чипы с учетом контекста пользователя
-          if (version === 1) {
-            // v1: concrete_result → main_pain → first_action
-            if (fieldName === 'concrete_result') {
-              // Если есть цель - подсказываем следующий шаг
-              recommended_chips = allFields?.concrete_result 
-                ? [ 'Что мешает достичь этого?', 'Главная проблема на пути' ]
-                : [ 'Главная проблема', 'Что мешает сейчас?' ];
-            } else if (fieldName === 'main_pain') {
-              recommended_chips = [ 'Первый шаг завтра', 'Начну с …' ];
-            } else {
-              recommended_chips = [ 'Уточнить результат', 'Добавить цифру в цель' ];
-            }
-          } else if (version === 2) {
-            if (fieldName === 'metric_type') {
-              // Если уже есть цель из v1 - предлагаем метрики в её контексте
-              const goalText = allFields?.concrete_result || '';
-              if (goalText.toLowerCase().includes('выручк') || goalText.toLowerCase().includes('доход')) {
-                recommended_chips = [ 'Текущая выручка', 'Сколько сейчас зарабатываю' ];
-              } else if (goalText.toLowerCase().includes('клиент') || goalText.toLowerCase().includes('заказ')) {
-                recommended_chips = [ 'Текущее кол-во клиентов', 'Сколько клиентов сейчас' ];
-              } else {
-                recommended_chips = [ 'Сколько сейчас?', 'Текущее значение' ];
-              }
-            } else if (fieldName === 'metric_current') {
-              recommended_chips = [ 'Целевое значение', 'Хочу к концу месяца …' ];
-            } else {
-              // metric_target заполнена - предлагаем перепроверить
-              recommended_chips = [ 'Пересчитать % роста', 'Реалистична ли цель?' ];
-            }
-          } else if (version === 3) {
-            // v3: адаптируем под номер недели
-            if (fieldName === 'week1_focus') {
-              recommended_chips = [ 'Неделя 2: фокус', 'Что делать во вторую неделю?' ];
-            } else if (fieldName === 'week2_focus') {
-              recommended_chips = [ 'Неделя 3: фокус', 'Что делать на третью неделю?' ];
-            } else if (fieldName === 'week3_focus') {
-              recommended_chips = [ 'Неделя 4: фокус', 'Финальная неделя' ];
-            } else {
-              recommended_chips = [ 'Неделя 1: фокус', 'Пересмотреть план' ];
-            }
-          } else if (version === 4) {
-            if (fieldName === 'readiness_score') {
-              const score = allFields?.readiness_score;
-              if (score && parseInt(score) >= 7) {
-                recommended_chips = [ 'Дата старта', 'Начать завтра!' ];
-              } else {
-                recommended_chips = [ 'Как повысить готовность?', 'Что еще нужно?' ];
-              }
-            } else if (fieldName === 'start_date') {
-              recommended_chips = [ 'Кому расскажу о цели', 'Поддержка близких' ];
-            } else if (fieldName === 'accountability_person') {
-              recommended_chips = [ 'План на первые 3 дня', 'С чего начнем?' ];
-            } else {
-              recommended_chips = [ 'Готовность 7/10', 'Уточнить дату старта' ];
-            }
-          }
-        }
-
-        // XAI_API_KEY уже проверен в начале функции
-        const model = Deno.env.get('OPENAI_MODEL') || 'grok-4-fast-non-reasoning';
-        const openaiClient = getOpenAIClient(model);
-        
-        const completionParams = getChatCompletionParams(model, [{
-          role: 'system',
-          content: basePrompt
-        }, {
-          role: 'user',
-          content: userParts.join('\n') || 'Новое поле сохранено'
-        }], {
-          temperature: 0.3,
-          max_tokens: isVersionComplete ? 200 : 120 // Больше токенов для milestone-реакций
-        });
-        
-        const completion = await openaiClient.chat.completions.create(completionParams);
-
-        const assistantMessage = completion.choices[0].message;
-        const usage = completion.usage;
-
-        console.log('[GOAL_COMMENT] OpenAI response generated', {
-          model: completion.model,
-          tokensUsed: usage?.total_tokens || 0,
-          messageLength: assistantMessage?.content?.length || 0,
-          hasRecommendedChips: Boolean(recommended_chips),
-          chipsCount: recommended_chips ? recommended_chips.length : 0
-        });
-
-        // Ограничение/дедуп/логирование (по флагам)
-        try {
-          const cfg = getChipConfig();
-          if (cfg.enableMaxV2) {
-            let chips = recommended_chips || [];
-            chips = dedupChipsForUser(body?.user_id || null, 'max', chips, cfg.sessionTtlMin);
-            chips = limitChips(chips, cfg.maxCount);
-            recommended_chips = chips.length ? chips : undefined;
-            if (recommended_chips) logChipsRendered('max', recommended_chips);
-          } else {
-            recommended_chips = undefined;
-          }
-        } catch (_) {}
-
-        // Breadcrumbs (без PII)
-        console.log('BR goal_comment_done', { version, fieldName, hasAllFields: Boolean(allFields) });
-
-        return new Response(JSON.stringify({
-          message: assistantMessage,
-          usage,
-          ...(recommended_chips ? { recommended_chips } : {})
-        }), {
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-
-      } catch (e) {
-        const short = (e?.message || String(e)).slice(0, 240);
-        console.error('[GOAL_COMMENT] Error occurred', { 
-          errorType: e?.name || 'Unknown',
-          errorMessage: short.slice(0, 120),
-          stack: e?.stack?.slice(0, 200)
-        });
-        console.error('BR goal_comment_error', { details: short.slice(0, 120) });
-        return new Response(JSON.stringify({
-          error: 'goal_comment_error',
-          details: short
-        }), {
-          status: 502,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
     }
 
     // ==============================
@@ -732,104 +488,10 @@ serve(async (req) => {
     // Disabled by default via feature flag
     // ==============================
     if (mode === 'weekly_checkin') {
-      // Feature flag: allow disabling weekly reaction quickly (default OFF)
-      const flag = (Deno.env.get('ENABLE_WEEKLY_REACTION') || 'false').toLowerCase();
-      if (flag !== 'true') {
-        return new Response(null, { headers: corsHeaders });
-      }
-
-      try {
-        // Webhook: Authorization: Bearer <CRON_SECRET>
-        const cronSecret = (Deno.env.get('CRON_SECRET') || '').trim();
-        const authHeader = req.headers.get('authorization') || '';
-        const bearerOk = cronSecret && authHeader.startsWith('Bearer ') && authHeader.replace('Bearer ', '').trim() === cronSecret;
-
-        if (!bearerOk) {
-          return new Response(JSON.stringify({ error: 'unauthorized_webhook' }), {
-            status: 401,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          });
-        }
-
-        const weekNumber = Number.isFinite(body?.week_number) ? Number(body.week_number) : -1;
-        const weekResult = typeof body?.week_result === 'string' ? body.week_result : '';
-        const metricValue = typeof body?.metric_value === 'number' ? body.metric_value : Number.isFinite(body?.metric_value) ? Number(body.metric_value) : null;
-        const usedTools = Array.isArray(body?.used_tools) ? body.used_tools.map((x) => String(x)) : [];
-
-        const basePrompt = `Ты — Макс, трекер целей BizLevel. Отвечай кратко (2–3 предложения), по-русски.
-КОНТЕКСТ: недельный чек-ин пользователя (Неделя ${weekNumber > 0 ? weekNumber : '?'}).
-СТИЛЬ: простые слова, локальный контекст (Казахстан, тенге), на «ты». Структура: 1) короткая реакция на результат недели/метрику; 2) подсказка к следующему шагу; 3) (опц.) микро-совет.
-ЗАПРЕЩЕНО: общие фразы «отлично/молодец/правильно», вопросы «чем помочь?», лишние вводные.`;
-
-        const parts = [];
-        if (weekResult) parts.push(`Итог недели: ${weekResult}`);
-        if (metricValue !== null) parts.push(`Метрика (факт): ${metricValue}`);
-        if (usedTools.length) parts.push(`Инструменты: ${usedTools.join(', ')}`);
-
-        // Recommended chips: next-week focus
-        let recommended_chips = [
-          'Фокус следующей недели',
-          'Как усилить результат',
-          'Что мешает сейчас?'
-        ];
-
-        // Ограничение/дедуп/логирование (по флагам)
-        try {
-          const cfg = getChipConfig();
-          if (cfg.enableMaxV2) {
-            let chips = recommended_chips || [];
-            chips = dedupChipsForUser(body?.user_id || null, 'max', chips, cfg.sessionTtlMin);
-            chips = limitChips(chips, cfg.maxCount);
-            recommended_chips = chips.length ? chips : undefined;
-            if (recommended_chips) logChipsRendered('max', recommended_chips);
-          } else {
-            recommended_chips = undefined;
-          }
-        } catch (_) {}
-
-        // XAI_API_KEY уже проверен в начале функции
-        const model = Deno.env.get('OPENAI_MODEL') || 'grok-4-fast-non-reasoning';
-        const openaiClient = getOpenAIClient(model);
-
-        const completionParams = getChatCompletionParams(model, [{
-          role: 'system',
-          content: basePrompt
-        }, {
-          role: 'user',
-          content: parts.join('\n') || 'Чек-ин сохранён'
-        }], {
-          temperature: 0.3,
-          max_tokens: 120
-        });
-
-        const completion = await openaiClient.chat.completions.create(completionParams);
-
-        const assistantMessage = completion.choices[0].message;
-        const usage = completion.usage;
-
-        // Breadcrumbs (без PII)
-        console.log('BR weekly_checkin_done', { weekNumber, hasTools: usedTools.length > 0 });
-
-        return new Response(JSON.stringify({
-          message: assistantMessage,
-          usage,
-          recommended_chips
-        }), {
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-
-      } catch (e) {
-        const short = (e?.message || String(e)).slice(0, 240);
-        console.error('BR weekly_checkin_error', { details: short.slice(0, 120) });
-        return new Response(JSON.stringify({
-          error: 'weekly_checkin_error',
-          details: short
-        }), {
-          status: 502,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
+      return new Response(JSON.stringify({ error: 'weekly_checkin_gone' }), {
+        status: 410,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
 
     // ==============================
@@ -1075,6 +737,13 @@ serve(async (req) => {
       userContextText = profileText;
     }
 
+    // Распознаём специальный контекст чекпоинтов целей
+    let checkpoint: 'l1' | 'l4' | 'l7' | null = null;
+    try {
+      const m = (userContextText || '').match(/checkpoint\s*[:=]\s*(l1|l4|l7)/i);
+      if (m && m[1]) checkpoint = m[1].toLowerCase() as any;
+    } catch (_) {}
+
     // Извлекаем последний запрос пользователя
     const lastUserMessage = Array.isArray(messages) ? [...messages].reverse().find((m) => m?.role === 'user')?.content ?? '' : '';
 
@@ -1285,50 +954,52 @@ serve(async (req) => {
       contextCache.set(key, { data, timestamp: Date.now() });
     };
     
-    // Extra goal/sprint/reminders/quote context for Max (tracker)
+    // Extra goal/practice context for Max (tracker)
     let goalBlock = '';
-    let sprintBlock = '';
-    let remindersBlock = '';
-    let quoteBlock = '';
+    let practiceBlock = '';
     // Флаг ошибок загрузки блока целей (должен существовать вне кеш‑веток)
     let goalLoadError = false;
 
     // (Опционально) Получаем current_level из users
     let currentLevel1 = null;
     if (isMax && userId) {
-      // Проверяем кэш для всех блоков
+      // Проверяем кэш для блоков
       const goalCacheKey = `goal_${userId}_max`;
-      const sprintCacheKey = `sprint_${userId}_max`;
-      const remindersCacheKey = `reminders_${userId}_max`;
-      const quoteCacheKey = `quote_${userId}_max`;
+      const practiceCacheKey = `practice_${userId}_max`;
       goalBlock = getCachedContext(goalCacheKey);
-      sprintBlock = getCachedContext(sprintCacheKey);
-      remindersBlock = getCachedContext(remindersCacheKey);
-      quoteBlock = getCachedContext(quoteCacheKey);
+      practiceBlock = getCachedContext(practiceCacheKey);
 
       // Если какие-то блоки не в кэше, загружаем их параллельно
       const needsLoading = {
         goal: !goalBlock,
-        sprint: !sprintBlock,
-        reminders: !remindersBlock,
-        quote: !quoteBlock
-      };
+        practice: !practiceBlock,
+      } as const;
 
-      if (needsLoading.goal || needsLoading.sprint || needsLoading.reminders || needsLoading.quote) {
+      if (needsLoading.goal || needsLoading.practice) {
         // Подготавливаем запросы для параллельного выполнения
         const queries = [];
 
         if (needsLoading.goal) {
-          queries.push(supabaseAdmin!.from('core_goals').select('version, goal_text, version_data, updated_at').eq('user_id', userId).order('version', { ascending: false }).limit(1).then(result => ({ type: 'goal', result })).catch(e => ({ type: 'goal', error: e })));
+          queries.push(
+            supabaseAdmin!.from('user_goal')
+              .select('goal_text, metric_type, metric_current, metric_target, readiness_score, target_date, updated_at')
+              .eq('user_id', userId)
+              .order('updated_at', { ascending: false })
+              .limit(1)
+              .then(result => ({ type: 'goal', result }))
+              .catch(e => ({ type: 'goal', error: e }))
+          );
         }
-        if (needsLoading.sprint) {
-          queries.push(supabaseAdmin!.from('weekly_progress').select('week_number, achievement, metric_actual, created_at').eq('user_id', userId).order('created_at', { ascending: false }).limit(1).then(result => ({ type: 'sprint', result })).catch(e => ({ type: 'sprint', error: e })));
-        }
-        if (needsLoading.reminders) {
-          queries.push(supabaseAdmin!.from('reminder_checks').select('day_number, reminder_text, is_completed').eq('user_id', userId).eq('is_completed', false).order('day_number', { ascending: true }).limit(5).then(result => ({ type: 'reminders', result })).catch(e => ({ type: 'reminders', error: e })));
-        }
-        if (needsLoading.quote) {
-          queries.push(supabaseAdmin!.from('motivational_quotes').select('quote_text, author').eq('is_active', true).limit(1).then(result => ({ type: 'quote', result })).catch(e => ({ type: 'quote', error: e })));
+        if (needsLoading.practice) {
+          queries.push(
+            supabaseAdmin!.from('practice_log')
+              .select('applied_at, applied_tools, note')
+              .eq('user_id', userId)
+              .order('applied_at', { ascending: false })
+              .limit(5)
+              .then(result => ({ type: 'practice', result }))
+              .catch(e => ({ type: 'practice', error: e }))
+          );
         }
         
         // Выполняем все запросы параллельно
@@ -1337,53 +1008,57 @@ serve(async (req) => {
         // Обрабатываем результаты
         for (const { type, result, error } of results) {
           if (error) {
-            console.error(`ERR alex_${type}`, { message: String(error).slice(0, 200) });
+            console.error(`ERR max_ctx_${type}`, { message: String(error).slice(0, 200) });
             if (type === 'goal') goalLoadError = true;
             continue;
           }
 
           switch (type) {
-            case 'goal':
+            case 'goal': {
               if (Array.isArray(result.data) && result.data.length > 0) {
                 const g = result.data[0];
-          const version = g?.version;
-          const goalText = g?.goal_text || '';
-          const versionData = typeof g?.version_data === 'object' ? JSON.stringify(g?.version_data) : String(g?.version_data || '');
-          goalBlock = `Версия цели: v${version}. Кратко: ${goalText}. Данные версии: ${versionData}`;
+                const goalText = (g?.goal_text || '').toString();
+                const mt = (g?.metric_type || '').toString();
+                const mc = (g?.metric_current ?? '').toString();
+                const mtgt = (g?.metric_target ?? '').toString();
+                const rs = (g?.readiness_score ?? '').toString();
+                const td = (g?.target_date || '').toString();
+                const tdShort = td ? String(td).slice(0, 10) : '';
+                const parts = [
+                  goalText && `Цель: ${goalText}`,
+                  mt && `Метрика: ${mt}`,
+                  (mc || mtgt) && `Текущее/Целевое: ${mc || '—'} → ${mtgt || '—'}`,
+                  rs && `Готовность: ${rs}/10`,
+                  tdShort && `Дедлайн: ${tdShort}`,
+                ].filter(Boolean);
+                goalBlock = parts.join('\n');
               } else {
-                // Fallback на профиль пользователя при отсутствии core_goals
                 const profileGoal = profile?.goal;
                 if (profileGoal && profileGoal.trim()) {
                   goalBlock = `Цель из профиля: ${profileGoal.trim()}`;
                 } else {
                   goalBlock = 'Цель не установлена. Рекомендуется сформулировать конкретную цель для эффективной работы.';
                 }
-                // Пустые цели — это не ошибка загрузки, но отметим как отсутствие данных
               }
               setCachedContext(goalCacheKey, goalBlock);
               break;
-            case 'sprint':
+            }
+            case 'practice': {
               if (Array.isArray(result.data) && result.data.length > 0) {
-                const p = result.data[0];
-                sprintBlock = `Неделя: ${p?.week_number ?? ''}. Итоги: ${p?.achievement ?? ''}. Метрика (факт): ${p?.metric_actual ?? ''}`;
+                const lines = result.data.map((r: any) => {
+                  const d = (r?.applied_at || '').toString().slice(0, 10);
+                  const toolsArr = Array.isArray(r?.applied_tools) ? r.applied_tools : [];
+                  const tools = toolsArr.length ? `[${toolsArr.join(', ')}]` : '';
+                  const note = (r?.note || '').toString().trim();
+                  return `• ${d}${tools ? ' ' + tools : ''}${note ? ' — ' + note : ''}`;
+                });
+                practiceBlock = lines.join('\n');
+              } else {
+                practiceBlock = '';
               }
-              setCachedContext(sprintCacheKey, sprintBlock);
+              setCachedContext(practiceCacheKey, practiceBlock);
               break;
-            case 'reminders':
-              if (Array.isArray(result.data) && result.data.length > 0) {
-                const lines = result.data.map((r) => `• День ${r?.day_number}: ${r?.reminder_text}`);
-          remindersBlock = lines.join('\n');
-        }
-              setCachedContext(remindersCacheKey, remindersBlock);
-              break;
-            case 'quote':
-              if (Array.isArray(result.data) && result.data.length > 0) {
-                const q = result.data[0];
-          const author = q?.author ? ` — ${q.author}` : '';
-          quoteBlock = `${q?.quote_text || ''}${author}`;
-              }
-              setCachedContext(quoteCacheKey, quoteBlock);
-              break;
+            }
           }
         }
       }
@@ -1576,6 +1251,9 @@ ${localContextModule}
 Структурируй ответ: чёткое уточнение цели, конкретный шаг, без вводных и без предложений помощи.
 Ты — трекер целей BizLevel. Работай строго по инструкции. Нарушение любого из пунктов недопустимо.
 
+## Подсказки по артефактам:
+— При необходимости рекомендуй уместные артефакты из курса (по теме вопроса), называя их кратко. Если пользователь просит — подскажи, где их найти в приложении.
+
 ## ОГРАНИЧЕНИЕ ПО ПРОГРЕССУ:
 Пользователь прошёл уровней: ${finalLevel}.
 ЕСЛИ уровень >= 4: полностью включайся в работу с целями
@@ -1583,14 +1261,12 @@ ${localContextModule}
 
 ## Данные пользователя и контекст:
 ${personaSummary ? `Персона: ${personaSummary}\n` : ''}
-${goalBlock ? `Цель: ${goalBlock}\n` : ''}
-${sprintBlock ? `Спринт: ${sprintBlock}\n` : ''}
-${remindersBlock ? `Незафиксированные напоминания:\n${remindersBlock}\n` : ''}
+${goalBlock ? `${goalBlock}\n` : ''}
+${practiceBlock ? `Журнал применений:\n${practiceBlock}\n` : ''}
 ${recentSummaries ? `Итоги прошлых обсуждений:\n${recentSummaries}\n` : ''}
 ${memoriesText ? `Личные заметки:\n${memoriesText}\n` : ''}
 ${userContextText ? `Персонализация: ${userContextText}\n` : ''}
 ${levelContext && levelContext !== 'null' ? `Контекст экрана/урока: ${levelContext}\n` : ''}
-${quoteBlock ? `Цитата дня: ${quoteBlock}\n` : ''}
 
 ## Правила формата:
 - 2–5 коротких абзацев или маркированный список. Без таблиц. Эмодзи — 1-2 по делу.
@@ -1603,42 +1279,19 @@ ${quoteBlock ? `Цитата дня: ${quoteBlock}\n` : ''}
 ## Возврат к теме цели:
 Если пользователь уходит от темы кристаллизации цели или отвечает не по теме, вежливо возвращай к формулировке цели и следующему конкретному шагу.`;
 
-    // Дополнение для Макса по версиям цели (v2/v3/v4)
-    let goalVersion = null;
-    try {
-      // Сначала ищем в goalBlock (основной источник)
-      if (goalBlock) {
-        const m2 = goalBlock.match(/Версия цели:\s*v(\d+)/i);
-        if (m2 && m2[1]) goalVersion = parseInt(m2[1]);
-      }
-      // Fallback на userContextText (если передается от клиента)
-      if (!goalVersion && typeof userContextText === 'string') {
-        const m1 = userContextText.match(/goal_version\s*[:=]\s*(\d+)/i);
-        if (m1 && m1[1]) goalVersion = parseInt(m1[1]);
-      }
-    } catch (_) {}
-
     let systemPrompt = isMax ? systemPromptAlex : systemPromptLeo;
     if (isMax) {
-      const v2Rules = `Если пользователь на этапе v2 (Метрики):
-— Убедись, что метрика названа конкретно (выручка, клиенты, конверсия, время и т.п.)
-— Проверь, что заданы ТЕКУЩЕЕ и ЦЕЛЕВОЕ значения; предупреждай, если рост >200% за месяц
-— Отвечай кратко (2–3 строки), предлагай корректировку до реалистичного диапазона`;
-      const v3Rules = `Если пользователь на этапе v3 (SMART‑план):
-— Сформируй 4 недельных мини‑цели и по 2–3 действия на каждую неделю
-— Проверь связность недель (неделя n помогает неделе n+1)
-— Ответ краткий, структурируй списком`;
-      const v4Rules = `Если пользователь на этапе v4 (Финал):
-— Спроси оценку готовности 1–10 и ближайшую дату старта
-— Если готовность <7 — уточни главное препятствие и предложи один шаг для повышения готовности
-— Ответ 2–4 строки, конкретика без вводных фраз`;
-      // Добавляем информацию об ошибке загрузки целей, если она была
-      const errorNotice = goalLoadError ? '\n\n⚠️ ВНИМАНИЕ: Не удалось загрузить актуальные цели из базы данных. Ответ может быть менее точным. Рекомендуется обновить страницу или обратиться в поддержку.' : '';
-      // Добавляем информацию о версии цели
-      const versionContext = goalVersion ? `\n\nТЕКУЩАЯ ВЕРСИЯ ЦЕЛИ: v${goalVersion}` : '';
-      systemPrompt = systemPromptAlex + "\n\n" + [
-        v2Rules, v3Rules, v4Rules
-      ].join("\n\n") + errorNotice + versionContext;
+      const errorNotice = goalLoadError ? '\n\nВНИМАНИЕ: не удалось загрузить актуальные данные цели.' : '';
+      // Специализированные сценарии чекпоинтов
+      let checkpointModule = '';
+      if (checkpoint === 'l1') {
+        checkpointModule = `\n\n## Чекпоинт L1: Первая цель\n— Веди шагами: (1) текущее положение → (2) ключевая метрика → (3) целевое значение → (4) срок.\n— На каждом шаге задай один короткий вопрос и жди ответа.\n— Сформулируй итоговую цель одной фразой (SMART) и попроси подтвердить.`;
+      } else if (checkpoint === 'l4') {
+        checkpointModule = `\n\n## Чекпоинт L4: Финансовый фокус\n— Предложи добавить финансовую метрику (выручка/средний чек/маржа).\n— Коротко оцени финансовый эффект цели (гипотетический счёт).\n— Сформулируй цель с финансовой частью.`;
+      } else if (checkpoint === 'l7') {
+        checkpointModule = `\n\n## Чекпоинт L7: Проверка реальности\n— Оцени текущий темп (по последним применениями).\n— Предложи: усилить применение / скорректировать цель / оставить темп.\n— Помоги выбрать следующий шаг.`;
+      }
+      systemPrompt = systemPromptAlex + checkpointModule + errorNotice;
     }
 
     // --- Безопасный вызов OpenAI с валидацией конфигурации ---
@@ -1672,28 +1325,30 @@ ${quoteBlock ? `Цитата дня: ${quoteBlock}\n` : ''}
       }
 
       // Рекомендованные chips (опционально) — только для Макса
-      let recommended_chips = undefined;
+      let recommended_chips = undefined as string[] | undefined;
       if (isMax) {
-        const v = goalVersion;
-        if (v === 2) {
-          recommended_chips = ['💰 Выручка', '👥 Кол-во клиентов', '⏱ Время на задачи', '📊 Конверсия %', '✏️ Другое'];
-        } else if (v === 3) {
-          recommended_chips = ['Неделя 1: Подготовка', 'Неделя 2: Запуск', 'Неделя 3: Масштабирование', 'Неделя 4: Оптимизация'];
-        } else if (v === 4) {
-          recommended_chips = ['Готовность 7/10', 'Начать завтра', 'Старт в понедельник'];
+        // Рекомендованные чипы для Макса по чекпоинтам
+        if (checkpoint === 'l1') {
+          recommended_chips = ['Сформулировать цель', 'Выбрать метрику', 'Задать срок'];
+        } else if (checkpoint === 'l4') {
+          recommended_chips = ['Добавить финансовую метрику', 'Посчитать эффект', 'Оставить как есть'];
+        } else if (checkpoint === 'l7') {
+          recommended_chips = ['Оценить текущий темп', 'Скорректировать цель', 'Усилить применение'];
         }
-
-        // Ограничение/дедуп/логирование (по флагам)
+        // Всегда добавляем ссылочную подсказку на артефакты
+        try {
+          const base = recommended_chips || [];
+          if (!base.includes('Открыть артефакты')) base.push('Открыть артефакты');
+          recommended_chips = base;
+        } catch (_) {}
         try {
           const cfg = getChipConfig();
-          if (cfg.enableMaxV2 && recommended_chips) {
+          if (recommended_chips) {
             let chips = recommended_chips || [];
             chips = dedupChipsForUser(userId, 'max', chips, cfg.sessionTtlMin);
             chips = limitChips(chips, cfg.maxCount);
             recommended_chips = chips.length ? chips : undefined;
             if (recommended_chips) logChipsRendered('max', recommended_chips);
-          } else if (!cfg.enableMaxV2) {
-            recommended_chips = undefined;
           }
         } catch (_) {}
       } else {

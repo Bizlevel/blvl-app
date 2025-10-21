@@ -1,84 +1,126 @@
-## Отчет по изменениям (код + Supabase) в данном чате
+# Текущее состояние: Цель, Журнал, Макс, Чекпоинты и БД
 
-### Изменения в коде (Edge Functions)
+## База данных (Supabase)
+- Таблицы (owner-only RLS):
+  - `user_goal(user_id PK, goal_text, metric_type, metric_start, metric_current, metric_target, start_date, target_date, financial_focus, action_plan_note, updated_at)`
+  - `practice_log(id PK, user_id, applied_at, applied_tools text[], note, created_at, updated_at)`
+- Индексы: `ix_practice_log_user_applied_at(user_id, applied_at desc)` — ускоряет списки и агрегаты журнала.
+- Политики RLS: для `user_goal` и `practice_log` — "Allow owner read/insert/update/delete" (доступ только к своим данным по `auth.uid() = user_id`).
+- Функции GP-экономики:
+  - `gp_claim_daily_application()` — разовый бонус за дневную запись в журнал (idempotent). Используется после `practice_log.insert`.
+  - `gp_claim_goal_progress(p_key)` — бонусы за достижения прогресса цели (используется из клиента при переходе порогов 50%/100%).
+- Public-политики на учебный контент: `lesson_metadata`, `lesson_facts`, `package_items` имеют SELECT-политику для безопасной выдачи данных в приложении.
+- Примечания:
+  - Колонка `metric_start` используется для стабильного расчёта прогресса (не зависит от колебаний текущего значения).
 
-1) `supabase/functions/leo-chat/index.ts`
-- Семантический отбор памяти вместо «последних N»:
-  - Запрос эмбеддинга для `lastUserMessage` (OpenAI embeddings), RPC `match_user_memories(query_embedding, p_user_id, match_threshold, match_count)`.
-  - Фолбэк на «последние записи» при ошибках/отсутствии ключа для эмбеддингов.
-  - Обновление счётчиков доступа: RPC `touch_user_memories(p_ids uuid[])` (инкремент `access_count`, `last_accessed`, повышение `relevance_score`).
-- Token‑кап и микросжатие контекста:
-  - Персонально для блоков: `PERSONA_MAX_TOKENS`, `MEM_MAX_TOKENS`, `SUMM_MAX_TOKENS`, `USERCTX_MAX_TOKENS`.
-  - Глобальный кап: `CONTEXT_MAX_TOKENS` с равномерным масштабированием всех блоков (persona/memories/summaries/RAG/userContext).
-  - Логи метрик: `BR context_scaled`, `BR context_tokens`.
-- Метрики семантики памяти:
-  - `BR semantic_hit_rate` (requested/hit/hitRate), `BR memory_fallback` при фолбэке.
-- Совместимость/устойчивость:
-  - Гейтинг по прогрессу сохранён; RAG остаётся только для Лео и с токен‑капом.
-  - Логи без PII; фича‑флаг `ENABLE_SEMANTIC_MEMORIES` учитывается.
+## Репозиторий (`lib/repositories/goals_repository.dart`)
+- Методы цели:
+  - `fetchUserGoal()` — читает одну запись из `user_goal` по текущему пользователю; на Web добавляет `apikey` в заголовок; кеширует в Hive `user_goal/self`.
+  - `upsertUserGoal({... metric_start, metric_current, metric_target, financial_focus?, action_plan_note? ...})` — upsert по `user_id`, обновляет кеш.
+- Журнал применений:
+  - `fetchPracticeLog(limit)` — читает список записей, кеширует в Hive `practice_log/list_<limit>`.
+  - `addPracticeEntry({appliedTools, note, appliedAt})` — вставка, затем idempotent RPC для GP‑бонуса, инвалидация кеша.
+  - `aggregatePracticeLog(items)` — агрегаты: дни с применениями, топ‑инструменты.
+- Утилиты:
+  - Z/W: `computeRecentPace`, `computeRequiredPace`.
+  - Прогресс: `computeGoalProgressPercent(goal)` — безопасный расчёт 0..1 с гвардом `target != start`.
+ - Заголовки/кеширование: на Web репозиторий добавляет `apikey` для Supabase REST; данные складываются в Hive и используются по принципу SWR (быстро из кеша, затем фоновое обновление).
 
-2) `supabase/functions/leo-memory/index.ts`
-- Фильтрация качества сообщений перед извлечением фактов:
-  - Только `role='user'`, длина ≥50 символов, исключены односложные ответы (да/нет/ок/спасибо/привет).
-- Экстракция фактов с жестким JSON‑ответом от модели, нормализация без PII (email/телефоны).
-- Эмбеддинги батчем и upsert в `user_memories` (onConflict user_id+content).
-- Лимит «горячих» записей: по умолчанию 50; «хвост» переносится в `memory_archive` и удаляется из `user_memories`.
-- Обновление `leo_chats.summary/last_topics` по итогам диалога.
+## Провайдеры (`lib/providers/goals_providers.dart`)
+- `userGoalProvider` — `fetchUserGoal`.
+- `practiceLogProvider` / `practiceLogWithLimitProvider` — список записей журнала.
+- `practiceLogAggregatesProvider` — агрегаты журнала.
+- `usedToolsOptionsProvider` — список навыков из `levels.artifact_title` (дедуплицировано).
+- `goalStateProvider` — флаги L1/L4/L7 для NextActionBanner и статусов:
+  - `l1Done` = есть `goal_text` и `metric_type` (старта/таргета может не быть).
+  - `l4Done` = заполнен `financial_focus`.
+  - `l7Done` = заполнен `action_plan_note` (решение по Z/W).
 
-### Изменения/проверки в базе данных (Supabase)
+## Экран «Цель» (`lib/screens/goal_screen.dart`)
+- Блок «Моя цель»:
+  - Поля: описание цели, метрика, дедлайн, три показателя: Стартовое (readonly), Текущее (редактируемо в режиме редактирования), Целевое (readonly).
+  - Кнопки: «Редактировать» (TextButton, включает режим), «Сохранить/Отмена» в режиме редактирования, «Обсудить с Максом» (синяя Elevated).
+  - Прогресс‑полоса: рассчитывается как (Текущее − Стартовое)/(Целевое − Стартовое), с индикацией дней до дедлайна и GP‑кнопками на 50%/100%.
+  - Z/W под прогрессом (флаг `kShowZWOnGoal`): короткая строка «Z: x/день • W: y/день • Осталось: N дней» + тап раскрывает пояснение.
+- Баннер «Что дальше?» (`NextActionBanner`): ведёт по маршруту L1 → L4 → L7 → Журнал, основывается на `goalStateProvider`.
+- Блок «Журнал применений»:
+  - Выбор навыка: выпадающий список «Выбрать навык» (один выбор) из `usedToolsOptionsProvider`; поле «Что конкретно сделал сегодня»; кнопка «Сохранить запись».
+  - После сохранения открывается диалог с Максом; в контекст передаётся реальный `practice_note` и `applied_tools` (значения берём до очистки полей). Авто‑сообщение после записи — без списания GP.
+  - Статистика (Всего/Дней/Часто) — в `Wrap`; переполнение предотвращается ограничением ширины для длинных надписей.
+  - «Вся история»: под списком показываются только 3 последние записи, кнопка «Вся история →» ведёт на `/goal/history`. Формат даты в элементах: `dd-аббр‑YYYY` (например, `19-окт-2025`).
+ - Sticky-CTA (флаг `kGoalStickyCta`): снизу две кнопки «Добавить запись» и «Обсудить с Максом» для быстрого действия.
+ - Prefill-навигация с L7 (флаг `kL7PrefillToJournal`): поддержка `?prefill=intensive&scroll=journal` для прокрутки к журналу и префилла.
+ - Наблюдаемость: breadcrumbs `goal_edit_saved`, `zw_info_opened`, `chat_opened_from_goal`, `journal_prefill_opened`.
 
-- Таблицы и поля:
-  - `public.user_memories`: подтверждены колонки `relevance_score (real, default 1.0)`, `last_accessed (timestamptz, default now())`, `access_count (int, default 0)` — присутствуют.
-  - `public.memory_archive`: есть для архивирования «хвоста».
-- RPC/SQL‑функции:
-  - Подтверждены: `match_user_memories`, `match_documents`, `touch_user_memories` — существуют.
-  - Созданы/обновлены:
-    - `public.touch_user_memories(p_ids uuid[])` — инкремент `access_count`, обновление `last_accessed`, повышение `relevance_score` (до 10.0).
-    - `public.memory_decay()` — мягкая деградация `relevance_score` (−0.15) у записей, не используемых ≥14 дней (кламп к [0..10]).
-    - `public.refresh_persona_summary(p_user_id uuid)` — агрегирует топ‑факты и последние сводки бесед в компактный `users.persona_summary`.
-    - `public.refresh_persona_summary_all()` — батч‑обновление для всех пользователей.
-- Планирование заданий (pg_cron):
-  - Созданы задания (при наличии расширения `pg_cron`):
-    - `memory_decay_weekly` — `0 4 * * 1` → `SELECT public.memory_decay()`.
-    - `persona_summary_weekly` — `30 4 * * 1` → `SELECT public.refresh_persona_summary_all()`.
-  - Проверка: оба джоба присутствуют (jobid=3/4), расписания корректны.
-- Контрольные вызовы:
-  - Ручной вызов `memory_decay()` и `refresh_persona_summary_all()` — без ошибок.
-  - В `users.persona_summary` заполнено у 13 пользователей — подтверждает работоспособность агрегации.
+## Макс (чат)
+- Экран чата `LeoDialogScreen` используется для диалогов. Для журнала контекст включает реальные данные записи.
+- Edge Function `leo-chat` использует `user_goal`/`practice_log` контекст и сценарии для чекпоинтов.
+- GP‑политика: обычные сообщения списывают 1 GP; авто‑комментарии (после записи в журнал, после решений L1/L4/L7, где предусмотрено) — бесплатно. `sendMessageWithRAG` передаёт `chatId` для идемпотентности списаний.
+- Рекомендованные чипы в чате Макса (fallback): быстрые подсказки по L1/L4, если сервер не прислал собственные.
+- Breadcrumbs: `chat_max_auto_commented` и другие события диалогов логируются в Sentry.
 
-### Что осталось сделать (следующие шаги)
+## Чекпоинты
+- L1 (`checkpoint_l1_screen.dart`): мастер из 4 шагов, сохраняет `user_goal` с `metric_start`, `metric_current`, `metric_target`, `target_date`; затем показывает мини‑квиз‑блок с ответом Макса и кнопками «Сохранить/Редактировать».
+- L4 (`checkpoint_l4_screen.dart`): предложение добавить финансовый фокус (`financial_focus`).
+  - «Добавить метрику»: обновляет `user_goal`, делает `ref.invalidate(userGoalProvider)` и возвращает на `/goal`.
+  - «Оставить как есть»: возвращает на `/goal` и даёт мотивацию (без изменения данных).
+- L7: расчёт Z/W и варианты действий; выбранное решение сохраняется в `user_goal.action_plan_note` и добавляется системная запись в `practice_log`.
+  - CTA: «Усилить применение» → `/goal?prefill=intensive&scroll=journal`; «Скорректировать цель» → `/goal`; «Продолжить темп» — триггерит бесплатный совет Макса и возвращает на `/goal`.
 
-- Деплой Edge Functions:
-  - Задеплоить обновлённые `leo-chat` и `leo-memory` на Supabase.
+## Навигация
+- Маршруты `/checkpoint/l1|l4|l7`, `/goal`, `/goal/history`; башня (`tower_tiles`) ведёт на мастера чекпоинтов.
+- Переходы выполняются через `GoRouter.of(context).push(...)` (а не `Navigator.pushNamed`), чтобы исключить ошибки `onGenerateRoute`.
 
-- Переменные окружения (проверить/установить в Edge Secrets):
-  - Обязательные: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`, `XAI_API_KEY`.
-  - Для эмбеддингов/RAG/семантики: `OPENAI_API_KEY`, `OPENAI_EMBEDDING_MODEL` (реком. `text-embedding-3-small`).
-  - Флаги/кап‑лимиты (по необходимости):
-    - `ENABLE_SEMANTIC_MEMORIES=true`
-    - `MEM_TOPK=5`, `MEM_MATCH_THRESHOLD=0.35`
-    - `PERSONA_MAX_TOKENS=400`, `MEM_MAX_TOKENS=500`, `SUMM_MAX_TOKENS=400`, `USERCTX_MAX_TOKENS=500`, `CONTEXT_MAX_TOKENS=2200`
-    - `RAG_MAX_TOKENS` (например, 1200) — уже учтён в коде
+## Известные замечания
+- Предупреждения анализатора по `use_build_context_synchronously` в нескольких местах — не критично для функционала.
+- Депрекейт `GoRouter.location` — постепенно переводим на `uri`.
 
-- Быстрые проверки после деплоя:
-  1) `leo-chat`: обычный диалог с Лео — в логах должны появиться `BR context_tokens`, `BR semantic_hit_rate`; при недоступном OPENAI — фолбэк памяти без ошибок.
-  2) `leo-memory`: после ассистентского ответа — триггер обработки, в `user_memories` появляются новые факты (с эмбеддингами), «хвост» уезжает в `memory_archive` при превышении 50.
-  3) Кроны: вручную выполнить `SELECT public.memory_decay();` и `SELECT public.refresh_persona_summary_all();` — без ошибок; выборочно проверить `users.persona_summary` и изменение `relevance_score`.
+## Путь пользователя (User Journey)
+1) Онбординг и вход
+   - Роут: `/login` → `/home`
+   - Таблицы: `auth.users`, `users`
+   - Цель: пользователь попадает в приложение, видит навигацию и башню уровней `/tower`.
 
-- Наблюдаемость/метрики (рекомендуется):
-  - Отслеживать долю фолбэков памяти и hit‑rate семантики по логам (`BR memory_fallback`, `BR semantic_hit_rate`).
-  - Мониторить длину контекста (`BR context_tokens`) и срабатывание `context_scaled`.
+2) Обучение и артефакты
+   - Роуты: `/tower`, `/levels/:id`, `/artifacts`
+   - Пользователь проходит уроки уровня 1, знакомится с артефактом «Ядро целей» (из `levels.artifact_title`).
+   - По завершении блока L1 — доступен чекпоинт «Первая цель».
 
-### Риски/совместимость
+3) Чекпоинт L1 — Постановка цели
+   - Роут: `/checkpoint/l1`
+   - Экран‑мастер (4 шага): текущее значение → ключевой показатель → целевое → срок.
+   - Сохранение: `user_goal` (поля: `goal_text`, `metric_type`, `metric_start`, `metric_current`, `metric_target`, `target_date`).
+   - После сохранения: компактный «квиз‑блок» с комментарием Макса и кнопки «Сохранить/Редактировать»; переход на `/goal`.
 
-- При отсутствии `OPENAI_API_KEY` семантический поиск памяти автоматически фолбэкнет на «последние записи» — диалоги остаются работоспособны.
-- Новые функции SQL не нарушают RLS; выполняются как `SECURITY DEFINER`.
-- pg_cron обязателен только для автоматического запуска decay/persona; без него доступен ручной вызов.
+4) Страница «Цель» — обзор и редактирование
+   - Роут: `/goal`
+   - Блок «Моя цель»:
+     - Режим «Просмотр»: поля статичны, доступна кнопка «Редактировать».
+     - Режим «Редактирование»: можно менять «Текущее»; сохранение обновляет `user_goal` (RLS owner‑only).
+     - Прогресс‑полоса: расчет от `metric_start` → `metric_target`; кнопки GP на 50% и 100%.
+   - Z/W: краткая строка под прогрессом (тап — пояснение).
+   - Блок «Журнал применений»:
+     - Навык: выбирается из выпадающего списка (один).
+     - Сохранение записи: `practice_log.insert` + автокомментарий Макса с фактической заметкой и инструментами (бесплатно).
+     - Под списком: 3 последних записи, формат даты `dd-аббр‑YYYY`; «Вся история →» ведёт на `/goal/history`.
 
-### Короткая сводка эффекта
+5) Журнал истории
+   - Роут: `/goal/history`
+   - Таблица: `practice_log` (фильтр текущего пользователя, лимит/пагинация по провайдеру).
 
-- Семантическая «горячая» память стала релевантнее и ограничена по объёму.
-- Контекст чата стабилизирован по токенам благодаря капам и микросжатию.
-- Появились регулярные decay и авто‑пересборка `persona_summary`, что поддерживает «тёплую» память в актуальном виде.
+6) Чекпоинт L4 — Финансовый фокус
+   - Роут: `/checkpoint/l4`
+   - Сценарий: предложение добавить финансовую метрику; «Добавить метрику» — апдейт `user_goal` + возврат на `/goal` с обновлением; «Оставить как есть» — возврат на `/goal`.
 
+7) Чекпоинт L7 — Проверка реальности (Z/W)
+   - Роут: `/checkpoint/l7`
+   - Сценарий: расчет Z (темп из `practice_log`) и W (требуемый до дедлайна из `user_goal`); CTA: «Усилить применение» (prefill журнала на Цели), «Скорректировать цель» (на `/goal`), «Продолжить темп» (автокомментарий Макса и переход на `/goal`).
+
+8) Диалоги с Максом
+   - Роут: `/chat` (или встроенные вызовы диалога с авто‑контекстом).
+   - Контекст: цель/журнал (фактический `practice_note`, `applied_tools`) и сценарии чекпоинтов.
+
+9) Награды и мотивация
+   - GP‑бонусы: RPC `gp_claim_daily_application`, `gp_claim_goal_progress`.
+   - Отображение достижений через уведомления/тосты.
 

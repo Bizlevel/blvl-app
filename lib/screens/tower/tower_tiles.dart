@@ -104,15 +104,18 @@ void _handleCheckpointTap(BuildContext context, Map<String, dynamic> node) {
       return;
     }
     final String type = node.nodeType;
-    final int? goalVersion = node.goalVersion;
+    // goalVersion больше не используется в новой модели
     final int? caseId = node.caseId;
     if (type == 'mini_case' && caseId != null) {
       if (!context.mounted) return;
       context.push('/case/$caseId');
-    } else if (type == 'goal_checkpoint' && goalVersion != null) {
+    } else if (type == 'goal_checkpoint') {
       if (!context.mounted) return;
-      // Разрешаем редактировать любую версию в любое время по требованию UX
-      context.push('/goal-checkpoint/$goalVersion');
+      final int after = node.afterLevel;
+      final String route = after == 1
+          ? '/checkpoint/l1'
+          : (after == 4 ? '/checkpoint/l4' : '/checkpoint/l7');
+      context.push(route);
     }
   } catch (e, st) {
     _captureError(e, st);
@@ -209,7 +212,7 @@ class _CheckpointNodeTile extends StatelessWidget {
     final String type = node.nodeType;
     final bool isCompleted = node.nodeCompleted;
     final int after = node.afterLevel;
-    final int? goalVersion = node.goalVersion;
+    // Новая модель цели: версии не используем
 
     String label;
     if (type == 'mini_case') {
@@ -217,7 +220,11 @@ class _CheckpointNodeTile extends StatelessWidget {
           after == 3 ? 1 : (after == 6 ? 2 : (after == 9 ? 3 : 0));
       label = caseIndex > 0 ? 'Кейс $caseIndex' : 'Кейс';
     } else if (type == 'goal_checkpoint') {
-      label = 'Кристаллизация цели ${goalVersion ?? ''}'.trim();
+      // afterLevel 1 → L1, 4 → L4, 7 → L7
+      final String cp = after == 1
+          ? 'L1: Первая цель'
+          : (after == 4 ? 'L4: Финансовый фокус' : 'L7: Проверка реальности');
+      label = cp;
     } else {
       label = '';
     }
@@ -231,7 +238,11 @@ class _CheckpointNodeTile extends StatelessWidget {
           label: type == 'mini_case'
               ? 'Мини-кейс после уровня $after'
               : (type == 'goal_checkpoint'
-                  ? 'Чекпоинт цели версии ${goalVersion ?? ''}'
+                  ? (after == 1
+                      ? 'Чекпоинт L1: Первая цель'
+                      : (after == 4
+                          ? 'Чекпоинт L4: Финансовый фокус'
+                          : 'Чекпоинт L7: Проверка реальности'))
                   : 'Чекпоинт'),
           button: true,
           child: Column(

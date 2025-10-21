@@ -1,3 +1,4 @@
+import 'package:bizlevel/widgets/common/notification_center.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sentry_flutter/sentry_flutter.dart' hide Breadcrumb;
@@ -110,18 +111,14 @@ class _LibrarySectionScreenState extends ConsumerState<LibrarySectionScreen> {
                         ref.invalidate(favoritesProvider);
                         ref.invalidate(favoritesDetailedProvider);
                         if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                                content: Text('Избранное обновлено')),
-                          );
+                          NotificationCenter.showSuccess(
+                              context, 'Избранное обновлено');
                         }
                       } catch (e, st) {
                         await Sentry.captureException(e, stackTrace: st);
                         if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                                content: Text('Ошибка обновления избранного')),
-                          );
+                          NotificationCenter.showError(
+                              context, 'Ошибка обновления избранного');
                         }
                       }
                     },
@@ -145,9 +142,7 @@ class _LibrarySectionScreenState extends ConsumerState<LibrarySectionScreen> {
     if (uri == null) return;
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Не удалось открыть ссылку')),
-      );
+      NotificationCenter.showError(context, 'Не удалось открыть ссылку');
     }
   }
 
@@ -313,9 +308,16 @@ class _ResourceCard extends StatelessWidget {
               const SizedBox(height: 8),
               Align(
                 alignment: Alignment.centerLeft,
-                child: ElevatedButton(
-                  onPressed: url.isEmpty ? null : onOpenLink,
-                  child: const Text('Перейти ↗'),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 44),
+                  child: Semantics(
+                    label: 'Открыть ресурс',
+                    button: true,
+                    child: ElevatedButton(
+                      onPressed: url.isEmpty ? null : onOpenLink,
+                      child: const Text('Перейти ↗'),
+                    ),
+                  ),
                 ),
               ),
             ],

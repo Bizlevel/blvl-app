@@ -302,18 +302,22 @@ class _ArtifactTileState extends State<_ArtifactTile> {
                             right: 8,
                             bottom: 8,
                             child: SizedBox(
-                              height: 34,
-                              child: ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor:
-                                      Colors.white.withValues(alpha: 0.9),
-                                  foregroundColor: Colors.black,
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 12, vertical: 6),
+                              height: 44,
+                              child: Semantics(
+                                label: 'Перейти к Башне',
+                                button: true,
+                                child: ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor:
+                                        Colors.white.withValues(alpha: 0.9),
+                                    foregroundColor: Colors.black,
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 10),
+                                  ),
+                                  onPressed: () => context
+                                      .go('/tower?scrollTo=${widget.level}'),
+                                  child: const Text('К Башне'),
                                 ),
-                                onPressed: () => context
-                                    .go('/tower?scrollTo=${widget.level}'),
-                                child: const Text('К Башне'),
                               ),
                             ),
                           ),

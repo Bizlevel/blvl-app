@@ -13,14 +13,18 @@ import '../screens/main_street_screen.dart';
 import '../screens/biz_tower_screen.dart';
 import '../screens/leo_chat_screen.dart';
 import '../screens/goal_screen.dart';
+import '../screens/goal_history_screen.dart';
 // material import не требуется
 import '../screens/mini_case_screen.dart';
-import '../screens/goal_checkpoint_screen.dart';
+// import '../screens/goal_checkpoint_screen.dart';
 import '../screens/gp_store_screen.dart';
 import '../screens/library/library_screen.dart';
 import '../screens/library/library_section_screen.dart';
 import '../screens/notifications_settings_screen.dart';
 import '../screens/artifacts_screen.dart';
+import '../screens/checkpoints/checkpoint_l1_screen.dart';
+import '../screens/checkpoints/checkpoint_l4_screen.dart';
+import '../screens/checkpoints/checkpoint_l7_screen.dart';
 
 /// Riverpod provider that exposes the [GoRouter] instance used across the app.
 ///
@@ -49,6 +53,22 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/goal',
         builder: (context, state) => const GoalScreen(),
+      ),
+      GoRoute(
+        path: '/goal/history',
+        builder: (context, state) => const GoalHistoryScreen(),
+      ),
+      GoRoute(
+        path: '/checkpoint/l1',
+        builder: (context, state) => const CheckpointL1Screen(),
+      ),
+      GoRoute(
+        path: '/checkpoint/l4',
+        builder: (context, state) => const CheckpointL4Screen(),
+      ),
+      GoRoute(
+        path: '/checkpoint/l7',
+        builder: (context, state) => const CheckpointL7Screen(),
       ),
       GoRoute(
         path: '/profile',
@@ -82,14 +102,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           return MiniCaseScreen(caseId: caseId);
         },
       ),
-      GoRoute(
-        path: '/goal-checkpoint/:version',
-        builder: (context, state) {
-          final version =
-              int.tryParse(state.pathParameters['version'] ?? '0') ?? 0;
-          return GoalCheckpointScreen(version: version);
-        },
-      ),
+      // goal-checkpoint снят
       GoRoute(
         path: '/gp-store',
         builder: (context, state) => const GpStoreScreen(),

@@ -5,31 +5,7 @@ import 'auth_provider.dart';
 import 'goals_repository_provider.dart';
 import 'levels_provider.dart';
 
-// Последняя версия цели пользователя
-final goalLatestProvider = FutureProvider<Map<String, dynamic>?>((ref) async {
-  final auth = await ref.watch(authStateProvider.future);
-  final user = auth.session?.user;
-  if (user == null) return null;
-  final repo = ref.read(goalsRepositoryProvider);
-  return repo.fetchLatestGoal(user.id);
-});
-
-// Все версии цели
-final goalVersionsProvider =
-    FutureProvider<List<Map<String, dynamic>>>((ref) async {
-  final auth = await ref.watch(authStateProvider.future);
-  final user = auth.session?.user;
-  if (user == null) return [];
-  final repo = ref.read(goalsRepositoryProvider);
-  return repo.fetchAllGoals(user.id);
-});
-
-// Текущая неделя (по номеру)
-final weekProvider =
-    FutureProvider.family<Map<String, dynamic>?, int>((ref, weekNumber) async {
-  final repo = ref.read(goalsRepositoryProvider);
-  return repo.fetchWeek(weekNumber);
-});
+// Удалены провайдеры legacy версий/weekly
 
 // Поток напоминаний
 final remindersStreamProvider =
@@ -71,47 +47,23 @@ final dailyQuoteProvider = FutureProvider<Map<String, dynamic>?>((ref) async {
 });
 
 /// Проверяет наличие версии цели у текущего пользователя
-final hasGoalVersionProvider =
-    FutureProvider.family<bool, int>((ref, version) async {
-  final all = await ref.watch(goalVersionsProvider.future);
-  for (final m in all) {
-    final int? v = m['version'] as int?;
-    if (v == version) return true;
-  }
-  return false;
-});
+// Удалён
 
 /// Прогресс активного чекпоинта (version): собранные поля и текущие данные версии
-final goalProgressProvider =
-    FutureProvider.family<Map<String, dynamic>, int>((ref, version) async {
-  final repo = ref.read(goalsRepositoryProvider);
-  return repo.fetchGoalProgress(version);
-});
+// Удалён
 
 /// Динамический label метрики из v2 для чек-ина недели
-final metricLabelProvider = FutureProvider<String?>((ref) async {
-  final all = await ref.watch(goalVersionsProvider.future);
-  final Map<int, Map<String, dynamic>> map = {
-    for (final m in all) (m['version'] as int): Map<String, dynamic>.from(m)
-  };
-  final Map<String, dynamic>? v2 =
-      (map[2]?['version_data'] as Map?)?.cast<String, dynamic>();
-  if (v2 == null) return null;
-  return (v2['metric_type'] ?? v2['metric_name'])?.toString();
-});
+// Удалён
 
 /// Список опций «инструментов недели» для чек-ина (SWR через уровни)
 final usedToolsOptionsProvider = FutureProvider<List<String>>((ref) async {
-  // Берём уровни через существующий провайдер уровней
+  // Берём только артефакты как названия навыков из levels.artifact_title
   final levels = await ref.watch(levelsProvider.future);
-  // Формируем базовый набор опций из завершённых/пройденных уровней
   final List<String> tools = <String>[];
   for (final lv in levels) {
-    final String title = (lv['title'] ?? '') as String? ?? '';
-    if (title.isEmpty) continue;
-    tools.add(title);
+    final String art = (lv['artifact_title'] ?? '') as String? ?? '';
+    if (art.isNotEmpty) tools.add(art);
   }
-  // Минимальный набор дефолтов для UX
   if (tools.isEmpty) {
     return const <String>[
       'Матрица Эйзенхауэра',
@@ -120,41 +72,71 @@ final usedToolsOptionsProvider = FutureProvider<List<String>>((ref) async {
       'SMART‑планирование',
     ];
   }
-  return tools;
+  final seen = <String>{};
+  final deduped = <String>[];
+  for (final t in tools) {
+    final s = t.trim();
+    if (s.isEmpty) continue;
+    if (seen.add(s)) deduped.add(s);
+  }
+  return deduped.take(64).toList();
 });
 
-// ===== Daily Progress (28 дней) =====
+// Удалён блок 28‑дневного режима
 
-final dailyProgressListProvider =
+// ============================
+// Новая единая цель (user_goal)
+// ============================
+
+final userGoalProvider = FutureProvider<Map<String, dynamic>?>((ref) async {
+  final repo = ref.read(goalsRepositoryProvider);
+  return repo.fetchUserGoal();
+});
+
+// ============================
+// Журнал применений (practice_log)
+// ============================
+
+/// Список последних записей журнала применений (дефолт 20)
+final practiceLogProvider =
     FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final repo = ref.read(goalsRepositoryProvider);
-  return repo.fetchDailyProgress();
+  return repo.fetchPracticeLog(limit: 20);
 });
 
-final dailyProgressDayProvider =
-    FutureProvider.family<Map<String, dynamic>?, int>((ref, day) async {
+/// Список journal с параметром лимита
+final practiceLogWithLimitProvider =
+    FutureProvider.family<List<Map<String, dynamic>>, int>((ref, limit) async {
   final repo = ref.read(goalsRepositoryProvider);
-  return repo.fetchDailyDay(day);
+  return repo.fetchPracticeLog(limit: limit);
 });
 
-final dailyStreakProvider = FutureProvider<int>((ref) async {
-  final list = await ref.watch(dailyProgressListProvider.future);
-  // Считаем от дня 1 до первого провала (pending/missed), без разрывов
-  final Map<int, String> map = <int, String>{};
-  for (final m in list) {
-    final int? d = m['day_number'] as int?;
-    if (d != null) {
-      map[d] = (m['completion_status'] ?? 'pending').toString();
-    }
-  }
-  int streak = 0;
-  for (int day = 1; day <= 28; day++) {
-    final s = map[day] ?? 'pending';
-    if (s == 'completed' || s == 'partial') {
-      streak += 1;
-    } else {
-      break;
-    }
-  }
-  return streak;
+/// Агрегаты журнала: дни с применениями, топ‑инструменты
+final practiceLogAggregatesProvider =
+    FutureProvider<Map<String, dynamic>>((ref) async {
+  final repo = ref.read(goalsRepositoryProvider);
+  final items = await ref.watch(practiceLogProvider.future);
+  return repo.aggregatePracticeLog(items);
+});
+
+// ============================
+// Состояние цели (флаги L1/L4/L7)
+// ============================
+
+final goalStateProvider = FutureProvider<Map<String, dynamic>>((ref) async {
+  final goal = await ref.watch(userGoalProvider.future);
+  final bool l1Done =
+      goal != null && (goal['goal_text'] ?? '').toString().trim().isNotEmpty;
+
+  final bool l4Done = goal != null &&
+      (goal['financial_focus'] ?? '').toString().trim().isNotEmpty;
+
+  final bool l7Done = goal != null &&
+      (goal['action_plan_note'] ?? '').toString().trim().isNotEmpty;
+
+  return <String, dynamic>{
+    'l1Done': l1Done,
+    'l4Done': l4Done,
+    'l7Done': l7Done,
+  };
 });

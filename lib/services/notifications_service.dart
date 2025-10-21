@@ -12,40 +12,20 @@ class NotificationsService {
   static final NotificationsService instance = NotificationsService._();
   static String? pendingRoute;
 
+  // Keys for local persistence
+  static const String _boxName = 'notifications';
+  static const String _kWeekdays = 'practice_reminder_weekdays';
+  static const String _kHour = 'practice_reminder_hour';
+  static const String _kMinute = 'practice_reminder_minute';
+
   final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
 
   bool _initialized = false;
 
-  // Централизованная таблица каналов (id -> (name, description, importance))
-  static const Map<String, (String name, String desc, Importance imp)>
-      _channelsMeta = {
-    'goal_reminder': (
-      'Напоминания по целям',
-      'План/середина недели и чекин',
-      Importance.high,
-    ),
-    'gp_economy': (
-      'Экономика GP',
-      'Покупки, начисления и баланс GP',
-      Importance.high,
-    ),
-    'education': (
-      'Обучение',
-      'Новые материалы, курсы и библиотека',
-      Importance.defaultImportance,
-    ),
-    'chat_messages': (
-      'Сообщения чатов',
-      'Ответы ИИ‑тренеров и уведомления чатов',
-      Importance.high,
-    ),
-  };
-
   Future<void> initialize() async {
     if (_initialized) return;
     if (kIsWeb) {
-      // На Web локальные уведомления не поддерживаются
       _initialized = true;
       try {
         Sentry.addBreadcrumb(Breadcrumb(
@@ -81,9 +61,6 @@ class NotificationsService {
               message: 'notif_tap',
             ));
           } catch (_) {}
-          // Навигация выполняется в MyApp через глобальный роутер.
-          // Здесь можно сохранить маршрут в кэш/статик, если потребуется.
-          // final route = data['route'];
         } catch (_) {}
       },
     );
@@ -94,23 +71,28 @@ class NotificationsService {
     _initialized = true;
   }
 
-  /// Возвращает маршрут, если приложение запущено тапом по уведомлению
-  Future<String?> getLaunchRoute() async {
+  // Load persisted practice reminder prefs; provide defaults when absent
+  Future<(Set<int> weekdays, int hour, int minute)>
+      getPracticeReminderPrefs() async {
     try {
-      final details = await _plugin.getNotificationAppLaunchDetails();
-      final payload = details?.notificationResponse?.payload;
-      if (payload == null) return null;
-      final data = json.decode(payload) as Map<String, dynamic>;
-      final route = data['route']?.toString();
-      return (route != null && route.isNotEmpty) ? route : null;
+      final Box box = Hive.isBoxOpen(_boxName)
+          ? Hive.box(_boxName)
+          : await Hive.openBox(_boxName);
+      final List<dynamic>? rawDays = box.get(_kWeekdays) as List<dynamic>?;
+      final int hour = (box.get(_kHour) as int?) ?? 19;
+      final int minute = (box.get(_kMinute) as int?) ?? 0;
+      final Set<int> days = rawDays == null
+          ? {DateTime.monday, DateTime.wednesday, DateTime.friday}
+          : rawDays
+              .map((e) => int.tryParse(e.toString()) ?? 0)
+              .where((v) => v >= 1 && v <= 7)
+              .toSet();
+      return (days, hour, minute);
     } catch (_) {
-      return null;
+      return ({DateTime.monday, DateTime.wednesday, DateTime.friday}, 19, 0);
     }
   }
 
-  /// Унифицированное получение маршрута запуска из:
-  /// 1) pendingRoute (in-app), 2) Hive('notifications').launch_route (push), 3) системных деталей (local notif)
-  /// После чтения очищает источники.
   Future<String?> consumeAnyLaunchRoute() async {
     try {
       String? route;
@@ -130,14 +112,23 @@ class NotificationsService {
           }
         } catch (_) {}
       }
-      route ??= await getLaunchRoute();
+      if (route == null) {
+        try {
+          final details = await _plugin.getNotificationAppLaunchDetails();
+          final payload = details?.notificationResponse?.payload;
+          if (payload != null) {
+            final data = json.decode(payload) as Map<String, dynamic>;
+            final r = data['route']?.toString();
+            if (r != null && r.isNotEmpty) route = r;
+          }
+        } catch (_) {}
+      }
       return route;
     } catch (_) {
       return null;
     }
   }
 
-  /// Показ немедленного локального уведомления (foreground heads-up)
   Future<void> showNow({
     required String title,
     required String body,
@@ -158,8 +149,12 @@ class NotificationsService {
         route != null && route.isNotEmpty ? '{"route":"$route"}' : null;
     try {
       await _plugin.show(
-          DateTime.now().millisecondsSinceEpoch % 1000000, title, body, details,
-          payload: payload);
+        DateTime.now().millisecondsSinceEpoch % 1000000,
+        title,
+        body,
+        details,
+        payload: payload,
+      );
     } catch (_) {}
   }
 
@@ -167,8 +162,6 @@ class NotificationsService {
     switch (id) {
       case 'goal_reminder':
         return 'Напоминания по целям';
-      case 'gp_economy':
-        return 'Экономика GP';
       case 'chat_messages':
         return 'Сообщения чатов';
       default:
@@ -180,8 +173,6 @@ class NotificationsService {
     switch (id) {
       case 'goal_reminder':
         return 'План недели и чекины';
-      case 'gp_economy':
-        return 'Покупки и начисления GP';
       case 'chat_messages':
         return 'Ответы ИИ‑тренеров';
       default:
@@ -196,21 +187,9 @@ class NotificationsService {
     if (android == null) return;
     try {
       await android.createNotificationChannel(const AndroidNotificationChannel(
-        'goal_critical',
-        'Критичные по целям',
-        description: 'Важные дедлайны и критичные напоминания по целям',
-        importance: Importance.max,
-      ));
-      await android.createNotificationChannel(const AndroidNotificationChannel(
         'goal_reminder',
         'Напоминания по целям',
         description: 'План недели, середина недели и чекин',
-        importance: Importance.high,
-      ));
-      await android.createNotificationChannel(const AndroidNotificationChannel(
-        'gp_economy',
-        'Экономика GP',
-        description: 'Покупки, начисления и баланс GP',
         importance: Importance.high,
       ));
       await android.createNotificationChannel(const AndroidNotificationChannel(
@@ -235,78 +214,27 @@ class NotificationsService {
     } catch (_) {}
   }
 
-  Future<void> scheduleWeeklyPlan() async {
-    if (kIsWeb) {
-      // no-op на Web
-      try {
-        Sentry.addBreadcrumb(Breadcrumb(
-          level: SentryLevel.info,
-          category: 'notif',
-          message: 'notif_schedule_skipped_web',
-        ));
-      } catch (_) {}
-      return;
-    }
+  /// Schedule reminders at selected weekdays (IDs: Monday..Sunday) and hour
+  Future<void> schedulePracticeReminders(
+      {required List<int> weekdays, int hour = 19}) async {
+    if (kIsWeb) return;
     if (!_initialized) await initialize();
-    final ch = _channelsMeta['goal_reminder']!;
-    final AndroidNotificationDetails android = AndroidNotificationDetails(
-      'goal_reminder',
-      ch.$1,
-      channelDescription: ch.$2,
-      importance: ch.$3,
+    const channelId = 'goal_reminder';
+    const AndroidNotificationDetails android = AndroidNotificationDetails(
+      channelId,
+      'Напоминания по целям',
+      channelDescription: 'План недели, середина недели и чекин',
+      importance: Importance.high,
       priority: Priority.high,
     );
-    final NotificationDetails details = NotificationDetails(android: android);
-
-    // Пн 09:00
-    await _plugin.zonedSchedule(
-      1001,
-      'Новая неделя! План готов?',
-      'Откройте страницу «Цель» и уточните план недели',
-      _nextInstanceOf(weekday: DateTime.monday, hour: 9, minute: 0),
-      details,
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-      matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
-      payload: '{"route":"/goal"}',
-    );
-
-    // Ср 14:00
-    await _plugin.zonedSchedule(
-      1002,
-      'Середина недели. Как прогресс?',
-      'Проверьте цель и отметьте прогресс',
-      _nextInstanceOf(weekday: DateTime.wednesday, hour: 14, minute: 0),
-      details,
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-      matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
-      payload: '{"route":"/goal"}',
-    );
-
-    // Пт 16:00
-    await _plugin.zonedSchedule(
-      1003,
-      'Напоминание на выходные',
-      'Через два дня — чекин недели',
-      _nextInstanceOf(weekday: DateTime.friday, hour: 16, minute: 0),
-      details,
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-      matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
-      payload: '{"route":"/goal"}',
-    );
-
-    // Вс 10:00 / 13:00 / 18:00
-    for (final hm in const [(10, 0), (13, 0), (18, 0)]) {
+    const details = NotificationDetails(android: android);
+    for (final wd in weekdays.toSet()) {
+      final idBase = 9000;
       await _plugin.zonedSchedule(
-        1100 + hm.$1,
-        'Время недельного чекина',
-        'Заполните итоги недели на странице «Цель»',
-        _nextInstanceOf(weekday: DateTime.sunday, hour: hm.$1, minute: hm.$2),
+        idBase + wd,
+        'Время практики',
+        'Загляни в «Цель» и отметь действие сегодня',
+        _nextInstanceOf(weekday: wd, hour: hour, minute: 0),
         details,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
         uiLocalNotificationDateInterpretation:
@@ -315,97 +243,47 @@ class NotificationsService {
         payload: '{"route":"/goal"}',
       );
     }
+    // Persist selected weekdays/hour
     try {
-      Sentry.addBreadcrumb(Breadcrumb(
-        level: SentryLevel.info,
-        category: 'notif',
-        message: 'notif_scheduled_weekly_plan',
-      ));
+      final Box box = Hive.isBoxOpen(_boxName)
+          ? Hive.box(_boxName)
+          : await Hive.openBox(_boxName);
+      await box.put(_kWeekdays, weekdays.toSet().toList());
+      await box.put(_kHour, hour);
+      await box.put(_kMinute, 0);
     } catch (_) {}
   }
 
-  /// Ежедневные уведомления для 28-дневного режима: утро и вечер
-  Future<void> scheduleDailySprint({
-    (int, int) morning = const (9, 0),
-    (int, int) evening = const (19, 0),
-  }) async {
-    if (kIsWeb) return;
-    if (!_initialized) await initialize();
-    final ch = _channelsMeta['goal_reminder']!;
-    final android = AndroidNotificationDetails(
-      'goal_reminder',
-      ch.$1,
-      channelDescription: ch.$2,
-      importance: ch.$3,
-      priority: Priority.high,
+  /// Convenience: default Mon/Wed/Fri
+  Future<void> scheduleDailyPracticeReminder({int hour = 19}) async {
+    await schedulePracticeReminders(
+      weekdays: const [DateTime.monday, DateTime.wednesday, DateTime.friday],
+      hour: hour,
     );
-    final details = NotificationDetails(android: android);
-
-    // На каждый день недели создаём расписание morning/evening
-    const days = <int>[
-      DateTime.monday,
-      DateTime.tuesday,
-      DateTime.wednesday,
-      DateTime.thursday,
-      DateTime.friday,
-      DateTime.saturday,
-      DateTime.sunday,
-    ];
-    for (final wd in days) {
-      await _plugin.zonedSchedule(
-        3000 + wd, // уникальные ID
-        'День цели',
-        'Проверьте задачу дня на странице «Цель»',
-        _nextInstanceOf(weekday: wd, hour: morning.$1, minute: morning.$2),
-        details,
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
-        matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
-        payload: '{"route":"/goal"}',
-      );
-      await _plugin.zonedSchedule(
-        4000 + wd,
-        'Итог дня',
-        'Отметьте результат дня на странице «Цель»',
-        _nextInstanceOf(weekday: wd, hour: evening.$1, minute: evening.$2),
-        details,
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
-        matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
-        payload: '{"route":"/goal"}',
-      );
-    }
   }
 
-  Future<void> cancelDailySprint() async {
+  Future<void> cancelDailyPracticeReminder() async {
     if (kIsWeb) return;
     if (!_initialized) await initialize();
-    // Диапазон ID 3000..4007 условно
-    for (int id = 3000; id <= 4007; id++) {
+    for (final wd in const [
+      DateTime.monday,
+      DateTime.wednesday,
+      DateTime.friday,
+      DateTime.tuesday,
+      DateTime.thursday,
+      DateTime.saturday,
+      DateTime.sunday
+    ]) {
       try {
-        await _plugin.cancel(id);
+        await _plugin.cancel(9000 + wd);
       } catch (_) {}
     }
   }
 
-  /// Отменяет существующее расписание еженедельных напоминаний (известные ID)
   Future<void> cancelWeeklyPlan() async {
-    if (kIsWeb) {
-      try {
-        Sentry.addBreadcrumb(Breadcrumb(
-          level: SentryLevel.info,
-          category: 'notif',
-          message: 'notif_cancel_skipped_web',
-        ));
-      } catch (_) {}
-      return;
-    }
+    if (kIsWeb) return;
     if (!_initialized) await initialize();
-    // Базовые ID по умолчанию
     final List<int> ids = <int>[1001, 1002, 1003];
-    // Диапазон воскресных ID (10:00, 13:00, 18:00), а также на будущее — с 0..23 часов
     for (int h = 0; h <= 23; h++) {
       ids.add(1100 + h);
     }
@@ -416,133 +294,14 @@ class NotificationsService {
     }
   }
 
-  /// Пересоздаёт еженедельное расписание под выбранные дни/время
-  /// mon/wed/fri — кортежи (hour, minute). sunTimes — список кортежей.
-  Future<void> rescheduleWeekly({
-    (int, int)? mon,
-    (int, int)? wed,
-    (int, int)? fri,
-    List<(int, int)> sunTimes = const <(int, int)>[],
-  }) async {
-    if (kIsWeb) {
+  Future<void> cancelDailySprint() async {
+    if (kIsWeb) return;
+    if (!_initialized) await initialize();
+    for (int id = 3000; id <= 4007; id++) {
       try {
-        Sentry.addBreadcrumb(Breadcrumb(
-          level: SentryLevel.info,
-          category: 'notif',
-          message: 'notif_reschedule_skipped_web',
-        ));
+        await _plugin.cancel(id);
       } catch (_) {}
-      return;
     }
-    if (!_initialized) await initialize();
-    await cancelWeeklyPlan();
-
-    final ch = _channelsMeta['goal_reminder']!;
-    final AndroidNotificationDetails android = AndroidNotificationDetails(
-      'goal_reminder',
-      ch.$1,
-      channelDescription: ch.$2,
-      importance: ch.$3,
-      priority: Priority.high,
-    );
-    final NotificationDetails details = NotificationDetails(android: android);
-
-    Future<void> scheduleIf(
-        {required (int, int)? time,
-        required int id,
-        required int weekday,
-        required String title,
-        required String body}) async {
-      if (time == null) return;
-      await _plugin.zonedSchedule(
-        id,
-        title,
-        body,
-        _nextInstanceOf(weekday: weekday, hour: time.$1, minute: time.$2),
-        details,
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
-        matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
-        payload: '{"route":"/goal"}',
-      );
-    }
-
-    await scheduleIf(
-      time: mon,
-      id: 1001,
-      weekday: DateTime.monday,
-      title: 'Новая неделя! План готов?',
-      body: 'Откройте страницу «Цель» и уточните план недели',
-    );
-
-    await scheduleIf(
-      time: wed,
-      id: 1002,
-      weekday: DateTime.wednesday,
-      title: 'Середина недели. Как прогресс?',
-      body: 'Проверьте цель и отметьте прогресс',
-    );
-
-    await scheduleIf(
-      time: fri,
-      id: 1003,
-      weekday: DateTime.friday,
-      title: 'Напоминание на выходные',
-      body: 'Через два дня — чекин недели',
-    );
-
-    // Вс — один или несколько слотов
-    for (final hm in sunTimes) {
-      final int id = 1100 + hm.$1; // уникальный ID на основе часа
-      await _plugin.zonedSchedule(
-        id,
-        'Время недельного чекина',
-        'Заполните итоги недели на странице «Цель»',
-        _nextInstanceOf(weekday: DateTime.sunday, hour: hm.$1, minute: hm.$2),
-        details,
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
-        matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
-        payload: '{"route":"/goal"}',
-      );
-    }
-
-    try {
-      Sentry.addBreadcrumb(Breadcrumb(
-        level: SentryLevel.info,
-        category: 'notif',
-        message: 'notif_rescheduled_weekly_plan',
-      ));
-    } catch (_) {}
-  }
-
-  /// Однократное локальное уведомление «Новые материалы в библиотеке»
-  Future<void> showLibraryDigestOnce() async {
-    if (!_initialized) await initialize();
-    const android = AndroidNotificationDetails(
-      'education',
-      'Обучение',
-      channelDescription: 'Новые материалы, курсы и библиотека',
-      importance: Importance.defaultImportance,
-      priority: Priority.defaultPriority,
-    );
-    const details = NotificationDetails(android: android);
-    await _plugin.show(
-      2001,
-      '📚 Новые материалы в библиотеке',
-      'Откройте «Библиотеку», чтобы посмотреть обновления',
-      details,
-      payload: '{"route":"/library"}',
-    );
-    try {
-      Sentry.addBreadcrumb(Breadcrumb(
-        level: SentryLevel.info,
-        category: 'notif',
-        message: 'notif_library_digest_shown',
-      ));
-    } catch (_) {}
   }
 
   tz.TZDateTime _nextInstanceOf(

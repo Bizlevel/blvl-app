@@ -24,6 +24,7 @@ import 'package:bizlevel/widgets/common/bizlevel_button.dart';
 import 'package:bizlevel/widgets/common/gp_balance_widget.dart';
 import 'package:bizlevel/widgets/common/bizlevel_card.dart';
 import 'package:bizlevel/widgets/common/bizlevel_text_field.dart';
+import 'package:bizlevel/widgets/reminders_settings_sheet.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -200,12 +201,9 @@ class ProfileScreen extends ConsumerWidget {
                   onSelected: (value) async {
                     switch (value) {
                       case 'notifications':
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Скоро: уведомления')),
-                        );
+                        await showRemindersSettingsSheet(context);
                         break;
                       case 'settings':
-                        // Пока отдельного экрана нет — подскажем пользователю
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                               content:
@@ -213,7 +211,6 @@ class ProfileScreen extends ConsumerWidget {
                         );
                         break;
                       case 'payments':
-                        // Платежи Premium отключены на этапе 39.1
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('Скоро: покупки GP')),
                         );

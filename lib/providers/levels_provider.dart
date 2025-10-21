@@ -5,7 +5,7 @@ import 'package:bizlevel/providers/auth_provider.dart';
 import 'package:bizlevel/utils/formatters.dart';
 import 'package:bizlevel/services/supabase_service.dart';
 // import 'package:hive_flutter/hive_flutter.dart';
-import 'package:bizlevel/providers/goals_providers.dart';
+// import 'package:bizlevel/providers/goals_providers.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bizlevel/utils/constant.dart';
 
@@ -131,32 +131,7 @@ final nextLevelToContinueProvider =
   final levels = await ref.watch(levelsProvider.future);
   final nodes = await ref.watch(towerNodesProvider.future);
 
-  // 0) Чекпоинт цели (если предшествующий уровень завершён)
-  final Map<String, dynamic> pendingGoalCp = nodes.firstWhere(
-    (n) => n['type'] == 'goal_checkpoint' && (n['isCompleted'] != true),
-    orElse: () => <String, dynamic>{},
-  );
-  if (pendingGoalCp.isNotEmpty) {
-    final int afterLevel = pendingGoalCp['afterLevel'] as int? ?? 0;
-    final int targetLevel = afterLevel;
-    final int? gver = pendingGoalCp['version'] as int?;
-    final candidate = levels.firstWhere(
-      (l) => (l['level'] as int? ?? -1) == targetLevel,
-      orElse: () => levels.first,
-    );
-    if ((candidate['isCompleted'] as bool? ?? false) == true) {
-      return {
-        'levelId': candidate['id'] as int,
-        'levelNumber': targetLevel,
-        'floorId': 1,
-        'requiresPremium': false,
-        'isLocked': false,
-        'targetScroll': targetLevel,
-        'label': 'Чекпоинт цели v${gver ?? ''}'.trim(),
-        if (gver != null) 'goalCheckpointVersion': gver,
-      };
-    }
-  }
+  // Чекпоинты цели больше не используются для гейтинга/навигации
 
   // 1) Мини‑кейс (если предыдущий уровень завершён)
   final Map<String, dynamic> pendingMiniCase = nodes.firstWhere(
@@ -225,7 +200,7 @@ final towerNodesProvider =
   // Локальное состояние старых чекпоинтов больше не используется
   // Загрузим мини-кейсы и прогресс пользователя по ним (id ∈ {1,2,3})
   final supa = Supabase.instance.client;
-  final List<dynamic> casesRows = await supa
+  final List casesRows = await supa
       .from('mini_cases')
       .select('id, after_level, title, is_required, active')
       .eq('active', true)
@@ -255,16 +230,32 @@ final towerNodesProvider =
     }
   }
 
+  // Лёгкие признаки для чекпоинтов цели (новая модель user_goal + practice_log)
+  final String uid = Supabase.instance.client.auth.currentUser?.id ?? '';
+  Map<String, dynamic>? userGoal;
+  bool hasAnyPractice = false;
+  if (uid.isNotEmpty) {
+    try {
+      userGoal = await supa
+          .from('user_goal')
+          .select('goal_text, metric_type, metric_target')
+          .eq('user_id', uid)
+          .limit(1)
+          .maybeSingle();
+    } catch (_) {}
+    try {
+      final List pr = await supa
+          .from('practice_log')
+          .select('id')
+          .eq('user_id', uid)
+          .order('applied_at', ascending: false)
+          .limit(1);
+      hasAnyPractice = pr.isNotEmpty;
+    } catch (_) {}
+  }
+
   // Статусы версий цели (v2 после L4, v3 после L7, v4 после L10)
-  const Map<int, int> goalCheckpointVersionByAfterLevel = {
-    4: 2,
-    7: 3,
-    10: 4,
-  };
-  // Проверяем наличие версий через провайдер (единый источник истины)
-  final bool hasV2 = await ref.watch(hasGoalVersionProvider(2).future);
-  final bool hasV3 = await ref.watch(hasGoalVersionProvider(3).future);
-  final bool hasV4 = await ref.watch(hasGoalVersionProvider(4).future);
+  // Чекпоинты версий цели больше не используются
 
   // Каркас узлов: level | divider | checkpoint
   final List<Map<String, dynamic>> nodes = [];
@@ -315,24 +306,31 @@ final towerNodesProvider =
       }
     }
 
-    // Вставляем чекпоинт цели после 4/7/10
-    final int? goalVersion = goalCheckpointVersionByAfterLevel[num];
-    if (goalVersion != null) {
-      final bool isCompleted =
-          goalVersion == 2 ? hasV2 : (goalVersion == 3 ? hasV3 : hasV4);
+    // Добавляем goal_checkpoint после 1, 4, 7
+    if (num == 1 || num == 4 || num == 7) {
+      bool completed = false;
+      if (num == 1) {
+        completed =
+            ((userGoal?['goal_text'] ?? '').toString().trim().isNotEmpty);
+      } else if (num == 4) {
+        final hasMetricType =
+            ((userGoal?['metric_type'] ?? '').toString().trim().isNotEmpty);
+        final hasMetricTarget = (userGoal?['metric_target'] != null);
+        completed = hasMetricType && hasMetricTarget;
+      } else if (num == 7) {
+        completed = hasAnyPractice;
+      }
+
       nodes.add({
         'type': 'goal_checkpoint',
         'afterLevel': num,
-        'version': goalVersion,
-        'title': goalVersion == 2
-            ? 'v2 Метрики'
-            : (goalVersion == 3 ? 'v3 SMART' : 'v4 Финал'),
-        'isCompleted': isCompleted,
-        // Разрешаем входить в чекпоинт, только если предыдущий уровень завершён
+        'goalVersion': null,
+        'isCompleted': completed,
         'prevLevelCompleted': (l['isCompleted'] as bool? ?? false),
+        'route': num == 1
+            ? '/checkpoint/l1'
+            : (num == 4 ? '/checkpoint/l4' : '/checkpoint/l7'),
       });
-      // Строгая логика: блокируем следующий уровень, пока checkpoint не завершён
-      // Новый UX: редактирование чекпоинтов не блокирует прогресс уровней
     }
   }
 

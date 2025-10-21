@@ -14,7 +14,6 @@ class _MockQueryBuilder extends Mock implements SupabaseQueryBuilder {}
 void main() {
   late Directory tempDir;
   late Box goalsBox;
-  late Box weeklyBox;
   late Box quotesBox;
   late GoalsRepository repository;
 
@@ -23,13 +22,11 @@ void main() {
     tempDir = await Directory.systemTemp.createTemp();
     Hive.init(p.join(tempDir.path, 'hive'));
     goalsBox = await Hive.openBox('goals');
-    weeklyBox = await Hive.openBox('weekly_progress');
     quotesBox = await Hive.openBox('quotes');
   });
 
   tearDownAll(() async {
     await goalsBox.close();
-    await weeklyBox.close();
     await quotesBox.close();
     await tempDir.delete(recursive: true);
   });
@@ -37,66 +34,15 @@ void main() {
   setUp(() {
     final client = _MockSupabaseClient();
     final builder = _MockQueryBuilder();
-    // По умолчанию все сетевые вызовы бросают SocketException (эмулируем офлайн)
     when(() => client.from(any())).thenReturn(builder);
     when(() => builder.select(any()))
         .thenThrow(const SocketException('offline'));
     repository = GoalsRepository(client);
     goalsBox.clear();
-    weeklyBox.clear();
     quotesBox.clear();
   });
 
-  group('GoalsRepository SWR', () {
-    test('fetchLatestGoal returns cache when offline', () async {
-      const userId = 'u1';
-      const key = 'latest_$userId';
-      final cached = {
-        'id': 'g1',
-        'user_id': userId,
-        'version': 1,
-        'goal_text': 'Моя цель',
-        'version_data': {
-          'goal_initial': 'Протестировать',
-          'goal_why': 'Важно',
-          'main_obstacle': 'Нет времени'
-        }
-      };
-      await goalsBox.put(key, cached);
-
-      final result = await repository.fetchLatestGoal(userId);
-
-      expect(result, isNotNull);
-      expect(result!['id'], 'g1');
-    });
-
-    test('fetchSprint returns cache when offline', () async {
-      const key = 'sprint_2';
-      final cached = {
-        'sprint_number': 2,
-        'achievement': 'Сделано X',
-      };
-      await weeklyBox.put(key, cached);
-
-      final result = await repository.fetchSprint(2);
-      expect(result, isNotNull);
-      expect(result!['achievement'], 'Сделано X');
-    });
-
-    test('weekly progress new API does not crash offline', () async {
-      // Smoke: методы существуют и обрабатывают офлайн без падения
-      try {
-        await repository.fetchWeek(1);
-      } catch (_) {}
-      try {
-        await repository.upsertWeek(weekNumber: 1, completionStatus: 'partial');
-      } catch (_) {}
-      try {
-        await repository.updateWeek(
-            id: '00000000-0000-0000-0000-000000000000', maxFeedback: 'ok');
-      } catch (_) {}
-    });
-
+  group('GoalsRepository', () {
     test('getDailyQuote returns deterministic item from cache', () async {
       final active = [
         {'id': 'q1', 'quote_text': 'A', 'author': 'Au'},

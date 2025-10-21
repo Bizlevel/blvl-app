@@ -6,6 +6,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bizlevel/services/gp_service.dart';
+import 'package:bizlevel/services/notifications_service.dart';
 import '../utils/env_helper.dart';
 
 // No longer importing SupabaseService directly to enable dependency injection.
@@ -66,6 +67,17 @@ class AuthService {
             await GpService.saveBalanceCache(fresh);
           } catch (_) {}
         } catch (_) {}
+
+        // Пересоздаём локальные уведомления под текущего пользователя
+        try {
+          final notif = NotificationsService.instance;
+          await notif.initialize();
+          // Чистим старые типы расписаний и ставим единое напоминание практики (Пн/Ср/Пт)
+          await notif.cancelWeeklyPlan();
+          await notif.cancelDailySprint();
+          await notif.cancelDailyPracticeReminder();
+          await notif.scheduleDailyPracticeReminder();
+        } catch (_) {}
       }
       return response;
     }, unknownErrorMessage: 'Неизвестная ошибка входа');
@@ -87,6 +99,14 @@ class AuthService {
       await _client.auth.signOut();
       // Clear Sentry user context
       Sentry.configureScope((scope) => scope.setUser(null));
+      // Отменяем локальные уведомления пользователя
+      try {
+        final notif = NotificationsService.instance;
+        await notif.initialize();
+        await notif.cancelWeeklyPlan();
+        await notif.cancelDailyPracticeReminder();
+        await notif.cancelDailySprint();
+      } catch (_) {}
     }, unknownErrorMessage: 'Неизвестная ошибка выхода');
   }
 

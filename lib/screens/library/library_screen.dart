@@ -1,3 +1,4 @@
+import 'package:bizlevel/widgets/common/notification_center.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
@@ -248,17 +249,14 @@ class _FavoritesTabState extends ConsumerState<_FavoritesTab> {
                   ref.invalidate(favoritesProvider);
                   ref.invalidate(favoritesDetailedProvider);
                   if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Избранное обновлено')),
-                    );
+                    NotificationCenter.showSuccess(
+                        context, 'Избранное обновлено');
                   }
                 } catch (e, st) {
                   await Sentry.captureException(e, stackTrace: st);
                   if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                          content: Text('Ошибка обновления избранного')),
-                    );
+                    NotificationCenter.showError(
+                        context, 'Ошибка обновления избранного');
                   }
                 }
               },
@@ -292,16 +290,12 @@ class _FavoritesTabState extends ConsumerState<_FavoritesTab> {
       if (uri == null) return;
       final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
       if (!ok && context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Не удалось открыть ссылку')),
-        );
+        NotificationCenter.showError(context, 'Не удалось открыть ссылку');
       }
     } catch (e, st) {
       Sentry.captureException(e, stackTrace: st);
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Не удалось открыть ссылку')),
-        );
+        NotificationCenter.showError(context, 'Не удалось открыть ссылку');
       }
     }
   }

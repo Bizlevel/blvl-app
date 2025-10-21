@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>HLS Player</title>
+    <style>
+      html, body { margin: 0; padding: 0; height: 100%; background: #000; }
+      #v { width: 100%; height: 100%; background: #000; }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  </head>
+  <body>
+    <video id="v" controls playsinline webkit-playsinline></video>
+    <script>
+      (function() {
+        try {
+          var params = new URLSearchParams(window.location.search);
+          var src = params.get('src');
+          var video = document.getElementById('v');
+          if (!src) {
+            document.title = 'No src provided';
+            return;
+          }
+          if (window.Hls && window.Hls.isSupported()) {
+            var hls = new Hls({ enableWorker: true });
+            hls.loadSource(src);
+            hls.attachMedia(video);
+          } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+            video.src = src;
+          } else {
+            video.src = src;
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      })();
+    </script>
+  </body>
+  </html>
+
+

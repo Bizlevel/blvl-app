@@ -82,7 +82,7 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
           .from('mini_cases')
           .select(
               'id, title, after_level, skill_name, estimated_minutes, script, '
-              'vimeo_id, video_url') // 🆕 Добавлены поля для видео
+              'video_url') // видео: Bunny/Supabase через video_url
           .eq('id', widget.caseId)
           .maybeSingle();
       if (!mounted) return;
@@ -207,7 +207,6 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
   /// 🆕 Блок 2: Видео + CTA "Решить с Лео"
   Widget _buildVideoBlock() {
     // Создаём фейковый LessonModel для переиспользования LessonWidget
-    final vimeoId = _caseMeta?['vimeo_id'] as String?;
     final videoUrl = _caseMeta?['video_url'] as String?;
 
     final mockLesson = LessonModel(
@@ -217,7 +216,6 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
       title: _caseMeta?['title'] as String? ?? 'Мини-кейс',
       description: 'Посмотрите видео перед решением кейса',
       videoUrl: videoUrl,
-      vimeoId: vimeoId,
       durationMinutes: _caseMeta?['estimated_minutes'] as int? ?? 10,
       quizQuestions: [],
       correctAnswers: [],

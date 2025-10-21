@@ -9,13 +9,46 @@ if ! command -v sentry-cli >/dev/null 2>&1; then
   exit 1
 fi
 
-# Fetch issues as JSON using sentry-cli
-ISSUES_JSON=$(sentry-cli issues list \
-  --org "$SENTRY_ORG" \
-  --project "$SENTRY_PROJECT" \
-  --stats-period 24h \
-  --query "is:unresolved" \
-  --json || true)
+MAX_RETRIES=${MAX_RETRIES:-3}
+SLEEP_BASE=${SLEEP_BASE:-1}
+
+fetch_issues_json() {
+  sentry-cli issues list \
+    --org "$SENTRY_ORG" \
+    --project "$SENTRY_PROJECT" \
+    --stats-period 24h \
+    --query "is:unresolved" \
+    --json
+}
+
+# Retry with exponential backoff if API returns non-JSON or fails
+attempt=0
+ISSUES_JSON=""
+while :; do
+  attempt=$((attempt+1))
+  if OUTPUT=$(fetch_issues_json 2>&1); then
+    ISSUES_JSON="$OUTPUT"
+  else
+    ISSUES_JSON=""
+  fi
+
+  # Validate JSON
+  if echo "$ISSUES_JSON" | jq empty >/dev/null 2>&1; then
+    break
+  fi
+
+  if [ "$attempt" -ge "$MAX_RETRIES" ]; then
+    echo "::warning::Sentry API is unavailable or returned invalid JSON after $attempt attempts. Skipping blocking check."
+    # Soft-fallback: do not fail the pipeline on Sentry API outages
+    echo "[]" > /tmp/sentry_issues.json
+    ISSUES_JSON="[]"
+    break
+  fi
+
+  sleep_time=$((SLEEP_BASE * 2 ** (attempt-1)))
+  echo "⚠️  Sentry API error (attempt $attempt/$MAX_RETRIES). Retrying in ${sleep_time}s…"
+  sleep "$sleep_time"
+done
 
 # Define patterns that are considered non-critical and can be ignored
 WHITELIST_REGEX="RenderFlex overflow|Layout|BackdropFilter performance"
