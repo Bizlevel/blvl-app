@@ -156,10 +156,11 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                           goalText: _goalCtrl.text.trim(),
                           targetDate: _selectedTargetDate,
                         );
+                        final messenger = ScaffoldMessenger.of(context);
                         ref.invalidate(userGoalProvider);
                         if (!mounted) return;
                         setState(() => _isEditing = false);
-                        ScaffoldMessenger.of(context).showSnackBar(
+                        messenger.showSnackBar(
                             const SnackBar(content: Text('Цель сохранена')));
                       } catch (e) {
                         if (!mounted) return;

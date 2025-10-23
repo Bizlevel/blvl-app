@@ -38,6 +38,15 @@ class LoginScreen extends HookConsumerWidget {
           ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text('Произошла неизвестная ошибка: $error')));
         }
+      } else if (next is AsyncData<void>) {
+        // Показать бонус за регистрацию при первом входе (если применимо)
+        // Сервер начисляет идемпотентно; показываем дружелюбный снэкбар один раз после входа
+        try {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text('Добро пожаловать! +30 GP за регистрацию')),
+          );
+        } catch (_) {}
       }
     });
 

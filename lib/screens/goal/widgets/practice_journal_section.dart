@@ -224,6 +224,15 @@ class _PracticeJournalSectionState
                             message: 'goal_momentum_shown',
                             level: SentryLevel.info));
                       } catch (_) {}
+                      // Сигнал о бонусе за практику
+                      try {
+                        final messenger = ScaffoldMessenger.of(context);
+                        if (!mounted) return;
+                        messenger.showSnackBar(
+                          const SnackBar(
+                              content: Text('+5 GP за практику сегодня')),
+                        );
+                      } catch (_) {}
                       await Future.delayed(const Duration(milliseconds: 800));
                       if (!mounted) return;
                       setState(() => _showMomentum = false);
@@ -232,12 +241,12 @@ class _PracticeJournalSectionState
                           bot: 'max',
                           chatId: null,
                           userContext: [
-                            if (note.isNotEmpty) 'practice_note: ' + note,
-                            if (tools.isNotEmpty) 'applied_tools: ' + tools,
+                            if (note.isNotEmpty) 'practice_note: $note',
+                            if (tools.isNotEmpty) 'applied_tools: $tools',
                           ].join('\n'),
                           levelContext: '',
                           autoUserMessage: note.isNotEmpty
-                              ? 'Сегодня сделал(а): ' + note
+                              ? 'Сегодня сделал(а): $note'
                               : 'Я сделал запись в дневнике применений. Подскажи, как усилить эффект?',
                         ),
                       ));

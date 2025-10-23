@@ -1,6 +1,7 @@
 part of '../biz_tower_screen.dart';
 
 // Стоимость и номер пакета доступа к этажу (используются в диалогах разблокировки)
+// Цена теперь подтягивается динамически из БД; значение ниже — только запасной дефолт.
 const int _kFloorUnlockCost = 1000;
 const int _kTargetFloorNumber = 1;
 
@@ -77,13 +78,20 @@ void _showUnlockFloorDialog(BuildContext context, {required int floorNumber}) {
   showDialog(
     context: context,
     builder: (ctx) {
-      return BizLevelModal(
-        title: 'Открыть этаж',
-        subtitle: 'Стоимость: $_kFloorUnlockCost GP. Открыть доступ?',
-        primaryLabel: '$_kFloorUnlockCost GP',
-        icon: Icons.lock_open,
-        onPrimary: () async {
-          await _unlockFloor(context, floorNumber: floorNumber);
+      return FutureBuilder<int>(
+        future: GpService(Supabase.instance.client)
+            .getFloorPrice(floorNumber: floorNumber),
+        builder: (context, snapshot) {
+          final price = snapshot.data ?? _kFloorUnlockCost;
+          return BizLevelModal(
+            title: 'Открыть этаж',
+            subtitle: 'Стоимость: $price GP. Открыть доступ?',
+            primaryLabel: '$price GP',
+            icon: Icons.lock_open,
+            onPrimary: () async {
+              await _unlockFloor(context, floorNumber: floorNumber);
+            },
+          );
         },
       );
     },

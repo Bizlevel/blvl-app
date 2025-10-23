@@ -143,6 +143,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                 children: [
                   Expanded(
                     child: ElevatedButton(
+                      key: const ValueKey('goal_add_entry_cta'),
                       onPressed: _scrollToJournal,
                       child: const Text('Добавить запись'),
                     ),
@@ -150,6 +151,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: OutlinedButton(
+                      key: const ValueKey('goal_chat_max_cta'),
                       onPressed: () {
                         try {
                           Sentry.addBreadcrumb(Breadcrumb(

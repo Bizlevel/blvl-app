@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:bizlevel/services/gp_service.dart';
 import 'package:bizlevel/services/supabase_service.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 
@@ -12,6 +13,25 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 class GoalsRepository {
   final SupabaseClient _client;
   GoalsRepository(this._client);
+  // ---------- small helpers to reduce duplication ----------
+  void _ensureAnonApikey() {
+    try {
+      Supabase.instance.client.rest.headers['apikey'] = SupabaseService.anonKey;
+    } catch (_) {}
+  }
+
+  String _requireUserId() {
+    final String? userId = _client.auth.currentUser?.id;
+    if (userId == null) {
+      throw const PostgrestException(
+          message: 'Not authorized', code: '401', details: null, hint: null);
+    }
+    return userId;
+  }
+
+  Future<Box> _getBox(String name) async {
+    return Hive.isBoxOpen(name) ? Hive.box(name) : await Hive.openBox(name);
+  }
 
   // ============================
   // Generic кеширование (DRY)
@@ -48,20 +68,14 @@ class GoalsRepository {
   Future<Map<String, dynamic>?> fetchUserGoal() async {
     final String? userId = _client.auth.currentUser?.id;
     if (userId == null) return null;
-    final Box cache = Hive.isBoxOpen('user_goal')
-        ? Hive.box('user_goal')
-        : await Hive.openBox('user_goal');
+    final Box cache = await _getBox('user_goal');
     const String cacheKey = 'self';
 
     return _cachedQuery<Map<String, dynamic>>(
       cache: cache,
       cacheKey: cacheKey,
       query: () {
-        // Ensure apikey header for Web PostgREST
-        try {
-          Supabase.instance.client.rest.headers['apikey'] =
-              SupabaseService.anonKey;
-        } catch (_) {}
+        _ensureAnonApikey();
         return _client
             .from('user_goal')
             .select(
@@ -85,28 +99,20 @@ class GoalsRepository {
     String? financialFocus,
     String? actionPlanNote,
   }) async {
-    final String? userId = _client.auth.currentUser?.id;
-    if (userId == null) {
-      throw PostgrestException(
-          message: 'Not authorized', code: '401', details: null, hint: null);
-    }
-    // Ensure apikey header for Web PostgREST
-    try {
-      Supabase.instance.client.rest.headers['apikey'] = SupabaseService.anonKey;
-    } catch (_) {}
-    final Map<String, dynamic> payload = <String, dynamic>{
-      'user_id': userId,
-      'goal_text': goalText,
-      if (metricType != null) 'metric_type': metricType,
-      if (metricStart != null) 'metric_start': metricStart,
-      if (metricCurrent != null) 'metric_current': metricCurrent,
-      if (metricTarget != null) 'metric_target': metricTarget,
-      if (startDate != null) 'start_date': startDate.toUtc().toIso8601String(),
-      if (targetDate != null)
-        'target_date': targetDate.toUtc().toIso8601String(),
-      if (financialFocus != null) 'financial_focus': financialFocus,
-      if (actionPlanNote != null) 'action_plan_note': actionPlanNote,
-    };
+    final String userId = _requireUserId();
+    _ensureAnonApikey();
+    final Map<String, dynamic> payload = _buildUserGoalPayload(
+      userId: userId,
+      goalText: goalText,
+      metricType: metricType,
+      metricStart: metricStart,
+      metricCurrent: metricCurrent,
+      metricTarget: metricTarget,
+      startDate: startDate,
+      targetDate: targetDate,
+      financialFocus: financialFocus,
+      actionPlanNote: actionPlanNote,
+    );
 
     final Map<String, dynamic> row = await _client
         .from('user_goal')
@@ -123,6 +129,33 @@ class GoalsRepository {
     return Map<String, dynamic>.from(row);
   }
 
+  Map<String, dynamic> _buildUserGoalPayload({
+    required String userId,
+    required String goalText,
+    String? metricType,
+    num? metricStart,
+    num? metricCurrent,
+    num? metricTarget,
+    DateTime? startDate,
+    DateTime? targetDate,
+    String? financialFocus,
+    String? actionPlanNote,
+  }) {
+    return <String, dynamic>{
+      'user_id': userId,
+      'goal_text': goalText,
+      if (metricType != null) 'metric_type': metricType,
+      if (metricStart != null) 'metric_start': metricStart,
+      if (metricCurrent != null) 'metric_current': metricCurrent,
+      if (metricTarget != null) 'metric_target': metricTarget,
+      if (startDate != null) 'start_date': startDate.toUtc().toIso8601String(),
+      if (targetDate != null)
+        'target_date': targetDate.toUtc().toIso8601String(),
+      if (financialFocus != null) 'financial_focus': financialFocus,
+      if (actionPlanNote != null) 'action_plan_note': actionPlanNote,
+    };
+  }
+
   // ============================
   // Practice log (was daily_progress)
   // ============================
@@ -130,29 +163,13 @@ class GoalsRepository {
   Future<List<Map<String, dynamic>>> fetchPracticeLog({int limit = 20}) async {
     final String? userId = _client.auth.currentUser?.id;
     if (userId == null) return <Map<String, dynamic>>[];
-    final Box cache = Hive.isBoxOpen('practice_log')
-        ? Hive.box('practice_log')
-        : await Hive.openBox('practice_log');
+    final Box cache = await _getBox('practice_log');
     final String cacheKey = 'list_$limit';
 
     final result = await _cachedQuery<List>(
       cache: cache,
       cacheKey: cacheKey,
-      query: () async {
-        // Ensure apikey header for Web PostgREST
-        try {
-          Supabase.instance.client.rest.headers['apikey'] =
-              SupabaseService.anonKey;
-        } catch (_) {}
-        final List rows = await _client
-            .from('practice_log')
-            .select(
-                'id, user_id, applied_at, applied_tools, note, created_at, updated_at')
-            .eq('user_id', userId)
-            .order('applied_at', ascending: false)
-            .limit(limit);
-        return rows;
-      },
+      query: () async => _fetchPracticeRows(userId: userId, limit: limit),
       fromCache: (cached) => List.from(cached),
     );
 
@@ -162,16 +179,24 @@ class GoalsRepository {
             result.map((e) => Map<String, dynamic>.from(e)));
   }
 
+  Future<List> _fetchPracticeRows(
+      {required String userId, required int limit}) async {
+    _ensureAnonApikey();
+    return await _client
+        .from('practice_log')
+        .select(
+            'id, user_id, applied_at, applied_tools, note, created_at, updated_at')
+        .eq('user_id', userId)
+        .order('applied_at', ascending: false)
+        .limit(limit);
+  }
+
   Future<Map<String, dynamic>> addPracticeEntry({
     List<String> appliedTools = const <String>[],
     String? note,
     DateTime? appliedAt,
   }) async {
-    final String? userId = _client.auth.currentUser?.id;
-    if (userId == null) {
-      throw PostgrestException(
-          message: 'Not authorized', code: '401', details: null, hint: null);
-    }
+    final String userId = _requireUserId();
     final Map<String, dynamic> payload = <String, dynamic>{
       'user_id': userId,
       'applied_tools': appliedTools,
@@ -179,10 +204,7 @@ class GoalsRepository {
       if (appliedAt != null) 'applied_at': appliedAt.toUtc().toIso8601String(),
     };
 
-    // Ensure apikey header for Web PostgREST
-    try {
-      Supabase.instance.client.rest.headers['apikey'] = SupabaseService.anonKey;
-    } catch (_) {}
+    _ensureAnonApikey();
     final inserted =
         await _client.from('practice_log').insert(payload).select().single();
 
@@ -198,10 +220,7 @@ class GoalsRepository {
       ));
     } catch (_) {}
 
-    // Best-effort: claim daily bonus (idempotent server-side)
-    try {
-      await _client.rpc('gp_claim_daily_application');
-    } catch (_) {}
+    await _claimDailyBonusAndRefresh();
 
     // Invalidate/refresh cache roughly
     try {
@@ -212,6 +231,18 @@ class GoalsRepository {
     return Map<String, dynamic>.from(inserted);
   }
 
+  Future<void> _claimDailyBonusAndRefresh() async {
+    // Best-effort: claim daily bonus (idempotent server-side)
+    try {
+      await _client.rpc('gp_claim_daily_application');
+      try {
+        final gp = GpService(Supabase.instance.client);
+        final fresh = await gp.getBalance();
+        await GpService.saveBalanceCache(fresh);
+      } catch (_) {}
+    } catch (_) {}
+  }
+
   Map<String, dynamic> aggregatePracticeLog(List<Map<String, dynamic>> items) {
     // daysApplied = количество уникальных дат с записями
     final Set<String> dates = <String>{};
@@ -219,8 +250,15 @@ class GoalsRepository {
     int total = 0;
     for (final m in items) {
       total++;
-      final String d = (m['applied_at'] ?? '').toString();
-      if (d.isNotEmpty) dates.add(d);
+      final String tsStr = (m['applied_at'] ?? '').toString();
+      if (tsStr.isNotEmpty) {
+        // Считаем уникальные дни, а не уникальные отметки времени
+        final DateTime? ts = DateTime.tryParse(tsStr);
+        final String dayKey = ts == null
+            ? tsStr.substring(0, tsStr.length.clamp(0, 10))
+            : '${ts.year.toString().padLeft(4, '0')}-${ts.month.toString().padLeft(2, '0')}-${ts.day.toString().padLeft(2, '0')}';
+        dates.add(dayKey);
+      }
       final List tools = (m['applied_tools'] as List?) ?? const <dynamic>[];
       for (final t in tools) {
         final String label = t.toString();
@@ -283,50 +321,27 @@ class GoalsRepository {
     final num? startRaw = goal['metric_start'] as num?;
     final num? currentRaw = goal['metric_current'] as num?;
     final num? targetRaw = goal['metric_target'] as num?;
-    if (startRaw == null || currentRaw == null || targetRaw == null)
+    if (startRaw == null || currentRaw == null || targetRaw == null) {
       return null;
+    }
     final double start = startRaw.toDouble();
     final double current = currentRaw.toDouble();
     final double target = targetRaw.toDouble();
     final double denom = (target - start);
-    if (denom.abs() < 1e-9) return null;
+    if (denom.abs() < 1e-9) {
+      return null;
+    }
     final double value = (current - start) / denom;
     // clamp 0..1 на клиенте для чистоты UI
-    if (value.isNaN) return null;
+    if (value.isNaN) {
+      return null;
+    }
     return value.clamp(0.0, 1.0);
   }
 
   // ===== Legacy core_goals/weekly/daily APIs удалены в новой концепции =====
 
-  /// 🆕 Проверяет серии выполненных дней и автоматически начисляет GP-бонусы (7/14/21/28)
-  Future<Map<String, dynamic>> checkAndGrantStreakBonus() async {
-    try {
-      final resp = await _client.rpc('check_and_grant_streak_bonus');
-      if (resp is Map) {
-        try {
-          Sentry.addBreadcrumb(Breadcrumb(
-            category: 'goal',
-            level: SentryLevel.info,
-            message: 'streak_bonus_checked',
-            data: resp.map((k, v) => MapEntry(k.toString(), v)),
-          ));
-        } catch (_) {}
-        return Map<String, dynamic>.from(resp);
-      }
-      return <String, dynamic>{};
-    } catch (e) {
-      debugPrint('checkAndGrantStreakBonus error: $e');
-      try {
-        Sentry.addBreadcrumb(Breadcrumb(
-          category: 'goal',
-          level: SentryLevel.warning,
-          message: 'streak_bonus_check_failed',
-          data: {'error': e.toString()},
-        ));
-      } catch (_) {}
-      return <String, dynamic>{};
-    }
-  }
+  // streak-бонусы удалены по новой концепции
 
   /// Получить daily_progress пользователя (MVP): если в БД нет таблицы,
   /// используем локальный Hive-кеш 'daily_progress_local'.
@@ -494,11 +509,7 @@ class GoalsRepository {
   /// Проверяет и начисляет GP-бонусы за серии выполненных дней
   Future<void> _checkStreakBonusIfCompleted(String? status) async {
     if (status == 'completed' || status == 'partial') {
-      try {
-        await checkAndGrantStreakBonus();
-      } catch (e) {
-        debugPrint('Streak bonus check failed: $e');
-      }
+      // streak-бонусы удалены
     }
   }
 

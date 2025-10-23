@@ -8,6 +8,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 class _MockSupabaseClient extends Mock implements SupabaseClient {}
 
+class _MockQueryBuilder extends Mock implements SupabaseQueryBuilder {}
+
 void main() {
   late Directory tempDir;
   late Box box;
@@ -36,7 +38,10 @@ void main() {
     final cached = [
       {'id': 'c1', 'title': 'Course 1'},
     ];
-    await box.put('courses:_all', cached);
+    await box.put('courses.v3:_all', cached);
+
+    // Эмулируем офлайн: любой доступ к таблице бросает SocketException
+    when(() => client.from(any())).thenThrow(const SocketException('offline'));
 
     final result = await repository.fetchCourses();
     expect(result, cached);

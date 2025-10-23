@@ -151,8 +151,58 @@ class GpService {
     final scalar = _asFirstInt(data);
     if (scalar != null) return scalar;
     final row = _asRow(data);
-    if (row != null) return (row['balance_after'] as num?)?.toInt();
+    if (row != null) {
+      final r = row; // promote to non-nullable for analyzer
+      return (r['balance_after'] as num?)?.toInt();
+    }
     return null;
+  }
+
+  bool _shouldEdgeFallback(PostgrestException e) {
+    return !kReleaseMode && _isFunctionMissing(e);
+  }
+
+  // _rethrowWithCapture: не используется, удалено
+
+  T _handlePostgrestException<T>(
+    PostgrestException e, {
+    void Function()? onInsufficient,
+    T Function()? devFallback,
+  }) {
+    final msg = e.message.toString();
+    if (msg.contains('gp_insufficient_balance')) {
+      if (onInsufficient != null) onInsufficient();
+    }
+    if (devFallback != null && _shouldEdgeFallback(e)) {
+      return devFallback();
+    }
+    // ignore: only_throw_errors
+    throw e;
+  }
+
+  Future<int> getFloorPrice({required int floorNumber}) async {
+    // Возвращает цену пакета доступа к этажу из таблицы packages;
+    // при ошибке/отсутствии записи — дефолтная цена
+    try {
+      final code = _packageCodeForFloor(floorNumber);
+      final res = await _client
+          .from('packages')
+          .select('price_gp, active')
+          .eq('code', code)
+          .limit(1)
+          .maybeSingle();
+      if (res != null) {
+        final m = Map<String, dynamic>.from(res as Map);
+        final bool isActive = (m['active'] as bool?) ?? true;
+        final int? price = (m['price_gp'] as num?)?.toInt();
+        if (isActive && price != null && price > 0) {
+          return price;
+        }
+      }
+    } catch (e) {
+      await _capture(e);
+    }
+    return _kDefaultFloorPrice;
   }
 
   Future<int> _unlockFloorViaEdge(
@@ -223,16 +273,16 @@ class GpService {
     String referenceId = '',
     String? idempotencyKey,
   }) async {
-    return _withRetry(() async {
-      try {
-        _requireSession();
-        final params = {
+    Map<String, dynamic> _buildSpendParams() => {
           'p_type': type,
           'p_amount': amount,
           'p_reference_id': referenceId,
           'p_idempotency_key': idempotencyKey ?? '',
         };
-        final data = await _client.rpc('gp_spend', params: params);
+    return _withRetry(() async {
+      try {
+        _requireSession();
+        final data = await _client.rpc('gp_spend', params: _buildSpendParams());
         final parsed = _parseBalanceAfter(data);
         if (parsed != null) {
           _bcSpent(type, amount);
@@ -240,35 +290,27 @@ class GpService {
         }
         throw GpFailure('Не удалось списать GP');
       } on PostgrestException catch (e) {
-        if (!kReleaseMode && _isFunctionMissing(e)) {
-          try {
-            final session = _requireSession();
-            return await _spendViaEdge(
-              session,
-              type: type,
-              amount: amount,
-              referenceId: referenceId,
-              idempotencyKey: idempotencyKey,
-            );
-          } on DioException catch (de) {
-            final data = de.response?.data;
-            if (data is Map && data['error'] == 'gp_insufficient_balance') {
-              _throwInsufficientBalanceBreadcrumb(
-                source: 'spend',
-                extra: {'type': type, 'amount': amount},
-              );
-            }
-          } catch (_) {}
-        }
-        final msg = e.message.toString();
-        if (msg.contains('gp_insufficient_balance')) {
-          _throwInsufficientBalanceBreadcrumb(
-            source: 'spend',
-            extra: {'type': type, 'amount': amount},
-          );
-        }
-        await _capture(e);
-        throw GpFailure('Ошибка сервера при списании GP');
+        return _handlePostgrestException<int>(e,
+            onInsufficient: () => _throwInsufficientBalanceBreadcrumb(
+                  source: 'spend',
+                  extra: {'type': type, 'amount': amount},
+                ),
+            devFallback: () async {
+              try {
+                final session = _requireSession();
+                return await _spendViaEdge(
+                  session,
+                  type: type,
+                  amount: amount,
+                  referenceId: referenceId,
+                  idempotencyKey: idempotencyKey,
+                );
+              } catch (_) {
+                // ignore and rethrow below
+              }
+              // ignore: only_throw_errors
+              throw e;
+            } as int Function());
       } on SocketException {
         throw GpFailure('Нет соединения с интернетом');
       } catch (e) {
@@ -328,15 +370,7 @@ class GpService {
     final session = _client.auth.currentSession;
     if (session == null) throw GpFailure('Не авторизован');
     try {
-      final resp = await _edgeDio.post('/gp-purchase-verify',
-          data: jsonEncode({'purchase_id': purchaseId}),
-          options: Options(
-              headers: _edgeHeadersAnonWithUserJwt(session, json: true)));
-      if (resp.statusCode == 200 && resp.data is Map<String, dynamic>) {
-        final m = Map<String, dynamic>.from(resp.data);
-        return (m['balance_after'] as num?)?.toInt() ?? 0;
-      }
-      throw GpFailure('Не удалось подтвердить покупку');
+      return await _postVerify(session, body: {'purchase_id': purchaseId});
     } on DioException catch (e) {
       if (e.error is SocketException) {
         throw GpFailure('Нет соединения с интернетом');
@@ -360,19 +394,11 @@ class GpService {
     final session = _client.auth.currentSession;
     if (session == null) throw GpFailure('Не авторизован');
     try {
-      final resp = await _edgeDio.post('/gp-purchase-verify',
-          data: jsonEncode({
-            'platform': platform,
-            'product_id': productId,
-            'token': token,
-          }),
-          options: Options(
-              headers: _edgeHeadersAnonWithUserJwt(session, json: true)));
-      if (resp.statusCode == 200 && resp.data is Map<String, dynamic>) {
-        final m = Map<String, dynamic>.from(resp.data);
-        return (m['balance_after'] as num?)?.toInt() ?? 0;
-      }
-      throw GpFailure('Не удалось подтвердить покупку');
+      return await _postVerify(session, body: {
+        'platform': platform,
+        'product_id': productId,
+        'token': token
+      });
     } on DioException catch (e) {
       if (e.error is SocketException) {
         throw GpFailure('Нет соединения с интернетом');
@@ -383,6 +409,19 @@ class GpService {
       await _capture(e);
       throw GpFailure('Не удалось подтвердить покупку');
     }
+  }
+
+  Future<int> _postVerify(Session session,
+      {required Map<String, dynamic> body}) async {
+    final resp = await _edgeDio.post('/gp-purchase-verify',
+        data: jsonEncode(body),
+        options:
+            Options(headers: _edgeHeadersAnonWithUserJwt(session, json: true)));
+    if (resp.statusCode == 200 && resp.data is Map<String, dynamic>) {
+      final m = Map<String, dynamic>.from(resp.data);
+      return (m['balance_after'] as num?)?.toInt() ?? 0;
+    }
+    throw GpFailure('Не удалось подтвердить покупку');
   }
 
   Future<int> unlockFloor({
@@ -404,26 +443,25 @@ class GpService {
       }
       throw GpFailure('Не удалось открыть этаж');
     } on PostgrestException catch (e) {
-      if (!kReleaseMode && _isFunctionMissing(e)) {
-        try {
-          final session = _requireSession();
-          // Дев-фолбэк: старый edge эндпоинт
-          return await _unlockFloorViaEdge(
-            session,
-            floorNumber: floorNumber,
-            idempotencyKey: idempotencyKey,
-          );
-        } catch (_) {}
-      }
-      final msg = e.message.toString();
-      if (msg.contains('gp_insufficient_balance')) {
-        _throwInsufficientBalanceBreadcrumb(
-          source: 'unlock_floor',
-          extra: {'amount': _kDefaultFloorPrice, 'floor': floorNumber},
-        );
-      }
-      await _capture(e);
-      throw GpFailure('Ошибка сервера при открытии этажа');
+      return _handlePostgrestException<int>(e,
+          onInsufficient: () => _throwInsufficientBalanceBreadcrumb(
+                source: 'unlock_floor',
+                extra: {'amount': _kDefaultFloorPrice, 'floor': floorNumber},
+              ),
+          devFallback: () async {
+            try {
+              final session = _requireSession();
+              return await _unlockFloorViaEdge(
+                session,
+                floorNumber: floorNumber,
+                idempotencyKey: idempotencyKey,
+              );
+            } catch (_) {
+              // ignore and rethrow below
+            }
+            // ignore: only_throw_errors
+            throw e;
+          } as int Function());
     } on SocketException {
       throw GpFailure('Нет соединения с интернетом');
     } catch (e) {
@@ -445,14 +483,17 @@ class GpService {
       }
       throw GpFailure('Не удалось получить бонус');
     } on PostgrestException catch (e) {
-      if (!kReleaseMode && _isFunctionMissing(e)) {
-        try {
-          final session = _requireSession();
-          return await _bonusViaEdge(session, ruleKey: ruleKey);
-        } catch (_) {}
-      }
-      await _capture(e);
-      throw GpFailure('Ошибка сервера при получении бонуса');
+      return _handlePostgrestException<int>(e,
+          devFallback: () async {
+            try {
+              final session = _requireSession();
+              return await _bonusViaEdge(session, ruleKey: ruleKey);
+            } catch (_) {
+              // ignore and rethrow below
+            }
+            // ignore: only_throw_errors
+            throw e;
+          } as int Function());
     } on SocketException {
       throw GpFailure('Нет соединения с интернетом');
     } catch (e) {

@@ -739,3 +739,38 @@ TODO:
   - L1 — форма цели на `BizLevelTextField`, формат даты YYYY‑MM‑DD, CTA неактивна при пустой цели, нотификации через `NotificationCenter`.
   - L4/L7 — чат обёрнут в `BizLevelCard` и оформлен как в квизах: добавлен хедер с аватаром Макса и бейджем «Чекпоинт L4/L7»; кнопки приведены к `BizLevelButton`.
 - Башня/виджеты: финальный токен‑проход без функциональных изменений.
+
+## 2025-10-21 — Задача bl-db-cleanup fix
+- Задача bl-db-cleanup fix: Удалены неиспользуемые legacy-таблицы и функции в Supabase: `core_goals`, `weekly_progress`, `goal_checkpoint_progress`, `daily_progress`, `reminder_checks`, `application_bank`, `payments`, `user_rhythm`, `internal_usage_stats`, `documents_backfill_map`, а также `upsert_goal_field(..)`. Использование по коду и edge перепроверено; актуальная модель — `user_goal` и `practice_log`. Advisors без критичных замечаний.
+
+- Задача bonus-fix: динамическая цена разблокировки этажа берётся из `packages.price_gp` (клиент: `GpService.getFloorPrice`, `tower_tiles.dart`), убран риск рассинхрона с сервером. Применены миграции индексов через supabase‑mcp: добавлен `idx_gp_bonus_grants_rule_key`, удалены дубли `gp_ledger_user_created_idx`, `idx_practice_log_user_applied_at`, снят дублирующий unique‑constraint `user_goal_user_id_unique`. Advisors perf — чисто по GP.
+ - Задача goals-repo-refactor fix: в `GoalsRepository` устранено дублирование (helpers `_ensureAnonApikey/_requireUserId/_getBox`), вынесены билдеры payload/запросов (`_buildUserGoalPayload`, `_fetchPracticeRows`), бонус за дневную практику вынесен в `_claimDailyBonusAndRefresh`. Публичные сигнатуры без изменений.
+
+
+## 2025-10-22 — Тесты: чистка и актуализация
+- Удалены legacy/пустые тесты под старую модель: `test/screens/goal_checkpoint_screen_test.dart`,
+  `test/screens/goal_screen_readonly_test.dart`, `test/screens/levels_map_screen_test.dart`,
+  `test/services/leo_service_unit_test.dart`.
+- Добавлены актуальные тесты:
+  - `test/screens/next_action_banner_test.dart` — L1/L4/L7/Журнал.
+  - `test/screens/goal_practice_aggregates_test.dart` — агрегаты журнала Z/W.
+  - Скелеты (skip): `test/screens/tower_checkpoint_navigation_test.dart`,
+    `test/services/gp_unlock_floor_flow_test.dart`, `test/services/leo_service_gp_spend_test.dart`.
+- Исправления для стабилизации:
+  - `GoalsRepository.aggregatePracticeLog` считает уникальные дни (а не метки времени).
+  - `gp_service_cache_test.dart`: инициализация Hive box перед чтением кеша.
+  - `NotificationCenter` тесты: дополнительные `pump` и безопасный тап по action.
+  - `LeoQuizWidget` тесты: переход на клики по ключам карточек (`leo_quiz_option_*`).
+- Прогон тестов: часть падений остаётся (требуют отдельной адаптации под новый UI/моки Supabase):
+  - mocktail: заменить `thenReturn(Future)` → `thenAnswer` в отдельных тестах сервисов/репозиториев.
+  - UI-оверфлоу на `GoalCompactCard` в узкой ширине; тестам нужен иной layout/селекторы.
+  - Навигационные тесты (`levels_system_test.dart`, `street_screen_test.dart`) — привести к актуальным маршрутам `/tower`.
+  - Интеграции, зависящие от реального бэкенда, оставить `skip`/smoke с моками.
+
+## 2025-10-23 — Обновлён отчёт по контенту уровней
+- Переписан `docs/draft-2.md` в формате «Уровень → Страница» с полным текстом:
+  - Intro: заголовок/описание, наличие картинки.
+  - Видео: отображаемый текст (description из `lessons`).
+  - Квиз: вступительное сообщение, полный текст вопроса и варианты ответов (из `lessons.quiz_questions`).
+  - Уровень 0: форма профиля (лейблы/hint), Уровень 1: форма цели v1 (лейблы/hint).
+  - Артефакты: `artifact_title`/`artifact_description` из `levels`.

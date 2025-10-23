@@ -147,6 +147,36 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
               ),
             ),
             const SizedBox(height: 12),
+            // Подсказка: как получить GP (бонусы)
+            const BizLevelCard(
+              padding: EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Как получить GP',
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                  SizedBox(height: 8),
+                  _FaqRow(
+                      icon: Icons.person_add_alt,
+                      text: '+30 GP — за регистрацию (первый вход)'),
+                  _FaqRow(
+                      icon: Icons.badge_outlined,
+                      text:
+                          '+50 GP — за полный профиль (Имя, О себе, Цель, Аватар)'),
+                  _FaqRow(
+                      icon: Icons.work_outline,
+                      text: '+200 GP — за 3 решённых мини‑кейса'),
+                  _FaqRow(
+                      icon: Icons.check_circle_outline,
+                      text: '+5 GP — за ежедневное применение навыков'),
+                  _FaqRow(
+                      icon: Icons.flag_outlined,
+                      text: '+20 GP — за завершение уровня'),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
             // Переключатель планов
             Semantics(
               label: 'Выбор плана',

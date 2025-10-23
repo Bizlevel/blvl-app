@@ -788,6 +788,19 @@ class _AboutMeCardState extends ConsumerState<_AboutMeCard> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Профиль обновлён')),
       );
+      // Подсказка о возможном бонусе за полный профиль (если все поля заполнены)
+      try {
+        final nameOk = _nameCtrl.text.trim().isNotEmpty;
+        final aboutOk = _aboutCtrl.text.trim().isNotEmpty;
+        final goalOk = _goalCtrl.text.trim().isNotEmpty;
+        final hasAvatar =
+            (ref.read(currentUserProvider).value?.avatarId ?? 0) > 0;
+        if (nameOk && aboutOk && goalOk && hasAvatar) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('+50 GP за полный профиль')),
+          );
+        }
+      } catch (_) {}
       ref.invalidate(currentUserProvider);
       setState(() => _editing = false);
     } catch (e) {

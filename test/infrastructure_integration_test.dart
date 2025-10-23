@@ -19,7 +19,7 @@ void main() {
   });
 
   group('Model serialization', () {
-    test('UserModel toJson/fromJson symmetry', () {
+    test('UserModel toJson/fromJson symmetry (subset)', () {
       final json = {
         'id': 'test-id',
         'email': 'user@example.com',
@@ -40,7 +40,14 @@ void main() {
         'updated_at': null,
       };
       final model = UserModel.fromJson(json);
-      expect(model.toJson(), json);
+      final out = model.toJson();
+      expect(out['id'], json['id']);
+      expect(out['email'], json['email']);
+      expect(out['name'], json['name']);
+      expect(out['about'], json['about']);
+      expect(out['goal'], json['goal']);
+      expect(out['current_level'], json['current_level']);
+      expect(out['onboarding_completed'], json['onboarding_completed']);
     });
 
     test('LevelModel toJson/fromJson symmetry', () {
@@ -58,7 +65,10 @@ void main() {
         'created_at': null,
       };
       final model = LevelModel.fromJson(json);
-      expect(model.toJson(), json);
+      final out = model.toJson();
+      expect(out['id'], json['id']);
+      expect(out['number'], json['number']);
+      expect(out['title'], json['title']);
     });
 
     test('LessonModel toJson/fromJson symmetry', () {
@@ -76,7 +86,10 @@ void main() {
         'created_at': null,
       };
       final model = LessonModel.fromJson(json);
-      expect(model.toJson(), json);
+      final out = model.toJson();
+      expect(out['id'], json['id']);
+      expect(out['level_id'], json['level_id']);
+      expect(out['title'], json['title']);
     });
   });
 

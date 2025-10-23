@@ -4,7 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:chewie/chewie.dart';
 import 'dart:async';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart'
+    show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:bizlevel/models/lesson_model.dart';
 import 'package:video_player/video_player.dart';
@@ -29,8 +30,9 @@ class _LessonWidgetState extends ConsumerState<LessonWidget> {
   ChewieController? _chewieController;
   bool _initialized = false;
   bool _progressSent = false;
-  bool _controlsVisible = true;
+  // Legacy flag (custom overlay removed after enabling Chewie controls)
   Timer? _hideTimer;
+  bool _enteredFullscreen = false; // auto-fullscreen on mobile after first play
 
   // For Web iframe playback (local helper page with hls.js)
   String? _webIframeUrl;
@@ -93,7 +95,8 @@ class _LessonWidgetState extends ConsumerState<LessonWidget> {
           looping: false,
           allowFullScreen: true,
           allowMuting: true,
-          showControls: false,
+          showControls: true,
+          playbackSpeeds: const [0.5, 0.75, 1.0, 1.25, 1.5, 2.0],
           aspectRatio: _videoController!.value.aspectRatio == 0
               ? 9 / 16
               : _videoController!.value.aspectRatio,
@@ -120,6 +123,17 @@ class _LessonWidgetState extends ConsumerState<LessonWidget> {
 
   void _listener() {
     final position = _videoController!.value.position;
+    // Auto-enter fullscreen on first user play on mobile platforms
+    if (!_enteredFullscreen && !kIsWeb) {
+      final isMobile = defaultTargetPlatform == TargetPlatform.iOS ||
+          defaultTargetPlatform == TargetPlatform.android;
+      if (isMobile && _videoController!.value.isPlaying) {
+        _enteredFullscreen = true;
+        try {
+          _chewieController?.enterFullScreen();
+        } catch (_) {}
+      }
+    }
     if (!_progressSent && position >= const Duration(seconds: 10)) {
       _progressSent = true;
       widget.onWatched();
@@ -127,32 +141,7 @@ class _LessonWidgetState extends ConsumerState<LessonWidget> {
     if (mounted) setState(() {});
   }
 
-  void _scheduleHideControls() {
-    _hideTimer?.cancel();
-    if (!(_videoController?.value.isPlaying ?? false)) return;
-    final dpr = MediaQueryData.fromView(
-            WidgetsBinding.instance.platformDispatcher.views.first)
-        .devicePixelRatio;
-    final isLowEnd = dpr < 2.0;
-    _hideTimer = Timer(Duration(seconds: isLowEnd ? 2 : 3), () {
-      if (!mounted) return;
-      setState(() => _controlsVisible = false);
-    });
-  }
-
-  void _toggleControls() {
-    setState(() => _controlsVisible = !_controlsVisible);
-    if (_controlsVisible) _scheduleHideControls();
-  }
-
-  Future<void> _seekRelative(Duration offset) async {
-    if (_videoController == null) return;
-    final current = _videoController!.value.position;
-    final duration = _videoController!.value.duration;
-    final targetMs =
-        (current + offset).inMilliseconds.clamp(0, duration.inMilliseconds);
-    await _videoController!.seekTo(Duration(milliseconds: targetMs));
-  }
+  // Gestures and custom overlay removed in favor of Chewie controls
 
   @override
   void dispose() {
@@ -252,113 +241,7 @@ class _LessonWidgetState extends ConsumerState<LessonWidget> {
                 child: SizedBox(
                   width: w,
                   height: h,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      Chewie(controller: _chewieController!),
-                      // Gesture layer
-                      Positioned.fill(
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: GestureDetector(
-                                behavior: HitTestBehavior.translucent,
-                                onTap: _toggleControls,
-                                onDoubleTap: () =>
-                                    _seekRelative(const Duration(seconds: -10)),
-                                child: Semantics(
-                                  label: 'Перемотать назад на 10 секунд',
-                                  button: true,
-                                  child: const SizedBox.expand(),
-                                ),
-                              ),
-                            ),
-                            Expanded(
-                              child: GestureDetector(
-                                behavior: HitTestBehavior.translucent,
-                                onTap: _toggleControls,
-                                onDoubleTap: () =>
-                                    _seekRelative(const Duration(seconds: 10)),
-                                child: Semantics(
-                                  label: 'Перемотать вперёд на 10 секунд',
-                                  button: true,
-                                  child: const SizedBox.expand(),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (_controlsVisible) ...[
-                        // Bottom gradient + progress bar
-                        Positioned(
-                          left: 0,
-                          right: 0,
-                          bottom: 0,
-                          child: Container(
-                            padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-                            decoration: const BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                                colors: [Colors.transparent, Color(0x99000000)],
-                              ),
-                            ),
-                            child: LinearProgressIndicator(
-                              value: () {
-                                final d = _videoController!
-                                    .value.duration.inMilliseconds;
-                                if (d <= 0) return null;
-                                final p = _videoController!
-                                    .value.position.inMilliseconds;
-                                return (p / d).clamp(0.0, 1.0);
-                              }(),
-                              minHeight: 3,
-                              backgroundColor:
-                                  Colors.white.withValues(alpha: 0.2),
-                              valueColor: const AlwaysStoppedAnimation<Color>(
-                                  Colors.white),
-                            ),
-                          ),
-                        ),
-                        // Center play/pause
-                        Center(
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.3),
-                              shape: BoxShape.circle,
-                            ),
-                            child: Semantics(
-                              label: _videoController!.value.isPlaying
-                                  ? 'Пауза'
-                                  : 'Воспроизвести',
-                              button: true,
-                              child: IconButton(
-                                iconSize: 64,
-                                onPressed: () async {
-                                  final playing =
-                                      _videoController!.value.isPlaying;
-                                  if (playing) {
-                                    await _videoController!.pause();
-                                  } else {
-                                    await _videoController!.play();
-                                    _scheduleHideControls();
-                                  }
-                                  if (mounted) setState(() {});
-                                },
-                                icon: Icon(
-                                  _videoController!.value.isPlaying
-                                      ? Icons.pause_circle_filled
-                                      : Icons.play_circle_filled,
-                                  color: Colors.white.withValues(alpha: 0.9),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
+                  child: Chewie(controller: _chewieController!),
                 ),
               );
             },

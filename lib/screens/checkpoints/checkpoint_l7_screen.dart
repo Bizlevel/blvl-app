@@ -41,12 +41,15 @@ class CheckpointL7Screen extends ConsumerWidget {
           DateTime.tryParse((m['applied_at'] ?? '').toString());
       if (ts != null && ts.isAfter(from)) recent++;
     }
-    if (recent >= 5)
+    if (recent >= 5) {
       return 'За последнюю неделю ты применял навыки $recent раз. Отличный темп!';
-    if (recent >= 2)
+    }
+    if (recent >= 2) {
       return 'За последнюю неделю навыки применялись $recent раза — хороший старт.';
-    if (recent == 1)
+    }
+    if (recent == 1) {
       return 'За последнюю неделю отмечено 1 применение — давай усилим регулярность.';
+    }
     return 'За последнюю неделю применений навыков не видно — начнём с небольших, но ежедневных шагов.';
   }
 

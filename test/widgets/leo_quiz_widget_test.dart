@@ -56,12 +56,11 @@ void main() {
     // Привяжем колбэк к статическому флагу
     _OnCorrectProbe.bind(() => passed = true);
 
-    // Выбираем правильный вариант (index 1)
-    await tester.tap(find.byType(RadioListTile<int>).at(1));
+    // Выбираем правильный вариант через новый UI (карточки с ключами)
+    await tester.tap(find.byKey(const Key('leo_quiz_option_1')));
     await tester.pumpAndSettle();
 
-    // Нажимаем «Проверить»
-    await tester.tap(find.widgetWithText(ElevatedButton, 'Проверить'));
+    // В новом UI проверка запускается по тапу на опцию, кнопки «Проверить» нет
     await tester.pumpAndSettle();
 
     // Статус «Тест пройден ✅» отображается
@@ -115,12 +114,10 @@ void main() {
       ),
     ));
 
-    // Выбираем правильный вариант (index 0)
-    await tester.tap(find.byType(RadioListTile<int>).at(0));
+    // Выбираем правильный вариант через новый UI
+    await tester.tap(find.byKey(const Key('leo_quiz_option_0')));
     await tester.pumpAndSettle();
 
-    // Нажимаем «Проверить»
-    await tester.tap(find.widgetWithText(ElevatedButton, 'Проверить'));
     await tester.pumpAndSettle();
 
     // Видим успешный статус
@@ -136,5 +133,3 @@ class _OnCorrectProbe {
   static void bind(VoidCallback hook) => _hook = hook;
   static void setPassed() => _hook?.call();
 }
-
-

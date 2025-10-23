@@ -194,6 +194,7 @@ class AuthService {
             final fresh = await gp.getBalance();
             await GpService.saveBalanceCache(fresh);
           } catch (_) {}
+          // Показать уведомление о бонусе профиля (UI ответственность — экран профиля)
         }
       } catch (_) {}
     }, unknownErrorMessage: 'Не удалось сохранить профиль');
