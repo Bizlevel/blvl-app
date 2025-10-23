@@ -49,7 +49,7 @@ class FriendlyMessages {
 
   // Специфичные для Goal
   static const String goalNotReady =
-      'Сначала нужно завершить текущий этап кристаллизации цели';
+      'Сначала нужно сформулировать цель в профиле';
   static const String levelRequired =
       'Пройди следующий уровень, чтобы открыть этот этап';
   static const String sprintAlreadyStarted = 'Спринт уже начат!';

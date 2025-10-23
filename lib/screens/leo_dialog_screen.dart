@@ -158,7 +158,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
         greetings.add(widget.firstPrompt!.trim());
       } else {
         greetings.add(
-            'Я — Макс, трекер цели BizLevel. Помогаю кристаллизовать цель и двигаться к ней. Напишите, чего хотите добиться — предложу ближайший шаг.');
+            'Я — Макс, трекер цели BizLevel. Помогаю формулировать и достигать цель. Напишите, чего хотите добиться — предложу ближайший шаг.');
       }
       for (final g in greetings) {
         _messages.add({
