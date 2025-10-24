@@ -196,7 +196,6 @@ class NotificationsService {
         'education',
         'Обучение',
         description: 'Новые материалы, курсы и библиотека',
-        importance: Importance.defaultImportance,
       ));
       await android.createNotificationChannel(const AndroidNotificationChannel(
         'chat_messages',
@@ -229,7 +228,7 @@ class NotificationsService {
     );
     const details = NotificationDetails(android: android);
     for (final wd in weekdays.toSet()) {
-      final idBase = 9000;
+      const idBase = 9000;
       await _plugin.zonedSchedule(
         idBase + wd,
         'Время практики',

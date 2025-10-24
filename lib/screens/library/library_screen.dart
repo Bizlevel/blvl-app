@@ -7,6 +7,9 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'package:bizlevel/providers/library_providers.dart';
 import 'package:bizlevel/widgets/common/bizlevel_card.dart';
+import 'package:bizlevel/theme/spacing.dart';
+import 'package:bizlevel/theme/color.dart';
+import 'package:bizlevel/widgets/common/bizlevel_button.dart';
 import 'package:bizlevel/widgets/common/bizlevel_empty.dart';
 import 'package:bizlevel/widgets/common/bizlevel_error.dart';
 import 'package:bizlevel/widgets/common/bizlevel_loading.dart';
@@ -69,7 +72,7 @@ class _SectionsTab extends ConsumerWidget {
         a.asData?.value.length;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: AppSpacing.insetsAll(AppSpacing.screenPadding),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -80,7 +83,7 @@ class _SectionsTab extends ConsumerWidget {
                 .titleMedium
                 ?.copyWith(fontWeight: FontWeight.w600),
           ),
-          const SizedBox(height: 12),
+          AppSpacing.gapH(AppSpacing.sectionSpacing),
           _SectionCard(
             icon: Icons.menu_book,
             title: 'Курсы',
@@ -95,7 +98,7 @@ class _SectionsTab extends ConsumerWidget {
               }
             },
           ),
-          const SizedBox(height: 12),
+          AppSpacing.gapH(AppSpacing.sectionSpacing),
           _SectionCard(
             icon: Icons.volunteer_activism,
             title: 'Гранты и поддержка',
@@ -110,7 +113,7 @@ class _SectionsTab extends ConsumerWidget {
               }
             },
           ),
-          const SizedBox(height: 12),
+          AppSpacing.gapH(AppSpacing.sectionSpacing),
           _SectionCard(
             icon: Icons.rocket_launch,
             title: 'Акселераторы',
@@ -148,14 +151,14 @@ class _SectionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return BizLevelCard(
       onTap: onTap,
-      padding: const EdgeInsets.all(16),
+      padding: AppSpacing.insetsAll(AppSpacing.cardPadding),
       semanticsLabel: title,
       child: ConstrainedBox(
         constraints: const BoxConstraints(minHeight: 44),
         child: Row(
           children: [
             Icon(icon, size: 32),
-            const SizedBox(width: 12),
+            AppSpacing.gapW(AppSpacing.itemSpacing),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -166,7 +169,7 @@ class _SectionCard extends StatelessWidget {
                           fontWeight: FontWeight.w600,
                         ),
                   ),
-                  const SizedBox(height: 4),
+                  AppSpacing.gapH(4),
                   Text(
                     subtitle,
                     style: Theme.of(context).textTheme.bodyMedium,
@@ -219,9 +222,9 @@ class _FavoritesTabState extends ConsumerState<_FavoritesTab> {
         final favRows = favMeta.asData?.value ?? const <Map<String, dynamic>>[];
 
         return ListView.separated(
-          padding: const EdgeInsets.all(16),
+          padding: AppSpacing.insetsAll(AppSpacing.screenPadding),
           itemCount: items.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 8),
+          separatorBuilder: (_, __) => AppSpacing.gapH(AppSpacing.itemSpacing),
           itemBuilder: (context, index) {
             final data = items[index];
             final type = (data['_type'] ?? 'courses').toString();
@@ -248,13 +251,13 @@ class _FavoritesTabState extends ConsumerState<_FavoritesTab> {
                   );
                   ref.invalidate(favoritesProvider);
                   ref.invalidate(favoritesDetailedProvider);
-                  if (mounted) {
+                  if (context.mounted) {
                     NotificationCenter.showSuccess(
                         context, 'Избранное обновлено');
                   }
                 } catch (e, st) {
                   await Sentry.captureException(e, stackTrace: st);
-                  if (mounted) {
+                  if (context.mounted) {
                     NotificationCenter.showError(
                         context, 'Ошибка обновления избранного');
                   }
@@ -328,7 +331,7 @@ class _FavResourceCard extends StatelessWidget {
     final url = (data['url'] ?? '').toString();
 
     return BizLevelCard(
-      padding: const EdgeInsets.all(16),
+      padding: AppSpacing.insetsAll(AppSpacing.cardPadding),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -345,7 +348,7 @@ class _FavResourceCard extends StatelessWidget {
                           .titleMedium
                           ?.copyWith(fontWeight: FontWeight.w600),
                     ),
-                    const SizedBox(height: 4),
+                    AppSpacing.gapH(4),
                     Text(platform,
                         style: Theme.of(context).textTheme.bodySmall),
                   ],
@@ -362,16 +365,28 @@ class _FavResourceCard extends StatelessWidget {
             ],
           ),
           if (expanded) ...[
-            const SizedBox(height: 8),
-            Text(description, style: Theme.of(context).textTheme.bodyMedium),
-            const SizedBox(height: 8),
-            _FavDynamicInfo(type: type, data: data),
-            const SizedBox(height: 8),
+            AppSpacing.gapH(AppSpacing.itemSpacing),
+            // Fade‑in описание
+            TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0, end: 1),
+              duration: const Duration(milliseconds: 250),
+              builder: (context, v, child) => Opacity(opacity: v, child: child),
+              child: Text(description,
+                  style: Theme.of(context).textTheme.bodyMedium),
+            ),
+            AppSpacing.gapH(AppSpacing.itemSpacing),
+            TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0, end: 1),
+              duration: const Duration(milliseconds: 250),
+              builder: (context, v, child) => Opacity(opacity: v, child: child),
+              child: _FavDynamicInfo(type: type, data: data),
+            ),
+            AppSpacing.gapH(AppSpacing.itemSpacing),
             Align(
               alignment: Alignment.centerLeft,
-              child: ElevatedButton(
+              child: BizLevelButton(
+                label: 'Перейти ↗',
                 onPressed: url.isEmpty ? null : onOpenLink,
-                child: const Text('Перейти ↗'),
               ),
             ),
           ],
@@ -399,7 +414,7 @@ class _FavDynamicInfo extends StatelessWidget {
     final textStyleLabel = Theme.of(context)
         .textTheme
         .bodySmall
-        ?.copyWith(color: Colors.grey[600]);
+        ?.copyWith(color: AppColor.labelColor);
     final textStyleValue = Theme.of(context).textTheme.bodyMedium;
 
     return LayoutBuilder(
@@ -408,7 +423,8 @@ class _FavDynamicInfo extends StatelessWidget {
         return Column(
           children: rows
               .map((r) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
+                    padding:
+                        const EdgeInsets.only(bottom: AppSpacing.itemSpacing),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [

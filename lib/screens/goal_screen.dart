@@ -123,8 +123,9 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
       bottomNavigationBar: LayoutBuilder(
         builder: (context, cons) {
           // Простая эвристика мобайла: ширина < 600
-          if (cons.maxWidth >= 600 || !kGoalStickyCta)
+          if (cons.maxWidth >= 600 || !kGoalStickyCta) {
             return const SizedBox.shrink();
+          }
           return SafeArea(
             top: false,
             child: Container(
@@ -143,6 +144,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                 children: [
                   Expanded(
                     child: ElevatedButton(
+                      key: const ValueKey('goal_add_entry_cta'),
                       onPressed: _scrollToJournal,
                       child: const Text('Добавить запись'),
                     ),
@@ -150,6 +152,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: OutlinedButton(
+                      key: const ValueKey('goal_chat_max_cta'),
                       onPressed: () {
                         try {
                           Sentry.addBreadcrumb(Breadcrumb(
@@ -183,7 +186,6 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                         Navigator.of(context).push(MaterialPageRoute(
                           builder: (_) => LeoDialogScreen(
                             bot: 'max',
-                            chatId: null,
                             userContext: userCtxLines.join('\n'),
                             levelContext: '',
                           ),

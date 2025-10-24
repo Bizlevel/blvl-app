@@ -1,6 +1,7 @@
 part of '../biz_tower_screen.dart';
 
 // Стоимость и номер пакета доступа к этажу (используются в диалогах разблокировки)
+// Цена теперь подтягивается динамически из БД; значение ниже — только запасной дефолт.
 const int _kFloorUnlockCost = 1000;
 const int _kTargetFloorNumber = 1;
 
@@ -77,13 +78,20 @@ void _showUnlockFloorDialog(BuildContext context, {required int floorNumber}) {
   showDialog(
     context: context,
     builder: (ctx) {
-      return BizLevelModal(
-        title: 'Открыть этаж',
-        subtitle: 'Стоимость: $_kFloorUnlockCost GP. Открыть доступ?',
-        primaryLabel: '$_kFloorUnlockCost GP',
-        icon: Icons.lock_open,
-        onPrimary: () async {
-          await _unlockFloor(context, floorNumber: floorNumber);
+      return FutureBuilder<int>(
+        future: GpService(Supabase.instance.client)
+            .getFloorPrice(floorNumber: floorNumber),
+        builder: (context, snapshot) {
+          final price = snapshot.data ?? _kFloorUnlockCost;
+          return BizLevelModal(
+            title: 'Открыть этаж',
+            subtitle: 'Стоимость: $price GP. Открыть доступ?',
+            primaryLabel: '$price GP',
+            icon: Icons.lock_open,
+            onPrimary: () async {
+              await _unlockFloor(context, floorNumber: floorNumber);
+            },
+          );
         },
       );
     },
@@ -174,8 +182,7 @@ Widget _buildLevelCoreTile({
           BoxShadow(
               color: AppColor.premium.withValues(alpha: 0.55),
               blurRadius: 18,
-              spreadRadius: 1,
-              offset: const Offset(0, 0)),
+              spreadRadius: 1),
       ],
     ),
     child: Stack(
@@ -248,7 +255,7 @@ class _CheckpointNodeTile extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _buildNodeLabel(label, textAlign: TextAlign.center),
+              _buildNodeLabel(label),
               Container(
                 width: size,
                 height: size,
@@ -323,7 +330,6 @@ class _LevelNodeTile extends StatelessWidget {
                 levelNumber == 0
                     ? 'Уровень 0: Первый шаг'
                     : 'Уровень $levelNumber: ${data['name']}',
-                textAlign: TextAlign.center,
               ),
               _buildLevelCoreTile(
                 isCurrent: isCurrent,

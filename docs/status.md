@@ -739,3 +739,101 @@ TODO:
   - L1 — форма цели на `BizLevelTextField`, формат даты YYYY‑MM‑DD, CTA неактивна при пустой цели, нотификации через `NotificationCenter`.
   - L4/L7 — чат обёрнут в `BizLevelCard` и оформлен как в квизах: добавлен хедер с аватаром Макса и бейджем «Чекпоинт L4/L7»; кнопки приведены к `BizLevelButton`.
 - Башня/виджеты: финальный токен‑проход без функциональных изменений.
+
+## 2025-10-21 — Задача bl-db-cleanup fix
+- Задача bl-db-cleanup fix: Удалены неиспользуемые legacy-таблицы и функции в Supabase: `core_goals`, `weekly_progress`, `goal_checkpoint_progress`, `daily_progress`, `reminder_checks`, `application_bank`, `payments`, `user_rhythm`, `internal_usage_stats`, `documents_backfill_map`, а также `upsert_goal_field(..)`. Использование по коду и edge перепроверено; актуальная модель — `user_goal` и `practice_log`. Advisors без критичных замечаний.
+
+- Задача bonus-fix: динамическая цена разблокировки этажа берётся из `packages.price_gp` (клиент: `GpService.getFloorPrice`, `tower_tiles.dart`), убран риск рассинхрона с сервером. Применены миграции индексов через supabase‑mcp: добавлен `idx_gp_bonus_grants_rule_key`, удалены дубли `gp_ledger_user_created_idx`, `idx_practice_log_user_applied_at`, снят дублирующий unique‑constraint `user_goal_user_id_unique`. Advisors perf — чисто по GP.
+ - Задача goals-repo-refactor fix: в `GoalsRepository` устранено дублирование (helpers `_ensureAnonApikey/_requireUserId/_getBox`), вынесены билдеры payload/запросов (`_buildUserGoalPayload`, `_fetchPracticeRows`), бонус за дневную практику вынесен в `_claimDailyBonusAndRefresh`. Публичные сигнатуры без изменений.
+
+## 2025-10-22 — Тесты: чистка и актуализация
+- Удалены legacy/пустые тесты под старую модель: `test/screens/goal_checkpoint_screen_test.dart`,
+  `test/screens/goal_screen_readonly_test.dart`, `test/screens/levels_map_screen_test.dart`,
+  `test/services/leo_service_unit_test.dart`.
+- Добавлены актуальные тесты:
+  - `test/screens/next_action_banner_test.dart` — L1/L4/L7/Журнал.
+  - `test/screens/goal_practice_aggregates_test.dart` — агрегаты журнала Z/W.
+  - Скелеты (skip): `test/screens/tower_checkpoint_navigation_test.dart`,
+    `test/services/gp_unlock_floor_flow_test.dart`, `test/services/leo_service_gp_spend_test.dart`.
+- Исправления для стабилизации:
+  - `GoalsRepository.aggregatePracticeLog` считает уникальные дни (а не метки времени).
+  - `gp_service_cache_test.dart`: инициализация Hive box перед чтением кеша.
+  - `NotificationCenter` тесты: дополнительные `pump` и безопасный тап по action.
+  - `LeoQuizWidget` тесты: переход на клики по ключам карточек (`leo_quiz_option_*`).
+- Прогон тестов: часть падений остаётся (требуют отдельной адаптации под новый UI/моки Supabase):
+  - mocktail: заменить `thenReturn(Future)` → `thenAnswer` в отдельных тестах сервисов/репозиториев.
+  - UI-оверфлоу на `GoalCompactCard` в узкой ширине; тестам нужен иной layout/селекторы.
+  - Навигационные тесты (`levels_system_test.dart`, `street_screen_test.dart`) — привести к актуальным маршрутам `/tower`.
+  - Интеграции, зависящие от реального бэкенда, оставить `skip`/smoke с моками.
+
+## 2025-10-23 — Design System: токены и консистентность (база)
+- Добавлены токены в `AppColor`: backgroundSuccess/backgroundInfo/backgroundWarning/backgroundError, borderSubtle/borderStrong, textTertiary; централизована палитра `skillColors`.
+- Повышен контраст вторичного текста: `labelColor=#64748B`.
+- Кнопки: `BizLevelButton` — minSize повышены (sm=48, md=52) для доступности.
+- Замены хардкод‑цветов на токены:
+  - `NotificationCenter` → фон баннеров из `AppColor.background*`.
+  - `GpStoreScreen` (нижний бар) → `AppColor.surface/borderStrong`.
+  - `GpBalanceWidget` → `AppColor.surface/borderSubtle`.
+  - `SkillsTreeView` → цвета навыков из `AppColor.skillColors`.
+  - `LoginScreen` → фоновые градиенты через `AppColor.bgGradient`.
+- Линты: критичных ошибок нет; предупреждения по сложности в `NotificationCenter` не блокируют.
+
+## 2025-10-24 — Design System: анимации/тема/инпуты и библиотека
+- Анимации: добавлены токены `AppAnimations` (quick/normal/slow/verySlow, кривые) и подключены в ключевых компонентах:
+  - `BizLevelProgressBar` (slow), `SuccessIndicator` (normal, easeOutCubic→defaultCurve),
+  - `AchievementBadge` (verySlow), `BottomBarItem` (normal+smoothCurve).
+- Размеры/spacing:
+  - Создан `AppDimensions` (иконки, радиусы, min touch target),
+  - `AppSpacing` расширен специализированными токенами (card/screen/section/item, buttonPadding).
+- Поля ввода: введён `AppInputDecoration.theme()` и подключён в теме приложения; единые бордеры/паддинги/цвета ошибок.
+- Тема:
+  - Создан `AppTheme.light()/dark()`; включён `AppTheme.light()` (dark подготовлен, по умолчанию не активирован).
+- Кнопки: удалён `AnimatedButton`, все места переведены на `BizLevelButton` (градиент и scale через общие токены/стили).
+- Библиотека:
+  - `LibraryScreen`/`LibrarySectionScreen`: выведены расширенные поля, отступы переведены на `AppSpacing`, цвета — на `AppColor`, кнопки — на `BizLevelButton`; убраны жёсткие бордеры в фильтрах (используется `InputDecorationTheme`).
+- Уведомления: `NotificationCenter` рефакторинг — введены `_BannerOptions/_BannerStyle`, сокращено число параметров вызова, без изменения UX.
+- Прочее: сняты локальные хардкоды бордеров/цветов (включая `GpStoreScreen`/`GpBalanceWidget`); `SkillsTreeView` берёт палитру из токенов; `LoginScreen` использует градиент‑токен.
+- Анализ кода (fix6): ошибок/варнингов нет; INFO сведены к безопасным рекомендациям (use_build_context_synchronously в UI местах с уже добавленными mounted-проверками).
+
+### 2025-10-24 — Линт‑чистка (fix6.x)
+- fix6.1: Применены автофиксы (`dart fix`) и повторный анализ.
+- fix6.2: Массово удалены дефолтные аргументы (`avoid_redundant_argument_values`).
+- fix6.3: Добавлены `context.mounted/mounted` и перенос `ScaffoldMessenger` до await.
+- fix6.4: GoRouter: `.location` → `.uri.toString()`.
+- fix6.5: Правки `throw/rethrow` в `gp_service.dart` (устранены ошибки; поведение без изменений).
+- fix6.6: Переименованы локальные идентификаторы с подчёркиванием.
+- fix6.7: Добавлены фигурные скобки у одинарных if/else.
+- fix6.8: Константы к lowerCamelCase (`ANIMATED_BODY_MS` → `animatedBodyMs`).
+
+## 2025-10-24 — Design Strategy: финальные правки UI/тема
+- MainStreet: локальный фон‑градиент (#FAFAFA→#F7F3FF), цветовое кодирование карточек разделов (мягкие градиенты по типам).
+- Goal: hero‑прогресс — круговой индикатор с градиентом + «Осталось N дн.» (безопасные фолбэки).
+- Tower: вертикальный градиент путей в `_GridPathPainter` (без просадок FPS); узлы приведены к 60×60 (геометрия сохранена).
+- Chat: микроанимация «плавания» аватара (low‑end guard), лёгкие «эмо‑реакции» у ассистента (ненавязчиво, без шума).
+- Checkpoints L4/L7: единый хедер диалога Макса (аватар, бейдж, подложка).
+- Profile: витрина достижений на `AchievementBadge` (shine‑эффект); мини‑баланс GP сохранён.
+- Artifacts: tilt/hover, бейдж «NEW» до первого просмотра (Hive), полноэкранный viewer без регрессий.
+- Library: fade‑in для описаний и динамических блоков, empty/error экраны унифицированы.
+- Level Detail: тёплый CTA, тонкая верхняя полоса прогресса по урокам, лёгкий параллакс иллюстрации (отключается на low‑end).
+- Тема: добавлен `AppColor.warmGradient`, подключён `AppTheme.dark()` + тумблер в Профиле; в тёмной теме уточнены бордеры/инпуты (светлые границы, приглушённые градиенты).
+
+### 2025-10-24 — UX: LoginScreen
+- Переставлена основная CTA «Войти» сразу под полем пароля (до соц‑логинов), чтобы уменьшить путаницу и улучшить завершение сценария входа.
+
+## 2025-10-24 — DB hardening (fix6.x)
+- Привёл search_path: функция `match_user_memories` теперь фиксирована на `public` (устранён `function_search_path_mutable`).
+- Ужесточены права EXECUTE у RPC ядра GP (`gp_balance/gp_spend/gp_package_buy/gp_bonus_claim/gp_purchase_verify` и `gp_floor_unlock*`): только `authenticated` и `service_role`.
+- Добавлены покрывающие индексы для FK: `ai_message(leo_message_id)`, `memory_archive(user_id)`, `user_packages(package_id)`.
+
+## 2025-10-24 — RLS перепись (initplan/duplicates)
+- Заменены выражения `auth.uid()` на `(select auth.uid())` в USING/WITH CHECK (исключён initplan‑overhead) для таблиц: `ai_message`, `leo_chats`, `leo_messages`, `user_memories`, `user_progress`.
+- Удалены дубли permissive‑политик: `ai_message` (второй INSERT), `leo_chats` (`select_own`, `update_own`), `app_settings` (`app_settings_deny_all`). Поведение доступа не расширено.
+- Service‑role политики не менялись. Функциональные права пользователей не изменялись (owner‑паттерн сохранён).
+
+## 2025-10-24 — GP IAP/Web Verify (fix6.9–fix6.12)
+- Добавлена RPC `gp_iap_credit(p_purchase_id text, p_amount_gp int)` (SECURITY DEFINER, search_path=public). Идемпотентное начисление по ключу `iap:<purchase_id>` в `gp_ledger`; обновление `gp_wallets`. GRANT EXECUTE → authenticated.
+- Обновлена Edge Function `gp-purchase-verify`:
+  - Ветка IAP (Android/iOS): верификация в сторе → вызов `gp_iap_credit` c `purchaseId = <platform>:<product_id>:<transactionId>`.
+  - Ветка Web: поддержан `purchase_id` (вызов `gp_purchase_verify(purchase_id)` для завершения веб‑покупки).
+- Клиент Android: добавлен fallback на `purchaseToken` из `localVerificationData` при неуспешной первой попытке verify; добавлены breadcrumbs.
+- Проверки: линтеры чистые; деплой edge v49; таблицы `gp_wallets/gp_ledger` готовы к зачислениям (новые записи появятся после первой реальной покупки).

@@ -21,10 +21,21 @@ class AppColor {
   static const textBoxColor = surface;
   static const textColor = Color(0xFF0F172A);
   static const glassTextColor = Color(0xFFFFFFFF);
-  static const labelColor = Color(0xFF94A3B8);
+  // Повышенный контраст вторичного текста
+  static const labelColor = Color(0xFF64748B);
   static const glassLabelColor = Color(0xFFFFFFFF);
   static const borderColor = Color(0xFFCBD5E1);
   static const dividerColor = Color(0xFFE2E8F0);
+
+  // Дополнительные токены (унификация и использования в виджетах)
+  static const textTertiary = Color(0xFF64748B);
+  static const warmAccent = Color(0xFFF59E0B);
+  static const backgroundSuccess = Color(0xFFE6F6ED);
+  static const backgroundInfo = Color(0xFFE8F0FE);
+  static const backgroundWarning = Color(0xFFFFF4E5);
+  static const backgroundError = Color(0xFFFFEBEE);
+  static const borderSubtle = Color(0xFFE5E7EB);
+  static const borderStrong = Color(0xFFE2E8F0);
 
   // Доп. семантические алиасы для удобства
   static const onSurface = textColor;
@@ -52,6 +63,11 @@ class AppColor {
   );
   static const achievementGradient = LinearGradient(
     colors: [Color(0xFF7C3AED), Color(0xFFEC4899)],
+  );
+  static const warmGradient = LinearGradient(
+    colors: [Color(0xFFF59E0B), Color(0xFFFB923C)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
   );
 
   // Подготовка к dark‑mode
@@ -103,6 +119,18 @@ class AppColor {
     error,
     warning,
   ];
+
+  // Палитра навыков (централизовано)
+  static const Color orangeSoft = Color(0xFFFB923C);
+  static const Color indigo = Color(0xFF6366F1);
+  static const Map<int, Color> skillColors = {
+    1: premium,
+    2: warning,
+    3: orangeSoft,
+    4: info,
+    5: success,
+    6: indigo, // AI‑предприниматель
+  };
 }
 
 // Глобальные константы отступов

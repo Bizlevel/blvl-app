@@ -53,14 +53,14 @@ class RootApp extends ConsumerWidget {
                 const VerticalDivider(width: 1),
                 Expanded(
                   child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: ANIMATED_BODY_MS),
+                    duration: const Duration(milliseconds: animatedBodyMs),
                     child: pageWidget,
                   ),
                 ),
               ],
             )
           : AnimatedSwitcher(
-              duration: const Duration(milliseconds: ANIMATED_BODY_MS),
+              duration: const Duration(milliseconds: animatedBodyMs),
               child: pageWidget,
             ),
     );
@@ -94,7 +94,6 @@ class RootApp extends ConsumerWidget {
             (index) => BottomBarItem(
               _tabs[index]["icon"] as IconData,
               isActive: activeTab == index,
-              activeColor: AppColor.primary,
               onTap: () => ref.read(_rootTabProvider.notifier).state = index,
             ),
           ),

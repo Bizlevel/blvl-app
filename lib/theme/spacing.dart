@@ -26,4 +26,12 @@ class AppSpacing {
   // Вертикальные/горизонтальные GAP'ы
   static SizedBox gapH(double height) => SizedBox(height: height);
   static SizedBox gapW(double width) => SizedBox(width: width);
+
+  // Специализированные токены
+  static const double buttonPaddingHorizontal = 16.0;
+  static const double buttonPaddingVertical = 12.0;
+  static const double cardPadding = 16.0;
+  static const double screenPadding = 16.0;
+  static const double sectionSpacing = 24.0;
+  static const double itemSpacing = 12.0;
 }

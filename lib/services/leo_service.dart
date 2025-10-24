@@ -34,7 +34,6 @@ class LeoService {
     connectTimeout: const Duration(seconds: 10),
     sendTimeout: const Duration(seconds: 20),
     receiveTimeout: const Duration(seconds: 20),
-    responseType: ResponseType.json,
   ));
 
   // =============== Private helpers to reduce duplication and complexity ===============
@@ -156,7 +155,6 @@ class LeoService {
     final gp = GpService(_client);
     final String idempotencyKey = _generateIdempotencyKey(
       userId: session.user.id,
-      chatId: null,
       messages: messages,
     );
 
@@ -166,8 +164,6 @@ class LeoService {
           await _spendMessageAndRefresh(
             gp: gp,
             idempotencyKey: idempotencyKey,
-            chatId: null,
-            skipSpend: false,
           );
         } on GpFailure catch (ge) {
           if (ge.message.contains('Недостаточно GP')) {

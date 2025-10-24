@@ -340,7 +340,6 @@ class _Header extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           const CircleAvatar(
             radius: 16,

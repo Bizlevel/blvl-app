@@ -8,6 +8,7 @@ import 'package:bizlevel/screens/leo_dialog_screen.dart';
 import 'package:bizlevel/widgets/common/bizlevel_button.dart';
 import 'package:bizlevel/widgets/common/bizlevel_card.dart';
 import 'package:bizlevel/theme/spacing.dart';
+import 'package:bizlevel/theme/color.dart';
 
 class GoalCompactCard extends ConsumerStatefulWidget {
   const GoalCompactCard({super.key});
@@ -60,6 +61,19 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
 
           final metricType = (goal?['metric_type'] ?? '').toString();
 
+          // Прогресс и дни до дедлайна (герой-блок)
+          double? progress;
+          int? daysLeft;
+          try {
+            final repo = ref.read(goalsRepositoryProvider);
+            progress = repo.computeGoalProgressPercent(goal);
+            if (_selectedTargetDate != null) {
+              final int d =
+                  _selectedTargetDate!.difference(DateTime.now()).inDays;
+              daysLeft = d;
+            }
+          } catch (_) {}
+
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -69,14 +83,55 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                       .titleLarge
                       ?.copyWith(fontWeight: FontWeight.w700)),
               const SizedBox(height: 12),
-              if (goal == null || (goal['goal_text'] ?? '').toString().isEmpty)
+              // Hero-прогресс: круг + дни до дедлайна (показываем только при наличии данных)
+              if (!_isEditing && (progress != null || daysLeft != null))
                 Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.only(bottom: AppSpacing.md),
                   child: Row(
                     children: [
-                      const Icon(Icons.flag_outlined, color: Colors.black54),
-                      const SizedBox(width: 8),
-                      const Expanded(
+                      if (progress != null)
+                        _GoalProgressCircle(value: progress),
+                      if (progress != null)
+                        const SizedBox(width: AppSpacing.lg),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (daysLeft != null)
+                              Text(
+                                daysLeft < 0
+                                    ? 'Дедлайн прошёл'
+                                    : 'Осталось ${daysLeft} дн.',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleMedium
+                                    ?.copyWith(fontWeight: FontWeight.w600),
+                              ),
+                            if (progress != null)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Text(
+                                  'Прогресс к цели',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.copyWith(color: AppColor.labelColor),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              if (goal == null || (goal['goal_text'] ?? '').toString().isEmpty)
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    children: [
+                      Icon(Icons.flag_outlined, color: Colors.black54),
+                      SizedBox(width: 8),
+                      Expanded(
                           child: Text(
                               'Пока цель не задана. Начните с простого описания и метрики.')),
                     ],
@@ -156,13 +211,14 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                           goalText: _goalCtrl.text.trim(),
                           targetDate: _selectedTargetDate,
                         );
+                        final messenger = ScaffoldMessenger.of(context);
                         ref.invalidate(userGoalProvider);
-                        if (!mounted) return;
+                        if (!context.mounted) return;
                         setState(() => _isEditing = false);
-                        ScaffoldMessenger.of(context).showSnackBar(
+                        messenger.showSnackBar(
                             const SnackBar(content: Text('Цель сохранена')));
                       } catch (e) {
-                        if (!mounted) return;
+                        if (!context.mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(content: Text('Ошибка: $e')));
                       }
@@ -183,7 +239,6 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                     Navigator.of(context).push(MaterialPageRoute(
                       builder: (_) => LeoDialogScreen(
                         bot: 'max',
-                        chatId: null,
                         userContext: [
                           'goal_text: ${_goalCtrl.text.trim()}',
                           if (metricType.isNotEmpty) 'metric_type: $metricType',
@@ -204,4 +259,56 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
       ),
     );
   }
+}
+
+class _GoalProgressCircle extends StatelessWidget {
+  final double value; // 0..1
+  const _GoalProgressCircle({required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    final double clamped = value.clamp(0.0, 1.0);
+    // Подбор мягкого градиента по фазе прогресса
+    List<Color> colors;
+    if (clamped < 0.31) {
+      colors = const [Color(0xFFF59E0B), Color(0xFFFB923C)]; // тёплый старт
+    } else if (clamped < 0.71) {
+      colors = const [Color(0xFFFB923C), Color(0xFF7C3AED)]; // работа
+    } else {
+      colors = const [Color(0xFF7C3AED), Color(0xFF10B981)]; // финиш
+    }
+    return SizedBox(
+      width: 72,
+      height: 72,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          SizedBox(
+            width: 72,
+            height: 72,
+            child: CircularProgressIndicator(
+              strokeWidth: 6,
+              value: clamped,
+              strokeCap: StrokeCap.round,
+              valueColor: AlwaysStoppedAnimation(
+                _GradientColor(colors: colors),
+              ),
+              backgroundColor: AppColor.borderSubtle,
+            ),
+          ),
+          Text('${(clamped * 100).round()}%',
+              style: Theme.of(context)
+                  .textTheme
+                  .labelLarge
+                  ?.copyWith(fontWeight: FontWeight.w700)),
+        ],
+      ),
+    );
+  }
+}
+
+// Простая обёртка, чтобы прокинуть цвет в индикатор (без кастомного painter)
+class _GradientColor extends Color {
+  final List<Color> colors;
+  _GradientColor({required this.colors}) : super(colors.first.value);
 }

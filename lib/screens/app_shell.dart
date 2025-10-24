@@ -44,7 +44,7 @@ class _AppShellState extends ConsumerState<AppShell> {
 
   void _ensureController(int initialPage) {
     _pageController ??=
-        PageController(initialPage: initialPage, keepPage: true);
+        PageController(initialPage: initialPage);
   }
 
   @override
@@ -131,7 +131,6 @@ class _AppShellState extends ConsumerState<AppShell> {
                       return BottomBarItem(
                         icon,
                         isActive: activeTab == index,
-                        activeColor: AppColor.primary,
                         onTap: () => goTab(index),
                         iconWidget: index == 1
                             ? Padding(
@@ -176,7 +175,6 @@ class _AppShellState extends ConsumerState<AppShell> {
                                     return LeoDialogScreen(
                                       userContext: userCtx,
                                       levelContext: lvlCtx,
-                                      bot: 'leo',
                                     );
                                   },
                                 ),
@@ -403,7 +401,6 @@ class _HexagonPainter extends CustomPainter {
         p.arcToPoint(
           p2,
           radius: Radius.circular(rr),
-          clockwise: true,
         );
       } else {
         p.lineTo(vi.dx, vi.dy);

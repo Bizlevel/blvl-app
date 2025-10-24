@@ -40,7 +40,6 @@ void main() {
     name: 'Test User',
     email: 'test@example.com',
     onboardingCompleted: true,
-    currentLevel: 1,
   );
 
   final skills = [

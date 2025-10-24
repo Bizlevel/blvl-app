@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io' show Platform;
 
 import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 /// Сервис для работы с In‑App Purchases (StoreKit 2 / Google Billing)
 /// Минимальная обёртка: загрузка продуктов и покупка одного consumable товара.
@@ -53,7 +54,7 @@ class IapService {
     });
 
     final param = PurchaseParam(productDetails: product);
-    await _iap.buyConsumable(purchaseParam: param, autoConsume: true);
+    await _iap.buyConsumable(purchaseParam: param);
 
     final result = await completer.future
         .timeout(const Duration(seconds: 90), onTimeout: () => null);
@@ -62,10 +63,16 @@ class IapService {
     return result;
   }
 
-  /// Возвращает платформу: ios/android/other.
+  /// Возвращает платформу: ios/android/web/other.
   static String currentPlatform() {
-    if (Platform.isIOS) return 'ios';
-    if (Platform.isAndroid) return 'android';
+    // На Web нельзя обращаться к dart:io -> Platform.*
+    if (kIsWeb) return 'web';
+    try {
+      if (Platform.isIOS) return 'ios';
+      if (Platform.isAndroid) return 'android';
+    } catch (_) {
+      // На всякий случай гасим любые UnsupportedError
+    }
     return 'other';
   }
 }

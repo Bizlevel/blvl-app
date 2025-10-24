@@ -45,7 +45,7 @@ void main() {
 
       // Act
       final result =
-          await service.startCheckout(amount: amount, provider: provider);
+          await service.startCheckout(amount: amount);
 
       // Assert
       expect(result.url, redirectUrl);

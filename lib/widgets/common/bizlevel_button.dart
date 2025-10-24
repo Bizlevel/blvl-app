@@ -15,6 +15,8 @@ class BizLevelButton extends StatelessWidget {
   final bool fullWidth;
   final Key? buttonKey;
   final bool enableHaptic;
+  final Color? backgroundColorOverride;
+  final Color? foregroundColorOverride;
 
   const BizLevelButton({
     super.key,
@@ -26,14 +28,16 @@ class BizLevelButton extends StatelessWidget {
     this.fullWidth = false,
     this.buttonKey,
     this.enableHaptic = true,
+    this.backgroundColorOverride,
+    this.foregroundColorOverride,
   });
 
   Size get _minSize {
     switch (size) {
       case BizLevelButtonSize.sm:
-        return const Size(44, 44);
-      case BizLevelButtonSize.md:
         return const Size(48, 48);
+      case BizLevelButtonSize.md:
+        return const Size(52, 52);
       case BizLevelButtonSize.lg:
         return const Size(56, 56);
     }
@@ -79,8 +83,8 @@ class BizLevelButton extends StatelessWidget {
           key: buttonKey,
           onPressed: onPressed == null ? null : safeHapticTap,
           style: ElevatedButton.styleFrom(
-            backgroundColor: AppColor.primary,
-            foregroundColor: AppColor.onPrimary,
+            backgroundColor: backgroundColorOverride ?? AppColor.primary,
+            foregroundColor: foregroundColorOverride ?? AppColor.onPrimary,
             minimumSize: _minSize,
             padding: _padding,
             shape: RoundedRectangleBorder(
@@ -90,6 +94,8 @@ class BizLevelButton extends StatelessWidget {
           child: child,
         );
         break;
+      // Тёплый вариант CTA через outline+градиент бэкграунд (используется точечно)
+      // Чтобы не ломать API, warm-стиль зададим через BizLevelButtonVariant.outline при необходимости на местах
       case BizLevelButtonVariant.danger:
         button = ElevatedButton(
           key: buttonKey,

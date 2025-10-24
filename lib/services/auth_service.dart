@@ -194,6 +194,7 @@ class AuthService {
             final fresh = await gp.getBalance();
             await GpService.saveBalanceCache(fresh);
           } catch (_) {}
+          // Показать уведомление о бонусе профиля (UI ответственность — экран профиля)
         }
       } catch (_) {}
     }, unknownErrorMessage: 'Не удалось сохранить профиль');
@@ -209,13 +210,13 @@ class AuthService {
   Future<AuthResponse> signInWithGoogle() async {
     return _handleAuthCall(() async {
       if (kIsWeb) {
-        final redirectTo = envOrDefine('WEB_REDIRECT_ORIGIN', defaultValue: '');
+        final redirectTo = envOrDefine('WEB_REDIRECT_ORIGIN');
         await _client.auth.signInWithOAuth(
           OAuthProvider.google,
           redirectTo: redirectTo.isNotEmpty ? redirectTo : null,
         );
         // На web произойдёт редирект, сессия подхватится onAuthStateChange
-        return AuthResponse(session: null, user: null);
+        return AuthResponse();
       } else if (Platform.isAndroid || Platform.isIOS) {
         final googleWebClientId = envOrDefine('GOOGLE_WEB_CLIENT_ID');
         final googleSignIn = GoogleSignIn(

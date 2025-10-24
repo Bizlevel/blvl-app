@@ -41,7 +41,7 @@ class PushService {
 
       // Mobile permissions
       if (Platform.isIOS || Platform.isAndroid) {
-        await _fm.requestPermission(alert: true, badge: true, sound: true);
+        await _fm.requestPermission();
       }
 
       FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);

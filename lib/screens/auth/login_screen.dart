@@ -8,7 +8,7 @@ import '../../providers/login_controller.dart';
 import '../../services/auth_service.dart';
 import '../../theme/color.dart' show AppColor;
 import '../../widgets/custom_textfield.dart';
-import '../../widgets/common/animated_button.dart';
+import '../../widgets/common/bizlevel_button.dart';
 import '../../theme/spacing.dart';
 import '../../utils/constant.dart';
 
@@ -38,6 +38,15 @@ class LoginScreen extends HookConsumerWidget {
           ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text('Произошла неизвестная ошибка: $error')));
         }
+      } else if (next is AsyncData<void>) {
+        // Показать бонус за регистрацию при первом входе (если применимо)
+        // Сервер начисляет идемпотентно; показываем дружелюбный снэкбар один раз после входа
+        try {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text('Добро пожаловать! +30 GP за регистрацию')),
+          );
+        } catch (_) {}
       }
     });
 
@@ -138,7 +147,6 @@ class LoginScreen extends HookConsumerWidget {
                             'assets/images/logo_light.svg',
                             width: 176,
                             height: 176,
-                            fit: BoxFit.contain,
                           ),
                         ),
                         AppSpacing.gapH(32),
@@ -163,6 +171,12 @@ class LoginScreen extends HookConsumerWidget {
                             onPressed: () =>
                                 obscurePassword.value = !obscurePassword.value,
                           ),
+                        ),
+                        AppSpacing.gapH(24),
+                        // Основная CTA: «Войти» – сразу под полем пароля
+                        BizLevelButton(
+                          label: isLoading ? 'Входим…' : 'Войти',
+                          onPressed: isLoading ? null : submit,
                         ),
                         AppSpacing.gapH(24),
                         if (kEnableGoogleAuth) const _OrDivider(),
@@ -190,13 +204,7 @@ class LoginScreen extends HookConsumerWidget {
                               ),
                             ),
                           ),
-                        if (kEnableGoogleAuth) AppSpacing.gapH(32),
-                        AnimatedButton(
-                          label: 'Войти',
-                          onPressed: isLoading ? null : submit,
-                          loading: isLoading,
-                        ),
-                        AppSpacing.gapH(16),
+                        if (kEnableGoogleAuth) AppSpacing.gapH(16),
                         // Social proof (лёгкий блок
                         const _SocialProofBlock(),
                         AppSpacing.gapH(8),
@@ -258,8 +266,8 @@ class _AnimatedGradientBackgroundState
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                Color.lerp(
-                    const Color(0xFFF0F4FF), const Color(0xFFDDE8FF), t * 0.6)!,
+                Color.lerp(AppColor.bgGradient.colors.first,
+                    AppColor.bgGradient.colors.last, t * 0.6)!,
                 Color.lerp(
                     const Color(0xFFE0F2FE), const Color(0xFFEDE9FE), t * 0.6)!,
               ],

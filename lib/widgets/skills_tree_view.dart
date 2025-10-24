@@ -24,14 +24,7 @@ class _SkillsTreeViewState extends State<SkillsTreeView>
   late final bool _isLowEnd;
 
   // Цвета прогресса по id навыка.
-  static const Map<int, Color> _skillColors = {
-    1: Color(0xFF7C3AED), // purple
-    2: Color(0xFFF59E0B), // amber
-    3: Color(0xFFFB923C), // orange
-    4: Color(0xFF3B82F6), // blue
-    5: Color(0xFF10B981), // green
-    6: Color(0xFF6366F1), // indigo (AI‑предприниматель)
-  };
+  static const Map<int, Color> _skillColors = AppColor.skillColors;
 
   // Подбор иконок (можно заменить на кастомные изображения при желании).
   static const Map<int, IconData> _skillIcons = {

@@ -89,7 +89,6 @@ class FeatureItem extends StatelessWidget {
             color: AppColor.shadowColor.withValues(alpha: 0.05),
             spreadRadius: 1,
             blurRadius: 1,
-            offset: const Offset(0, 0),
           ),
         ],
       ),

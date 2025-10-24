@@ -39,7 +39,7 @@ void main() {
       {'applied_at': now.subtract(const Duration(days: 2)).toIso8601String()},
       {'applied_at': now.subtract(const Duration(days: 15)).toIso8601String()},
     ];
-    final z = repo.computeRecentPace(items, windowDays: 14, now: now);
+    final z = repo.computeRecentPace(items, now: now);
     expect(z, closeTo(2 / 14, 1e-9));
 
     final goal = <String, dynamic>{
