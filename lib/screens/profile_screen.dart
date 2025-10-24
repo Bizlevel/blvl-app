@@ -25,6 +25,8 @@ import 'package:bizlevel/widgets/common/gp_balance_widget.dart';
 import 'package:bizlevel/widgets/common/bizlevel_card.dart';
 import 'package:bizlevel/widgets/common/bizlevel_text_field.dart';
 import 'package:bizlevel/widgets/reminders_settings_sheet.dart';
+import 'package:bizlevel/widgets/common/achievement_badge.dart';
+import 'package:bizlevel/providers/theme_provider.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -200,6 +202,13 @@ class ProfileScreen extends ConsumerWidget {
                       color: AppColor.onSurfaceSubtle),
                   onSelected: (value) async {
                     switch (value) {
+                      case 'theme':
+                        final mode = ref.read(themeModeProvider);
+                        final next = mode == ThemeMode.light
+                            ? ThemeMode.dark
+                            : ThemeMode.light;
+                        ref.read(themeModeProvider.notifier).state = next;
+                        break;
                       case 'notifications':
                         await showRemindersSettingsSheet(context);
                         break;
@@ -221,6 +230,16 @@ class ProfileScreen extends ConsumerWidget {
                     }
                   },
                   itemBuilder: (context) => [
+                    PopupMenuItem(
+                      value: 'theme',
+                      child: Row(
+                        children: [
+                          const Icon(Icons.brightness_6, size: 18),
+                          const SizedBox(width: 10),
+                          Text('Тема: переключить'),
+                        ],
+                      ),
+                    ),
                     PopupMenuItem(
                       value: 'notifications',
                       child: Row(
@@ -556,6 +575,41 @@ class _BodyState extends ConsumerState<_Body> {
       child: Column(
         children: [
           _buildProfile(),
+          const SizedBox(height: AppSpacing.medium),
+          // Витрина достижений (простая витрина на 3 бейджа)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text('Достижения',
+                style: Theme.of(context)
+                    .textTheme
+                    .titleMedium
+                    ?.copyWith(fontWeight: FontWeight.w600)),
+          ),
+          const SizedBox(height: 8),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: const [
+                AchievementBadge(
+                    icon: Icons.flag,
+                    rarity: AchievementRarity.common,
+                    size: AchievementBadgeSize.s48,
+                    label: 'Первая цель'),
+                SizedBox(width: 12),
+                AchievementBadge(
+                    icon: Icons.rocket_launch,
+                    rarity: AchievementRarity.rare,
+                    size: AchievementBadgeSize.s48,
+                    label: '5 уровней'),
+                SizedBox(width: 12),
+                AchievementBadge(
+                    icon: Icons.stars,
+                    rarity: AchievementRarity.epic,
+                    size: AchievementBadgeSize.s48,
+                    label: 'AI‑навык +50'),
+              ],
+            ),
+          ),
           const SizedBox(height: AppSpacing.medium),
           // Блок статистики (уровень/артефакты) убран по новой спецификации
           skillsAsync.when(

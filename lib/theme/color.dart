@@ -64,6 +64,11 @@ class AppColor {
   static const achievementGradient = LinearGradient(
     colors: [Color(0xFF7C3AED), Color(0xFFEC4899)],
   );
+  static const warmGradient = LinearGradient(
+    colors: [Color(0xFFF59E0B), Color(0xFFFB923C)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
 
   // Подготовка к dark‑mode
   static const surfaceDark = Color(0xFF1E293B);

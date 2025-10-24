@@ -366,9 +366,21 @@ class _FavResourceCard extends StatelessWidget {
           ),
           if (expanded) ...[
             AppSpacing.gapH(AppSpacing.itemSpacing),
-            Text(description, style: Theme.of(context).textTheme.bodyMedium),
+            // Fade‑in описание
+            TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0, end: 1),
+              duration: const Duration(milliseconds: 250),
+              builder: (context, v, child) => Opacity(opacity: v, child: child),
+              child: Text(description,
+                  style: Theme.of(context).textTheme.bodyMedium),
+            ),
             AppSpacing.gapH(AppSpacing.itemSpacing),
-            _FavDynamicInfo(type: type, data: data),
+            TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0, end: 1),
+              duration: const Duration(milliseconds: 250),
+              builder: (context, v, child) => Opacity(opacity: v, child: child),
+              child: _FavDynamicInfo(type: type, data: data),
+            ),
             AppSpacing.gapH(AppSpacing.itemSpacing),
             Align(
               alignment: Alignment.centerLeft,

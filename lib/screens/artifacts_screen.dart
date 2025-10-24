@@ -4,6 +4,7 @@ import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/providers/levels_provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:bizlevel/widgets/common/bizlevel_button.dart';
 
 /// Экран «Артефакты» (этап 1: каркас и маршрут)
@@ -218,6 +219,21 @@ class _ArtifactTile extends StatefulWidget {
 
 class _ArtifactTileState extends State<_ArtifactTile> {
   bool _hovered = false;
+  bool _isNew = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Простая эвристика «Новый»: показываем, пока не откроют полноэкранный просмотр
+    try {
+      final box =
+          Hive.isBoxOpen('artifacts_seen') ? Hive.box('artifacts_seen') : null;
+      final key = 'seen_${widget.level}';
+      _isNew = !(box?.get(key) == true);
+    } catch (_) {
+      _isNew = true;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -236,6 +252,19 @@ class _ArtifactTileState extends State<_ArtifactTile> {
             onTap: widget.isLocked || image == null
                 ? null
                 : () {
+                    // Помечаем как просмотренный
+                    try {
+                      final key = 'seen_${widget.level}';
+                      () async {
+                        try {
+                          final box = Hive.isBoxOpen('artifacts_seen')
+                              ? Hive.box('artifacts_seen')
+                              : await Hive.openBox('artifacts_seen');
+                          await box.put(key, true);
+                        } catch (_) {}
+                      }();
+                      if (mounted) setState(() => _isNew = false);
+                    } catch (_) {}
                     Navigator.of(context).push(
                       PageRouteBuilder(
                         opaque: false,
@@ -267,10 +296,46 @@ class _ArtifactTileState extends State<_ArtifactTile> {
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
+                        // Лёгкий tilt‑эффект
                         if (image != null)
-                          Image.asset(image, fit: BoxFit.cover)
+                          AnimatedBuilder(
+                            animation:
+                                Listenable.merge([ValueNotifier(_hovered)]),
+                            builder: (context, child) {
+                              final angle = _hovered ? 0.06 : 0.0;
+                              return Transform(
+                                alignment: Alignment.center,
+                                transform: Matrix4.identity()
+                                  ..setEntry(3, 2, 0.001)
+                                  ..rotateY(angle),
+                                child: child,
+                              );
+                            },
+                            child: Image.asset(image, fit: BoxFit.cover),
+                          )
                         else
                           Container(color: AppColor.appBgColor),
+                        if (!widget.isLocked && _isNew)
+                          Positioned(
+                            top: 8,
+                            left: 8,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: AppColor.premium.withValues(alpha: 0.9),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Text(
+                                'NEW',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ),
                         if (widget.isLocked) ...[
                           Container(
                               color: Colors.black.withValues(alpha: 0.35)),

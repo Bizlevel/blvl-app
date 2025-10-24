@@ -41,6 +41,14 @@ class AppTheme {
       ),
       inputDecorationTheme: AppInputDecoration.theme().copyWith(
         fillColor: AppColor.surfaceDark,
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: AppColor.borderStrong),
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: AppColor.borderStrong),
+        ),
       ),
       snackBarTheme: const SnackBarThemeData(
         backgroundColor: AppColor.primary,

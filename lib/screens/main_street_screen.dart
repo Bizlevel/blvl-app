@@ -153,16 +153,13 @@ class _BackgroundLayer extends StatelessWidget {
   const _BackgroundLayer();
   @override
   Widget build(BuildContext context) {
-    // Простой градиентный фон вместо отсутствующего background.svg
+    // Локальный мягкий градиент фона для Main Street
     return Container(
       decoration: BoxDecoration(
-        gradient: LinearGradient(
+        gradient: const LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [
-            AppColor.appBgColor,
-            AppColor.appBgColor.withValues(alpha: 0.8),
-          ],
+          colors: [Color(0xFFFAFAFA), Color(0xFFF7F3FF)],
         ),
       ),
     );
@@ -199,6 +196,7 @@ class _MainActionsGrid extends ConsumerWidget {
                     title: 'Коворкинг',
                     icon: Icons.workspaces_outline,
                     svgAsset: 'assets/images/street/coworking.svg',
+                    kind: _CardKind.coworking,
                     state: _CardState.soon,
                     onTap: () => _showSoonSnackBar(context),
                   ),
@@ -210,6 +208,7 @@ class _MainActionsGrid extends ConsumerWidget {
                     title: 'Маркетплейс',
                     icon: Icons.storefront,
                     svgAsset: 'assets/images/street/marketplace.svg',
+                    kind: _CardKind.marketplace,
                     state: _CardState.soon,
                     onTap: () => _showSoonSnackBar(context),
                   ),
@@ -228,6 +227,7 @@ class _MainActionsGrid extends ConsumerWidget {
                     title: 'База тренеров',
                     icon: Icons.chat_bubble,
                     svgAsset: 'assets/images/street/training_base.svg',
+                    kind: _CardKind.trainers,
                     state: _CardState.active,
                     onTap: () {
                       try {
@@ -250,6 +250,7 @@ class _MainActionsGrid extends ConsumerWidget {
                     title: 'Библиотека',
                     icon: Icons.menu_book,
                     svgAsset: 'assets/images/street/library.svg',
+                    kind: _CardKind.library,
                     state: _CardState.active,
                     onTap: () {
                       try {
@@ -278,6 +279,7 @@ class _MainActionsGrid extends ConsumerWidget {
                     title: 'Башня БизЛевел',
                     icon: Icons.apartment,
                     svgAsset: 'assets/images/street/tower.svg',
+                    kind: _CardKind.tower,
                     state: _CardState.active,
                     onTap: () {
                       try {
@@ -303,12 +305,15 @@ class _MainActionsGrid extends ConsumerWidget {
 
 enum _CardState { active, soon }
 
+enum _CardKind { library, marketplace, trainers, coworking, tower }
+
 class _MainActionCard extends StatelessWidget {
   final String title;
   final IconData icon;
   final _CardState state;
   final VoidCallback? onTap;
   final String? svgAsset;
+  final _CardKind kind;
 
   const _MainActionCard({
     super.key,
@@ -317,6 +322,7 @@ class _MainActionCard extends StatelessWidget {
     required this.state,
     required this.onTap,
     this.svgAsset,
+    required this.kind,
   });
 
   @override
@@ -326,6 +332,49 @@ class _MainActionCard extends StatelessWidget {
         ? Theme.of(context).textTheme.bodyMedium!.color!.withValues(alpha: 0.6)
         : Theme.of(context).textTheme.bodyMedium!.color!;
     final Color border = AppColor.borderColor.withValues(alpha: 0.25);
+
+    // Цветовое кодирование подложки по типу раздела
+    LinearGradient? backgroundGradient;
+    switch (kind) {
+      case _CardKind.library:
+        backgroundGradient = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFE8F0FE), Color(0xFFDDE8FF)], // синий мягкий
+        );
+        break;
+      case _CardKind.marketplace:
+        backgroundGradient = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFE6F6ED), Color(0xFFD7FBEA)], // зелёный мягкий
+        );
+        break;
+      case _CardKind.trainers:
+        backgroundGradient = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFF0E9FF), Color(0xFFEDE7FF)], // фиолетовый мягкий
+        );
+        break;
+      case _CardKind.coworking:
+        backgroundGradient = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFFFF4E5), Color(0xFFFFF0D6)], // тёплый апельсиновый
+        );
+        break;
+      case _CardKind.tower:
+        backgroundGradient = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFFFFF3C4),
+            Color(0xFFEDE7FF)
+          ], // золото→фиолетовый soft
+        );
+        break;
+    }
 
     return Semantics(
       label: title,
@@ -346,6 +395,15 @@ class _MainActionCard extends StatelessWidget {
             onTap: onTap,
             child: Stack(
               children: [
+                // Подложка‑градиент по типу
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: backgroundGradient,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                ),
                 // Иконка на весь доступный размер (пониженная насыщенность для "Скоро")
                 Positioned.fill(
                   child: Center(

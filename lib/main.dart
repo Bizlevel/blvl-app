@@ -20,6 +20,7 @@ import 'package:go_router/go_router.dart';
 import 'services/supabase_service.dart';
 import 'theme/color.dart';
 import 'theme/app_theme.dart';
+import 'providers/theme_provider.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:bizlevel/services/notifications_service.dart';
 import 'package:timezone/data/latest.dart' as tz;
@@ -207,6 +208,8 @@ class MyApp extends ConsumerWidget {
         debugShowCheckedModeBanner: false,
         title: 'BizLevel',
         theme: AppTheme.light(),
+        darkTheme: AppTheme.dark(),
+        themeMode: ref.watch(themeModeProvider),
         // Навигатор теперь управляется GoRouter; SentryObserver добавлен в конфигурацию роутера
       ),
     );

@@ -489,12 +489,11 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
         backgroundColor: AppColor.primary,
         title: Row(
           children: [
-            CircleAvatar(
+            _FloatAvatar(
               radius: 14,
-              backgroundImage: AssetImage(widget.bot == 'max'
+              asset: widget.bot == 'max'
                   ? 'assets/images/avatars/avatar_max.png'
-                  : 'assets/images/avatars/avatar_leo.png'),
-              backgroundColor: Colors.transparent,
+                  : 'assets/images/avatars/avatar_leo.png',
             ),
             const SizedBox(width: 8),
             Text(widget.bot == 'max' ? 'Макс' : 'Лео'),
@@ -918,6 +917,73 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
         'Объясни тему ур.$lvl',
       ];
     }
+  }
+}
+
+class _FloatAvatar extends StatefulWidget {
+  final double radius;
+  final String asset;
+  const _FloatAvatar({required this.radius, required this.asset});
+
+  @override
+  State<_FloatAvatar> createState() => _FloatAvatarState();
+}
+
+class _FloatAvatarState extends State<_FloatAvatar>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c;
+  late final Animation<double> _t;
+
+  bool get _isLowEndDevice {
+    final mq = MediaQuery.maybeOf(context);
+    if (mq == null) return true;
+    final disableAnimations = View.of(context)
+        .platformDispatcher
+        .accessibilityFeatures
+        .disableAnimations;
+    return mq.devicePixelRatio < 2.0 || disableAnimations;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _c = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    )..repeat(reverse: true);
+    _t = CurvedAnimation(parent: _c, curve: Curves.easeInOut);
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLowEndDevice) {
+      return CircleAvatar(
+        radius: widget.radius,
+        backgroundImage: AssetImage(widget.asset),
+        backgroundColor: Colors.transparent,
+      );
+    }
+    return AnimatedBuilder(
+      animation: _t,
+      builder: (context, child) {
+        final dy = (1 - _t.value) * 1.5; // лёгкое «плавание»
+        return Transform.translate(
+          offset: Offset(0, dy),
+          child: child,
+        );
+      },
+      child: CircleAvatar(
+        radius: widget.radius,
+        backgroundImage: AssetImage(widget.asset),
+        backgroundColor: Colors.transparent,
+      ),
+    );
   }
 }
 
