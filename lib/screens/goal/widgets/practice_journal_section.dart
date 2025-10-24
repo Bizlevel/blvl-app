@@ -68,7 +68,8 @@ class _PracticeJournalSectionState
                   loc = GoRouter.of(context)
                       .routeInformationProvider
                       .value
-                      .location;
+                      .uri
+                      .toString();
                 } catch (_) {
                   final route = ModalRoute.of(context);
                   loc = route?.settings.name ?? '/goal';
@@ -227,19 +228,18 @@ class _PracticeJournalSectionState
                       // Сигнал о бонусе за практику
                       try {
                         final messenger = ScaffoldMessenger.of(context);
-                        if (!mounted) return;
+                        if (!context.mounted) return;
                         messenger.showSnackBar(
                           const SnackBar(
                               content: Text('+5 GP за практику сегодня')),
                         );
                       } catch (_) {}
                       await Future.delayed(const Duration(milliseconds: 800));
-                      if (!mounted) return;
+                      if (!context.mounted) return;
                       setState(() => _showMomentum = false);
                       Navigator.of(context).push(MaterialPageRoute(
                         builder: (_) => LeoDialogScreen(
                           bot: 'max',
-                          chatId: null,
                           userContext: [
                             if (note.isNotEmpty) 'practice_note: $note',
                             if (tools.isNotEmpty) 'applied_tools: $tools',
@@ -251,7 +251,7 @@ class _PracticeJournalSectionState
                         ),
                       ));
                     } catch (e) {
-                      if (!mounted) return;
+                      if (!context.mounted) return;
                       ScaffoldMessenger.of(context)
                           .showSnackBar(SnackBar(content: Text('Ошибка: $e')));
                     }
@@ -402,9 +402,9 @@ class _PracticeJournalSectionState
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(color: Colors.green.shade200),
                   ),
-                  child: Row(
+                  child: const Row(
                     mainAxisSize: MainAxisSize.min,
-                    children: const [
+                    children: [
                       Icon(Icons.trending_up, color: Colors.green, size: 18),
                       SizedBox(width: 6),
                       Text('+1 день движения к цели',

@@ -123,8 +123,9 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
       bottomNavigationBar: LayoutBuilder(
         builder: (context, cons) {
           // Простая эвристика мобайла: ширина < 600
-          if (cons.maxWidth >= 600 || !kGoalStickyCta)
+          if (cons.maxWidth >= 600 || !kGoalStickyCta) {
             return const SizedBox.shrink();
+          }
           return SafeArea(
             top: false,
             child: Container(
@@ -185,7 +186,6 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                         Navigator.of(context).push(MaterialPageRoute(
                           builder: (_) => LeoDialogScreen(
                             bot: 'max',
-                            chatId: null,
                             userContext: userCtxLines.join('\n'),
                             levelContext: '',
                           ),

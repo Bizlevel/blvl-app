@@ -78,7 +78,7 @@ class _LessonWidgetState extends ConsumerState<LessonWidget> {
       // Web HLS via local helper page (hls.js) inside iframe
       if (kIsWeb && _looksLikeHls(directUrl)) {
         final encoded = Uri.encodeComponent(directUrl);
-        _webIframeUrl = '/hls_player.html?src=' + encoded;
+        _webIframeUrl = '/hls_player.html?src=$encoded';
         _initialized = true;
         setState(() {});
         _autoMarkWatched();
@@ -91,11 +91,6 @@ class _LessonWidgetState extends ConsumerState<LessonWidget> {
       if (!kIsWeb) {
         _chewieController = ChewieController(
           videoPlayerController: _videoController!,
-          autoPlay: false,
-          looping: false,
-          allowFullScreen: true,
-          allowMuting: true,
-          showControls: true,
           playbackSpeeds: const [0.5, 0.75, 1.0, 1.25, 1.5, 2.0],
           aspectRatio: _videoController!.value.aspectRatio == 0
               ? 9 / 16

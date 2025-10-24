@@ -131,9 +131,7 @@ class _CheckpointL4ScreenState extends ConsumerState<CheckpointL4Screen> {
                             Expanded(
                               child: LeoDialogScreen(
                                 bot: 'max',
-                                chatId: null,
                                 embedded: true,
-                                skipSpend: false,
                                 userContext: userCtx,
                                 levelContext: '',
                                 initialAssistantMessages: initialMsgs,
@@ -168,7 +166,7 @@ class _CheckpointL4ScreenState extends ConsumerState<CheckpointL4Screen> {
                           level: SentryLevel.info,
                         ));
                       } catch (_) {}
-                      if (!mounted) return;
+                      if (!context.mounted) return;
                       GoRouter.of(context).push('/tower');
                     },
                   ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:bizlevel/theme/color.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:bizlevel/services/notification_log_service.dart';
 
@@ -9,12 +10,22 @@ class NotificationCenter {
 
   static void showSuccess(BuildContext context, String message,
       {int ms = 3500, String? route}) {
-    _show(context, message, _BannerType.success, ms: ms, route: route);
+    _show(
+      context,
+      message,
+      _BannerType.success,
+      _BannerOptions(ms: ms, route: route),
+    );
   }
 
   static void showInfo(BuildContext context, String message,
       {int ms = 3500, String? route}) {
-    _show(context, message, _BannerType.info, ms: ms, route: route);
+    _show(
+      context,
+      message,
+      _BannerType.info,
+      _BannerOptions(ms: ms, route: route),
+    );
   }
 
   static void showWarn(BuildContext context, String message,
@@ -22,51 +33,49 @@ class NotificationCenter {
       VoidCallback? onAction,
       String? actionLabel,
       String? route}) {
-    _show(context, message, _BannerType.warn,
-        ms: ms, onAction: onAction, actionLabel: actionLabel, route: route);
+    _show(
+      context,
+      message,
+      _BannerType.warn,
+      _BannerOptions(
+        ms: ms,
+        onAction: onAction,
+        actionLabel: actionLabel,
+        route: route,
+      ),
+    );
   }
 
   static void showError(BuildContext context, String message,
       {int ms = 3500, String? route}) {
-    _show(context, message, _BannerType.error, ms: ms, route: route);
+    _show(
+      context,
+      message,
+      _BannerType.error,
+      _BannerOptions(ms: ms, route: route),
+    );
   }
 
-  static void _show(BuildContext context, String message, _BannerType type,
-      {int ms = 3500,
-      VoidCallback? onAction,
-      String? actionLabel,
-      String? route}) {
+  static void _show(
+    BuildContext context,
+    String message,
+    _BannerType type,
+    _BannerOptions opts,
+  ) {
     final messenger = ScaffoldMessenger.of(context);
     messenger.hideCurrentMaterialBanner();
 
-    final Color bg;
-    final IconData icon;
-    switch (type) {
-      case _BannerType.success:
-        bg = const Color(0xFFE6F6ED);
-        icon = Icons.check_circle_outline;
-        break;
-      case _BannerType.info:
-        bg = const Color(0xFFE8F0FE);
-        icon = Icons.info_outline;
-        break;
-      case _BannerType.warn:
-        bg = const Color(0xFFFFF4E5);
-        icon = Icons.warning_amber_rounded;
-        break;
-      case _BannerType.error:
-        bg = const Color(0xFFFFEBEE);
-        icon = Icons.error_outline;
-        break;
-    }
+    final _BannerStyle style = _resolveStyle(type);
 
-    final action = onAction != null && (actionLabel?.isNotEmpty ?? false)
-        ? MaterialBannerAction(label: actionLabel!, onPressed: onAction)
-        : null;
+    final action =
+        opts.onAction != null && (opts.actionLabel?.isNotEmpty ?? false)
+            ? MaterialBannerAction(
+                label: opts.actionLabel!, onPressed: opts.onAction!)
+            : null;
 
     final banner = MaterialBanner(
-      backgroundColor: bg,
-      leading: Icon(icon),
+      backgroundColor: style.bg,
+      leading: Icon(style.icon),
       content: Text(message),
       actions: [
         if (action != null)
@@ -99,11 +108,11 @@ class NotificationCenter {
         },
         message: message,
         category: 'banner',
-        route: route,
+        route: opts.route,
       );
     } catch (_) {}
     // Автозакрытие баннера через ms
-    Future<void>.delayed(Duration(milliseconds: ms)).then((_) {
+    Future<void>.delayed(Duration(milliseconds: opts.ms)).then((_) {
       if (messenger.mounted) {
         messenger.hideCurrentMaterialBanner();
       }
@@ -115,4 +124,38 @@ class MaterialBannerAction {
   final String label;
   final VoidCallback onPressed;
   MaterialBannerAction({required this.label, required this.onPressed});
+}
+
+class _BannerOptions {
+  final int ms;
+  final VoidCallback? onAction;
+  final String? actionLabel;
+  final String? route;
+  const _BannerOptions({
+    this.ms = 3500,
+    this.onAction,
+    this.actionLabel,
+    this.route,
+  });
+}
+
+class _BannerStyle {
+  final Color bg;
+  final IconData icon;
+  const _BannerStyle(this.bg, this.icon);
+}
+
+_BannerStyle _resolveStyle(_BannerType type) {
+  switch (type) {
+    case _BannerType.success:
+      return const _BannerStyle(
+          AppColor.backgroundSuccess, Icons.check_circle_outline);
+    case _BannerType.info:
+      return const _BannerStyle(AppColor.backgroundInfo, Icons.info_outline);
+    case _BannerType.warn:
+      return const _BannerStyle(
+          AppColor.backgroundWarning, Icons.warning_amber_rounded);
+    case _BannerType.error:
+      return const _BannerStyle(AppColor.backgroundError, Icons.error_outline);
+  }
 }

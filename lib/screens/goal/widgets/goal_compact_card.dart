@@ -70,13 +70,13 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                       ?.copyWith(fontWeight: FontWeight.w700)),
               const SizedBox(height: 12),
               if (goal == null || (goal['goal_text'] ?? '').toString().isEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 8),
                   child: Row(
                     children: [
-                      const Icon(Icons.flag_outlined, color: Colors.black54),
-                      const SizedBox(width: 8),
-                      const Expanded(
+                      Icon(Icons.flag_outlined, color: Colors.black54),
+                      SizedBox(width: 8),
+                      Expanded(
                           child: Text(
                               'Пока цель не задана. Начните с простого описания и метрики.')),
                     ],
@@ -158,12 +158,12 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                         );
                         final messenger = ScaffoldMessenger.of(context);
                         ref.invalidate(userGoalProvider);
-                        if (!mounted) return;
+                        if (!context.mounted) return;
                         setState(() => _isEditing = false);
                         messenger.showSnackBar(
                             const SnackBar(content: Text('Цель сохранена')));
                       } catch (e) {
-                        if (!mounted) return;
+                        if (!context.mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(content: Text('Ошибка: $e')));
                       }
@@ -184,7 +184,6 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                     Navigator.of(context).push(MaterialPageRoute(
                       builder: (_) => LeoDialogScreen(
                         bot: 'max',
-                        chatId: null,
                         userContext: [
                           'goal_text: ${_goalCtrl.text.trim()}',
                           if (metricType.isNotEmpty) 'metric_type: $metricType',

@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  Widget _wrap(Widget child,
+  Widget wrap(Widget child,
       {Map<String, dynamic>? goal, Map<String, dynamic>? state}) {
     return ProviderScope(
       overrides: [
@@ -19,7 +19,7 @@ void main() {
 
   testWidgets('NextActionBanner: предлагает L1, когда цель не задана',
       (tester) async {
-    await tester.pumpWidget(_wrap(const NextActionBanner(currentLevel: 1)));
+    await tester.pumpWidget(wrap(const NextActionBanner(currentLevel: 1)));
     await tester.pump();
     expect(find.textContaining('Сформулируйте первую цель'), findsOneWidget);
     expect(find.textContaining('Перейти к чекпоинту L1'), findsOneWidget);
@@ -28,7 +28,7 @@ void main() {
   testWidgets('NextActionBanner: предлагает L4 после L1', (tester) async {
     final goal = {'goal_text': 'Цель'};
     final state = {'l1Done': true, 'l4Done': false, 'l7Done': false};
-    await tester.pumpWidget(_wrap(const NextActionBanner(currentLevel: 1),
+    await tester.pumpWidget(wrap(const NextActionBanner(currentLevel: 1),
         goal: goal, state: state));
     await tester.pump();
     expect(find.textContaining('Добавьте финансовый фокус'), findsOneWidget);
@@ -43,7 +43,7 @@ void main() {
           DateTime.now().add(const Duration(days: 10)).toIso8601String(),
     };
     final state = {'l1Done': true, 'l4Done': true, 'l7Done': false};
-    await tester.pumpWidget(_wrap(const NextActionBanner(currentLevel: 1),
+    await tester.pumpWidget(wrap(const NextActionBanner(currentLevel: 1),
         goal: goal, state: state));
     await tester.pump();
     expect(
@@ -61,7 +61,7 @@ void main() {
       'target_date': DateTime.now().toIso8601String(),
     };
     final state = {'l1Done': true, 'l4Done': true, 'l7Done': true};
-    await tester.pumpWidget(_wrap(const NextActionBanner(currentLevel: 1),
+    await tester.pumpWidget(wrap(const NextActionBanner(currentLevel: 1),
         goal: goal, state: state));
     await tester.pump();
     expect(find.textContaining('Двигайте цель ежедневными применениями'),

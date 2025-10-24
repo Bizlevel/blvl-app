@@ -70,7 +70,7 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
   void initState() {
     super.initState();
     // Берём последнюю разблокированную страницу, чтобы открывать уровень там, где пользователь остановился.
-    _pageController = PageController(initialPage: 0);
+    _pageController = PageController();
     // Гарантируем разблокировку Intro (0) и следующей страницы (1)
     _progressNotifier.unlockPage(1);
     // Listen for page changes to rebuild so that chat bubble visibility updates
@@ -222,7 +222,6 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
                                 // Праздничное уведомление о бонусе за уровень (+20 GP)
                                 await showDialog(
                                   context: context,
-                                  barrierDismissible: true,
                                   builder: (_) => Dialog(
                                     backgroundColor: Colors.transparent,
                                     insetPadding: const EdgeInsets.all(16),
@@ -251,7 +250,6 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
                             }
                           }
                         : null,
-                    fullWidth: false,
                   ),
               ],
             ),
@@ -491,7 +489,6 @@ class _ArtifactBlock extends _PageBlock {
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Text(
                 title,
@@ -543,7 +540,6 @@ class _ArtifactPreview extends StatelessWidget {
             );
           },
           child: Align(
-            alignment: Alignment.center,
             child: ClipRRect(
               borderRadius: BorderRadius.circular(12),
               child: SizedBox(
@@ -621,7 +617,7 @@ class _GoalV1Block extends _PageBlock {
 
     return Consumer(builder: (context, ref, _) {
       // legacy versions provider removed
-      final versionsAsync = const AsyncValue<List<Map<String, dynamic>>>.data(
+      const versionsAsync = AsyncValue<List<Map<String, dynamic>>>.data(
           <Map<String, dynamic>>[]);
       return versionsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -835,7 +831,6 @@ class _ProfileFormBlock extends _PageBlock {
         return SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               // Верхняя панель с иконкой «Редактировать» (показываем, если не в режиме редактирования)
               Align(
@@ -1020,7 +1015,6 @@ class _IntroBlock extends _PageBlock {
                 constraints: const BoxConstraints(maxWidth: 900),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     // Картинка уровня (для уровня 0 изображения может не быть)
                     if (!isFirstStep)
@@ -1032,7 +1026,6 @@ class _IntroBlock extends _PageBlock {
                           child: Image.asset(
                             assetPath,
                             fit: BoxFit.cover,
-                            alignment: Alignment.center,
                             errorBuilder: (context, error, stack) =>
                                 const SizedBox.shrink(),
                           ),
@@ -1125,7 +1118,7 @@ class _QuizBlock extends _PageBlock {
               );
             } else {
               return SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 8),
+                padding: const EdgeInsets.symmetric(vertical: 8),
                 child: QuizWidget(
                   questionData: {
                     'question': lesson.quizQuestions.first['question'],
@@ -1205,21 +1198,15 @@ class _NavBar extends StatelessWidget {
           BizLevelButton(
             label: 'Назад',
             onPressed: canBack ? onBack : null,
-            variant: BizLevelButtonVariant.primary,
-            size: BizLevelButtonSize.md,
           ),
           if (showDiscuss)
             BizLevelButton(
               label: 'Обсудить с Лео',
               onPressed: onDiscuss,
-              variant: BizLevelButtonVariant.primary,
-              size: BizLevelButtonSize.md,
             ),
           BizLevelButton(
             label: 'Далее',
             onPressed: canNext ? onNext : null,
-            variant: BizLevelButtonVariant.primary,
-            size: BizLevelButtonSize.md,
           ),
         ],
       ),

@@ -428,7 +428,7 @@ class _BodyState extends ConsumerState<_Body> {
                   child: SingleChildScrollView(
                     controller: scrollController,
                     padding: const EdgeInsets.all(AppSpacing.medium),
-                    child: _AboutMeCard(user: widget.user, showTitle: true),
+                    child: _AboutMeCard(user: widget.user),
                   ),
                 ),
               ],
@@ -515,13 +515,11 @@ class _BodyState extends ConsumerState<_Body> {
 
       debugPrint('Attempting to upload: $fileName');
 
-      final response = await Supabase.instance.client.storage
-          .from('artifacts')
-          .upload(
-            fileName,
-            File(filePath),
-            fileOptions: const FileOptions(cacheControl: '3600', upsert: false),
-          );
+      final response =
+          await Supabase.instance.client.storage.from('artifacts').upload(
+                fileName,
+                File(filePath),
+              );
 
       debugPrint('Upload successful: $response');
       if (!mounted) return;
@@ -709,7 +707,9 @@ class _BodyState extends ConsumerState<_Body> {
 }
 
 class _AboutMeCard extends ConsumerStatefulWidget {
-  const _AboutMeCard({required this.user, this.showTitle = true});
+  const _AboutMeCard(
+      {required this.user,
+      this.showTitle = true}); // ignore: unused_element_parameter
   final UserModel user;
   final bool showTitle;
 

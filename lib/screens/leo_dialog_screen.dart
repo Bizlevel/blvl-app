@@ -354,8 +354,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
           .replaceFirst(RegExp(r"^\s*Оценка\s*:\s*", caseSensitive: false), '')
           .replaceFirst(
               RegExp(
-                  r"^(EXCELLENT|GOOD|ACCEPTABLE|WEAK|INVALID)\s*[\.|\-–:]?\s*",
-                  caseSensitive: true),
+                  r"^(EXCELLENT|GOOD|ACCEPTABLE|WEAK|INVALID)\s*[\.|\-–:]?\s*"),
               '')
           .replaceFirst(
               RegExp(

@@ -357,7 +357,6 @@ class _MainActionCard extends StatelessWidget {
                         child: svgAsset != null
                             ? SvgPicture.asset(
                                 svgAsset!,
-                                fit: BoxFit.contain,
                               )
                             : Icon(
                                 icon,

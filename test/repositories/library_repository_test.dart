@@ -8,8 +8,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 class _MockSupabaseClient extends Mock implements SupabaseClient {}
 
-class _MockQueryBuilder extends Mock implements SupabaseQueryBuilder {}
-
 void main() {
   late Directory tempDir;
   late Box box;

@@ -44,7 +44,6 @@ void main() {
                 'script': 'Давай проверим...',
                 'explanation': 'Подсказка',
               },
-              initiallyPassed: false,
               userContext: 'Имя: Тест. Цель: Выучить.',
               onCorrect: _OnCorrectProbe.setPassed,
             ),

@@ -53,7 +53,7 @@ class IapService {
     });
 
     final param = PurchaseParam(productDetails: product);
-    await _iap.buyConsumable(purchaseParam: param, autoConsume: true);
+    await _iap.buyConsumable(purchaseParam: param);
 
     final result = await completer.future
         .timeout(const Duration(seconds: 90), onTimeout: () => null);

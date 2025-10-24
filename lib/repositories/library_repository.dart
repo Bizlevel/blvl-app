@@ -170,7 +170,7 @@ class LibraryRepository {
     try {
       final rows = await _client
           .from('library_favorites')
-          .select('*')
+          .select()
           .order('created_at', ascending: false) as List<dynamic>;
       final data =
           rows.map((e) => Map<String, dynamic>.from(e as Map)).toList();

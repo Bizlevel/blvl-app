@@ -44,7 +44,6 @@ class GpService {
     connectTimeout: const Duration(seconds: 10),
     sendTimeout: const Duration(seconds: 20),
     receiveTimeout: const Duration(seconds: 20),
-    responseType: ResponseType.json,
   ));
 
   // ----------------- Small safety helpers -----------------
@@ -273,7 +272,7 @@ class GpService {
     String referenceId = '',
     String? idempotencyKey,
   }) async {
-    Map<String, dynamic> _buildSpendParams() => {
+    Map<String, dynamic> buildSpendParams() => {
           'p_type': type,
           'p_amount': amount,
           'p_reference_id': referenceId,
@@ -282,7 +281,7 @@ class GpService {
     return _withRetry(() async {
       try {
         _requireSession();
-        final data = await _client.rpc('gp_spend', params: _buildSpendParams());
+        final data = await _client.rpc('gp_spend', params: buildSpendParams());
         final parsed = _parseBalanceAfter(data);
         if (parsed != null) {
           _bcSpent(type, amount);
@@ -308,7 +307,7 @@ class GpService {
               } catch (_) {
                 // ignore and rethrow below
               }
-              // ignore: only_throw_errors
+              // ignore: use_rethrow_when_possible, only_throw_errors
               throw e;
             } as int Function());
       } on SocketException {
@@ -332,8 +331,7 @@ class GpService {
             'package_id': packageId,
             'provider': provider,
           }),
-          options: Options(
-              headers: _edgeHeadersAnonWithUserJwt(session, json: true)));
+          options: Options(headers: _edgeHeadersAnonWithUserJwt(session)));
       if (resp.statusCode == 200 && resp.data is Map<String, dynamic>) {
         final m = Map<String, dynamic>.from(resp.data);
         // Сохраним purchase_id локально для кнопки «Проверить покупку»
@@ -415,8 +413,7 @@ class GpService {
       {required Map<String, dynamic> body}) async {
     final resp = await _edgeDio.post('/gp-purchase-verify',
         data: jsonEncode(body),
-        options:
-            Options(headers: _edgeHeadersAnonWithUserJwt(session, json: true)));
+        options: Options(headers: _edgeHeadersAnonWithUserJwt(session)));
     if (resp.statusCode == 200 && resp.data is Map<String, dynamic>) {
       final m = Map<String, dynamic>.from(resp.data);
       return (m['balance_after'] as num?)?.toInt() ?? 0;
@@ -459,7 +456,7 @@ class GpService {
             } catch (_) {
               // ignore and rethrow below
             }
-            // ignore: only_throw_errors
+            // ignore: use_rethrow_when_possible, only_throw_errors
             throw e;
           } as int Function());
     } on SocketException {
@@ -491,7 +488,7 @@ class GpService {
             } catch (_) {
               // ignore and rethrow below
             }
-            // ignore: only_throw_errors
+            // ignore: use_rethrow_when_possible, only_throw_errors
             throw e;
           } as int Function());
     } on SocketException {

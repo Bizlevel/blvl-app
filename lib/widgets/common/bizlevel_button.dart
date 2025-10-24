@@ -31,9 +31,9 @@ class BizLevelButton extends StatelessWidget {
   Size get _minSize {
     switch (size) {
       case BizLevelButtonSize.sm:
-        return const Size(44, 44);
-      case BizLevelButtonSize.md:
         return const Size(48, 48);
+      case BizLevelButtonSize.md:
+        return const Size(52, 52);
       case BizLevelButtonSize.lg:
         return const Size(56, 56);
     }

@@ -24,7 +24,7 @@ class GoalsRepository {
     final String? userId = _client.auth.currentUser?.id;
     if (userId == null) {
       throw const PostgrestException(
-          message: 'Not authorized', code: '401', details: null, hint: null);
+          message: 'Not authorized', code: '401');
     }
     return userId;
   }

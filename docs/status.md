@@ -746,7 +746,6 @@ TODO:
 - Задача bonus-fix: динамическая цена разблокировки этажа берётся из `packages.price_gp` (клиент: `GpService.getFloorPrice`, `tower_tiles.dart`), убран риск рассинхрона с сервером. Применены миграции индексов через supabase‑mcp: добавлен `idx_gp_bonus_grants_rule_key`, удалены дубли `gp_ledger_user_created_idx`, `idx_practice_log_user_applied_at`, снят дублирующий unique‑constraint `user_goal_user_id_unique`. Advisors perf — чисто по GP.
  - Задача goals-repo-refactor fix: в `GoalsRepository` устранено дублирование (helpers `_ensureAnonApikey/_requireUserId/_getBox`), вынесены билдеры payload/запросов (`_buildUserGoalPayload`, `_fetchPracticeRows`), бонус за дневную практику вынесен в `_claimDailyBonusAndRefresh`. Публичные сигнатуры без изменений.
 
-
 ## 2025-10-22 — Тесты: чистка и актуализация
 - Удалены legacy/пустые тесты под старую модель: `test/screens/goal_checkpoint_screen_test.dart`,
   `test/screens/goal_screen_readonly_test.dart`, `test/screens/levels_map_screen_test.dart`,
@@ -767,10 +766,41 @@ TODO:
   - Навигационные тесты (`levels_system_test.dart`, `street_screen_test.dart`) — привести к актуальным маршрутам `/tower`.
   - Интеграции, зависящие от реального бэкенда, оставить `skip`/smoke с моками.
 
-## 2025-10-23 — Обновлён отчёт по контенту уровней
-- Переписан `docs/draft-2.md` в формате «Уровень → Страница» с полным текстом:
-  - Intro: заголовок/описание, наличие картинки.
-  - Видео: отображаемый текст (description из `lessons`).
-  - Квиз: вступительное сообщение, полный текст вопроса и варианты ответов (из `lessons.quiz_questions`).
-  - Уровень 0: форма профиля (лейблы/hint), Уровень 1: форма цели v1 (лейблы/hint).
-  - Артефакты: `artifact_title`/`artifact_description` из `levels`.
+## 2025-10-23 — Design System: токены и консистентность (база)
+- Добавлены токены в `AppColor`: backgroundSuccess/backgroundInfo/backgroundWarning/backgroundError, borderSubtle/borderStrong, textTertiary; централизована палитра `skillColors`.
+- Повышен контраст вторичного текста: `labelColor=#64748B`.
+- Кнопки: `BizLevelButton` — minSize повышены (sm=48, md=52) для доступности.
+- Замены хардкод‑цветов на токены:
+  - `NotificationCenter` → фон баннеров из `AppColor.background*`.
+  - `GpStoreScreen` (нижний бар) → `AppColor.surface/borderStrong`.
+  - `GpBalanceWidget` → `AppColor.surface/borderSubtle`.
+  - `SkillsTreeView` → цвета навыков из `AppColor.skillColors`.
+  - `LoginScreen` → фоновые градиенты через `AppColor.bgGradient`.
+- Линты: критичных ошибок нет; предупреждения по сложности в `NotificationCenter` не блокируют.
+
+## 2025-10-24 — Design System: анимации/тема/инпуты и библиотека
+- Анимации: добавлены токены `AppAnimations` (quick/normal/slow/verySlow, кривые) и подключены в ключевых компонентах:
+  - `BizLevelProgressBar` (slow), `SuccessIndicator` (normal, easeOutCubic→defaultCurve),
+  - `AchievementBadge` (verySlow), `BottomBarItem` (normal+smoothCurve).
+- Размеры/spacing:
+  - Создан `AppDimensions` (иконки, радиусы, min touch target),
+  - `AppSpacing` расширен специализированными токенами (card/screen/section/item, buttonPadding).
+- Поля ввода: введён `AppInputDecoration.theme()` и подключён в теме приложения; единые бордеры/паддинги/цвета ошибок.
+- Тема:
+  - Создан `AppTheme.light()/dark()`; включён `AppTheme.light()` (dark подготовлен, по умолчанию не активирован).
+- Кнопки: удалён `AnimatedButton`, все места переведены на `BizLevelButton` (градиент и scale через общие токены/стили).
+- Библиотека:
+  - `LibraryScreen`/`LibrarySectionScreen`: выведены расширенные поля, отступы переведены на `AppSpacing`, цвета — на `AppColor`, кнопки — на `BizLevelButton`; убраны жёсткие бордеры в фильтрах (используется `InputDecorationTheme`).
+- Уведомления: `NotificationCenter` рефакторинг — введены `_BannerOptions/_BannerStyle`, сокращено число параметров вызова, без изменения UX.
+- Прочее: сняты локальные хардкоды бордеров/цветов (включая `GpStoreScreen`/`GpBalanceWidget`); `SkillsTreeView` берёт палитру из токенов; `LoginScreen` использует градиент‑токен.
+- Анализ кода (fix6): ошибок/варнингов нет; INFO сведены к безопасным рекомендациям (use_build_context_synchronously в UI местах с уже добавленными mounted-проверками).
+
+### 2025-10-24 — Линт‑чистка (fix6.x)
+- fix6.1: Применены автофиксы (`dart fix`) и повторный анализ.
+- fix6.2: Массово удалены дефолтные аргументы (`avoid_redundant_argument_values`).
+- fix6.3: Добавлены `context.mounted/mounted` и перенос `ScaffoldMessenger` до await.
+- fix6.4: GoRouter: `.location` → `.uri.toString()`.
+- fix6.5: Правки `throw/rethrow` в `gp_service.dart` (устранены ошибки; поведение без изменений).
+- fix6.6: Переименованы локальные идентификаторы с подчёркиванием.
+- fix6.7: Добавлены фигурные скобки у одинарных if/else.
+- fix6.8: Константы к lowerCamelCase (`ANIMATED_BODY_MS` → `animatedBodyMs`).

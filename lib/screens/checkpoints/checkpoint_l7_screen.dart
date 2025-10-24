@@ -121,9 +121,7 @@ class CheckpointL7Screen extends ConsumerWidget {
                             Expanded(
                               child: LeoDialogScreen(
                                 bot: 'max',
-                                chatId: null,
                                 embedded: true,
-                                skipSpend: false,
                                 userContext: userCtx,
                                 levelContext: '',
                                 initialAssistantMessages: initialMsgs,

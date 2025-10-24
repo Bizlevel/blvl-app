@@ -23,8 +23,6 @@ void main() {
       order: 1,
       title: 'Урок 1',
       description: 'Описание 1',
-      vimeoId: null,
-      videoUrl: null,
       durationMinutes: 1,
       quizQuestions: [
         {
@@ -33,7 +31,6 @@ void main() {
         }
       ],
       correctAnswers: [1],
-      createdAt: null,
     );
 
     const lesson2 = LessonModel(
@@ -42,12 +39,9 @@ void main() {
       order: 2,
       title: 'Урок 2',
       description: 'Описание 2',
-      vimeoId: null,
-      videoUrl: null,
       durationMinutes: 1,
       quizQuestions: [],
       correctAnswers: [],
-      createdAt: null,
     );
 
     final lessons = [lesson1, lesson2];

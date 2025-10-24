@@ -182,8 +182,7 @@ Widget _buildLevelCoreTile({
           BoxShadow(
               color: AppColor.premium.withValues(alpha: 0.55),
               blurRadius: 18,
-              spreadRadius: 1,
-              offset: const Offset(0, 0)),
+              spreadRadius: 1),
       ],
     ),
     child: Stack(
@@ -256,7 +255,7 @@ class _CheckpointNodeTile extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _buildNodeLabel(label, textAlign: TextAlign.center),
+              _buildNodeLabel(label),
               Container(
                 width: size,
                 height: size,
@@ -331,7 +330,6 @@ class _LevelNodeTile extends StatelessWidget {
                 levelNumber == 0
                     ? 'Уровень 0: Первый шаг'
                     : 'Уровень $levelNumber: ${data['name']}',
-                textAlign: TextAlign.center,
               ),
               _buildLevelCoreTile(
                 isCurrent: isCurrent,

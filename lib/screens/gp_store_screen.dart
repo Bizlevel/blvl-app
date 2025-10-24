@@ -131,7 +131,6 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
             const BizLevelCard(
               padding: EdgeInsets.all(12),
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   GpBalanceWidget(),
                   SizedBox(width: 12),
@@ -311,8 +310,8 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
         child: Container(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
           decoration: const BoxDecoration(
-            color: Colors.white,
-            border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
+            color: AppColor.surface,
+            border: Border(top: BorderSide(color: AppColor.borderStrong)),
           ),
           child: Row(
             children: [
@@ -457,7 +456,7 @@ Future<void> _startPurchaseIapOrWeb(
         data: {'productId': packageId},
       ));
     } catch (_) {}
-    final init = await gp.initPurchase(packageId: packageId, provider: 'epay');
+    final init = await gp.initPurchase(packageId: packageId);
     final urlStr = init['payment_url'] ?? '';
     final purchaseId = init['purchase_id'] ?? '';
     final url = Uri.tryParse(urlStr);
@@ -572,7 +571,6 @@ class _GpPlanCard extends StatelessWidget {
                 );
               }
               return Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Expanded(
                       child: Row(
