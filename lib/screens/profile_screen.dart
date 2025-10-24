@@ -576,7 +576,16 @@ class _BodyState extends ConsumerState<_Body> {
         children: [
           _buildProfile(),
           const SizedBox(height: AppSpacing.medium),
-          // Витрина достижений (простая витрина на 3 бейджа)
+          
+          // Блок статистики (уровень/артефакты) убран по новой спецификации
+          skillsAsync.when(
+            data: (skills) => SkillsTreeView(
+                skills: skills, currentLevel: widget.currentLevel),
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, st) =>
+                const Center(child: Text('Ошибка загрузки навыков')),
+          ),
+          const SizedBox(height: AppSpacing.medium),
           Align(
             alignment: Alignment.centerLeft,
             child: Text('Достижения',
@@ -609,15 +618,6 @@ class _BodyState extends ConsumerState<_Body> {
                     label: 'AI‑навык +50'),
               ],
             ),
-          ),
-          const SizedBox(height: AppSpacing.medium),
-          // Блок статистики (уровень/артефакты) убран по новой спецификации
-          skillsAsync.when(
-            data: (skills) => SkillsTreeView(
-                skills: skills, currentLevel: widget.currentLevel),
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, st) =>
-                const Center(child: Text('Ошибка загрузки навыков')),
           ),
           const SizedBox(height: AppSpacing.medium),
           // Premium отключён — кнопка скрыта

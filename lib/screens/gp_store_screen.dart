@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -26,6 +27,7 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
   int? _selectedAmount;
   String? _selectedLabel;
   bool _faqExpanded = false;
+  bool _bonusExpanded = false;
   final Map<String, ProductDetails> _productMap = {};
   final Map<String, Map<String, dynamic>> _serverPricing = {};
 
@@ -146,23 +148,21 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
               ),
             ),
             const SizedBox(height: 12),
-            // Подсказка: как получить GP (бонусы)
-            const BizLevelCard(
-              padding: EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Как получить GP',
-                      style:
-                          TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                  SizedBox(height: 8),
+            // Подсказка: как получить GP (бонусы) — свёрнутый раздел
+            BizLevelCard(
+              padding: const EdgeInsets.all(4),
+              child: ExpansionTile(
+                initiallyExpanded: _bonusExpanded,
+                onExpansionChanged: (v) => setState(() => _bonusExpanded = v),
+                title: const Text('Как получить бонусные GP'),
+                children: const [
                   _FaqRow(
                       icon: Icons.person_add_alt,
                       text: '+30 GP — за регистрацию (первый вход)'),
                   _FaqRow(
                       icon: Icons.badge_outlined,
                       text:
-                          '+50 GP — за полный профиль (Имя, О себе, Цель, Аватар)'),
+                          '+50 GP — за полный профиль (Профиль > Информация обо мне)'),
                   _FaqRow(
                       icon: Icons.work_outline,
                       text: '+200 GP — за 3 решённых мини‑кейса'),
@@ -172,6 +172,12 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
                   _FaqRow(
                       icon: Icons.flag_outlined,
                       text: '+20 GP — за завершение уровня'),
+                  _FaqRow(
+                      icon: Icons.rocket_launch_outlined,
+                      text: '+400 GP — покупка пакета «РАЗГОН»'),
+                  _FaqRow(
+                      icon: Icons.workspace_premium_outlined,
+                      text: '+1000 GP — покупка пакета «ТРАНСФОРМАЦИЯ»'),
                 ],
               ),
             ),
@@ -417,11 +423,42 @@ Future<void> _startPurchaseIapOrWeb(
                 data: {'productId': product.id, 'platform': platform},
               ));
             } catch (_) {}
-            final balance = await gp.verifyIapPurchase(
-              platform: platform,
-              productId: product.id,
-              token: token,
-            );
+            int balance;
+            try {
+              balance = await gp.verifyIapPurchase(
+                platform: platform,
+                productId: product.id,
+                token: token,
+              );
+            } catch (e) {
+              // Android fallback: извлечь чистый purchaseToken из localVerificationData
+              if (platform == 'android') {
+                final fallbackToken = _extractAndroidPurchaseToken(purchase);
+                try {
+                  await Sentry.addBreadcrumb(Breadcrumb(
+                    message: 'gp_verify_retry_android_token_fallback',
+                    data: {
+                      'hasFallback': fallbackToken != null,
+                      'origLen': token.length,
+                      'fbLen': fallbackToken?.length ?? 0,
+                    },
+                  ));
+                } catch (_) {}
+                if (fallbackToken != null &&
+                    fallbackToken.isNotEmpty &&
+                    fallbackToken != token) {
+                  balance = await gp.verifyIapPurchase(
+                    platform: platform,
+                    productId: product.id,
+                    token: fallbackToken,
+                  );
+                } else {
+                  rethrow;
+                }
+              } else {
+                rethrow;
+              }
+            }
             try {
               await Sentry.addBreadcrumb(Breadcrumb(
                 message: 'gp_verify_success',
@@ -491,6 +528,33 @@ Future<void> _startPurchaseIapOrWeb(
       const SnackBar(content: Text('Не удалось создать оплату')),
     );
   }
+}
+
+// Извлекает purchaseToken из localVerificationData на Android
+String? _extractAndroidPurchaseToken(PurchaseDetails p) {
+  final raw = p.verificationData.localVerificationData;
+  try {
+    final decoded = jsonDecode(raw);
+    if (decoded is Map) {
+      final token = decoded['purchaseToken'];
+      if (token is String && token.isNotEmpty) return token;
+      // Некоторые реализации несут JSON во вложенном поле 'json'
+      final inner = decoded['json'];
+      if (inner is String && inner.isNotEmpty) {
+        final decoded2 = jsonDecode(inner);
+        if (decoded2 is Map) {
+          final token2 = decoded2['purchaseToken'];
+          if (token2 is String && token2.isNotEmpty) return token2;
+        }
+      }
+    }
+  } catch (_) {
+    // Fallback: простая регэксп-выборка
+    final re = RegExp(r'"purchaseToken"\s*:\s*"([^"]+)"');
+    final m = re.firstMatch(raw);
+    if (m != null) return m.group(1);
+  }
+  return null;
 }
 
 class _GpPlanCard extends StatelessWidget {

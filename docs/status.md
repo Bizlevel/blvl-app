@@ -829,3 +829,11 @@ TODO:
 - Заменены выражения `auth.uid()` на `(select auth.uid())` в USING/WITH CHECK (исключён initplan‑overhead) для таблиц: `ai_message`, `leo_chats`, `leo_messages`, `user_memories`, `user_progress`.
 - Удалены дубли permissive‑политик: `ai_message` (второй INSERT), `leo_chats` (`select_own`, `update_own`), `app_settings` (`app_settings_deny_all`). Поведение доступа не расширено.
 - Service‑role политики не менялись. Функциональные права пользователей не изменялись (owner‑паттерн сохранён).
+
+## 2025-10-24 — GP IAP/Web Verify (fix6.9–fix6.12)
+- Добавлена RPC `gp_iap_credit(p_purchase_id text, p_amount_gp int)` (SECURITY DEFINER, search_path=public). Идемпотентное начисление по ключу `iap:<purchase_id>` в `gp_ledger`; обновление `gp_wallets`. GRANT EXECUTE → authenticated.
+- Обновлена Edge Function `gp-purchase-verify`:
+  - Ветка IAP (Android/iOS): верификация в сторе → вызов `gp_iap_credit` c `purchaseId = <platform>:<product_id>:<transactionId>`.
+  - Ветка Web: поддержан `purchase_id` (вызов `gp_purchase_verify(purchase_id)` для завершения веб‑покупки).
+- Клиент Android: добавлен fallback на `purchaseToken` из `localVerificationData` при неуспешной первой попытке verify; добавлены breadcrumbs.
+- Проверки: линтеры чистые; деплой edge v49; таблицы `gp_wallets/gp_ledger` готовы к зачислениям (новые записи появятся после первой реальной покупки).
