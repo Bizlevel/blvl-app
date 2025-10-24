@@ -84,7 +84,6 @@ class _CheckpointL1ScreenState extends ConsumerState<CheckpointL1Screen> {
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(AppSpacing.lg),
         child: BizLevelCard(
-          padding: const EdgeInsets.all(AppSpacing.lg),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

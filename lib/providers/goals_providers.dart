@@ -101,7 +101,7 @@ final userGoalProvider = FutureProvider<Map<String, dynamic>?>((ref) async {
 final practiceLogProvider =
     FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final repo = ref.read(goalsRepositoryProvider);
-  return repo.fetchPracticeLog(limit: 20);
+  return repo.fetchPracticeLog();
 });
 
 /// Список journal с параметром лимита

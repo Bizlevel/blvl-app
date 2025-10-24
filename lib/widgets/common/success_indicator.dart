@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:bizlevel/theme/color.dart';
+import 'package:bizlevel/theme/animations.dart';
 
 /// Анимируемая «галочка» успеха
 /// - Длительность по умолчанию: 400мс
 /// - Размеры: 24 или 48 (можно задать любой)
 class SuccessIndicator extends StatefulWidget {
   const SuccessIndicator(
-      {super.key,
-      this.size = 24,
-      this.duration = const Duration(milliseconds: 400)});
+      {super.key, this.size = 24, this.duration = AppAnimations.normal});
 
   final double size;
   final Duration duration;
@@ -47,7 +46,7 @@ class _SuccessIndicatorState extends State<SuccessIndicator>
         builder: (context, _) => CustomPaint(
           painter: _CheckPainter(
               progress: CurvedAnimation(
-                      parent: _controller, curve: Curves.easeOutCubic)
+                      parent: _controller, curve: AppAnimations.defaultCurve)
                   .value),
         ),
       ),

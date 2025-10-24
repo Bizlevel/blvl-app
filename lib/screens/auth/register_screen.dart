@@ -133,7 +133,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           'assets/images/logo_light.svg',
           width: 176,
           height: 176,
-          fit: BoxFit.contain,
         ),
         AppSpacing.gapH(AppSpacing.xl),
         CustomTextBox(
@@ -178,8 +177,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             decoration: BoxDecoration(
               gradient: const LinearGradient(
                 colors: [AppColor.primary, Color(0xFF1273C4)],
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
               ),
               borderRadius: BorderRadius.circular(12),
             ),
@@ -240,7 +237,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           'assets/images/logo_light.svg',
           width: 176,
           height: 176,
-          fit: BoxFit.contain,
         ),
         AppSpacing.gapH(AppSpacing.xl),
         Container(
@@ -294,8 +290,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             decoration: BoxDecoration(
               gradient: const LinearGradient(
                 colors: [AppColor.primary, Color(0xFF1273C4)],
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
               ),
               borderRadius: BorderRadius.circular(12),
             ),

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:bizlevel/theme/color.dart';
+import 'package:bizlevel/theme/animations.dart';
 
 enum AchievementRarity { common, rare, epic }
 
@@ -37,9 +38,10 @@ class _AchievementBadgeState extends State<AchievementBadge>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 800),
+      duration: AppAnimations.verySlow,
     );
-    _t = CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic);
+    _t =
+        CurvedAnimation(parent: _controller, curve: AppAnimations.defaultCurve);
     // Запускаем shine один раз при первом появлении
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _playShineOnce();
@@ -124,8 +126,6 @@ class _AchievementBadgeState extends State<AchievementBadge>
                           height: d,
                           decoration: const BoxDecoration(
                             gradient: LinearGradient(
-                              begin: Alignment.centerLeft,
-                              end: Alignment.centerRight,
                               colors: [
                                 Color(0x00FFFFFF),
                                 Color(0x66FFFFFF),

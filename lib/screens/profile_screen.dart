@@ -25,6 +25,8 @@ import 'package:bizlevel/widgets/common/gp_balance_widget.dart';
 import 'package:bizlevel/widgets/common/bizlevel_card.dart';
 import 'package:bizlevel/widgets/common/bizlevel_text_field.dart';
 import 'package:bizlevel/widgets/reminders_settings_sheet.dart';
+import 'package:bizlevel/widgets/common/achievement_badge.dart';
+import 'package:bizlevel/providers/theme_provider.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -200,6 +202,13 @@ class ProfileScreen extends ConsumerWidget {
                       color: AppColor.onSurfaceSubtle),
                   onSelected: (value) async {
                     switch (value) {
+                      case 'theme':
+                        final mode = ref.read(themeModeProvider);
+                        final next = mode == ThemeMode.light
+                            ? ThemeMode.dark
+                            : ThemeMode.light;
+                        ref.read(themeModeProvider.notifier).state = next;
+                        break;
                       case 'notifications':
                         await showRemindersSettingsSheet(context);
                         break;
@@ -221,6 +230,16 @@ class ProfileScreen extends ConsumerWidget {
                     }
                   },
                   itemBuilder: (context) => [
+                    PopupMenuItem(
+                      value: 'theme',
+                      child: Row(
+                        children: [
+                          const Icon(Icons.brightness_6, size: 18),
+                          const SizedBox(width: 10),
+                          Text('Тема: переключить'),
+                        ],
+                      ),
+                    ),
                     PopupMenuItem(
                       value: 'notifications',
                       child: Row(
@@ -428,7 +447,7 @@ class _BodyState extends ConsumerState<_Body> {
                   child: SingleChildScrollView(
                     controller: scrollController,
                     padding: const EdgeInsets.all(AppSpacing.medium),
-                    child: _AboutMeCard(user: widget.user, showTitle: true),
+                    child: _AboutMeCard(user: widget.user),
                   ),
                 ),
               ],
@@ -515,13 +534,11 @@ class _BodyState extends ConsumerState<_Body> {
 
       debugPrint('Attempting to upload: $fileName');
 
-      final response = await Supabase.instance.client.storage
-          .from('artifacts')
-          .upload(
-            fileName,
-            File(filePath),
-            fileOptions: const FileOptions(cacheControl: '3600', upsert: false),
-          );
+      final response =
+          await Supabase.instance.client.storage.from('artifacts').upload(
+                fileName,
+                File(filePath),
+              );
 
       debugPrint('Upload successful: $response');
       if (!mounted) return;
@@ -559,6 +576,7 @@ class _BodyState extends ConsumerState<_Body> {
         children: [
           _buildProfile(),
           const SizedBox(height: AppSpacing.medium),
+          
           // Блок статистики (уровень/артефакты) убран по новой спецификации
           skillsAsync.when(
             data: (skills) => SkillsTreeView(
@@ -566,6 +584,40 @@ class _BodyState extends ConsumerState<_Body> {
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (e, st) =>
                 const Center(child: Text('Ошибка загрузки навыков')),
+          ),
+          const SizedBox(height: AppSpacing.medium),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text('Достижения',
+                style: Theme.of(context)
+                    .textTheme
+                    .titleMedium
+                    ?.copyWith(fontWeight: FontWeight.w600)),
+          ),
+          const SizedBox(height: 8),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: const [
+                AchievementBadge(
+                    icon: Icons.flag,
+                    rarity: AchievementRarity.common,
+                    size: AchievementBadgeSize.s48,
+                    label: 'Первая цель'),
+                SizedBox(width: 12),
+                AchievementBadge(
+                    icon: Icons.rocket_launch,
+                    rarity: AchievementRarity.rare,
+                    size: AchievementBadgeSize.s48,
+                    label: '5 уровней'),
+                SizedBox(width: 12),
+                AchievementBadge(
+                    icon: Icons.stars,
+                    rarity: AchievementRarity.epic,
+                    size: AchievementBadgeSize.s48,
+                    label: 'AI‑навык +50'),
+              ],
+            ),
           ),
           const SizedBox(height: AppSpacing.medium),
           // Premium отключён — кнопка скрыта
@@ -709,7 +761,9 @@ class _BodyState extends ConsumerState<_Body> {
 }
 
 class _AboutMeCard extends ConsumerStatefulWidget {
-  const _AboutMeCard({required this.user, this.showTitle = true});
+  const _AboutMeCard(
+      {required this.user,
+      this.showTitle = true}); // ignore: unused_element_parameter
   final UserModel user;
   final bool showTitle;
 
@@ -788,6 +842,19 @@ class _AboutMeCardState extends ConsumerState<_AboutMeCard> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Профиль обновлён')),
       );
+      // Подсказка о возможном бонусе за полный профиль (если все поля заполнены)
+      try {
+        final nameOk = _nameCtrl.text.trim().isNotEmpty;
+        final aboutOk = _aboutCtrl.text.trim().isNotEmpty;
+        final goalOk = _goalCtrl.text.trim().isNotEmpty;
+        final hasAvatar =
+            (ref.read(currentUserProvider).value?.avatarId ?? 0) > 0;
+        if (nameOk && aboutOk && goalOk && hasAvatar) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('+50 GP за полный профиль')),
+          );
+        }
+      } catch (_) {}
       ref.invalidate(currentUserProvider);
       setState(() => _editing = false);
     } catch (e) {

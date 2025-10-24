@@ -321,7 +321,6 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
       ];
       final result = await Navigator.of(context).push(MaterialPageRoute(
         builder: (_) => LeoDialogScreen(
-          bot: 'leo',
           caseMode: true,
           systemPrompt: systemPrompt,
           firstPrompt: firstPrompt,
@@ -557,7 +556,6 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
           } catch (_) {}
           showDialog(
             context: context,
-            barrierDismissible: true,
             builder: (_) => Dialog(
               backgroundColor: Colors.transparent,
               insetPadding: const EdgeInsets.all(16),

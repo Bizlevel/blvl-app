@@ -13,6 +13,18 @@ class _GridPathPainter extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..isAntiAlias = true;
 
+      // Вертикальный мягкий градиент (снизу вверх) поверх базового цвета сегмента
+      // Подмешиваем к базовому цвету, не ломая статусы; минимальный оверхед.
+      final shader = LinearGradient(
+        begin: Alignment.bottomCenter,
+        end: Alignment.topCenter,
+        colors: [
+          s.color.withValues(alpha: kPathAlpha * 0.9),
+          s.color.withValues(alpha: kPathAlpha),
+        ],
+      ).createShader(Offset.zero & size);
+      paint.shader = shader;
+
       final path = Path();
       const double r = kCornerRadius;
       final dx = s.end.dx - s.start.dx;

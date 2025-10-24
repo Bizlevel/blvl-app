@@ -111,7 +111,7 @@ class _RemindersSettingsContentState extends State<RemindersSettingsContent> {
                         level: SentryLevel.info,
                       ));
                     } catch (_) {}
-                    if (mounted) {
+                    if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('Напоминания настроены')),
                       );

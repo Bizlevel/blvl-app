@@ -1,11 +1,18 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
+// Типовая заглушка для линтера в среде без Deno-типов
+// (в рантайме Supabase Edge переменная Deno доступна)
+declare const Deno: any;
+
 // Env: SUPABASE_URL, SUPABASE_ANON_KEY, APPLE_ISSUER_ID, APPLE_KEY_ID, APPLE_PRIVATE_KEY, GOOGLE_SERVICE_ACCOUNT_JSON
 
 type VerifyRequest = {
-  platform: "ios" | "android";
-  product_id: string;
-  token: string; // iOS: base64 receipt-data; Android: purchaseToken
+  // IAP (mobile)
+  platform?: "ios" | "android";
+  product_id?: string;
+  token?: string; // iOS: base64 receipt-data; Android: purchaseToken
+  // Web
+  purchase_id?: string; // uuid (string)
 };
 
 type RpcResponse = { balance_after?: number } | number[] | number | Record<string, unknown>;
@@ -173,11 +180,29 @@ Deno.serve(async (req: Request) => {
   }
   try {
     const body = (await req.json()) as VerifyRequest;
+    const userJwt = req.headers.get("x-user-jwt") || "";
+    if (!userJwt) return jsonResponse({ error: "no_user_jwt" }, 401);
+
+    // --- Web branch: verify by purchase_id only ---
+    if (body?.purchase_id && !body.platform && !body.product_id && !body.token) {
+      const rpcData = await callPostgrestRpc("gp_purchase_verify", {
+        p_purchase_id: body.purchase_id,
+      }, userJwt);
+      const balance = parseBalanceAfter(rpcData);
+      if (balance == null) return jsonResponse({ error: "rpc_no_balance" }, 500);
+      return new Response(JSON.stringify({ balance_after: balance }), {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+          'Access-Control-Allow-Origin': '*',
+        },
+      });
+    }
+
+    // --- IAP branch (mobile) ---
     if (!body?.platform || !body?.product_id || !body?.token) {
       return jsonResponse({ error: "invalid_request" }, 400);
     }
-    const userJwt = req.headers.get("x-user-jwt") || "";
-    if (!userJwt) return jsonResponse({ error: "no_user_jwt" }, 401);
     const amount = PRODUCT_TO_GP[body.product_id];
     if (!amount) return jsonResponse({ error: "unknown_product" }, 400);
 
@@ -192,15 +217,11 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ error: "unsupported_platform" }, 400);
     }
 
-    // Формируем идемпотентный ключ
     const purchaseId = `${body.platform}:${body.product_id}:${transactionId}`;
 
-    // Вызываем серверный RPC, который начисляет GP идемпотентно
-    // Предпочтительно: gp_purchase_verify(p_purchase_id, p_product_id, p_amount_gp)
-    // Совместимость: если сигнатура иная — сервер вернет 4xx, это увидим в логах.
-    const rpcData = await callPostgrestRpc("gp_purchase_verify", {
+    // Новая RPC: идемпотентный кредит по purchaseId
+    const rpcData = await callPostgrestRpc("gp_iap_credit", {
       p_purchase_id: purchaseId,
-      p_product_id: body.product_id,
       p_amount_gp: amount,
     }, userJwt);
     const balance = parseBalanceAfter(rpcData);

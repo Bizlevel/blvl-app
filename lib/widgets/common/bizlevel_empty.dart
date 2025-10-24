@@ -23,7 +23,6 @@ class BizLevelEmpty extends StatelessWidget {
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Icon(icon, size: 48, color: Colors.grey),
             const SizedBox(height: 8),

@@ -132,9 +132,7 @@ class _CheckpointL4ScreenState extends ConsumerState<CheckpointL4Screen> {
                             Expanded(
                               child: LeoDialogScreen(
                                 bot: 'max',
-                                chatId: null,
                                 embedded: true,
-                                skipSpend: false,
                                 userContext: userCtx,
                                 levelContext: '',
                                 initialAssistantMessages: initialMsgs,

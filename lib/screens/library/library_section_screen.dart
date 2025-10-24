@@ -7,6 +7,8 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'package:bizlevel/providers/library_providers.dart';
 import 'package:bizlevel/widgets/common/breadcrumb.dart';
+import 'package:bizlevel/theme/color.dart';
+import 'package:bizlevel/theme/spacing.dart';
 
 class LibrarySectionScreen extends ConsumerStatefulWidget {
   final String type; // 'courses' | 'grants' | 'accelerators'
@@ -54,7 +56,7 @@ class _LibrarySectionScreenState extends ConsumerState<LibrarySectionScreen> {
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.only(top: 8),
+            padding: AppSpacing.insetsSymmetric(v: 8),
             child: Breadcrumb(
               items: [
                 BreadcrumbItem(
@@ -79,9 +81,10 @@ class _LibrarySectionScreenState extends ConsumerState<LibrarySectionScreen> {
           Expanded(
             child: async.when(
               data: (rows) => ListView.separated(
-                padding: const EdgeInsets.all(16),
+                padding: AppSpacing.insetsAll(AppSpacing.screenPadding),
                 itemCount: rows.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 8),
+                separatorBuilder: (_, __) =>
+                    AppSpacing.gapH(AppSpacing.itemSpacing),
                 itemBuilder: (context, index) {
                   final r = rows[index];
                   final id = (r['id'] ?? index).toString();
@@ -110,13 +113,13 @@ class _LibrarySectionScreenState extends ConsumerState<LibrarySectionScreen> {
                         // Инвалидация избранного для обновления UI
                         ref.invalidate(favoritesProvider);
                         ref.invalidate(favoritesDetailedProvider);
-                        if (mounted) {
+                        if (context.mounted) {
                           NotificationCenter.showSuccess(
                               context, 'Избранное обновлено');
                         }
                       } catch (e, st) {
                         await Sentry.captureException(e, stackTrace: st);
-                        if (mounted) {
+                        if (context.mounted) {
                           NotificationCenter.showError(
                               context, 'Ошибка обновления избранного');
                         }
@@ -178,14 +181,13 @@ class _CategoryFilter extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(libraryCategoriesProvider(type));
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      padding: AppSpacing.insetsSymmetric(h: AppSpacing.screenPadding, v: 12),
       child: LayoutBuilder(
         builder: (context, constraints) {
           final isNarrow = constraints.maxWidth < 420;
           final categories = async.asData?.value ?? const <String>[];
           final items = <DropdownMenuItem<String?>>[
             const DropdownMenuItem<String?>(
-                value: null,
                 child: Text('Все', overflow: TextOverflow.ellipsis)),
             ...categories.map((c) => DropdownMenuItem<String?>(
                   value: c,
@@ -194,13 +196,11 @@ class _CategoryFilter extends ConsumerWidget {
           ];
           final rowChildren = <Widget>[
             const Text('Категория:'),
-            const SizedBox(width: 12),
+            AppSpacing.gapW(AppSpacing.itemSpacing),
             Flexible(
               child: DropdownButtonFormField<String?>(
                 isExpanded: true,
-                value: null,
-                decoration: const InputDecoration(
-                    isDense: true, border: OutlineInputBorder()),
+                decoration: const InputDecoration(isDense: true),
                 hint: Text(
                   async.isLoading ? 'Загрузка…' : 'Все',
                   overflow: TextOverflow.ellipsis,
@@ -215,12 +215,10 @@ class _CategoryFilter extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const Text('Категория:'),
-                const SizedBox(height: 8),
+                AppSpacing.gapH(AppSpacing.itemSpacing),
                 DropdownButtonFormField<String?>(
                   isExpanded: true,
-                  value: null,
-                  decoration: const InputDecoration(
-                      isDense: true, border: OutlineInputBorder()),
+                  decoration: const InputDecoration(isDense: true),
                   hint: Text(
                     async.isLoading ? 'Загрузка…' : 'Все',
                     overflow: TextOverflow.ellipsis,
@@ -348,7 +346,7 @@ class _DynamicInfo extends StatelessWidget {
     final textStyleLabel = Theme.of(context)
         .textTheme
         .bodySmall
-        ?.copyWith(color: Colors.grey[600]);
+        ?.copyWith(color: AppColor.labelColor);
     final textStyleValue = Theme.of(context).textTheme.bodyMedium;
 
     return LayoutBuilder(
@@ -357,7 +355,8 @@ class _DynamicInfo extends StatelessWidget {
         return Column(
           children: rows
               .map((r) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
+                    padding:
+                        const EdgeInsets.only(bottom: AppSpacing.itemSpacing),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [

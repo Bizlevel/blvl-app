@@ -28,11 +28,9 @@ void main() {
       title: 'Test lesson',
       description: 'Test description',
       vimeoId: '76979871', // Public Vimeo demo video
-      videoUrl: null,
       durationMinutes: 1,
       quizQuestions: <dynamic>[],
       correctAnswers: <int>[],
-      createdAt: null,
     );
 
     await tester.pumpWidget(

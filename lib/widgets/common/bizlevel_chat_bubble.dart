@@ -29,10 +29,24 @@ class BizLevelChatBubble extends StatelessWidget {
       ChatBubbleRole.error => AppColor.error,
     };
 
+    // Поддержка лёгкой «эмо‑реакции» у ассистентских сообщений (без шума)
+    final bool showReaction =
+        role == ChatBubbleRole.assistant && text.length > 40;
     return Column(
       crossAxisAlignment:
           isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
       children: [
+        if (showReaction)
+          Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: 2),
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0, end: 1),
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOut,
+              builder: (context, v, child) => Opacity(opacity: v, child: child),
+              child: const Text('💡', style: TextStyle(fontSize: 14)),
+            ),
+          ),
         Container(
           margin: const EdgeInsets.symmetric(vertical: 4),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),

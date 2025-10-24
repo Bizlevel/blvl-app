@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:bizlevel/theme/color.dart';
 import 'package:go_router/go_router.dart';
 import 'package:bizlevel/providers/gp_providers.dart';
 
@@ -29,9 +30,9 @@ class GpBalanceWidget extends ConsumerWidget {
         height: height,
         padding: const EdgeInsets.symmetric(horizontal: 8),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColor.surface,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: const Color(0xFFE5E7EB)),
+          border: Border.all(color: AppColor.borderSubtle),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,

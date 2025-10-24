@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:bizlevel/theme/color.dart';
+import 'package:bizlevel/theme/animations.dart';
 
 class BizLevelProgressBar extends StatelessWidget {
   const BizLevelProgressBar({
@@ -9,7 +10,7 @@ class BizLevelProgressBar extends StatelessWidget {
     this.color,
     this.backgroundColor,
     this.animated = true,
-    this.duration = const Duration(milliseconds: 600),
+    this.duration = AppAnimations.slow,
   });
 
   final double value; // 0..1

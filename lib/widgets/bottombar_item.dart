@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:bizlevel/theme/color.dart';
+import 'package:bizlevel/theme/animations.dart';
 
 class BottomBarItem extends StatelessWidget {
   const BottomBarItem(
@@ -26,8 +27,8 @@ class BottomBarItem extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.fastOutSlowIn,
+        duration: AppAnimations.normal,
+        curve: AppAnimations.smoothCurve,
         padding: const EdgeInsets.all(7),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(50),
@@ -38,7 +39,6 @@ class BottomBarItem extends StatelessWidget {
                 color: AppColor.shadowColor.withValues(alpha: 0.1),
                 spreadRadius: 2,
                 blurRadius: 2,
-                offset: const Offset(0, 0), // changes position of shadow
               ),
           ],
         ),

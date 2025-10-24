@@ -58,7 +58,6 @@ class _ChatItemState extends State<ChatItem> {
               ],
             ),
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 if (showPhoto) _buildPhoto(imagePath),
                 if (showPhoto) const SizedBox(width: 10),

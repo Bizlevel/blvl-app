@@ -1,10 +1,9 @@
 part of '../biz_tower_screen.dart';
 
 // Геометрические константы башни (задаются централизованно)
-const double kNodeSize = 88.0;
-const double kCheckpointSize = 88.0;
-const double kRowHeight =
-    144.0; // базовая высота строки (под 3 строки заголовка ×1.2)
+const double kNodeSize = 60.0;
+const double kCheckpointSize = 60.0;
+const double kRowHeight = 120.0; // под ужатые узлы и сохранение геометрии
 const double kLabelHeight = 48.0; // высота лейбла над квадратом (до 3 строк)
 const double kSidePadding = 24.0; // боковые отступы внутри сетки
 const double kCornerRadius = 20.0; // радиус скругления углов линий

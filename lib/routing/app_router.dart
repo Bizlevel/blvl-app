@@ -127,7 +127,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
 
   return GoRouter(
     initialLocation: initialLocation,
-    debugLogDiagnostics: false,
     observers: [SentryNavigatorObserver()],
     routes: [
       GoRoute(

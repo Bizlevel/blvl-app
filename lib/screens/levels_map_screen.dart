@@ -69,7 +69,6 @@ class LevelsMapScreen extends ConsumerWidget {
                   button: true,
                   child: LevelCard(
                     data: levelData,
-                    width: double.infinity,
                     compact: true,
                     onTap: () {
                       try {
