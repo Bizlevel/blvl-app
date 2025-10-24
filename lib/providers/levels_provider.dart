@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:bizlevel/models/level_model.dart';
 import 'package:bizlevel/providers/levels_repository_provider.dart';
 import 'package:bizlevel/providers/auth_provider.dart';
+import 'package:bizlevel/providers/checkpoints_provider.dart';
 import 'package:bizlevel/utils/formatters.dart';
 import 'package:bizlevel/services/supabase_service.dart';
 // import 'package:hive_flutter/hive_flutter.dart';
@@ -197,6 +198,13 @@ final nextLevelToContinueProvider =
 final towerNodesProvider =
     FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final levels = await ref.watch(levelsProvider.future);
+  // Подписываемся на изменения чекпойнтов
+  ref.watch(checkpointsProvider);
+  
+  // Получаем текущий уровень пользователя
+  final user = await ref.watch(currentUserProvider.future);
+  final int userCurrentLevelNumber =
+      await SupabaseService.resolveCurrentLevelNumber(user?.currentLevel);
   // Локальное состояние старых чекпоинтов больше не используется
   // Загрузим мини-кейсы и прогресс пользователя по ним (id ∈ {1,2,3})
   final supa = Supabase.instance.client;
@@ -308,17 +316,24 @@ final towerNodesProvider =
 
     // Добавляем goal_checkpoint после 1, 4, 7
     if (num == 1 || num == 4 || num == 7) {
-      bool completed = false;
-      if (num == 1) {
-        completed =
-            ((userGoal?['goal_text'] ?? '').toString().trim().isNotEmpty);
-      } else if (num == 4) {
-        final hasMetricType =
-            ((userGoal?['metric_type'] ?? '').toString().trim().isNotEmpty);
-        final hasMetricTarget = (userGoal?['metric_target'] != null);
-        completed = hasMetricType && hasMetricTarget;
-      } else if (num == 7) {
-        completed = hasAnyPractice;
+      // Получаем состояние чекпойнтов из провайдера
+      final checkpoints = ref.read(checkpointsProvider);
+      final checkpointId = 'l$num';
+      bool completed = checkpoints[checkpointId] ?? false;
+      
+      // Дополнительная проверка только если пользователь дошел до нужного уровня
+      if (!completed && userCurrentLevelNumber >= num) {
+        if (num == 1) {
+          completed =
+              ((userGoal?['goal_text'] ?? '').toString().trim().isNotEmpty);
+        } else if (num == 4) {
+          final hasMetricType =
+              ((userGoal?['metric_type'] ?? '').toString().trim().isNotEmpty);
+          final hasMetricTarget = (userGoal?['metric_target'] != null);
+          completed = hasMetricType && hasMetricTarget;
+        } else if (num == 7) {
+          completed = hasAnyPractice;
+        }
       }
 
       nodes.add({

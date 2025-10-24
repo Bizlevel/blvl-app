@@ -69,6 +69,7 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
   @override
   void initState() {
     super.initState();
+      _goalV1Saved = false; // Сброс для новых пользователей
     // Берём последнюю разблокированную страницу, чтобы открывать уровень там, где пользователь остановился.
     _pageController = PageController(initialPage: 0);
     // Гарантируем разблокировку Intro (0) и следующей страницы (1)

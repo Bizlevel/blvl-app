@@ -152,9 +152,19 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
 
   /// 🆕 Блок 1: Intro (Картинка + короткое описание + кнопка "Далее")
   Widget _buildIntroBlock() {
-    final introText = _script?['intro'] is Map
-        ? ((_script?['intro'] as Map)['text']?.toString() ?? '')
-        : '';
+    String introText = '';
+    
+    if (_script?['intro'] is Map) {
+      // Если intro - это объект с полем text
+      introText = ((_script?['intro'] as Map)['text']?.toString() ?? '');
+    } else if (_script?['intro'] is List) {
+      // Если intro - это массив строк, объединяем их
+      final List<dynamic> introList = _script?['intro'] as List;
+      introText = introList.map((item) => item.toString()).join('\n');
+    } else if (_script?['intro'] is String) {
+      // Если intro - это просто строка
+      introText = _script?['intro'] as String;
+    }
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -170,12 +180,16 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
 
           // Короткое описание (только intro, без context)
           if (introText.isNotEmpty)
-            Text(
-              introText,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
+            SelectableText.rich(
+              TextSpan(
+                text: introText,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  height: 1.4, // Межстрочный интервал
+                ),
               ),
+              textAlign: TextAlign.left,
             ),
           if (introText.isEmpty)
             const Text(
@@ -301,9 +315,9 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
       } catch (_) {}
       final List<String> contexts = [
         '',
-        (_script?['q2_context']?.toString() ?? ''),
-        (_script?['q3_context']?.toString() ?? ''),
-        (_script?['q4_context']?.toString() ?? ''),
+        _formatContextArray(_script?['q2_context']),
+        _formatContextArray(_script?['q3_context']),
+        _formatContextArray(_script?['q4_context']),
       ];
       final result = await Navigator.of(context).push(MaterialPageRoute(
         builder: (_) => LeoDialogScreen(
@@ -314,7 +328,7 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
           casePrompts: prompts,
           caseContexts: contexts,
           casePreface: _buildChecklistPreface(),
-          finalStory: _script?['final_story']?.toString(),
+          finalStory: _formatContextArray(_script?['final_story']),
         ),
         fullscreenDialog: true,
       ));
@@ -389,9 +403,19 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
     final title = _caseMeta?['title']?.toString() ?? '';
     final afterLevel = _caseMeta?['after_level']?.toString() ?? '';
     final skill = _caseMeta?['skill_name']?.toString() ?? '';
-    final contextText = _script?['context'] is Map
-        ? ((_script?['context'] as Map)['text']?.toString() ?? '')
-        : '';
+    String contextText = '';
+    
+    if (_script?['context'] is Map) {
+      // Если context - это объект с полем text
+      contextText = ((_script?['context'] as Map)['text']?.toString() ?? '');
+    } else if (_script?['context'] is List) {
+      // Если context - это массив строк, объединяем их
+      final List<dynamic> contextList = _script?['context'] as List;
+      contextText = contextList.map((item) => item.toString()).join('\n');
+    } else if (_script?['context'] is String) {
+      // Если context - это просто строка
+      contextText = _script?['context'] as String;
+    }
     final user = Supabase.instance.client.auth.currentUser;
 
     final hasProfile = user != null;
@@ -407,16 +431,38 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
           'Формат ответов короткий (2–3 предложения). Поддерживай мотивацию и давай мягкие подсказки.';
     }
 
+    // Получаем финальную историю для контекста о техниках
+    String finalStoryText = '';
+    if (_script?['final_story'] != null) {
+      finalStoryText = _formatContextArray(_script?['final_story']);
+    }
+    
     return 'Режим: case_facilitатор. Ты — Лео, фасилитатор мини‑кейса. '
         'Кейс: "$title" (после уровня $afterLevel, навык: $skill). '
         '${contextText.isNotEmpty ? 'Текст кейса: $contextText ' : ''}'
-        'Правила: отвечай ТОЛЬКО на основе «Текста кейса», игнорируй внешние источники/память/RAG. '
+        '${finalStoryText.isNotEmpty ? 'Финальная история кейса: $finalStoryText ' : ''}'
+        'Правила: отвечай ТОЛЬКО на основе «Текста кейса» и «Финальной истории» выше. '
+        'КРИТИЧЕСКИ ВАЖНО: Используй ТОЛЬКО информацию из «Текста кейса» и «Финальной истории». '
+        'ЗАПРЕЩЕНО использовать свои базовые знания, если они не упомянуты в тексте кейса. '
+        'Отвечай ТОЛЬКО на основе «Текста кейса» и «Финальной истории», игнорируй внешние источники/память/RAG.'
         'Алгоритм: дай «Задание 1» как ассистент; оцени ответ (EXCELLENT/GOOD/ACCEPTABLE/WEAK/INVALID). '
         'При EXCELLENT/GOOD — переход к следующему заданию (верни маркер [CASE:NEXT]); '
         'при ACCEPTABLE — мягкая подсказка и переход (верни [CASE:NEXT]); '
         'при WEAK/INVALID — короткая наводящая подсказка и запрос доработки (верни [CASE:RETRY]). '
         'В финале выдай краткий итог и верни маркер [CASE:FINAL]. '
         'Формат ответов краткий (2–3 предложения), без таблиц/эмодзи.';
+  }
+
+  /// Форматирует контекст из массива или строки в читаемый текст
+  String _formatContextArray(dynamic contextData) {
+    if (contextData is List) {
+      // Если это массив, объединяем элементы с переносами строк
+      return contextData.map((item) => item.toString()).join('\n');
+    } else if (contextData is String) {
+      // Если это строка, возвращаем как есть
+      return contextData;
+    }
+    return '';
   }
 
   String _firstTaskPromptFromScript() {

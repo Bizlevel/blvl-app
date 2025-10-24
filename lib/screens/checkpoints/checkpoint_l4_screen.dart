@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:bizlevel/providers/goals_providers.dart';
+import 'package:bizlevel/providers/checkpoints_provider.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:bizlevel/screens/leo_dialog_screen.dart';
 import 'package:go_router/go_router.dart';
@@ -168,6 +169,10 @@ class _CheckpointL4ScreenState extends ConsumerState<CheckpointL4Screen> {
                           level: SentryLevel.info,
                         ));
                       } catch (_) {}
+                      
+                      // Отмечаем чекпойнт как завершенный
+                      await ref.read(checkpointsProvider.notifier).completeCheckpoint('l4');
+                      
                       if (!mounted) return;
                       GoRouter.of(context).push('/tower');
                     },

@@ -3,6 +3,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:bizlevel/providers/auth_provider.dart';
 
 class LessonProgressState {
   final int unlockedPage;
@@ -49,13 +50,14 @@ class LessonProgressState {
 
 class LessonProgressNotifier extends StateNotifier<LessonProgressState> {
   final int levelId;
-  LessonProgressNotifier(this.levelId) : super(LessonProgressState.empty) {
+  final String? userId;
+  LessonProgressNotifier(this.levelId, {this.userId}) : super(LessonProgressState.empty) {
     _load();
   }
 
   Timer? _debounce;
 
-  String get _prefsKey => 'level_progress_$levelId';
+  String get _prefsKey => 'level_progress_${userId ?? 'anonymous'}_$levelId';
 
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -106,5 +108,8 @@ class LessonProgressNotifier extends StateNotifier<LessonProgressState> {
 
 final lessonProgressProvider = StateNotifierProvider.family<
     LessonProgressNotifier, LessonProgressState, int>(
-  (ref, levelId) => LessonProgressNotifier(levelId),
+  (ref, levelId) {
+    final user = ref.watch(currentUserProvider);
+    return LessonProgressNotifier(levelId);
+  },
 );
