@@ -173,6 +173,12 @@ class LoginScreen extends HookConsumerWidget {
                           ),
                         ),
                         AppSpacing.gapH(24),
+                        // Основная CTA: «Войти» – сразу под полем пароля
+                        BizLevelButton(
+                          label: isLoading ? 'Входим…' : 'Войти',
+                          onPressed: isLoading ? null : submit,
+                        ),
+                        AppSpacing.gapH(24),
                         if (kEnableGoogleAuth) const _OrDivider(),
                         if (kEnableGoogleAuth) AppSpacing.gapH(24),
                         if (kEnableGoogleAuth)
@@ -198,12 +204,7 @@ class LoginScreen extends HookConsumerWidget {
                               ),
                             ),
                           ),
-                        if (kEnableGoogleAuth) AppSpacing.gapH(32),
-                        BizLevelButton(
-                          label: isLoading ? 'Входим…' : 'Войти',
-                          onPressed: isLoading ? null : submit,
-                        ),
-                        AppSpacing.gapH(16),
+                        if (kEnableGoogleAuth) AppSpacing.gapH(16),
                         // Social proof (лёгкий блок
                         const _SocialProofBlock(),
                         AppSpacing.gapH(8),

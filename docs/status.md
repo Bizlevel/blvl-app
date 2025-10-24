@@ -817,4 +817,15 @@ TODO:
 - Level Detail: тёплый CTA, тонкая верхняя полоса прогресса по урокам, лёгкий параллакс иллюстрации (отключается на low‑end).
 - Тема: добавлен `AppColor.warmGradient`, подключён `AppTheme.dark()` + тумблер в Профиле; в тёмной теме уточнены бордеры/инпуты (светлые границы, приглушённые градиенты).
 
-Проверка: `flutter analyze` — без ошибок; визуальные регрессии/overflow не воспроизводятся на ширинах 320–1024.
+### 2025-10-24 — UX: LoginScreen
+- Переставлена основная CTA «Войти» сразу под полем пароля (до соц‑логинов), чтобы уменьшить путаницу и улучшить завершение сценария входа.
+
+## 2025-10-24 — DB hardening (fix6.x)
+- Привёл search_path: функция `match_user_memories` теперь фиксирована на `public` (устранён `function_search_path_mutable`).
+- Ужесточены права EXECUTE у RPC ядра GP (`gp_balance/gp_spend/gp_package_buy/gp_bonus_claim/gp_purchase_verify` и `gp_floor_unlock*`): только `authenticated` и `service_role`.
+- Добавлены покрывающие индексы для FK: `ai_message(leo_message_id)`, `memory_archive(user_id)`, `user_packages(package_id)`.
+
+## 2025-10-24 — RLS перепись (initplan/duplicates)
+- Заменены выражения `auth.uid()` на `(select auth.uid())` в USING/WITH CHECK (исключён initplan‑overhead) для таблиц: `ai_message`, `leo_chats`, `leo_messages`, `user_memories`, `user_progress`.
+- Удалены дубли permissive‑политик: `ai_message` (второй INSERT), `leo_chats` (`select_own`, `update_own`), `app_settings` (`app_settings_deny_all`). Поведение доступа не расширено.
+- Service‑role политики не менялись. Функциональные права пользователей не изменялись (owner‑паттерн сохранён).
