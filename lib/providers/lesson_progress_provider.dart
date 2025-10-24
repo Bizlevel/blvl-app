@@ -109,7 +109,8 @@ class LessonProgressNotifier extends StateNotifier<LessonProgressState> {
 final lessonProgressProvider = StateNotifierProvider.family<
     LessonProgressNotifier, LessonProgressState, int>(
   (ref, levelId) {
-    final user = ref.watch(currentUserProvider);
-    return LessonProgressNotifier(levelId);
+    final userAsync = ref.watch(currentUserProvider);
+    final user = userAsync.value;
+    return LessonProgressNotifier(levelId, userId: user?.id);
   },
 );

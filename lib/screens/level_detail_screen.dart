@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:bizlevel/models/lesson_model.dart';
 import 'package:bizlevel/providers/lessons_provider.dart';
 import 'package:bizlevel/theme/color.dart';
@@ -69,7 +70,6 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
   @override
   void initState() {
     super.initState();
-      _goalV1Saved = false; // Сброс для новых пользователей
     // Берём последнюю разблокированную страницу, чтобы открывать уровень там, где пользователь остановился.
     _pageController = PageController(initialPage: 0);
     // Гарантируем разблокировку Intro (0) и следующей страницы (1)
@@ -78,6 +78,11 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
     _pageController.addListener(() {
       if (mounted) setState(() {});
     });
+    
+    // Инициализируем флаг _goalV1Saved для уровня 1
+    if ((widget.levelNumber ?? -1) == 1) {
+      _initializeGoalV1Flag();
+    }
   }
 
   @override
@@ -284,6 +289,29 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
 
   // Helpers ---------------------------------------------------------
 
+  Future<bool> _isGoalV1AlreadySaved() async {
+    final prefs = await SharedPreferences.getInstance();
+    final user = ref.read(currentUserProvider).value;
+    final key = 'goal_v1_saved_${user?.id ?? 'anonymous'}_${widget.levelId}';
+    return prefs.getBool(key) ?? false;
+  }
+
+  Future<void> _markGoalV1AsSaved() async {
+    final prefs = await SharedPreferences.getInstance();
+    final user = ref.read(currentUserProvider).value;
+    final key = 'goal_v1_saved_${user?.id ?? 'anonymous'}_${widget.levelId}';
+    await prefs.setBool(key, true);
+  }
+
+  Future<void> _initializeGoalV1Flag() async {
+    final isSaved = await _isGoalV1AlreadySaved();
+    if (mounted) {
+      setState(() {
+        _goalV1Saved = isSaved;
+      });
+    }
+  }
+
   int get _currentIndex {
     if (!_pageController.hasClients) return 0;
     // Используем фактическую позицию страницы, а не только целые индексы,
@@ -377,6 +405,7 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
     }
     // Для уровня 1 требуется также заполнение v1 «Семя»
     if ((widget.levelNumber ?? -1) == 1) {
+      // Проверяем только локальный флаг, так как асинхронная проверка не подходит для синхронного метода
       return _goalV1Saved;
     }
     return true;
@@ -425,9 +454,10 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
             ),
         ],
         _GoalV1Block(
-          onSaved: () {
+          onSaved: () async {
             if (mounted) {
               setState(() => _goalV1Saved = true);
+              await _markGoalV1AsSaved();
               // Инвалидация провайдеров целей для синхронизации страницы «Цель»
               // legacy invalidates removed
             }
