@@ -717,20 +717,36 @@ serve(async (req)=>{
       // Проверяем, не относится ли вопрос к непройденным уровням
       const questionLower = lastUserMessage.toLowerCase();
       let questionLevel = 0;
-      // Определяем уровень вопроса по ключевым словам
-      if (questionLower.includes('элеватор питч') || questionLower.includes('elevator pitch') || questionLower.includes('презентация бизнеса') || questionLower.includes('60 секунд')) {
-        questionLevel = 6;
-      } else if (questionLower.includes('утп') || questionLower.includes('уникальное торговое предложение') || questionLower.includes('конкурентный анализ')) {
-        questionLevel = 5;
-      } else if (questionLower.includes('матрица эйзенхауэра') || questionLower.includes('приоритизация') || questionLower.includes('планирование задач')) {
-        questionLevel = 3;
-      } else if (questionLower.includes('учёт доходов') || questionLower.includes('финансы') || questionLower.includes('денежные потоки')) {
-        questionLevel = 4;
-      } else if (questionLower.includes('стресс-менеджмент') || questionLower.includes('управление стрессом') || questionLower.includes('дыхательные техники')) {
-        questionLevel = 2;
-      } else if (questionLower.includes('цели') || questionLower.includes('мотивация') || questionLower.includes('smart-цели')) {
-        questionLevel = 1;
+      
+      // Исключения для универсальных чипов, которые должны работать независимо от уровня
+      const universalChips = [
+        'пример из моей сферы',
+        'дай микро-шаг',
+        'микро‑шаг',
+        'как применить на практике',
+        'разобрать мою задачу',
+        'типичные ошибки'
+      ];
+      
+      const isUniversalChip = universalChips.some(chip => questionLower.includes(chip.toLowerCase()));
+      
+      // Определяем уровень вопроса по ключевым словам (только если это не универсальный чип)
+      if (!isUniversalChip) {
+        if (questionLower.includes('элеватор питч') || questionLower.includes('elevator pitch') || questionLower.includes('презентация бизнеса') || questionLower.includes('60 секунд')) {
+          questionLevel = 6;
+        } else if (questionLower.includes('утп') || questionLower.includes('уникальное торговое предложение') || questionLower.includes('конкурентный анализ')) {
+          questionLevel = 5;
+        } else if (questionLower.includes('матрица эйзенхауэра') || questionLower.includes('приоритизация') || questionLower.includes('планирование задач')) {
+          questionLevel = 3;
+        } else if (questionLower.includes('учёт доходов') || questionLower.includes('финансы') || questionLower.includes('денежные потоки')) {
+          questionLevel = 4;
+        } else if (questionLower.includes('стресс-менеджмент') || questionLower.includes('управление стрессом') || questionLower.includes('дыхательные техники')) {
+          questionLevel = 2;
+        } else if (questionLower.includes('цели') || questionLower.includes('мотивация') || questionLower.includes('smart-цели')) {
+          questionLevel = 1;
+        }
       }
+      
       // Если вопрос относится к непройденным уровням, НЕ загружаем RAG
       if (questionLevel > maxCompletedLevel) {
         ragPromise = Promise.resolve('');
@@ -1148,8 +1164,17 @@ serve(async (req)=>{
 ## ПРАВИЛО ПЕРВОЙ ПРОВЕРКИ:
 ПЕРЕД ЛЮБЫМ ОТВЕТОМ проверь уровень вопроса. Если уровень > ${finalLevel}, НЕ давай подробный ответ — только нейтральный отказ без ссылок на конкретные уроки + 1–2 общих подсказки.
 
+ИСКЛЮЧЕНИЕ: Универсальные чипы ("Пример из моей сферы", "Дай микро‑шаг", "Как применить на практике", "Разобрать мою задачу", "Типичные ошибки") работают независимо от уровня — всегда давай персонализированные ответы по ним.
+
 ## АЛГОРИТМ ПРОВЕРКИ ПЕРЕД ОТВЕТОМ:
-1. Определи, к какому уровню относится вопрос пользователя по следующим примерам:
+1. СНАЧАЛА проверь, является ли запрос универсальным чипом:
+   - "Пример из моей сферы" — ВСЕГДА давай персонализированный ответ
+   - "Дай микро‑шаг" — ВСЕГДА давай конкретный шаг
+   - "Как применить на практике" — ВСЕГДА давай практические советы
+   - "Разобрать мою задачу" — ВСЕГДА помогай с задачей
+   - "Типичные ошибки" — ВСЕГДА предупреждай об ошибках
+
+2. Если НЕ универсальный чип, определи уровень вопроса:
    - Уровень 1: цели, мотивация, SMART-цели
    - Уровень 2: стресс-менеджмент, управление стрессом, дыхательные техники
    - Уровень 3: матрица Эйзенхауэра, приоритизация, планирование задач
@@ -1161,8 +1186,8 @@ serve(async (req)=>{
    - Уровень 9: юридические аспекты, налоги, чек-лист
    - Уровень 10: интеграция инструментов, карта действий
 
-2. Если уровень > ${finalLevel}, не отвечай подробно: дай направление к уроку и 1–2 общих подсказки.
-3. НЕ ИСПОЛЬЗУЙ материалы из RAG, если они относятся к непройденным уровням
+3. Если уровень > ${finalLevel}, не отвечай подробно: дай направление к уроку и 1–2 общих подсказки.
+4. НЕ ИСПОЛЬЗУЙ материалы из RAG, если они относятся к непройденным уровням
 
 ## Твоя Роль и Личность:
 Ты — Лео, харизматичный ИИ-консультант программы «БизЛевел» в Казахстане. 
