@@ -103,6 +103,10 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
   // Добавляем debounce для предотвращения дублей
   Timer? _debounceTimer;
   static const Duration _debounceDelay = Duration(milliseconds: 500);
+  
+  // Debounce для обновления чипсов
+  Timer? _chipsDebounceTimer;
+  static const Duration _chipsDebounceDelay = Duration(milliseconds: 1000);
 
   @override
   void initState() {
@@ -125,6 +129,8 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
         setState(() => _showScrollToBottom = show);
       }
     });
+    // Загружаем персональные чипсы при инициализации
+    _refreshChipsDebounced();
     // Автоприветствие: кейс → первый промпт задания; иначе Макс приветствие
     if (widget.caseMode && _chatId == null && _messages.isEmpty) {
       final String start = (widget.firstPrompt?.trim().isNotEmpty == true)
@@ -189,6 +195,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
   @override
   void dispose() {
     _debounceTimer?.cancel();
+    _chipsDebounceTimer?.cancel();
     _inputFocus.dispose();
     super.dispose();
   }
@@ -257,6 +264,35 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
           );
         }
       });
+
+  /// Обновляет чипсы с сервера с дебаунсом
+  void _refreshChipsDebounced() {
+    _chipsDebounceTimer?.cancel();
+    _chipsDebounceTimer = Timer(_chipsDebounceDelay, () async {
+      try {
+        final chips = await _leo.fetchRecommendedChips(
+          bot: widget.bot,
+          chatId: _chatId,
+          userContext: widget.userContext,
+          levelContext: widget.levelContext,
+        );
+        debugPrint('CHIPS server=${chips}');
+        if (mounted) {
+          setState(() {
+            _serverRecommendedChips = chips;
+            // Показываем подсказки, если получили чипсы
+            if (chips.isNotEmpty) {
+              _showSuggestions = true;
+            }
+          });
+          debugPrint('CHIPS merged=${_resolveRecommendedChips()}');
+        }
+      } catch (e) {
+        // Тихо фейлимся — останется локальный фолбэк
+        debugPrint('Failed to fetch recommended chips: $e');
+      }
+    });
+  }
 
   Future<void> _sendMessage() async {
     // debug prints removed
@@ -456,6 +492,8 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
           .showSnackBar(SnackBar(content: Text('Ошибка: $e')));
     } finally {
       if (mounted) setState(() => _isSending = false);
+      // Обновляем чипсы после отправки сообщения
+      _refreshChipsDebounced();
     }
   }
 
@@ -835,15 +873,18 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
   }
 
   List<String> _resolveRecommendedChips() {
+    // Временно показываем ТОЛЬКО серверные чипсы (без мерджа и без фильтра dismissed)
+    if (_serverRecommendedChips.isNotEmpty) {
+      final clean = _serverRecommendedChips.where((e) => e.trim().isNotEmpty).toList();
+      return clean.length > 6 ? clean.sublist(0, 6) : clean;
+    }
     final fromWidget = widget.recommendedChips ?? const [];
-    final fromServer = _serverRecommendedChips;
     final local = _localChipsFallback();
-    final merged = <String>{...fromWidget, ...fromServer, ...local}
+    final fallback = <String>{...fromWidget, ...local}
         .where((e) => e.trim().isNotEmpty)
         .where((e) => !_dismissedChips.contains(e))
         .toList();
-    if (merged.length > 6) return merged.sublist(0, 6);
-    return merged;
+    return fallback.length > 6 ? fallback.sublist(0, 6) : fallback;
   }
 
   List<String> _localChipsFallback() {
