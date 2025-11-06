@@ -17,4 +17,10 @@ class AppDimensions {
   // Минимальные размеры
   static const double minTouchTarget = 48.0;
   static const double minButtonHeight = 48.0;
+
+  // Home screen specific
+  static const double homeGreetingHeight = 80.0; // avatar row height
+  static const double homeCtaHeight = 84.0; // big CTA height
+  static const double homeGoalMinHeight = 160.0; // "Моя цель"
+  static const double quickTileMinHeight = 56.0; // quick action tile min height
 }

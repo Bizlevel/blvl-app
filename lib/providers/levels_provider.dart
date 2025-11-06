@@ -189,6 +189,8 @@ final nextLevelToContinueProvider =
     'isLocked': isLocked,
     'targetScroll': levelNumber,
     'label': 'Уровень $levelNumber',
+    // surface title from levels table (level name)
+    'levelTitle': (candidate['name'] as String?),
   };
 });
 
