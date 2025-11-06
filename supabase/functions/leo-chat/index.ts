@@ -6,6 +6,9 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.0";
 import OpenAI from "https://deno.land/x/openai@v4.20.1/mod.ts";
 const personaCache = new Map();
 const ragCache = new Map();
+// Кеш для LLM-саммари и готовых чипсов (TTL задаётся ниже)
+const chipsCache = new Map(); // key: userId|bot|chatId -> { value: string[], expiresAt }
+const chipsSummaryCache = new Map(); // key: userId|bot|chatId -> { value: string, expiresAt }
 // Временный кеш для дедупликации чипов в рамках жизни процесса Edge (best-effort)
 const chipsSeenCache = new Map(); // key: `${userId}|${bot}` -> Map<label,{expiresAt:number}>
 function nowMs() {
@@ -30,6 +33,15 @@ function setCached(map, key, value, ttlMs) {
     expiresAt: nowMs() + ttlMs
   });
 }
+function getOrSetCached(map, key, ttlMs, compute) {
+  const hit = map.get(key);
+  const now = nowMs();
+  if (hit && hit.expiresAt > now) return hit.value;
+  return compute().then((value) => {
+    setCached(map, key, value, ttlMs);
+    return value;
+  });
+}
 // ============================
 // Flags & Env
 // ============================
@@ -49,7 +61,9 @@ function getChipConfig() {
     enableLeoV1: getBoolEnv('LEO_CHIPS_V1', true),
     maxCount: Math.max(1, Math.min(6, getIntEnv('CHIPS_MAX_COUNT', 6))),
     sessionTtlMin: Math.max(5, getIntEnv('CHIPS_SESSION_TTL_MIN', 30)),
-    dailyDedup: getBoolEnv('CHIPS_DAILY_DEDUP', true)
+    dailyDedup: getBoolEnv('CHIPS_DAILY_DEDUP', true),
+    useLLM: getBoolEnv('CHIPS_USE_LLM', true),
+    llmTtlSec: Math.max(30, getIntEnv('CHIPS_LLM_TTL_SEC', 120))
   };
 }
 function limitChips(chips, maxCount) {
@@ -90,6 +104,169 @@ function logChipsRendered(bot, labels) {
       labels: Array.isArray(labels) ? labels.slice(0, 6) : []
     });
   } catch (_) {}
+}
+
+function generatePersonalizedChips({ bot, userId, profile, currentLevel, userGoal, recentQuestions, userContext, levelContext }) {
+  const chips = [];
+  
+  if (bot === 'max') {
+    // Чипсы для Макса (цель/план/практика)
+    if (userGoal) {
+      const { goal_text, metric_type, metric_current, metric_target } = userGoal;
+      
+      if (goal_text) {
+        // Персонализированные чипсы на основе текста цели
+        const goalLower = goal_text.toLowerCase();
+        if (goalLower.includes('выручк') || goalLower.includes('доход')) {
+          chips.push('Как увеличить выручку?');
+          chips.push('Стратегии роста продаж');
+        } else if (goalLower.includes('клиент') || goalLower.includes('покупател')) {
+          chips.push('Как привлечь больше клиентов?');
+          chips.push('Улучшить удержание клиентов');
+        } else if (goalLower.includes('чек') || goalLower.includes('средний')) {
+          chips.push('Как повысить средний чек?');
+          chips.push('Стратегии увеличения чека');
+        }
+        
+        // Чипсы на основе цели
+        chips.push(`Достичь: ${goal_text.length > 40 ? goal_text.substring(0, 40) + '...' : goal_text}`);
+      }
+      
+      if (metric_type && metric_current !== null && metric_target !== null) {
+        const progress = metric_target > 0 ? (metric_current / metric_target * 100) : 0;
+        if (progress < 50) {
+          chips.push(`Прогресс ${progress.toFixed(0)}%: как ускорить?`);
+        } else if (progress < 80) {
+          chips.push(`Прогресс ${progress.toFixed(0)}%: что мешает?`);
+        } else {
+          chips.push(`Прогресс ${progress.toFixed(0)}%: финальный рывок`);
+        }
+      }
+      
+      chips.push('Пересмотреть план действий');
+      chips.push('Какие шаги на эту неделю?');
+    } else {
+      chips.push('Поставить конкретную цель');
+      chips.push('Выбрать метрику для отслеживания');
+    }
+    
+    // Чипсы на основе последних вопросов (более детальный анализ)
+    if (recentQuestions.length > 0) {
+      const lastQuestion = recentQuestions[0].toLowerCase();
+      const allQuestions = recentQuestions.join(' ').toLowerCase();
+      
+      // Извлекаем ключевые слова из последних вопросов
+      if (lastQuestion.includes('план') || lastQuestion.includes('действи') || lastQuestion.includes('шаг')) {
+        chips.push('Продолжить планирование');
+      }
+      if (lastQuestion.includes('метрик') || lastQuestion.includes('измер') || lastQuestion.includes('отслежива')) {
+        chips.push('Настроить отслеживание');
+      }
+      if (lastQuestion.includes('мотивац') || lastQuestion.includes('стимул')) {
+        chips.push('Больше мотивации');
+      }
+      
+      // Если в вопросах упоминается конкретная тема - предлагаем её
+      if (allQuestions.includes('клиент') || allQuestions.includes('покупател')) {
+        chips.push('Больше про привлечение клиентов');
+      }
+      if (allQuestions.includes('продаж') || allQuestions.includes('выручк')) {
+        chips.push('Увеличить продажи');
+      }
+    }
+    
+    // Общие чипсы для Макса (только если мало персонализированных)
+    if (chips.length < 4) {
+      chips.push('Дай мотивацию на сегодня');
+      chips.push('Проверить готовность к старту');
+    }
+    
+  } else {
+    // Чипсы для Лео (обучение/уровень/RAG)
+    if (currentLevel > 0) {
+      chips.push(`Объясни тему ур.${currentLevel} просто`);
+      chips.push(`Пример из моей сферы (ур.${currentLevel})`);
+      
+      if (currentLevel < 10) {
+        chips.push(`Что изучать на ур.${currentLevel + 1}?`);
+      }
+    } else {
+      chips.push('С чего начать обучение?');
+      chips.push('Покажи план развития');
+    }
+    
+    // Персонализация по сфере деятельности
+    if (profile?.business_area) {
+      const area = profile.business_area.toLowerCase();
+      if (area.includes('торгов') || area.includes('продаж') || area.includes('розниц')) {
+        chips.push('Примеры для торговли/розницы');
+      } else if (area.includes('услуг') || area.includes('сервис')) {
+        chips.push('Примеры для сферы услуг');
+      } else if (area.includes('производ')) {
+        chips.push('Примеры для производства');
+      } else if (area.includes('еда') || area.includes('продукт')) {
+        chips.push('Примеры для продуктов питания');
+      } else {
+        chips.push(`Примеры для ${profile.business_area}`);
+      }
+    }
+    
+    // Чипсы на основе последних вопросов (более детальный анализ)
+    if (recentQuestions.length > 0) {
+      const lastQuestion = recentQuestions[0].toLowerCase();
+      const allQuestions = recentQuestions.join(' ').toLowerCase();
+      
+      // Извлекаем конкретные темы из вопросов
+      if (lastQuestion.includes('лобстер') || lastQuestion.includes('раки') || lastQuestion.includes('морепродукт')) {
+        chips.push('Продолжить про морепродукты');
+      }
+      if (lastQuestion.includes('клиент') || lastQuestion.includes('покупател') || lastQuestion.includes('привлеч')) {
+        chips.push('Больше про привлечение клиентов');
+      }
+      if (lastQuestion.includes('smart') || lastQuestion.includes('цел') || lastQuestion.includes('целеполагание')) {
+        chips.push('Продолжить про SMART-цели');
+      }
+      if (lastQuestion.includes('финанс') || lastQuestion.includes('учет') || lastQuestion.includes('деньг')) {
+        chips.push('Больше про финансы');
+      }
+      if (lastQuestion.includes('маркетинг') || lastQuestion.includes('реклам') || lastQuestion.includes('продвижен')) {
+        chips.push('Развить тему маркетинга');
+      }
+      if (lastQuestion.includes('ценообразован') || lastQuestion.includes('цена') || lastQuestion.includes('стоимость')) {
+        chips.push('Про ценообразование');
+      }
+      
+      // Если не нашли конкретную тему, но есть вопросы - предлагаем продолжить
+      if (chips.length < 5 && recentQuestions.length > 0) {
+        const questionPreview = recentQuestions[0].length > 50 
+          ? recentQuestions[0].substring(0, 50) + '...' 
+          : recentQuestions[0];
+        chips.push(`Продолжить: ${questionPreview}`);
+      }
+    }
+    
+    // Чипсы на основе цели пользователя (если есть)
+    if (userGoal?.goal_text) {
+      const goalText = userGoal.goal_text.toLowerCase();
+      if (goalText.includes('выручк') || goalText.includes('доход')) {
+        chips.push('Как достичь цели по выручке?');
+      } else if (goalText.includes('клиент')) {
+        chips.push('Как достичь цели по клиентам?');
+      } else if (goalText.includes('чек')) {
+        chips.push('Как повысить средний чек?');
+      }
+    }
+    
+    // Общие чипсы для Лео (только если мало персонализированных)
+    if (chips.length < 4) {
+      chips.push('Дай микро-шаг на сегодня');
+      chips.push('Покажи полезные материалы');
+      chips.push('Разбери мою ситуацию');
+    }
+  }
+  
+  // Убираем дубликаты и возвращаем
+  return [...new Set(chips)];
 }
 function hashQuery(s) {
   // DJB2 hash for stable keying
@@ -143,6 +320,95 @@ function sanitizeMaxResponse(content) {
     out = stripTableFormatting(removeEmojis(out));
   }
   return out;
+}
+
+// --- LLM helpers for CHIPS ---
+async function summarizeRecentQuestionsLLM({ openaiClient, model, recentQuestions }) {
+  try {
+    const text = Array.isArray(recentQuestions) ? recentQuestions.filter(Boolean).join('\n- ') : '';
+    if (!text) return '';
+    const prompt = `Суммаризируй темы последних вопросов пользователя в 1-3 коротких маркерах без нумерации. Вот вопросы:\n- ${text}`;
+    const params = getChatCompletionParams(model, [
+      { role: 'system', content: 'Ты кратко формулируешь темы. Пиши по-русски, 1-3 пункта, без воды.' },
+      { role: 'user', content: prompt }
+    ], { max_tokens: 120 });
+    const completion = await openaiClient.chat.completions.create(params);
+    const content = completion.choices?.[0]?.message?.content || '';
+    return (content || '').trim();
+  } catch (_) {
+    return '';
+  }
+}
+
+// Функция для обрезки чипсов до максимальной длины
+function truncateChip(text, maxLength = 60) {
+  if (!text || typeof text !== 'string') return '';
+  const trimmed = text.trim();
+  if (trimmed.length <= maxLength) return trimmed;
+  // Обрезаем до последнего пробела перед maxLength, чтобы не резать слова
+  const truncated = trimmed.substring(0, maxLength);
+  const lastSpace = truncated.lastIndexOf(' ');
+  if (lastSpace > maxLength * 0.7) {
+    return truncated.substring(0, lastSpace) + '...';
+  }
+  return truncated + '...';
+}
+
+// Рекурсивно расплющивает вложенные массивы
+function flattenArray(arr) {
+  const result = [];
+  for (const item of arr) {
+    if (Array.isArray(item)) {
+      result.push(...flattenArray(item));
+    } else if (item != null) {
+      result.push(String(item));
+    }
+  }
+  return result;
+}
+
+async function generateChipsWithLLM({ openaiClient, model, bot, currentLevel, profile, userGoal, dialogSummary }) {
+  const goalText = (userGoal?.goal_text || '').toString();
+  const businessArea = (profile?.business_area || '').toString();
+  const sys = bot === 'max'
+    ? 'Ты генерируешь 4-6 коротких подсказок-чипсов для ассистента Макс (цели/план действий). Каждый чипс - максимум 60 символов. Только JSON-массив строк, без вложенных массивов.'
+    : 'Ты генерируешь 4-6 коротких подсказок-чипсов для ассистента Лео (обучение по уровням). Каждый чипс - максимум 60 символов. Только JSON-массив строк, без вложенных массивов.';
+  const user = [
+    bot === 'max' ? 'Ассистент: Макс' : 'Ассистент: Лео',
+    currentLevel ? `Текущий уровень: ${currentLevel}` : '',
+    businessArea ? `Сфера: ${businessArea}` : '',
+    goalText ? `Цель: ${goalText}` : '',
+    dialogSummary ? `Темы прошлых вопросов: ${dialogSummary}` : ''
+  ].filter(Boolean).join('\n');
+  const params = getChatCompletionParams(model, [
+    { role: 'system', content: `${sys} Коротко, конкретно, без эмодзи. Формат: ["чипс1", "чипс2", ...]` },
+    { role: 'user', content: user }
+  ], { max_tokens: 200 });
+  const completion = await openaiClient.chat.completions.create(params);
+  const raw = completion.choices?.[0]?.message?.content || '';
+  
+  // Пытаемся извлечь JSON-массив
+  let parsed = [];
+  try {
+    const jsonStart = raw.indexOf('[');
+    const jsonEnd = raw.lastIndexOf(']');
+    if (jsonStart >= 0 && jsonEnd > jsonStart) {
+      const parsedRaw = JSON.parse(raw.slice(jsonStart, jsonEnd + 1));
+      // Расплющиваем вложенные массивы
+      parsed = flattenArray(Array.isArray(parsedRaw) ? parsedRaw : [parsedRaw]);
+    }
+  } catch (_) {
+    // Фолбэк: разделение по строкам
+    parsed = raw.split('\n')
+      .map((s) => s.replace(/^[-•\d\.\s\[\]"]+/, '').replace(/["\]]+$/, '').trim())
+      .filter(Boolean);
+  }
+  
+  // Обрезаем каждый чипс до 60 символов и фильтруем пустые
+  return parsed
+    .map((x) => truncateChip(String(x), 60))
+    .filter((x) => x.length > 0)
+    .slice(0, 6);
 }
 // Функция расчета стоимости
 function calculateCost(usage, model = 'grok-4-fast-non-reasoning') {
@@ -460,6 +726,170 @@ serve(async (req)=>{
           'Content-Type': 'application/json'
         }
       });
+    }
+    // ==============================
+    // CHIPS MODE (personalized suggestions)
+    // ==============================
+    if (mode === 'chips') {
+      try {
+        // Получаем пользователя для персонализации
+        const authHeader = req.headers.get("Authorization") || req.headers.get("authorization");
+        const userJwtHeader = req.headers.get("x-user-jwt");
+        let jwt = null;
+        if (typeof userJwtHeader === 'string' && userJwtHeader.trim().length > 20) {
+          jwt = userJwtHeader.trim();
+        } else if (authHeader?.startsWith("Bearer ")) {
+          const token = authHeader.replace("Bearer ", "").trim();
+          const anon = (Deno.env.get("SUPABASE_ANON_KEY") || '').trim();
+          const service = (Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || '').trim();
+          if (token && token !== anon && token !== service) {
+            jwt = token;
+          }
+        }
+
+        let userId = null;
+        let profile = null;
+        let currentLevel = 0;
+        let userGoal = null;
+        let recentQuestions = [];
+        let maxCompletedLevel = 0;
+
+        if (jwt) {
+          try {
+            let authResult = await supabaseAuth.auth.getUser(jwt);
+            if (authResult.error) {
+              authResult = await supabaseAdmin.auth.getUser(jwt);
+            }
+            const user = authResult.data?.user;
+            if (user) {
+              userId = user.id;
+              
+              // Параллельно загружаем данные пользователя
+              const queries = [
+                // Профиль пользователя
+                supabaseAdmin.from("users").select("name, goal, business_area, experience_level, current_level").eq("id", userId).single(),
+                // Цель пользователя
+                supabaseAdmin.from('user_goal').select('goal_text, metric_type, metric_current, metric_target').eq('user_id', userId).order('updated_at', { ascending: false }).limit(1).maybeSingle(),
+                // Последние вопросы пользователя (если есть chatId)
+                chatId ? supabaseAdmin.from('leo_messages').select('content').eq('chat_id', chatId).eq('role', 'user').order('created_at', { ascending: false }).limit(5) : Promise.resolve({ data: [] }),
+                // Максимальный пройденный уровень (как в основном режиме)
+                supabaseAdmin.from('user_progress').select('level_id').eq('user_id', userId).eq('is_completed', true)
+              ];
+
+              const [profileResult, goalResult, messagesResult, progressResult] = await Promise.all(queries);
+              
+              if (profileResult.data) {
+                profile = profileResult.data;
+              }
+              
+              // Определяем максимальный пройденный уровень (как в основном режиме)
+              if (progressResult.data && Array.isArray(progressResult.data) && progressResult.data.length > 0) {
+                const levelIds = progressResult.data.map((r) => r?.level_id).filter((x) => Number.isFinite(x));
+                if (levelIds.length > 0) {
+                  const { data: levelRows } = await supabaseAdmin.from('levels').select('number, floor_number').in('id', levelIds);
+                  if (Array.isArray(levelRows)) {
+                    for (const r of levelRows) {
+                      const n = Number(r?.number ?? 0);
+                      if (Number.isFinite(n) && n > maxCompletedLevel) maxCompletedLevel = n;
+                    }
+                  }
+                }
+              }
+              
+              // Определяем текущий уровень из профиля (с маппингом как в основном режиме)
+              let currentLevel1 = null;
+              if (profile?.current_level !== undefined && profile.current_level !== null) {
+                currentLevel1 = profile.current_level;
+              }
+              const levelMapping = { '11': 1, '12': 2, '13': 3, '14': 4, '15': 5, '16': 6, '17': 7, '18': 8, '19': 9, '20': 10, '22': 0 };
+              const currentLevelNumber = currentLevel1 != null ? levelMapping[String(currentLevel1)] ?? 0 : 0;
+              currentLevel = maxCompletedLevel > 0 ? maxCompletedLevel : currentLevelNumber;
+              
+              if (goalResult.data) {
+                userGoal = goalResult.data;
+              }
+              
+              if (messagesResult.data && Array.isArray(messagesResult.data)) {
+                recentQuestions = messagesResult.data.map(m => m.content).filter(Boolean);
+              }
+            }
+          } catch (e) {
+            console.log('WARN chips_auth_failed', { message: String(e).slice(0, 200) });
+          }
+        }
+
+        // Логируем данные для диагностики
+        console.log('INFO chips_context', {
+          userId: userId ? 'present' : 'absent',
+          currentLevel,
+          maxCompletedLevel,
+          hasGoal: Boolean(userGoal),
+          recentQuestionsCount: recentQuestions.length,
+          hasProfile: Boolean(profile)
+        });
+
+        // Генерируем чипсы на основе данных (LLM или эвристики) с кешем 2 минуты
+        const config = getChipConfig();
+        const cacheKey = `${userId || 'anon'}|${bot}|${chatId || 'nochat'}`;
+        let chips = [];
+        if (config.useLLM) {
+          const llmTtl = config.llmTtlSec * 1000;
+          const model = Deno.env.get('OPENAI_MODEL') || 'grok-4-fast-non-reasoning';
+          const openaiClient = getOpenAIClient(model);
+          // Короткое саммари диалога кешируем отдельно
+          const dialogSummary = await getOrSetCached(
+            chipsSummaryCache,
+            cacheKey,
+            llmTtl,
+            async () => await summarizeRecentQuestionsLLM({ openaiClient, model, recentQuestions })
+          );
+          chips = await getOrSetCached(
+            chipsCache,
+            cacheKey,
+            llmTtl,
+            async () => await generateChipsWithLLM({ openaiClient, model, bot, currentLevel, profile, userGoal, dialogSummary })
+          );
+        } else {
+          chips = generatePersonalizedChips({
+            bot,
+            userId,
+            profile,
+            currentLevel,
+            userGoal,
+            recentQuestions,
+            userContext,
+            levelContext
+          });
+        }
+
+        // Применяем дедупликацию и лимиты
+        const dedupedChips = config.dailyDedup ? dedupChipsForUser(userId, bot, chips, config.sessionTtlMin) : chips;
+        const finalChips = limitChips(dedupedChips, config.maxCount);
+        
+        logChipsRendered(bot, finalChips);
+
+        return new Response(JSON.stringify({
+          chips: finalChips
+        }), {
+          status: 200,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json"
+          }
+        });
+      } catch (e) {
+        console.error('ERR chips_mode', { message: String(e).slice(0, 240) });
+        return new Response(JSON.stringify({
+          error: "chips_mode_error",
+          details: String(e).slice(0, 240)
+        }), {
+          status: 502,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json"
+          }
+        });
+      }
     }
     // ==============================
     // QUIZ MODE (short reply, no RAG)

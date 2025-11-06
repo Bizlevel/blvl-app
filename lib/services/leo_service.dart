@@ -538,6 +538,75 @@ class LeoService {
     }
   }
 
+  /// Получает персонализированные чипсы с сервера
+  Future<List<String>> fetchRecommendedChips({
+    required String bot, // 'leo' | 'max'
+    String? chatId,
+    String? userContext,
+    String? levelContext,
+  }) async {
+    final session = _client.auth.currentSession;
+    if (session == null) {
+      throw LeoFailure('Пользователь не авторизован');
+    }
+
+    return _withRetry(() async {
+      try {
+        final payload = jsonEncode({
+          'mode': 'chips',
+          'bot': bot,
+          'chatId': chatId,
+          'userContext': _clean(userContext),
+          'levelContext': _clean(levelContext),
+        });
+        
+        final response = await _postLeoChat(payload);
+        debugPrint('CHIPS http_status=${response.statusCode}');
+        try {
+          debugPrint('CHIPS http_body=${response.data}');
+        } catch (_) {}
+
+        if (response.statusCode == 200 && response.data is Map<String, dynamic>) {
+          final responseData = Map<String, dynamic>.from(response.data);
+          final chipsList = responseData['chips'];
+          if (chipsList is List) {
+            return chipsList.map((e) => e.toString()).toList();
+          }
+          return <String>[];
+        } else {
+          final message = (response.data is Map && response.data['error'] != null)
+              ? response.data['error'] as String
+              : 'Неизвестная ошибка получения чипсов';
+          throw LeoFailure(message);
+        }
+      } on DioException catch (e) {
+        try {
+          await Sentry.captureException(e);
+        } catch (_) {
+          debugPrint('DEBUG: Exception (Sentry not configured): $e');
+        }
+        if (e.error is SocketException) {
+          throw LeoFailure('Нет соединения с интернетом');
+        }
+        final parsed = _parseServerMessage(e.response?.data);
+        if (parsed != null) {
+          throw LeoFailure(_humanizeServerError(parsed));
+        }
+        if ((e.response?.statusCode ?? 0) >= 500) {
+          throw LeoFailure('Сервер временно недоступен. Попробуйте позже.');
+        }
+        throw LeoFailure('Сетевая ошибка при получении чипсов');
+      } catch (e) {
+        try {
+          await Sentry.captureException(e);
+        } catch (_) {
+          debugPrint('DEBUG: Exception (Sentry not configured): $e');
+        }
+        throw LeoFailure('Не удалось получить чипсы');
+      }
+    });
+  }
+
   /// Публичный метод для сохранения данных о стоимости AI запроса в таблицу ai_message
   /// Позволяет внешним компонентам сохранять данные о стоимости
   Future<void> saveAiMessageData({
