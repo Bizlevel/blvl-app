@@ -48,11 +48,12 @@ class _MotivationCardState extends ConsumerState<MotivationCard> {
                   return Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const CircleAvatar(
+                      CircleAvatar(
                         radius: 28,
                         backgroundImage:
-                            AssetImage('assets/images/avatars/avatar_max.png'),
-                        backgroundColor: Colors.transparent,
+                            const AssetImage('assets/images/avatars/avatar_max.png'),
+                        backgroundColor:
+                            AppColor.surface.withValues(alpha: 0.0),
                       ),
                       AppSpacing.gapW(16),
                       Expanded(
@@ -73,11 +74,12 @@ class _MotivationCardState extends ConsumerState<MotivationCard> {
                 return Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const CircleAvatar(
+                    CircleAvatar(
                       radius: 28,
                       backgroundImage:
-                          AssetImage('assets/images/avatars/avatar_max.png'),
-                      backgroundColor: Colors.transparent,
+                          const AssetImage('assets/images/avatars/avatar_max.png'),
+                      backgroundColor:
+                          AppColor.surface.withValues(alpha: 0.0),
                     ),
                     AppSpacing.gapW(16),
                     Expanded(
@@ -195,11 +197,12 @@ class _MotivationCardState extends ConsumerState<MotivationCard> {
               error: (_, __) => Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const CircleAvatar(
+                  CircleAvatar(
                     radius: 28,
                     backgroundImage:
-                        AssetImage('assets/images/avatars/avatar_max.png'),
-                    backgroundColor: Colors.transparent,
+                        const AssetImage('assets/images/avatars/avatar_max.png'),
+                    backgroundColor:
+                        AppColor.surface.withValues(alpha: 0.0),
                   ),
                   AppSpacing.gapW(16),
                   Expanded(

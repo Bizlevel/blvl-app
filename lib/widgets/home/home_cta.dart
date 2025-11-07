@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:bizlevel/theme/dimensions.dart';
+import 'package:bizlevel/theme/color.dart';
+import 'package:bizlevel/theme/spacing.dart';
 
 class HomeCta extends StatefulWidget {
   final String title;
@@ -57,24 +59,22 @@ class _HomeCtaState extends State<HomeCta> with SingleTickerProviderStateMixin {
                 child: Container(
                   height: height,
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [Color(0xFF4A90E2), Color(0xFF357ABD)],
-                    ),
+                    // fix: заменить градиент/тени на токены
+                    gradient: AppColor.businessGradient,
                     borderRadius: BorderRadius.circular(14),
                     boxShadow: const [
                       BoxShadow(
-                        color: Color(0x804285F4),
+                        color: AppColor.shadow,
                         blurRadius: 20,
                         offset: Offset(0, 6),
                       )
                     ],
                   ),
-                  padding: const EdgeInsets.all(16),
+                  // fix: spacing токен
+                  padding: const EdgeInsets.all(AppSpacing.lg),
                   child: Row(
                     children: [
-                      const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 24),
+                      const Icon(Icons.play_arrow_rounded, color: AppColor.onPrimary, size: 24),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Column(
@@ -85,18 +85,22 @@ class _HomeCtaState extends State<HomeCta> with SingleTickerProviderStateMixin {
                               widget.title.toUpperCase(),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 17,
-                              ),
+                              // fix: типографика через textTheme
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleLarge
+                                  ?.copyWith(color: AppColor.onPrimary),
                             ),
                             const SizedBox(height: 4),
                             Text(
                               widget.subtitle,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(color: Colors.white70, fontSize: 14),
+                              // fix: типографика через textTheme
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyMedium
+                                  ?.copyWith(color: AppColor.onPrimary.withValues(alpha: 0.85)),
                             ),
                           ],
                         ),

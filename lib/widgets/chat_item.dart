@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:bizlevel/theme/color.dart';
 import 'chat_notify.dart';
 import 'custom_image.dart';
+import 'package:bizlevel/theme/spacing.dart';
+import 'package:bizlevel/theme/dimensions.dart';
 
 class ChatItem extends StatefulWidget {
   const ChatItem(
@@ -44,14 +46,21 @@ class _ChatItemState extends State<ChatItem> {
           scale: _isHover ? 1.03 : 1.0,
           duration: const Duration(milliseconds: 120),
           child: Container(
-            margin: const EdgeInsets.only(bottom: 8),
-            padding: const EdgeInsets.fromLTRB(10, 12, 10, 10),
+            // fix: магические числа → AppSpacing
+            margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.itemSpacing,
+            ),
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(10),
+              // fix: хардкод цвета → AppColor.card / Theme.surface
+              color: AppColor.card,
+              // fix: радиус → AppDimensions
+              borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.grey.withValues(alpha: _isHover ? 0.2 : 0.1),
+                  // fix: тень → AppColor.shadow
+                  color: AppColor.shadow.withValues(alpha: _isHover ? 0.2 : 0.1),
                   spreadRadius: _isHover ? 2 : 1,
                   blurRadius: _isHover ? 4 : 1,
                   offset: const Offset(1, 1),
@@ -88,7 +97,8 @@ class _ChatItemState extends State<ChatItem> {
             widget.chatData['last_text'] ?? '',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 13),
+            // fix: inline типографика → Theme.textTheme
+            style: Theme.of(context).textTheme.bodyMedium,
           ),
         ),
         if (widget.isNotified)
@@ -117,7 +127,11 @@ class _ChatItemState extends State<ChatItem> {
         if (botLabel.isNotEmpty)
           Text(
             botLabel,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+            // fix: inline типографика → textTheme.labelMedium
+            style: Theme.of(context)
+                .textTheme
+                .labelMedium
+                ?.copyWith(fontWeight: FontWeight.w700),
           ),
       ],
     );
@@ -132,7 +146,11 @@ class _ChatItemState extends State<ChatItem> {
             widget.chatData['name'] ?? '',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+            // fix: inline типографика → textTheme.titleMedium
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(fontWeight: FontWeight.w700),
           ),
         ),
         const SizedBox(width: 5),
@@ -140,7 +158,11 @@ class _ChatItemState extends State<ChatItem> {
           widget.chatData['date'] ?? '',
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 11, color: Colors.grey),
+          // fix: inline типографика/цвет → textTheme + токен
+          style: Theme.of(context)
+              .textTheme
+              .labelSmall
+              ?.copyWith(color: AppColor.onSurfaceSubtle),
         ),
       ],
     );

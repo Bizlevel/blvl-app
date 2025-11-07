@@ -141,7 +141,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
             child: Container(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: AppColor.card,
                 boxShadow: [
                   BoxShadow(
                     color: AppColor.shadowColor.withValues(alpha: 0.08),

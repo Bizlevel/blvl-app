@@ -173,7 +173,7 @@ final nextLevelToContinueProvider =
   if (desiredNumber > maxLevel) {
     desiredNumber = maxLevel; // выход за пределы: ведём к последнему уровню
   }
-  Map<String, dynamic> candidate = levels.firstWhere(
+  final Map<String, dynamic> candidate = levels.firstWhere(
     (l) => (l['level'] as int? ?? -1) == desiredNumber,
     orElse: () => currentRow ?? levels.first,
   );

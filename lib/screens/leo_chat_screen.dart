@@ -177,9 +177,7 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
             decoration: BoxDecoration(
               color: AppColor.surface,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                  color: Colors.grey.shade300,
-                  width: 1),
+              border: Border.all(color: AppColor.borderSubtle),
               boxShadow: const [
                 BoxShadow(
                   color: AppColor.shadowColor,
@@ -194,7 +192,7 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
                 CircleAvatar(
                   radius: 32,
                   backgroundImage: AssetImage(avatar),
-                  backgroundColor: Colors.transparent,
+                  backgroundColor: AppColor.surface.withValues(alpha: 0.0),
                 ),
                 AppSpacing.gapW(12),
                 Expanded(
@@ -202,16 +200,20 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(name,
-                          style: const TextStyle(
-                              fontSize: 20, fontWeight: FontWeight.w600)),
+                          style: Theme.of(context)
+                              .textTheme
+                              .headlineSmall
+                              ?.copyWith(fontWeight: FontWeight.w600)),
                       AppSpacing.gapH(2),
                       Text(
                         subtitle,
                         maxLines: 2,
                         softWrap: true,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontSize: 13, color: AppColor.labelColor),
+                        style: Theme.of(context)
+                            .textTheme
+                            .labelMedium
+                            ?.copyWith(color: AppColor.labelColor),
                       ),
                       AppSpacing.gapH(8),
                       const Text(

@@ -130,16 +130,17 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
           padding: const EdgeInsets.all(16),
           children: [
             // Вводный блок
-            const BizLevelCard(
-              padding: EdgeInsets.all(12),
+            BizLevelCard(
+              padding: const EdgeInsets.all(12),
+              outlined: true,
               child: Row(
                 children: [
-                  GpBalanceWidget(),
-                  SizedBox(width: 12),
+                  const GpBalanceWidget(),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       'GP — внутренняя валюта BizLevel: 1 GP = 1 сообщение в чате тренеров, также GP открывают новые этажи.',
-                      style: TextStyle(fontSize: 14),
+                      style: Theme.of(context).textTheme.bodyMedium,
                       maxLines: 3,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -772,7 +773,10 @@ class _Ribbon extends StatelessWidget {
       ),
       child: Text(
         text,
-        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+        style: Theme.of(context)
+            .textTheme
+            .labelMedium
+            ?.copyWith(fontWeight: FontWeight.w600),
       ),
     );
   }

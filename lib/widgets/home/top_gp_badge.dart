@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:bizlevel/providers/gp_providers.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:bizlevel/theme/color.dart';
 
 class TopGpBadge extends ConsumerWidget {
   const TopGpBadge({super.key});
@@ -24,11 +25,12 @@ class TopGpBadge extends ConsumerWidget {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: const Color(0xFFFFA000),
+              // fix: цвет/тень → токены (тёплый акцент)
+              color: AppColor.warmAccent,
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFFFFA000).withValues(alpha: 0.25),
+                  color: AppColor.warmAccent.withValues(alpha: 0.25),
                   blurRadius: 8,
                   offset: const Offset(0, 2),
                 )
@@ -42,10 +44,11 @@ class TopGpBadge extends ConsumerWidget {
                 const SizedBox(width: 6),
                 Text(
                   '$balance',
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 16),
+                  // fix: типографика → textTheme + onPrimary
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleMedium
+                      ?.copyWith(color: AppColor.onPrimary, fontWeight: FontWeight.w700),
                 ),
               ],
             ),

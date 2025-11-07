@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:bizlevel/providers/goals_providers.dart';
+import 'package:bizlevel/theme/color.dart';
 
 class GoalHistoryScreen extends ConsumerWidget {
   const GoalHistoryScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    int limit = 100;
+    const int limit = 100;
     final itemsAsync = ref.watch(practiceLogWithLimitProvider(limit));
     return Scaffold(
       appBar: AppBar(title: const Text('История применений')),
@@ -53,7 +54,7 @@ class GoalHistoryScreen extends ConsumerWidget {
                   final ts = (m['applied_at'] ?? '').toString();
                   return ListTile(
                     leading: const Icon(Icons.check_circle_outline,
-                        color: Colors.blueGrey),
+                        color: AppColor.success),
                     title: Text(tools.isEmpty ? 'Без метки' : tools.join(', ')),
                     subtitle: Text(note),
                     trailing: Text(ts.split('T').first),

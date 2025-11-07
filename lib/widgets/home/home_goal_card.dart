@@ -19,21 +19,22 @@ class HomeGoalCard extends ConsumerWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: () => context.go('/goal'),
-          borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(AppDimensions.radiusXl),
           child: Container(
             constraints: const BoxConstraints(
                 minHeight: AppDimensions.homeGoalMinHeight),
-            padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x14000000),
-                  blurRadius: 16,
-                  offset: Offset(0, 4),
-                )
-              ],
+          // fix: цвета/радиусы/тени → токены
+          color: AppColor.card,
+          borderRadius: BorderRadius.circular(AppDimensions.radiusXl),
+          boxShadow: const [
+            BoxShadow(
+              color: AppColor.shadow,
+              blurRadius: 16,
+              offset: Offset(0, 4),
+            )
+          ],
             ),
             child: goalAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
@@ -76,7 +77,8 @@ class HomeGoalCard extends ConsumerWidget {
                     Container(
                       height: 8,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFE8F0FE),
+                        // fix: фон прогресса → AppColor.backgroundInfo
+                        color: AppColor.backgroundInfo,
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Align(
@@ -85,10 +87,8 @@ class HomeGoalCard extends ConsumerWidget {
                           widthFactor: (progress).clamp(0.0, 1.0),
                           child: Container(
                             decoration: BoxDecoration(
-                              gradient: const LinearGradient(colors: [
-                                Color(0xFF4A90E2),
-                                Color(0xFF5BC1FF)
-                              ]),
+                              // fix: градиент прогресса → AppColor.businessGradient
+                              gradient: AppColor.businessGradient,
                               borderRadius: BorderRadius.circular(4),
                             ),
                           ),
@@ -100,26 +100,25 @@ class HomeGoalCard extends ConsumerWidget {
                       goalText.isEmpty ? 'Цель не задана' : goalText,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          fontSize: 15,
-                          height: 22 / 15,
-                          color: AppColor.textColor),
+                      // fix: inline типографика → Theme.textTheme.bodyMedium
+                      style: Theme.of(context).textTheme.bodyMedium,
                     ),
                     const SizedBox(height: 12),
                     if (daysLeft != null)
                       Row(
                         children: [
-                          const Text('⏱ ', style: TextStyle(fontSize: 16)),
+                          // emoji может остаться, шрифт через textTheme
+                          Text('⏱ ', style: Theme.of(context).textTheme.titleMedium),
                           Text(
                             daysLeft < 0
                                 ? 'Дедлайн прошёл'
                                 : 'Осталось $daysLeft дней',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: daysLeft < 0
-                                  ? const Color(0xFFE11D48)
-                                  : const Color(0xFF7F8C8B),
-                            ),
+                            // fix: inline типографика/цвет → textTheme + токены
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                  color: daysLeft < 0
+                                      ? AppColor.error
+                                      : AppColor.onSurfaceSubtle,
+                                ),
                           ),
                         ],
                       ),

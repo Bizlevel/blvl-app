@@ -48,6 +48,6 @@ Alignment _alignmentForColumn(int col) {
 
 // Утилита затемнения цвета (используется в плитке уровня)
 Color _darker(Color c, double t) {
-  final lerped = Color.lerp(c, Colors.black, t);
+  final lerped = Color.lerp(c, AppColor.textColor, t);
   return lerped ?? c;
 }

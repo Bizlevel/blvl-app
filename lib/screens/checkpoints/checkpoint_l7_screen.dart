@@ -205,11 +205,10 @@ class _CheckpointHeader extends StatelessWidget {
             ),
             child: Text(
               title,
-              style: const TextStyle(
-                color: AppColor.onSurface,
-                fontWeight: FontWeight.w600,
-                fontSize: 12,
-              ),
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: AppColor.onSurface,
+                    fontWeight: FontWeight.w600,
+                  ),
             ),
           ),
         ],

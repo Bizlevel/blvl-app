@@ -101,7 +101,7 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                               Text(
                                 daysLeft < 0
                                     ? 'Дедлайн прошёл'
-                                    : 'Осталось ${daysLeft} дн.',
+                                    : 'Осталось $daysLeft дн.',
                                 style: Theme.of(context)
                                     .textTheme
                                     .titleMedium
@@ -129,7 +129,7 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                   padding: EdgeInsets.only(bottom: 8),
                   child: Row(
                     children: [
-                      Icon(Icons.flag_outlined, color: Colors.black54),
+                      Icon(Icons.flag_outlined, color: AppColor.onSurfaceSubtle),
                       SizedBox(width: 8),
                       Expanded(
                           child: Text(
@@ -159,6 +159,7 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                       decoration: InputDecoration(
                         labelText: 'Дедлайн (YYYY-MM-DD) — необязательно',
                         suffixIcon: IconButton(
+                          tooltip: 'Выбрать дату',
                           icon: const Icon(Icons.calendar_today),
                           onPressed: () async {
                             final now = DateTime.now();
@@ -211,9 +212,9 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                           goalText: _goalCtrl.text.trim(),
                           targetDate: _selectedTargetDate,
                         );
+                        if (!context.mounted) return;
                         final messenger = ScaffoldMessenger.of(context);
                         ref.invalidate(userGoalProvider);
-                        if (!context.mounted) return;
                         setState(() => _isEditing = false);
                         messenger.showSnackBar(
                             const SnackBar(content: Text('Цель сохранена')));
@@ -271,11 +272,11 @@ class _GoalProgressCircle extends StatelessWidget {
     // Подбор мягкого градиента по фазе прогресса
     List<Color> colors;
     if (clamped < 0.31) {
-      colors = const [Color(0xFFF59E0B), Color(0xFFFB923C)]; // тёплый старт
+      colors = AppColor.warmGradient.colors; // тёплый старт
     } else if (clamped < 0.71) {
-      colors = const [Color(0xFFFB923C), Color(0xFF7C3AED)]; // работа
+      colors = AppColor.achievementGradient.colors; // работа
     } else {
-      colors = const [Color(0xFF7C3AED), Color(0xFF10B981)]; // финиш
+      colors = AppColor.growthGradient.colors; // финиш
     }
     return SizedBox(
       width: 72,
@@ -310,5 +311,8 @@ class _GoalProgressCircle extends StatelessWidget {
 // Простая обёртка, чтобы прокинуть цвет в индикатор (без кастомного painter)
 class _GradientColor extends Color {
   final List<Color> colors;
+  // Используем значение первого цвета как прокси для Color — линтер ругается из-за value,
+  // но нам нужен только числовой ARGB для базового Color. Градиент остаётся в логике выше.
+  // ignore: deprecated_member_use
   _GradientColor({required this.colors}) : super(colors.first.value);
 }

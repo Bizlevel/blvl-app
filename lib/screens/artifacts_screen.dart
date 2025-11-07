@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:bizlevel/widgets/common/bizlevel_button.dart';
+import 'package:bizlevel/widgets/common/bizlevel_card.dart';
 
 /// Экран «Артефакты» (этап 1: каркас и маршрут)
 /// Далее будет добавлена сетка 3xN и просмотр карточек.
@@ -163,9 +164,9 @@ class _CollectedBadge extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.15),
+        color: AppColor.glassTextColor.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+        border: Border.all(color: AppColor.glassTextColor.withValues(alpha: 0.3)),
       ),
       child: SizedBox(
         width:
@@ -182,9 +183,9 @@ class _CollectedBadge extends ConsumerWidget {
                 borderRadius: BorderRadius.circular(3),
                 child: LinearProgressIndicator(
                   value: progress.clamp(0.0, 1.0),
-                  backgroundColor: Colors.white.withValues(alpha: 0.15),
+                  backgroundColor: AppColor.glassTextColor.withValues(alpha: 0.15),
                   valueColor: AlwaysStoppedAnimation<Color>(
-                    Colors.white.withValues(alpha: 0.9),
+                    AppColor.glassTextColor.withValues(alpha: 0.9),
                   ),
                 ),
               ),
@@ -268,7 +269,7 @@ class _ArtifactTileState extends State<_ArtifactTile> {
                     Navigator.of(context).push(
                       PageRouteBuilder(
                         opaque: false,
-                        barrierColor: Colors.black.withValues(alpha: 0.85),
+                        barrierColor: AppColor.surfaceDark.withValues(alpha: 0.85),
                         pageBuilder: (ctx, _, __) => _ArtifactFullscreen(
                           front: widget.front!,
                           back: widget.back!,
@@ -278,7 +279,7 @@ class _ArtifactTileState extends State<_ArtifactTile> {
                   },
             child: Container(
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: AppColor.card,
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
@@ -329,7 +330,7 @@ class _ArtifactTileState extends State<_ArtifactTile> {
                               child: const Text(
                                 'NEW',
                                 style: TextStyle(
-                                  color: Colors.white,
+                                  color: AppColor.glassTextColor,
                                   fontSize: 10,
                                   fontWeight: FontWeight.w700,
                                 ),
@@ -338,11 +339,11 @@ class _ArtifactTileState extends State<_ArtifactTile> {
                           ),
                         if (widget.isLocked) ...[
                           Container(
-                              color: Colors.black.withValues(alpha: 0.35)),
+                              color: AppColor.surfaceDark.withValues(alpha: 0.35)),
                           const Positioned(
                             right: 8,
                             top: 8,
-                            child: Icon(Icons.lock, color: Colors.white),
+                            child: Icon(Icons.lock, color: AppColor.glassTextColor),
                           ),
                           Positioned(
                             left: 8,
@@ -352,14 +353,14 @@ class _ArtifactTileState extends State<_ArtifactTile> {
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 8, vertical: 6),
                               decoration: BoxDecoration(
-                                color: Colors.black.withValues(alpha: 0.45),
+                                color: AppColor.surfaceDark.withValues(alpha: 0.45),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
                                   'Откроется после Уровня ${widget.level}',
                                   textAlign: TextAlign.center,
                                   style: const TextStyle(
-                                      color: Colors.white, fontSize: 12)),
+                                      color: AppColor.glassTextColor, fontSize: 12)),
                             ),
                           ),
                           Positioned(
@@ -371,11 +372,11 @@ class _ArtifactTileState extends State<_ArtifactTile> {
                               child: Semantics(
                                 label: 'Перейти к Башне',
                                 button: true,
-                                child: ElevatedButton(
+                        child: ElevatedButton(
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor:
-                                        Colors.white.withValues(alpha: 0.9),
-                                    foregroundColor: Colors.black,
+                            backgroundColor:
+                                AppColor.glassTextColor.withValues(alpha: 0.9),
+                            foregroundColor: AppColor.textColor,
                                     padding: const EdgeInsets.symmetric(
                                         horizontal: 12, vertical: 10),
                                   ),
@@ -394,18 +395,18 @@ class _ArtifactTileState extends State<_ArtifactTile> {
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
-                                color: Colors.black.withValues(alpha: 0.5),
+                                color: AppColor.surfaceDark.withValues(alpha: 0.5),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: const Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Icon(Icons.touch_app,
-                                      color: Colors.white, size: 14),
+                                      color: AppColor.glassTextColor, size: 14),
                                   SizedBox(width: 4),
                                   Text('Тапните',
                                       style: TextStyle(
-                                          color: Colors.white, fontSize: 12)),
+                                          color: AppColor.glassTextColor, fontSize: 12)),
                                 ],
                               ),
                             ),
@@ -534,7 +535,7 @@ class _ArtifactFullscreenState extends State<_ArtifactFullscreen>
       onVerticalDragUpdate: _onVerticalDragUpdate,
       onVerticalDragEnd: _onVerticalDragEnd,
       child: Scaffold(
-        backgroundColor: Colors.black.withValues(alpha: 0.85),
+        backgroundColor: AppColor.surfaceDark.withValues(alpha: 0.85),
         body: SafeArea(
           child: Stack(
             children: [
@@ -555,12 +556,12 @@ class _ArtifactFullscreenState extends State<_ArtifactFullscreen>
                       transform: Matrix4.identity()
                         ..setEntry(3, 2, 0.0012)
                         ..rotateY(displayAngle),
-                      child: Container(
+                        child: Container(
                         constraints: const BoxConstraints(maxWidth: 900),
                         decoration: BoxDecoration(
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.25),
+                              color: AppColor.surfaceDark.withValues(alpha: 0.25),
                               blurRadius: 20,
                               spreadRadius: 2,
                             )
@@ -579,7 +580,8 @@ class _ArtifactFullscreenState extends State<_ArtifactFullscreen>
                 top: 8,
                 right: 8,
                 child: IconButton(
-                  icon: const Icon(Icons.close, color: Colors.white),
+                  tooltip: 'Закрыть',
+                  icon: const Icon(Icons.close, color: AppColor.glassTextColor),
                   onPressed: () => Navigator.of(context).pop(),
                 ),
               ),
@@ -595,18 +597,19 @@ class _ArtifactFullscreenState extends State<_ArtifactFullscreen>
                         padding: const EdgeInsets.symmetric(
                             horizontal: 12, vertical: 8),
                         decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.45),
+                          // fix: dark mode friendly overlay
+                          color: AppColor.surfaceDark.withValues(alpha: 0.45),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: const Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(Icons.touch_app,
-                                color: Colors.white, size: 16),
+                                color: AppColor.glassTextColor, size: 16),
                             SizedBox(width: 6),
                             Text('Тапните или кнопка ниже',
                                 style: TextStyle(
-                                    color: Colors.white, fontSize: 13)),
+                                    color: AppColor.glassTextColor, fontSize: 13)),
                           ],
                         ),
                       ),
@@ -652,11 +655,11 @@ class _ArtifactsSkeletonGrid extends StatelessWidget {
           itemCount: 8,
           itemBuilder: (context, index) {
             return Shimmer.fromColors(
-              baseColor: Colors.grey.shade300,
-              highlightColor: Colors.grey.shade100,
+              baseColor: AppColor.borderSubtle,
+              highlightColor: AppColor.borderStrong,
               child: Container(
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: AppColor.card,
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
@@ -675,20 +678,8 @@ class _ArtifactsEmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
-      child: Container(
-        width: double.infinity,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: AppColor.shadowColor.withValues(alpha: 0.06),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        padding: const EdgeInsets.all(16),
+      child: BizLevelCard(
+        outlined: true,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
