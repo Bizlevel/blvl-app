@@ -118,6 +118,16 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
     return Scaffold(
       appBar: AppBar(
         centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
+          tooltip: 'Назад к Главной',
+          onPressed: () {
+            try {
+              // Возврат на Главный экран
+              Navigator.of(context).maybePop();
+            } catch (_) {}
+          },
+        ),
         title: const Text('Цель'),
       ),
       bottomNavigationBar: LayoutBuilder(

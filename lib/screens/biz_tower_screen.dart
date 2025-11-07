@@ -77,15 +77,6 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
     return Scaffold(
       appBar: AppBar(
         centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded),
-          tooltip: 'Главная улица',
-          onPressed: () {
-            try {
-              GoRouter.of(context).go('/home');
-            } catch (_) {}
-          },
-        ),
         title: const Column(
           mainAxisSize: MainAxisSize.min,
           children: [

@@ -19,7 +19,6 @@ class LeoChatScreen extends ConsumerStatefulWidget {
 }
 
 class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
-  String _activeBot = 'leo'; // 'leo' | 'max'
   late Future<void> _loadFuture;
   // int _messagesLeft = 0; // удалено из UI, поле оставлено закомментированным для возможного возврата
   List<Map<String, dynamic>> _chats = [];
@@ -38,7 +37,6 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
       final chatsFuture = Supabase.instance.client
           .from('leo_chats')
           .select('id, title, updated_at, message_count, bot')
-          .eq('bot', _activeBot)
           .gt('message_count', 0)
           .order('updated_at', ascending: false);
 
@@ -61,23 +59,7 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('База тренеров')),
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: AppColor.primary,
-        onPressed: _onNewChat,
-        icon: CircleAvatar(
-          radius: 12,
-          backgroundImage: AssetImage(_activeBot == 'max'
-              ? 'assets/images/avatars/avatar_max.png'
-              : 'assets/images/avatars/avatar_leo.png'),
-          backgroundColor: Colors.transparent,
-        ),
-        label: Text(
-          _activeBot == 'max' ? 'Новый чат с Максом' : 'Новый чат с Лео',
-          style: const TextStyle(
-              color: AppColor.onPrimary, fontWeight: FontWeight.w600),
-        ),
-      ),
+      appBar: AppBar(title: const Text('Менторы')),
       body: FutureBuilder<void>(
         future: _loadFuture,
         builder: (context, snapshot) {
@@ -119,11 +101,18 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
         final formattedDate =
             '${dt.day.toString().padLeft(2, '0')}.${dt.month.toString().padLeft(2, '0')}';
 
+        final String bot = (chat['bot'] as String?)?.toLowerCase() == 'max' ? 'max' : 'leo';
+        final String botLabel = bot == 'max' ? 'Max AI' : 'Leo AI';
+        final String avatarPath = bot == 'max'
+            ? 'assets/images/avatars/avatar_max.png'
+            : 'assets/images/avatars/avatar_leo.png';
+
         final chatData = {
           'name': chat['title'] ?? 'Диалог',
           'last_text': '${chat['message_count']} сообщений',
           'date': formattedDate,
-          // без image, чтобы не отображать иконку в списке
+          'image': avatarPath,
+          'botLabel': botLabel,
           'notify': 0,
         };
         return ChatItem(
@@ -141,7 +130,7 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
                   chatId: chat['id'],
                   userContext: userCtx,
                   levelContext: lvlCtx,
-                  bot: _activeBot,
+                  bot: bot,
                 );
                   }
                 ),
@@ -153,7 +142,7 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
     );
   }
 
-  void _onNewChat() {
+  void _onNewChat(String bot) {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => FutureBuilder<List<String?>>( 
@@ -164,7 +153,7 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
             return LeoDialogScreen(
               userContext: userCtx,
               levelContext: lvlCtx,
-              bot: _activeBot,
+              bot: bot,
             );
           },
         ),
@@ -178,24 +167,19 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
         required String name,
         required String subtitle,
         required String avatar}) {
-      final bool active = _activeBot == bot;
       return Expanded(
         child: GestureDetector(
-          onTap: () {
-            if (_activeBot == bot) return;
-            setState(() => _activeBot = bot);
-            _loadData();
-          },
+          onTap: () => _onNewChat(bot),
           child: Container(
             padding: AppSpacing.insetsAll(12),
             margin: AppSpacing.insetsSymmetric(h: 6),
-            constraints: const BoxConstraints(minHeight: 100),
+            constraints: const BoxConstraints(minHeight: 128),
             decoration: BoxDecoration(
-              color: active ? AppColor.surface : AppColor.surface,
+              color: AppColor.surface,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                  color: active ? AppColor.primary : Colors.grey.shade300,
-                  width: active ? 2 : 1),
+                  color: Colors.grey.shade300,
+                  width: 1),
               boxShadow: const [
                 BoxShadow(
                   color: AppColor.shadowColor,
@@ -208,7 +192,7 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 CircleAvatar(
-                  radius: 22,
+                  radius: 32,
                   backgroundImage: AssetImage(avatar),
                   backgroundColor: Colors.transparent,
                 ),
@@ -219,7 +203,7 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
                     children: [
                       Text(name,
                           style: const TextStyle(
-                              fontSize: 18, fontWeight: FontWeight.w600)),
+                              fontSize: 20, fontWeight: FontWeight.w600)),
                       AppSpacing.gapH(2),
                       Text(
                         subtitle,
@@ -227,7 +211,15 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
                         softWrap: true,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                            fontSize: 12, color: AppColor.labelColor),
+                            fontSize: 13, color: AppColor.labelColor),
+                      ),
+                      AppSpacing.gapH(8),
+                      const Text(
+                        'Начать чат',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: AppColor.primary,
+                        ),
                       ),
                     ],
                   ),

@@ -28,6 +28,7 @@ class _ChatItemState extends State<ChatItem> {
   @override
   Widget build(BuildContext context) {
     final String imagePath = widget.chatData['image'] as String? ?? '';
+    final String botLabel = widget.chatData['botLabel'] as String? ?? '';
     final bool showPhoto = imagePath.isNotEmpty;
 
     return MouseRegion(
@@ -59,7 +60,7 @@ class _ChatItemState extends State<ChatItem> {
             ),
             child: Row(
               children: [
-                if (showPhoto) _buildPhoto(imagePath),
+                if (showPhoto) _buildPhoto(imagePath, botLabel),
                 if (showPhoto) const SizedBox(width: 10),
                 Expanded(
                   child: Column(
@@ -103,11 +104,22 @@ class _ChatItemState extends State<ChatItem> {
     );
   }
 
-  Widget _buildPhoto(String imagePath) {
-    return CustomImage(
-      imagePath,
-      width: widget.profileSize,
-      height: widget.profileSize,
+  Widget _buildPhoto(String imagePath, String botLabel) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        CustomImage(
+          imagePath,
+          width: widget.profileSize,
+          height: widget.profileSize,
+        ),
+        const SizedBox(height: 4),
+        if (botLabel.isNotEmpty)
+          Text(
+            botLabel,
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+          ),
+      ],
     );
   }
 
