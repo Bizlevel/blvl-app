@@ -45,111 +45,49 @@ class _MotivationCardState extends ConsumerState<MotivationCard> {
             child: quoteAsync.when(
               data: (q) {
                 if (q == null) {
-                  return Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      CircleAvatar(
-                        radius: 28,
-                        backgroundImage:
-                            const AssetImage('assets/images/avatars/avatar_max.png'),
-                        backgroundColor:
-                            AppColor.surface.withValues(alpha: 0.0),
-                      ),
-                      AppSpacing.gapW(16),
-                      Expanded(
-                        child: Text(
-                          'Цитата недоступна',
-                          style:
-                              Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                    color: AppColor.labelColor,
-                                    height: 1.4,
-                                  ),
+                  return Text(
+                    'Цитата недоступна',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: AppColor.labelColor,
+                          height: 1.4,
                         ),
-                      )
-                    ],
                   );
                 }
                 final text = (q['quote_text'] as String?) ?? '';
                 final String? author = q['author'] as String?;
-                return Row(
+                return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    CircleAvatar(
-                      radius: 28,
-                      backgroundImage:
-                          const AssetImage('assets/images/avatars/avatar_max.png'),
-                      backgroundColor:
-                          AppColor.surface.withValues(alpha: 0.0),
+                    Text(
+                      'Мотивация',
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w600),
                     ),
-                    AppSpacing.gapW(16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          LayoutBuilder(
-                            builder: (context, constraints) {
-                              final isDesktop = constraints.maxWidth > 600;
-                              return Text(
-                                'Мотивация от Макса',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .titleMedium
-                                    ?.copyWith(
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: isDesktop
-                                          ? (Theme.of(context)
-                                                      .textTheme
-                                                      .titleMedium
-                                                      ?.fontSize ??
-                                                  16) +
-                                              1
-                                          : null,
-                                    ),
-                              );
-                            },
+                    AppSpacing.gapH(8),
+                    Text(
+                      '"$text"',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            fontStyle: FontStyle.italic,
+                            height: 1.4,
                           ),
-                          AppSpacing.gapH(8),
-                          Text(
-                            '"$text"',
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodyMedium
-                                ?.copyWith(
-                                  fontStyle: FontStyle.italic,
-                                  height: 1.4,
-                                ),
-                            // Показываем полный текст без обрезки
-                          ),
-                          AppSpacing.gapH(4),
-                          if (author != null && author.isNotEmpty)
-                            Text(
-                              '— $author',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.copyWith(
-                                    color: AppColor.primary,
-                                    fontWeight: FontWeight.w500,
-                                  ),
+                    ),
+                    AppSpacing.gapH(4),
+                    if (author != null && author.isNotEmpty)
+                      Text(
+                        '— $author',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: AppColor.primary,
+                              fontWeight: FontWeight.w500,
                             ),
-                        ],
                       ),
-                    ),
                   ],
                 );
               },
               loading: () => Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    width: 56,
-                    height: 56,
-                    decoration: const BoxDecoration(
-                      color: AppColor.dividerColor,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  AppSpacing.gapW(16),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -194,27 +132,12 @@ class _MotivationCardState extends ConsumerState<MotivationCard> {
                   ),
                 ],
               ),
-              error: (_, __) => Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  CircleAvatar(
-                    radius: 28,
-                    backgroundImage:
-                        const AssetImage('assets/images/avatars/avatar_max.png'),
-                    backgroundColor:
-                        AppColor.surface.withValues(alpha: 0.0),
-                  ),
-                  AppSpacing.gapW(16),
-                  Expanded(
-                    child: Text(
-                      'Цитата недоступна',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: AppColor.labelColor,
-                            height: 1.4,
-                          ),
+              error: (_, __) => Text(
+                'Цитата недоступна',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AppColor.labelColor,
+                      height: 1.4,
                     ),
-                  )
-                ],
               ),
             ),
           ),

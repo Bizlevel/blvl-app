@@ -388,15 +388,23 @@ class GpService {
     required String platform,
     required String productId,
     required String token,
+    String? packageName,
   }) async {
     final session = _client.auth.currentSession;
     if (session == null) throw GpFailure('Не авторизован');
     try {
-      return await _postVerify(session, body: {
+      final body = <String, dynamic>{
         'platform': platform,
         'product_id': productId,
-        'token': token
-      });
+        'token': token,
+      };
+      // Для Android передаём фактическое имя пакета, чтобы исключить рассинхрон с env
+      if (platform == 'android' &&
+          packageName != null &&
+          packageName.isNotEmpty) {
+        body['package_name'] = packageName;
+      }
+      return await _postVerify(session, body: body);
     } on DioException catch (e) {
       if (e.error is SocketException) {
         throw GpFailure('Нет соединения с интернетом');
@@ -418,6 +426,15 @@ class GpService {
       final m = Map<String, dynamic>.from(resp.data);
       return (m['balance_after'] as num?)?.toInt() ?? 0;
     }
+    // Попробуем отдать код ошибки от Edge (например: google_purchase_failed, android_package_missing)
+    try {
+      final data = resp.data;
+      if (data is Map &&
+          data['error'] is String &&
+          (data['error'] as String).isNotEmpty) {
+        throw GpFailure('Ошибка подтверждения: ${data['error']}');
+      }
+    } catch (_) {}
     throw GpFailure('Не удалось подтвердить покупку');
   }
 

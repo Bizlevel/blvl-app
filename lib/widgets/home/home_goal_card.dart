@@ -6,6 +6,10 @@ import 'package:bizlevel/theme/dimensions.dart';
 import 'package:bizlevel/providers/goals_providers.dart';
 import 'package:bizlevel/providers/goals_repository_provider.dart';
 import 'package:bizlevel/screens/leo_dialog_screen.dart';
+import 'package:bizlevel/widgets/common/bizlevel_button.dart';
+import 'package:bizlevel/widgets/common/donut_progress.dart';
+import 'package:intl/intl.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 
 class HomeGoalCard extends ConsumerWidget {
   const HomeGoalCard({super.key});
@@ -19,162 +23,175 @@ class HomeGoalCard extends ConsumerWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: () => context.go('/goal'),
-      borderRadius: BorderRadius.circular(AppDimensions.radiusXl),
+          borderRadius: BorderRadius.circular(AppDimensions.radiusXl),
           child: Container(
             constraints: const BoxConstraints(
                 minHeight: AppDimensions.homeGoalMinHeight),
-        padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-          // fix: цвета/радиусы/тени → токены
-          color: AppColor.card,
-          borderRadius: BorderRadius.circular(AppDimensions.radiusXl),
-          boxShadow: const [
-            BoxShadow(
-              color: AppColor.shadow,
-              blurRadius: 16,
-              offset: Offset(0, 4),
-            )
-          ],
+              // fix: цвета/радиусы/тени → токены
+              color: AppColor.card,
+              borderRadius: BorderRadius.circular(AppDimensions.radiusXl),
+              boxShadow: const [
+                BoxShadow(
+                  color: AppColor.shadow,
+                  blurRadius: 16,
+                  offset: Offset(0, 4),
+                )
+              ],
             ),
             child: goalAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (_, __) => const Text('Не удалось загрузить цель'),
               data: (goal) {
                 final repo = ref.read(goalsRepositoryProvider);
-                final progress = repo.computeGoalProgressPercent(goal) ?? 0.0;
-                final percent = (progress * 100).clamp(0, 100).round();
+                final double? progress = repo.computeGoalProgressPercent(goal);
                 final String goalText = (goal?['goal_text'] ?? '').toString();
 
-                int? daysLeft;
+                DateTime? targetDate;
                 try {
                   final td = (goal?['target_date']?.toString());
-                  final dt =
+                  targetDate =
                       td == null ? null : DateTime.tryParse(td)?.toLocal();
-                  if (dt != null) {
-                    daysLeft = dt.difference(DateTime.now()).inDays;
-                  }
                 } catch (_) {}
 
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        const Text('🎯 МОЯ ЦЕЛЬ',
-                            style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: AppColor.textColor)),
-                        const Spacer(),
-                        Text('$percent%',
-                            style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w700,
-                                color: AppColor.premium)),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Container(
-                      height: 8,
-                      decoration: BoxDecoration(
-                        // fix: фон прогресса → AppColor.backgroundInfo
-                        color: AppColor.backgroundInfo,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: FractionallySizedBox(
-                          widthFactor: (progress).clamp(0.0, 1.0),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              // fix: градиент прогресса → AppColor.businessGradient
-                              gradient: AppColor.businessGradient,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      goalText.isEmpty ? 'Цель не задана' : goalText,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      // fix: inline типографика → Theme.textTheme.bodyMedium
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                    const SizedBox(height: 12),
-                    if (daysLeft != null)
-                      Row(
+                    // Левая колонка: текст и дата/прогресс
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // emoji может остаться, шрифт через textTheme
-                          Text('⏱ ', style: Theme.of(context).textTheme.titleMedium),
                           Text(
-                            daysLeft < 0
-                                ? 'Дедлайн прошёл'
-                                : 'Осталось $daysLeft дней',
-                            // fix: inline типографика/цвет → textTheme + токены
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                  color: daysLeft < 0
-                                      ? AppColor.error
-                                      : AppColor.onSurfaceSubtle,
+                            'Моя цель',
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(fontWeight: FontWeight.w600),
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            goalText.isEmpty ? 'Цель не задана' : goalText,
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                          const SizedBox(height: 10),
+                          if (targetDate != null)
+                            Row(
+                              children: [
+                                Text('⏱ ',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium),
+                                Text(
+                                  targetDate.isBefore(DateTime.now())
+                                      ? 'Поставить новый дедлайн'
+                                      : 'до ${DateFormat('dd.MM.yyyy').format(targetDate)}',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodyMedium
+                                      ?.copyWith(
+                                          color: targetDate
+                                                  .isBefore(DateTime.now())
+                                              ? AppColor.error
+                                              : AppColor.onSurfaceSubtle),
                                 ),
+                              ],
+                            ),
+                          if (progress == null) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              'Добавьте метрику (тип, текущее и целевое значение), чтобы видеть прогресс.',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .labelMedium
+                                  ?.copyWith(color: AppColor.onSurfaceSubtle),
+                            ),
+                          ],
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: BizLevelButton(
+                                  icon: const Icon(Icons.add_circle_outline,
+                                      size: 18),
+                                  label: 'Действие к цели',
+                                  onPressed: () {
+                                    try {
+                                      Sentry.addBreadcrumb(Breadcrumb(
+                                        category: 'ui.tap',
+                                        message: 'home_goal_action_tap',
+                                        level: SentryLevel.info,
+                                      ));
+                                    } catch (_) {}
+                                    context.go('/goal');
+                                  },
+                                  variant: BizLevelButtonVariant.secondary,
+                                  size: BizLevelButtonSize.md,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: BizLevelButton(
+                                  icon: const Icon(Icons.chat_bubble_outline,
+                                      size: 18),
+                                  label: 'Обсудить с Максом',
+                                  onPressed: () {
+                                    try {
+                                      Sentry.addBreadcrumb(Breadcrumb(
+                                        category: 'ui.tap',
+                                        message: 'home_goal_max_tap',
+                                        level: SentryLevel.info,
+                                      ));
+                                    } catch (_) {}
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) => LeoDialogScreen(
+                                          bot: 'max',
+                                          userContext: [
+                                            if (goalText.isNotEmpty)
+                                              'goal_text: $goalText',
+                                            if ((goal?['metric_type'] ?? '')
+                                                .toString()
+                                                .trim()
+                                                .isNotEmpty)
+                                              'metric_type: ${(goal?['metric_type']).toString()}',
+                                            if ((goal?['metric_current'] ?? '')
+                                                .toString()
+                                                .trim()
+                                                .isNotEmpty)
+                                              'metric_current: ${(goal?['metric_current']).toString()}',
+                                            if ((goal?['metric_target'] ?? '')
+                                                .toString()
+                                                .trim()
+                                                .isNotEmpty)
+                                              'metric_target: ${(goal?['metric_target']).toString()}',
+                                            if ((goal?['target_date'] ?? '')
+                                                .toString()
+                                                .trim()
+                                                .isNotEmpty)
+                                              'target_date: ${(goal?['target_date']).toString()}',
+                                          ].join('\n'),
+                                          levelContext: '',
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  variant: BizLevelButtonVariant.primary,
+                                  size: BizLevelButtonSize.md,
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Semantics(
-                            label: 'Открыть журнал применений',
-                            button: true,
-                            child: OutlinedButton(
-                              onPressed: () => context.go('/goal'),
-                              style: OutlinedButton.styleFrom(
-                                minimumSize: const Size(0, 36),
-                                side: const BorderSide(color: AppColor.border),
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10)),
-                                foregroundColor: AppColor.primary,
-                              ),
-                              child: const Text('📝 Прогресс'),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Semantics(
-                            label: 'Обсудить цель с тренером Максом',
-                            button: true,
-                            child: OutlinedButton(
-                              onPressed: () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => LeoDialogScreen(
-                                      bot: 'max',
-                                      userContext: [
-                                        if (goalText.isNotEmpty)
-                                          'goal_text: $goalText'
-                                      ].join('\n'),
-                                      levelContext: '',
-                                    ),
-                                  ),
-                                );
-                              },
-                              style: OutlinedButton.styleFrom(
-                                minimumSize: const Size(0, 36),
-                                side: const BorderSide(color: AppColor.border),
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10)),
-                                foregroundColor: AppColor.primary,
-                              ),
-                              child: const Text('💬 Макс'),
-                            ),
-                          ),
-                        ),
-                      ],
                     ),
+                    const SizedBox(width: 16),
+                    // Правая колонка: донат‑прогресс
+                    if (progress != null)
+                      DonutProgress(value: progress.clamp(0.0, 1.0)),
                   ],
                 );
               },

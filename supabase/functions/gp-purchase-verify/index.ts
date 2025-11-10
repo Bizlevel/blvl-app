@@ -11,6 +11,8 @@ type VerifyRequest = {
   platform?: "ios" | "android";
   product_id?: string;
   token?: string; // iOS: base64 receipt-data; Android: purchaseToken
+  // Android package name (optional, overrides env ANDROID_PACKAGE_NAME)
+  package_name?: string;
   // Web
   purchase_id?: string; // uuid (string)
 };
@@ -27,6 +29,20 @@ const PRODUCT_TO_GP: Record<string, number> = {
   bizlevelgp_1000: 1400, // в магазине отображается как 1000 + 400 бонус
   bizlevelgp_2000: 3000,
 };
+
+function extractUserJwt(req: Request): string | null {
+  const h = req.headers;
+  const x = (h.get("x-user-jwt") || "").trim();
+  if (x.length > 20) return x;
+  const auth = h.get("authorization") || h.get("Authorization") || "";
+  if (auth.startsWith("Bearer ")) {
+    const token = auth.replace("Bearer ", "").trim();
+    const anon = (Deno.env.get("SUPABASE_ANON_KEY") || "").trim();
+    const service = (Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "").trim();
+    if (token && token !== anon && token !== service) return token;
+  }
+  return null;
+}
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -180,7 +196,8 @@ Deno.serve(async (req: Request) => {
   }
   try {
     const body = (await req.json()) as VerifyRequest;
-    const userJwt = req.headers.get("x-user-jwt") || "";
+    // Принимаем JWT как из x-user-jwt, так и из Authorization (если это не anon/service ключ)
+    const userJwt = extractUserJwt(req) || "";
     if (!userJwt) return jsonResponse({ error: "no_user_jwt" }, 401);
 
     // --- Web branch: verify by purchase_id only ---
@@ -211,7 +228,7 @@ Deno.serve(async (req: Request) => {
       const r = await verifyAppleReceipt(body.product_id, body.token);
       transactionId = r.transactionId;
     } else if (body.platform === "android") {
-      const r = await verifyGooglePurchase(body.product_id, body.token);
+      const r = await verifyGooglePurchase(body.product_id, body.token, body.package_name);
       transactionId = r.transactionId;
     } else {
       return jsonResponse({ error: "unsupported_platform" }, 400);

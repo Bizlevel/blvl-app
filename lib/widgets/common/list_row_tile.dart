@@ -27,7 +27,7 @@ class ListRowTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final content = Row(
       children: [
-        Icon(leadingIcon, size: 24, color: Theme.of(context).colorScheme.onSurface),
+        Icon(leadingIcon, size: 26, color: Theme.of(context).colorScheme.onSurface),
         AppSpacing.gapW(AppSpacing.itemSpacing),
         Expanded(
           child: Column(

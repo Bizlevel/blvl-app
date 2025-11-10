@@ -22,6 +22,7 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
   final TextEditingController _metricCurrentCtrl = TextEditingController();
   final TextEditingController _metricTargetCtrl = TextEditingController();
   final TextEditingController _targetDateCtrl = TextEditingController();
+  final TextEditingController _metricTypeCtrl = TextEditingController();
   DateTime? _selectedTargetDate;
   bool _isEditing = false;
 
@@ -31,6 +32,7 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
     _metricCurrentCtrl.dispose();
     _metricTargetCtrl.dispose();
     _targetDateCtrl.dispose();
+    _metricTypeCtrl.dispose();
     super.dispose();
   }
 
@@ -43,10 +45,11 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (_, __) => const Text('Не удалось загрузить цель'),
         data: (goal) {
-          if (goal != null) {
+          if (goal != null && !_isEditing) {
             _goalCtrl.text = (goal['goal_text'] ?? '').toString();
             _metricCurrentCtrl.text = (goal['metric_current'] ?? '').toString();
             _metricTargetCtrl.text = (goal['metric_target'] ?? '').toString();
+            _metricTypeCtrl.text = (goal['metric_type'] ?? '').toString();
             final String td = (goal['target_date'] ?? '').toString();
             try {
               final dt = DateTime.tryParse(td)?.toLocal();
@@ -59,7 +62,7 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
             }
           }
 
-          final metricType = (goal?['metric_type'] ?? '').toString();
+          final metricType = (_metricTypeCtrl.text).toString();
 
           // Прогресс и дни до дедлайна (герой-блок)
           double? progress;
@@ -107,6 +110,18 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                                     .titleMedium
                                     ?.copyWith(fontWeight: FontWeight.w600),
                               ),
+                            // Пояснение формулы прогресса
+                            if (progress != null)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Text(
+                                  'Прогресс = (Текущее − Старт) / (Цель − Старт)',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.copyWith(color: AppColor.labelColor),
+                                ),
+                              ),
                             if (progress != null)
                               Padding(
                                 padding: const EdgeInsets.only(top: 4),
@@ -121,6 +136,16 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                           ],
                         ),
                       ),
+                      if (progress == null)
+                        Expanded(
+                          child: Text(
+                            'Метрика не настроена. Нажмите «Редактировать», чтобы указать тип, текущее и целевое значения.',
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(color: AppColor.labelColor),
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -129,7 +154,8 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                   padding: EdgeInsets.only(bottom: 8),
                   child: Row(
                     children: [
-                      Icon(Icons.flag_outlined, color: AppColor.onSurfaceSubtle),
+                      Icon(Icons.flag_outlined,
+                          color: AppColor.onSurfaceSubtle),
                       SizedBox(width: 8),
                       Expanded(
                           child: Text(
@@ -151,6 +177,58 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                       labelText: 'Короткое описание цели'),
                 ),
                 const SizedBox(height: 8),
+                // Блок метрики
+                DropdownButtonFormField<String>(
+                  value: () {
+                    const opts = [
+                      'Выручка (тенге)',
+                      'Количество клиентов',
+                      'Количество продаж',
+                      'Часы работы',
+                      'Конверсия (%)',
+                      'Другое',
+                    ];
+                    final t = _metricTypeCtrl.text.trim();
+                    return (t.isEmpty || !opts.contains(t)) ? null : t;
+                  }(),
+                  items: const [
+                    'Выручка (тенге)',
+                    'Количество клиентов',
+                    'Количество продаж',
+                    'Часы работы',
+                    'Конверсия (%)',
+                    'Другое',
+                  ]
+                      .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                      .toList(),
+                  onChanged: (v) {
+                    if (v != null) _metricTypeCtrl.text = v;
+                  },
+                  decoration: const InputDecoration(
+                    labelText: 'Метрика (тип)',
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _metricCurrentCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration:
+                          const InputDecoration(labelText: 'Текущее значение'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextField(
+                      controller: _metricTargetCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration:
+                          const InputDecoration(labelText: 'Целевое значение'),
+                    ),
+                  ),
+                ]),
+                const SizedBox(height: 8),
                 Row(children: [
                   Expanded(
                     child: TextField(
@@ -163,12 +241,20 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                           icon: const Icon(Icons.calendar_today),
                           onPressed: () async {
                             final now = DateTime.now();
-                            final initial = _selectedTargetDate ?? now;
+                            final first = DateTime(now.year - 5, 1, 1);
+                            final last = DateTime(now.year + 5, 12, 31);
+                            final initial = _selectedTargetDate == null
+                                ? now
+                                : _selectedTargetDate!.isBefore(first)
+                                    ? first
+                                    : _selectedTargetDate!.isAfter(last)
+                                        ? last
+                                        : _selectedTargetDate!;
                             final picked = await showDatePicker(
                               context: context,
                               initialDate: initial,
-                              firstDate: now,
-                              lastDate: now.add(const Duration(days: 365 * 3)),
+                              firstDate: first,
+                              lastDate: last,
                             );
                             if (picked != null) {
                               setState(() {
@@ -189,7 +275,7 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
               ],
               const SizedBox(height: 8),
               const SizedBox(height: 12),
-              Row(children: [
+              Wrap(spacing: 12, runSpacing: 8, children: [
                 if (!_isEditing)
                   BizLevelButton(
                     variant: BizLevelButtonVariant.text,
@@ -208,9 +294,32 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                               level: SentryLevel.info));
                         } catch (_) {}
                         final repo = ref.read(goalsRepositoryProvider);
+                        // Авто‑старт: если не задан metric_start и задано текущее
+                        num? metricStartParam;
+                        try {
+                          final hasStart =
+                              (goal?['metric_start'] as num?) != null;
+                          final curParsed =
+                              num.tryParse(_metricCurrentCtrl.text.trim());
+                          if (!hasStart && curParsed != null) {
+                            metricStartParam = curParsed;
+                          }
+                        } catch (_) {}
                         await repo.upsertUserGoal(
                           goalText: _goalCtrl.text.trim(),
                           targetDate: _selectedTargetDate,
+                          metricType: _metricTypeCtrl.text.trim().isEmpty
+                              ? null
+                              : _metricTypeCtrl.text.trim(),
+                          metricCurrent: num.tryParse(
+                              _metricCurrentCtrl.text.trim().isEmpty
+                                  ? ''
+                                  : _metricCurrentCtrl.text.trim()),
+                          metricTarget: num.tryParse(
+                              _metricTargetCtrl.text.trim().isEmpty
+                                  ? ''
+                                  : _metricTargetCtrl.text.trim()),
+                          metricStart: metricStartParam,
                         );
                         if (!context.mounted) return;
                         final messenger = ScaffoldMessenger.of(context);
@@ -225,14 +334,24 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                       }
                     },
                   ),
-                  const SizedBox(width: 12),
                   BizLevelButton(
                     variant: BizLevelButtonVariant.text,
                     label: 'Отмена',
                     onPressed: () => setState(() => _isEditing = false),
                   ),
                 ],
-                const SizedBox(width: 12),
+                if (!_isEditing)
+                  BizLevelButton(
+                    variant: BizLevelButtonVariant.text,
+                    label: 'Новая цель',
+                    onPressed: () => _showStartNewGoalSheet(context),
+                  ),
+                if (!_isEditing)
+                  BizLevelButton(
+                    variant: BizLevelButtonVariant.text,
+                    label: 'Обновить текущее',
+                    onPressed: () => _showUpdateCurrentSheet(context),
+                  ),
                 BizLevelButton(
                   icon: const Icon(Icons.chat_bubble_outline),
                   label: 'Обсудить с Максом',
@@ -257,6 +376,167 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
             ],
           );
         },
+      ),
+    );
+  }
+
+  Future<void> _showUpdateCurrentSheet(BuildContext context) async {
+    final TextEditingController currentCtrl =
+        TextEditingController(text: _metricCurrentCtrl.text.trim());
+    await showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('Обновить текущее значение',
+                  style: Theme.of(ctx)
+                      .textTheme
+                      .titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 12),
+              TextField(
+                controller: currentCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Текущее значение',
+                ),
+              ),
+              const SizedBox(height: 12),
+              ElevatedButton(
+                onPressed: () async {
+                  try {
+                    final repo = ref.read(goalsRepositoryProvider);
+                    await repo.upsertUserGoal(
+                      goalText: _goalCtrl.text.trim(),
+                      metricType: _metricTypeCtrl.text.trim().isEmpty
+                          ? null
+                          : _metricTypeCtrl.text.trim(),
+                      metricCurrent: num.tryParse(currentCtrl.text.trim()),
+                      metricTarget: num.tryParse(_metricTargetCtrl.text.trim()),
+                      targetDate: _selectedTargetDate,
+                    );
+                    _metricCurrentCtrl.text = currentCtrl.text.trim();
+                    if (mounted) {
+                      ref.invalidate(userGoalProvider);
+                      Navigator.of(ctx).pop();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Значение обновлено')),
+                      );
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Ошибка: $e')),
+                      );
+                    }
+                  }
+                },
+                child: const Text('Сохранить'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showStartNewGoalSheet(BuildContext context) async {
+    final TextEditingController textCtrl = TextEditingController();
+    DateTime? newTarget;
+    await showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('Новая цель',
+                  style: Theme.of(ctx)
+                      .textTheme
+                      .titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 12),
+              TextField(
+                controller: textCtrl,
+                decoration:
+                    const InputDecoration(labelText: 'Опишите новую цель'),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      newTarget == null
+                          ? 'Дедлайн не выбран'
+                          : newTarget!
+                              .toLocal()
+                              .toIso8601String()
+                              .split('T')
+                              .first,
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () async {
+                      final now = DateTime.now();
+                      final picked = await showDatePicker(
+                        context: ctx,
+                        initialDate: newTarget ?? now,
+                        firstDate: now,
+                        lastDate: now.add(const Duration(days: 365 * 3)),
+                      );
+                      if (picked != null) {
+                        newTarget = picked;
+                        // ignore: use_build_context_synchronously
+                        (ctx as Element).markNeedsBuild();
+                      }
+                    },
+                    child: const Text('Выбрать дату'),
+                  )
+                ],
+              ),
+              const SizedBox(height: 12),
+              ElevatedButton(
+                onPressed: () async {
+                  final String txt = textCtrl.text.trim();
+                  if (txt.isEmpty) {
+                    ScaffoldMessenger.of(ctx).showSnackBar(
+                      const SnackBar(
+                          content: Text('Введите формулировку цели')),
+                    );
+                    return;
+                  }
+                  try {
+                    final repo = ref.read(goalsRepositoryProvider);
+                    await repo.startNewGoal(
+                        goalText: txt, targetDate: newTarget);
+                    if (mounted) {
+                      ref.invalidate(userGoalProvider);
+                      Navigator.of(ctx).pop();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Новая цель сохранена')),
+                      );
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Ошибка: $e')),
+                      );
+                    }
+                  }
+                },
+                child: const Text('Сохранить новую цель'),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

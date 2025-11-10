@@ -47,6 +47,7 @@ dependencies:
   flutter_timezone: ^4.1.1
   google_sign_in:
   in_app_purchase:
+  intl: ^0.19.0
 
 dev_dependencies:
   flutter_test:

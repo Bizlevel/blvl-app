@@ -106,6 +106,16 @@ class _PracticeJournalSectionState
                       spacing: 8,
                       runSpacing: 8,
                       children: [
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 4),
+                          child: Text(
+                            'Подсказка: «Топ‑3» — инструменты, которые вы отмечали чаще всего.',
+                            style: Theme.of(context)
+                                .textTheme
+                                .labelSmall
+                                ?.copyWith(color: AppColor.onSurfaceSubtle),
+                          ),
+                        ),
                         for (final t in top3)
                           FilledButton.tonalIcon(
                             onPressed: () async {
@@ -401,12 +411,14 @@ class _PracticeJournalSectionState
                   decoration: BoxDecoration(
                     color: AppColor.backgroundSuccess,
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: AppColor.success.withValues(alpha: 0.3)),
+                    border: Border.all(
+                        color: AppColor.success.withValues(alpha: 0.3)),
                   ),
                   child: const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.trending_up, color: AppColor.success, size: 18),
+                      Icon(Icons.trending_up,
+                          color: AppColor.success, size: 18),
                       SizedBox(width: 6),
                       Text('+1 день движения к цели',
                           style: TextStyle(color: AppColor.success)),

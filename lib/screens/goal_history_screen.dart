@@ -8,8 +8,7 @@ class GoalHistoryScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    const int limit = 100;
-    final itemsAsync = ref.watch(practiceLogWithLimitProvider(limit));
+    final itemsAsync = ref.watch(practiceLogByCurrentHistoryProvider);
     return Scaffold(
       appBar: AppBar(title: const Text('История применений')),
       body: itemsAsync.when(
@@ -17,31 +16,6 @@ class GoalHistoryScreen extends ConsumerWidget {
         error: (_, __) => const Center(child: Text('Не удалось загрузить')),
         data: (items) => Column(
           children: [
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Row(
-                children: [
-                  const Text('Показать:'),
-                  const SizedBox(width: 8),
-                  DropdownButton<int>(
-                    value: limit,
-                    items: const [50, 100, 200]
-                        .map((e) =>
-                            DropdownMenuItem(value: e, child: Text('$e')))
-                        .toList(),
-                    onChanged: (v) {
-                      if (v == null) return;
-                      // Простой навигационный перезапуск с другим лимитом
-                      Navigator.of(context).pushReplacement(
-                        MaterialPageRoute(
-                          builder: (_) => const GoalHistoryScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
             Expanded(
               child: ListView.separated(
                 padding: const EdgeInsets.all(16),

@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 // import 'package:go_router/go_router.dart';
 // import 'package:supabase_flutter/supabase_flutter.dart';
@@ -124,7 +125,11 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
           onPressed: () {
             try {
               // Возврат на Главный экран
-              Navigator.of(context).maybePop();
+              if (Navigator.of(context).canPop()) {
+                Navigator.of(context).pop();
+              } else {
+                context.go('/home');
+              }
             } catch (_) {}
           },
         ),
@@ -219,6 +224,41 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const MotivationCard(),
+                const SizedBox(height: 16),
+                // Онбординг: если цель ещё не задана — предложить начать с L1
+                Consumer(builder: (context, ref, _) {
+                  final g = ref.watch(userGoalProvider).asData?.value;
+                  final bool empty = g == null ||
+                      ((g['goal_text'] ?? '').toString().trim().isEmpty);
+                  if (!empty) return const SizedBox.shrink();
+                  return Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColor.backgroundInfo,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColor.border),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.flag_outlined,
+                            color: AppColor.primary),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Начните с формулировки первой цели. Это займёт 1–2 минуты.',
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        ElevatedButton(
+                          onPressed: () => context.go('/checkpoint/l1'),
+                          child: const Text('Чекпоинт L1'),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
                 const SizedBox(height: 16),
                 // Что дальше? (баннер) — удалён по новой спецификации
                 const SizedBox(height: 16),

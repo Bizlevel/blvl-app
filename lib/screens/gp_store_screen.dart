@@ -14,6 +14,7 @@ import 'package:bizlevel/widgets/common/bizlevel_button.dart';
 import 'package:bizlevel/widgets/common/gp_balance_widget.dart';
 import 'package:bizlevel/theme/color.dart' show AppColor;
 import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 class GpStoreScreen extends ConsumerStatefulWidget {
   const GpStoreScreen({super.key});
@@ -418,6 +419,14 @@ Future<void> _startPurchaseIapOrWeb(
             final gp = GpService(Supabase.instance.client);
             final token = purchase.verificationData.serverVerificationData;
             final platform = IapService.currentPlatform();
+            // Имя пакета нужно передать на сервер для Android (устранение рассинхрона с env)
+            String? packageName;
+            if (platform == 'android') {
+              try {
+                final pi = await PackageInfo.fromPlatform();
+                packageName = pi.packageName;
+              } catch (_) {}
+            }
             try {
               await Sentry.addBreadcrumb(Breadcrumb(
                 message: 'gp_verify_started',
@@ -430,6 +439,7 @@ Future<void> _startPurchaseIapOrWeb(
                 platform: platform,
                 productId: product.id,
                 token: token,
+                packageName: packageName,
               );
             } catch (e) {
               // Android fallback: извлечь чистый purchaseToken из localVerificationData
@@ -452,6 +462,7 @@ Future<void> _startPurchaseIapOrWeb(
                     platform: platform,
                     productId: product.id,
                     token: fallbackToken,
+                    packageName: packageName,
                   );
                 } else {
                   rethrow;
