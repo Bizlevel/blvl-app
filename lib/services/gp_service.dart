@@ -419,23 +419,33 @@ class GpService {
 
   Future<int> _postVerify(Session session,
       {required Map<String, dynamic> body}) async {
-    final resp = await _edgeDio.post('/gp-purchase-verify',
-        data: jsonEncode(body),
-        options: Options(headers: _edgeHeadersAnonWithUserJwt(session)));
-    if (resp.statusCode == 200 && resp.data is Map<String, dynamic>) {
-      final m = Map<String, dynamic>.from(resp.data);
-      return (m['balance_after'] as num?)?.toInt() ?? 0;
-    }
-    // Попробуем отдать код ошибки от Edge (например: google_purchase_failed, android_package_missing)
     try {
-      final data = resp.data;
+      final resp = await _edgeDio.post('/gp-purchase-verify',
+          data: jsonEncode(body),
+          options: Options(headers: _edgeHeadersAnonWithUserJwt(session)));
+      if (resp.statusCode == 200 && resp.data is Map<String, dynamic>) {
+        final m = Map<String, dynamic>.from(resp.data);
+        return (m['balance_after'] as num?)?.toInt() ?? 0;
+      }
+      // Попробуем отдать код ошибки от Edge (например: google_purchase_failed, android_package_missing)
+      try {
+        final data = resp.data;
+        if (data is Map &&
+            data['error'] is String &&
+            (data['error'] as String).isNotEmpty) {
+          throw GpFailure('Ошибка подтверждения: ${data['error']}');
+        }
+      } catch (_) {}
+      throw GpFailure('Не удалось подтвердить покупку');
+    } on DioException catch (e) {
+      final data = e.response?.data;
       if (data is Map &&
           data['error'] is String &&
           (data['error'] as String).isNotEmpty) {
         throw GpFailure('Ошибка подтверждения: ${data['error']}');
       }
-    } catch (_) {}
-    throw GpFailure('Не удалось подтвердить покупку');
+      rethrow;
+    }
   }
 
   Future<int> unlockFloor({
