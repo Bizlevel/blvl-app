@@ -241,6 +241,7 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
                                     context.go('/goal');
                                   }
                                 } else {
+                                  if (!context.mounted) return;
                                   Navigator.of(context).pop();
                                 }
                               }

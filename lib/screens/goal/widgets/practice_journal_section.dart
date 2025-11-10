@@ -10,6 +10,7 @@ import 'package:bizlevel/widgets/reminders_settings_sheet.dart';
 import 'package:bizlevel/widgets/common/bizlevel_button.dart';
 import 'package:bizlevel/widgets/common/bizlevel_card.dart';
 import 'package:bizlevel/theme/spacing.dart';
+import 'package:bizlevel/theme/color.dart';
 
 class PracticeJournalSection extends ConsumerStatefulWidget {
   const PracticeJournalSection({super.key});
@@ -105,6 +106,16 @@ class _PracticeJournalSectionState
                       spacing: 8,
                       runSpacing: 8,
                       children: [
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 4),
+                          child: Text(
+                            'Подсказка: «Топ‑3» — инструменты, которые вы отмечали чаще всего.',
+                            style: Theme.of(context)
+                                .textTheme
+                                .labelSmall
+                                ?.copyWith(color: AppColor.onSurfaceSubtle),
+                          ),
+                        ),
                         for (final t in top3)
                           FilledButton.tonalIcon(
                             onPressed: () async {
@@ -134,7 +145,7 @@ class _PracticeJournalSectionState
                 loading: () => const SizedBox.shrink(),
                 error: (_, __) => const SizedBox.shrink(),
                 data: (opts) {
-                  String? selected =
+                  final String? selected =
                       _selectedTools.isEmpty ? null : _selectedTools.first;
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -227,8 +238,8 @@ class _PracticeJournalSectionState
                       } catch (_) {}
                       // Сигнал о бонусе за практику
                       try {
-                        final messenger = ScaffoldMessenger.of(context);
                         if (!context.mounted) return;
+                        final messenger = ScaffoldMessenger.of(context);
                         messenger.showSnackBar(
                           const SnackBar(
                               content: Text('+5 GP за практику сегодня')),
@@ -317,7 +328,7 @@ class _PracticeJournalSectionState
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.grey.shade50,
+                        color: AppColor.backgroundInfo,
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Column(
@@ -363,7 +374,7 @@ class _PracticeJournalSectionState
                         ListTile(
                           dense: true,
                           leading: const Icon(Icons.check_circle_outline,
-                              color: Colors.blueGrey),
+                              color: AppColor.onSurfaceSubtle),
                           title: Text(((m['applied_tools'] as List?) ??
                                   const <dynamic>[])
                               .join(', ')),
@@ -398,17 +409,19 @@ class _PracticeJournalSectionState
                   padding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
-                    color: Colors.green.shade50,
+                    color: AppColor.backgroundSuccess,
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.green.shade200),
+                    border: Border.all(
+                        color: AppColor.success.withValues(alpha: 0.3)),
                   ),
                   child: const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.trending_up, color: Colors.green, size: 18),
+                      Icon(Icons.trending_up,
+                          color: AppColor.success, size: 18),
                       SizedBox(width: 6),
                       Text('+1 день движения к цели',
-                          style: TextStyle(color: Colors.green)),
+                          style: TextStyle(color: AppColor.success)),
                     ],
                   ),
                 ),

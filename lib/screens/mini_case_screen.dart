@@ -451,10 +451,12 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
       child: Container(
         height: 180,
         decoration: const BoxDecoration(
-          color: Colors.white,
+          color: AppColor.card,
           boxShadow: [
             BoxShadow(
-                color: Color(0x11000000), blurRadius: 10, offset: Offset(0, 6)),
+                color: AppColor.shadowColor,
+                blurRadius: 10,
+                offset: Offset(0, 6)),
           ],
         ),
         child: Image.asset(
@@ -462,7 +464,7 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
           fit: BoxFit.cover,
           errorBuilder: (context, _, __) => const Center(
             child: Icon(Icons.broken_image_outlined,
-                size: 56, color: Colors.black26),
+                size: 56, color: AppColor.onSurfaceSubtle),
           ),
         ),
       ),

@@ -27,7 +27,7 @@ class FeatureItem extends StatelessWidget {
         padding: const EdgeInsets.all(10),
         margin: const EdgeInsets.symmetric(vertical: 5),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColor.card,
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
@@ -95,7 +95,7 @@ class FeatureItem extends StatelessWidget {
       child: Text(
         data["price"],
         style: const TextStyle(
-          color: Colors.white,
+          color: AppColor.onPrimary,
           fontWeight: FontWeight.w500,
         ),
       ),
@@ -123,7 +123,7 @@ class FeatureItem extends StatelessWidget {
     );
   }
 
-  _getAttribute(IconData icon, Color color, String info) {
+  Widget _getAttribute(IconData icon, Color color, String info) {
     return Row(
       children: [
         Icon(icon, size: 18, color: color),

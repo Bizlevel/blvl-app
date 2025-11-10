@@ -24,29 +24,30 @@ dependencies:
   chewie: ^1.7.0
   flutter_cache_manager: ^3.3.0
   flutter_animate: ^4.3.0
-  url_launcher: ^6.2.2
-  package_info_plus: ^4.2.0
+  url_launcher:
+  package_info_plus:
   sentry_flutter: ^9.4.1
-  webview_flutter: ^4.7.0
+  webview_flutter:
   responsive_framework: ^0.2.0
   shimmer: ^2.0.0
   freezed_annotation: ^2.4.1
   json_annotation: ^4.9.0
   flutter_dotenv: ^5.0.2
-  file_picker: ^8.0.0+1
+  file_picker:
   go_router: ^10.1.0
   hooks_riverpod: ^2.4.0
   flutter_hooks: ^0.20.1
   app_links: ^6.4.0
   hive: ^2.2.3
   hive_flutter: ^1.1.0
-  flutter_local_notifications: ^17.2.1
+  flutter_local_notifications:
   timezone: ^0.9.4
   firebase_core: ^3.5.0
   firebase_messaging: ^15.1.4
   flutter_timezone: ^4.1.1
-  google_sign_in: ^6.2.1
-  in_app_purchase: ^3.1.11
+  google_sign_in:
+  in_app_purchase:
+  intl: ^0.19.0
 
 dev_dependencies:
   flutter_test:
@@ -80,7 +81,6 @@ flutter:
     - assets/images/avatars/
     - assets/images/
     - assets/images/cases/
-    - assets/images/street/
     - assets/images/lvls/
     - assets/images/artefacts/
     - .env

@@ -12,6 +12,8 @@ class BizLevelCard extends StatelessWidget {
   final Color? borderColor;
   final Key? semanticsKey;
   final String? semanticsLabel;
+  final bool outlined; // v2
+  final bool tonal; // v2
 
   const BizLevelCard({
     super.key,
@@ -24,19 +26,24 @@ class BizLevelCard extends StatelessWidget {
     this.borderColor,
     this.semanticsKey,
     this.semanticsLabel,
+    this.outlined = false,
+    this.tonal = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final content = Padding(padding: padding, child: child);
 
+    final cardColor = tonal ? AppColor.appBarColor : (color ?? AppColor.surface);
     final card = Card(
-      color: color ?? AppColor.surface,
+      color: cardColor,
       elevation: elevation,
       shadowColor: AppColor.shadow,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(radius),
-        side: BorderSide(color: borderColor ?? Colors.transparent),
+        side: BorderSide(
+          color: outlined ? (borderColor ?? AppColor.border) : (borderColor ?? Colors.transparent),
+        ),
       ),
       child: onTap == null
           ? content

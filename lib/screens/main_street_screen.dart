@@ -1,12 +1,24 @@
+// ignore_for_file: unused_element
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:bizlevel/theme/color.dart';
-import 'package:bizlevel/widgets/user_info_bar.dart';
 import 'package:bizlevel/providers/levels_provider.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
-import 'package:flutter_svg/flutter_svg.dart';
-import 'package:bizlevel/widgets/common/gp_balance_widget.dart';
+import 'package:bizlevel/theme/spacing.dart';
+import 'package:bizlevel/theme/dimensions.dart';
+import 'package:bizlevel/providers/auth_provider.dart';
+import 'package:bizlevel/providers/gp_providers.dart';
+import 'package:bizlevel/providers/goals_providers.dart';
+import 'package:bizlevel/services/supabase_service.dart';
+import 'package:bizlevel/widgets/custom_image.dart';
+import 'package:bizlevel/providers/library_providers.dart';
+import 'package:bizlevel/widgets/home/top_gp_badge.dart';
+import 'package:bizlevel/widgets/home/home_goal_card.dart';
+import 'package:bizlevel/widgets/home/home_continue_card.dart';
+import 'package:bizlevel/widgets/home/home_quote_card.dart';
+import 'package:bizlevel/widgets/common/list_row_tile.dart';
+import 'package:bizlevel/widgets/common/notification_center.dart';
 
 class MainStreetScreen extends ConsumerStatefulWidget {
   const MainStreetScreen({super.key});
@@ -19,6 +31,14 @@ class _MainStreetScreenState extends ConsumerState<MainStreetScreen> {
   @override
   void initState() {
     super.initState();
+    // Аналитика открытия экрана (без PII)
+    Sentry.addBreadcrumb(
+      Breadcrumb(
+        category: 'ui.screen',
+        message: 'home_opened',
+        level: SentryLevel.info,
+      ),
+    );
   }
 
   @override
@@ -37,105 +57,161 @@ class _MainStreetScreenState extends ConsumerState<MainStreetScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: UserInfoBar(showGp: false),
-                        ),
-                      ),
-                      GpBalanceWidget(),
-                    ],
+                const SizedBox(height: 8),
+                // Greeting block with avatar, name/level, GP badge
+                SizedBox(
+                  height: AppDimensions.homeGreetingHeight,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: _GreetingHeader(),
                   ),
                 ),
                 Expanded(
                   child: Center(
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 900),
-                      child: const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 16),
-                        child: _MainActionsGrid(),
+                      child: RefreshIndicator(
+                        color: AppColor.primary,
+                        onRefresh: () async {
+                          try {
+                            // Обновление ключевых провайдеров
+                            await Future.wait([
+                              ref.refresh(currentUserProvider.future),
+                              ref.refresh(gpBalanceProvider.future),
+                              ref.refresh(userGoalProvider.future),
+                              ref.refresh(levelsProvider.future),
+                            ]);
+                            if (mounted) {
+                              NotificationCenter.showSuccess(
+                                  context, 'Обновлено');
+                            }
+                          } catch (_) {
+                            // Без падения, индикатор скрываем
+                          }
+                        },
+                        child: SingleChildScrollView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              // Цитата дня
+                              const HomeQuoteCard(),
+                              const SizedBox(height: 12),
+                              // Карточка «Моя цель»
+                              const HomeGoalCard(),
+                              const SizedBox(height: 20),
+                              // Карточка «Продолжить обучение»
+                              Consumer(
+                                builder: (context, ref, _) {
+                                  final nextAsync = ref.watch(
+                                    nextLevelToContinueProvider,
+                                  );
+                                  return nextAsync.when(
+                                    data: (next) {
+                                      final String label =
+                                          (next['label'] as String?) ?? 'Далее';
+                                      final bool isLocked =
+                                          next['isLocked'] as bool? ?? false;
+                                      final int targetScroll =
+                                          next['targetScroll'] as int? ?? 0;
+                                      final int levelNum =
+                                          next['levelNumber'] as int? ?? 0;
+                                      final levelTitle =
+                                          (next['levelTitle'] as String?)
+                                              ?.trim();
+                                      // Подзаголовок «Уровень N: Название»
+                                      String subtitle;
+                                      if (levelTitle != null &&
+                                          levelTitle.isNotEmpty) {
+                                        final hasPrefix = levelTitle
+                                            .trimLeft()
+                                            .toLowerCase()
+                                            .startsWith('уровень');
+                                        subtitle = (!hasPrefix && levelNum > 0)
+                                            ? 'Уровень $levelNum: $levelTitle'
+                                            : levelTitle;
+                                      } else {
+                                        subtitle = levelNum > 0
+                                            ? 'Уровень $levelNum: $label'
+                                            : label;
+                                      }
+                                      return HomeContinueCard(
+                                        subtitle: subtitle,
+                                        levelNumber: levelNum,
+                                        onTap: () {
+                                          try {
+                                            Sentry.addBreadcrumb(
+                                              Breadcrumb(
+                                                category: 'ui.tap',
+                                                message:
+                                                    'home_cta_continue_tap',
+                                                level: SentryLevel.info,
+                                              ),
+                                            );
+                                            final int? miniCaseId =
+                                                next['miniCaseId'] as int?;
+                                            if (miniCaseId != null) {
+                                              context.go('/case/$miniCaseId');
+                                              return;
+                                            }
+                                            if (isLocked) {
+                                              context.go(
+                                                '/tower?scrollTo=$targetScroll',
+                                              );
+                                              return;
+                                            }
+                                            final levelNumber =
+                                                next['levelNumber'] as int? ??
+                                                    0;
+                                            final levelId =
+                                                next['levelId'] as int? ?? 0;
+                                            context.go(
+                                              '/levels/$levelId?num=$levelNumber',
+                                            );
+                                          } catch (e, st) {
+                                            Sentry.captureException(
+                                              e,
+                                              stackTrace: st,
+                                            );
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              const SnackBar(
+                                                content: Text(
+                                                  'Не удалось открыть уровень',
+                                                ),
+                                              ),
+                                            );
+                                          }
+                                        },
+                                      );
+                                    },
+                                    loading: () => const Center(
+                                      child: CircularProgressIndicator(),
+                                    ),
+                                    error: (error, stack) {
+                                      Sentry.captureException(
+                                        error,
+                                        stackTrace: stack,
+                                      );
+                                      return HomeContinueCard(
+                                        subtitle: 'Башня',
+                                        levelNumber: 0,
+                                        onTap: () => context.go('/tower'),
+                                      );
+                                    },
+                                  );
+                                },
+                              ),
+                              const SizedBox(height: 24),
+                              const _QuickAccessSection(),
+                              AppSpacing.gapH(12),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Consumer(builder: (context, ref, _) {
-                        final nextAsync =
-                            ref.watch(nextLevelToContinueProvider);
-                        return nextAsync.when(
-                          data: (next) {
-                            final String label =
-                                (next['label'] as String?) ?? 'Далее';
-                            final bool isLocked =
-                                next['isLocked'] as bool? ?? false;
-                            final int targetScroll =
-                                next['targetScroll'] as int? ?? 0;
-                            return SizedBox(
-                              height: 48,
-                              child: ElevatedButton(
-                                onPressed: () {
-                                  try {
-                                    final int? gver =
-                                        next['goalCheckpointVersion'] as int?;
-                                    if (gver != null) {
-                                      context.go('/goal-checkpoint/$gver');
-                                      return;
-                                    }
-                                    final int? miniCaseId =
-                                        next['miniCaseId'] as int?;
-                                    if (miniCaseId != null) {
-                                      context.go('/case/$miniCaseId');
-                                      return;
-                                    }
-                                    if (isLocked) {
-                                      context
-                                          .go('/tower?scrollTo=$targetScroll');
-                                      return;
-                                    }
-                                    final levelNumber =
-                                        next['levelNumber'] as int? ?? 0;
-                                    final levelId =
-                                        next['levelId'] as int? ?? 0;
-                                    context.go(
-                                        '/levels/$levelId?num=$levelNumber');
-                                  } catch (e, st) {
-                                    Sentry.captureException(e, stackTrace: st);
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                          content: Text(
-                                              'Не удалось открыть уровень')),
-                                    );
-                                  }
-                                },
-                                child: Text('Продолжить: $label'),
-                              ),
-                            );
-                          },
-                          loading: () => const SizedBox(
-                            height: 48,
-                            child: Center(child: CircularProgressIndicator()),
-                          ),
-                          error: (error, stack) {
-                            Sentry.captureException(error, stackTrace: stack);
-                            return SizedBox(
-                              height: 48,
-                              child: ElevatedButton(
-                                onPressed: () => context.go('/tower'),
-                                child: const Text('Продолжить: Башня'),
-                              ),
-                            );
-                          },
-                        );
-                      }),
-                    ],
                   ),
                 ),
               ],
@@ -155,12 +231,9 @@ class _BackgroundLayer extends StatelessWidget {
   Widget build(BuildContext context) {
     // Локальный мягкий градиент фона для Main Street
     return Container(
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Color(0xFFFAFAFA), Color(0xFFF7F3FF)],
-        ),
+      decoration: const BoxDecoration(
+        // fix: заменить хардкод-градиент на токен AppColor.bgGradient
+        gradient: AppColor.bgGradient,
       ),
     );
   }
@@ -168,319 +241,243 @@ class _BackgroundLayer extends StatelessWidget {
 
 // Анимация облаков и интерактивные SVG удалены (задача 33.20)
 
-class _MainActionsGrid extends ConsumerWidget {
-  const _MainActionsGrid();
-
-  void _showSoonSnackBar(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Скоро')),
-    );
-  }
-
+class _GreetingHeader extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return LayoutBuilder(builder: (context, constraints) {
-      const double gap = 12;
-      final double rowHeight = (constraints.maxHeight - 2 * gap) / 3;
-
-      return Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          SizedBox(
-            height: rowHeight,
-            child: Row(
-              children: [
-                Expanded(
-                  child: _MainActionCard(
-                    key: const Key('ms_card_coworking'),
-                    title: 'Коворкинг',
-                    icon: Icons.workspaces_outline,
-                    svgAsset: 'assets/images/street/coworking.svg',
-                    kind: _CardKind.coworking,
-                    state: _CardState.soon,
-                    onTap: () => _showSoonSnackBar(context),
+    final userAsync = ref.watch(currentUserProvider);
+    return userAsync.when(
+      data: (user) {
+        if (user == null) return const SizedBox.shrink();
+        return Row(
+          children: [
+            // Large avatar on the left
+            _GreetingAvatar(user.avatarId, user.avatarUrl),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    user.name,
+                    overflow: TextOverflow.ellipsis,
+                    // fix: inline типографика → Theme.textTheme
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurface,
+                          height: 1.15,
+                        ),
                   ),
-                ),
-                const SizedBox(width: gap),
-                Expanded(
-                  child: _MainActionCard(
-                    key: const Key('ms_card_marketplace'),
-                    title: 'Маркетплейс',
-                    icon: Icons.storefront,
-                    svgAsset: 'assets/images/street/marketplace.svg',
-                    kind: _CardKind.marketplace,
-                    state: _CardState.soon,
-                    onTap: () => _showSoonSnackBar(context),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: gap),
-          SizedBox(
-            height: rowHeight,
-            child: Row(
-              children: [
-                Expanded(
-                  child: _MainActionCard(
-                    key: const Key('ms_card_trainers'),
-                    title: 'База тренеров',
-                    icon: Icons.chat_bubble,
-                    svgAsset: 'assets/images/street/training_base.svg',
-                    kind: _CardKind.trainers,
-                    state: _CardState.active,
-                    onTap: () {
-                      try {
-                        context.go('/chat');
-                      } catch (e, st) {
-                        Sentry.captureException(e, stackTrace: st);
-                        // Падение навигации не критично — показать дружелюбный тост
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                              content: Text('Не удалось открыть страницу')),
-                        );
-                      }
+                  const SizedBox(height: 8),
+                  FutureBuilder<int>(
+                    future: SupabaseService.resolveCurrentLevelNumber(
+                      user.currentLevel,
+                    ),
+                    builder: (context, snap) {
+                      final level = snap.data ?? 0;
+                      // Капсула‑чип «Уровень N»
+                      return Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: AppColor.backgroundInfo,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColor.border),
+                        ),
+                        child: Text(
+                          'Уровень $level',
+                          overflow: TextOverflow.ellipsis,
+                          style:
+                              Theme.of(context).textTheme.labelLarge?.copyWith(
+                                    color: AppColor.primary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                        ),
+                      );
                     },
                   ),
-                ),
-                const SizedBox(width: gap),
-                Expanded(
-                  child: _MainActionCard(
-                    key: const Key('ms_card_library'),
-                    title: 'Библиотека',
-                    icon: Icons.menu_book,
-                    svgAsset: 'assets/images/street/library.svg',
-                    kind: _CardKind.library,
-                    state: _CardState.active,
-                    onTap: () {
-                      try {
-                        context.go('/library');
-                      } catch (e, st) {
-                        Sentry.captureException(e, stackTrace: st);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                              content: Text('Не удалось открыть страницу')),
-                        );
-                      }
-                    },
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: gap),
-          SizedBox(
-            height: rowHeight,
-            child: Row(
-              children: [
-                Expanded(
-                  child: _MainActionCard(
-                    key: const Key('ms_card_tower'),
-                    title: 'Башня БизЛевел',
-                    icon: Icons.apartment,
-                    svgAsset: 'assets/images/street/tower.svg',
-                    kind: _CardKind.tower,
-                    state: _CardState.active,
-                    onTap: () {
-                      try {
-                        context.go('/tower');
-                      } catch (e, st) {
-                        Sentry.captureException(e, stackTrace: st);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                              content: Text('Не удалось открыть башню')),
-                        );
-                      }
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      );
-    });
+            const SizedBox(width: 12),
+            const TopGpBadge(),
+          ],
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+    );
   }
 }
 
-enum _CardState { active, soon }
-
-enum _CardKind { library, marketplace, trainers, coworking, tower }
-
-class _MainActionCard extends StatelessWidget {
-  final String title;
-  final IconData icon;
-  final _CardState state;
-  final VoidCallback? onTap;
-  final String? svgAsset;
-  final _CardKind kind;
-
-  const _MainActionCard({
-    super.key,
-    required this.title,
-    required this.icon,
-    required this.state,
-    required this.onTap,
-    this.svgAsset,
-    required this.kind,
-  });
-
+class _GreetingAvatar extends StatelessWidget {
+  final int? avatarId;
+  final String? avatarUrl;
+  const _GreetingAvatar(this.avatarId, this.avatarUrl);
   @override
   Widget build(BuildContext context) {
-    final bool isSoon = state == _CardState.soon;
-    final Color foreground = isSoon
-        ? Theme.of(context).textTheme.bodyMedium!.color!.withValues(alpha: 0.6)
-        : Theme.of(context).textTheme.bodyMedium!.color!;
-    final Color border = AppColor.borderColor.withValues(alpha: 0.25);
-
-    // Цветовое кодирование подложки по типу раздела
-    LinearGradient? backgroundGradient;
-    switch (kind) {
-      case _CardKind.library:
-        backgroundGradient = const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFFE8F0FE), Color(0xFFDDE8FF)], // синий мягкий
-        );
-        break;
-      case _CardKind.marketplace:
-        backgroundGradient = const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFFE6F6ED), Color(0xFFD7FBEA)], // зелёный мягкий
-        );
-        break;
-      case _CardKind.trainers:
-        backgroundGradient = const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFFF0E9FF), Color(0xFFEDE7FF)], // фиолетовый мягкий
-        );
-        break;
-      case _CardKind.coworking:
-        backgroundGradient = const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFFFFF4E5), Color(0xFFFFF0D6)], // тёплый апельсиновый
-        );
-        break;
-      case _CardKind.tower:
-        backgroundGradient = const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Color(0xFFFFF3C4),
-            Color(0xFFEDE7FF)
-          ], // золото→фиолетовый soft
-        );
-        break;
+    String avatarPath;
+    bool isNetwork;
+    if ((avatarUrl ?? '').isNotEmpty) {
+      avatarPath = avatarUrl!;
+      isNetwork = true;
+    } else if (avatarId != null) {
+      avatarPath = 'assets/images/avatars/avatar_$avatarId.png';
+      isNetwork = false;
+    } else {
+      avatarPath = 'assets/images/avatars/avatar_1.png';
+      isNetwork = false;
     }
-
-    return Semantics(
-      label: title,
-      button: true,
-      child: AspectRatio(
-        aspectRatio: 1,
-        child: Card(
-          color: AppColor.surface,
-          elevation: 6, // более выраженная тень
-          shadowColor: AppColor.shadowColor,
-          surfaceTintColor: AppColor.surface,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: BorderSide(color: border),
+    return Container(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: AppColor.shadow.withValues(alpha: 0.08),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(16),
-            onTap: onTap,
-            child: Stack(
-              children: [
-                // Подложка‑градиент по типу
-                Positioned.fill(
-                  child: DecoratedBox(
+        ],
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(2),
+        decoration: const BoxDecoration(
+          color: AppColor.card,
+          shape: BoxShape.circle,
+        ),
+        child: CustomImage(
+          avatarPath,
+          width: 80,
+          height: 80,
+          radius: 40,
+          isNetwork: isNetwork,
+          isShadow: false,
+        ),
+      ),
+    );
+  }
+}
+
+// Удалены устаревшие приватные виджеты главной страницы
+
+class _QuickAccessSection extends ConsumerWidget {
+  const _QuickAccessSection();
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final levels = ref.watch(levelsProvider).value ?? const [];
+    final collected =
+        levels.where((l) => (l['isCompleted'] as bool? ?? false)).length;
+    final totalAsync = ref.watch(libraryTotalCountProvider);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Title removed per requirement
+        GridView.count(
+          crossAxisCount: 2,
+          // Flatter cards so section fits on one screen
+          childAspectRatio: 2.3,
+          mainAxisSpacing: 8,
+          crossAxisSpacing: 12,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          children: [
+            _QuickTile(
+              icon: Icons.menu_book,
+              title: 'Библиотека',
+              subtitle: totalAsync.when(
+                data: (v) => '$v материалов',
+                loading: () => 'Загрузка…',
+                error: (_, __) => 'Материалы',
+              ),
+              onTap: () {
+                Sentry.addBreadcrumb(
+                  Breadcrumb(
+                    category: 'ui.tap',
+                    message: 'home_quick_action_tap:library',
+                    level: SentryLevel.info,
+                  ),
+                );
+                context.go('/library');
+              },
+            ),
+            _QuickTile(
+              icon: Icons.inventory_2_outlined,
+              title: 'Мои артефакты',
+              subtitle: '$collected инструментов',
+              onTap: () {
+                Sentry.addBreadcrumb(
+                  Breadcrumb(
+                    category: 'ui.tap',
+                    message: 'home_quick_action_tap:artifacts',
+                    level: SentryLevel.info,
+                  ),
+                );
+                context.go('/artifacts');
+              },
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _QuickTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+  const _QuickTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: '$title, $subtitle',
+      button: true,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: TweenAnimationBuilder<double>(
+          tween: Tween(begin: 1, end: 1),
+          duration: const Duration(milliseconds: 150),
+          builder: (context, scale, child) {
+            return Material(
+              color: AppColor.card,
+              borderRadius: BorderRadius.circular(12),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: onTap,
+                child: AnimatedScale(
+                  scale: scale,
+                  duration: const Duration(milliseconds: 120),
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
-                      gradient: backgroundGradient,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                ),
-                // Иконка на весь доступный размер (пониженная насыщенность для "Скоро")
-                Positioned.fill(
-                  child: Center(
-                    child: FractionallySizedBox(
-                      widthFactor: 0.9, // -10%
-                      heightFactor: 0.9, // -10%
-                      child: Opacity(
-                        opacity: isSoon ? 0.45 : 1.0,
-                        child: svgAsset != null
-                            ? SvgPicture.asset(
-                                svgAsset!,
-                              )
-                            : Icon(
-                                icon,
-                                size: 64,
-                                color: foreground,
-                              ),
-                      ),
-                    ),
-                  ),
-                ),
-                // Заголовок над пиктограммой, по центру, с лёгкой тенью для читаемости
-                Positioned(
-                  top: 8,
-                  left: 0,
-                  right: 0,
-                  child: Text(
-                    title,
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.titleMedium!.copyWith(
-                      color: AppColor.textColor,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 16,
-                      shadows: [
-                        const Shadow(
-                          color: AppColor.shadowColor,
-                          blurRadius: 4,
-                          offset: Offset(0, 1),
-                        ),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColor.border),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: AppColor.shadow,
+                          blurRadius: 8,
+                          offset: Offset(0, 2),
+                        )
                       ],
                     ),
-                  ),
-                ),
-                // Lock‑чип в правом верхнем углу для состояния "Скоро"
-                if (isSoon)
-                  Positioned(
-                    top: 8,
-                    right: 8,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppColor.surface.withValues(alpha: 0.9),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColor.borderColor),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.lock,
-                              size: 12, color: AppColor.labelColor),
-                          SizedBox(width: 4),
-                          Text(
-                            'Скоро',
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: AppColor.labelColor,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
+                    child: ListRowTile(
+                      leadingIcon: icon,
+                      title: title,
+                      subtitle: subtitle,
+                      onTap: onTap,
+                      semanticsLabel: '$title, $subtitle',
                     ),
                   ),
-              ],
-            ),
-          ),
+                ),
+              ),
+            );
+          },
         ),
       ),
     );

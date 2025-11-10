@@ -385,7 +385,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
 
       if (!mounted) return;
       // Скрываем служебные маркеры и префикс "Оценка:" для пользователя
-      String displayMsg = assistantMsg
+      final String displayMsg = assistantMsg
           .replaceAll(RegExp(r"\[CASE:(NEXT|RETRY|FINAL)\]"), '')
           .replaceFirst(RegExp(r"^\s*Оценка\s*:\s*", caseSensitive: false), '')
           .replaceFirst(
@@ -716,6 +716,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
                   label: 'Скрыть клавиатуру',
                   button: true,
                   child: IconButton(
+                    tooltip: 'Скрыть клавиатуру',
                     icon: const Icon(Icons.keyboard_hide),
                     onPressed: () => FocusScope.of(context).unfocus(),
                   ),
@@ -730,6 +731,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
                         button: true,
                         child: IconButton(
                           key: const Key('chat_send_button'),
+                          tooltip: 'Отправить',
                           icon: const Icon(Icons.send),
                           color: AppColor.primary,
                           onPressed: _sendMessage,

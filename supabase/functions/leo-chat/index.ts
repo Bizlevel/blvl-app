@@ -1,3 +1,4 @@
+// @ts-nocheck
 // 1. Добавьте ссылку на типы Deno для корректной работы
 /// <reference types="https://deno.land/x/deno@1.36.1/lib.deno.d.ts" />
 
@@ -992,13 +993,30 @@ serve(async (req) => {
         }
         if (needsLoading.practice) {
           queries.push(
-            supabaseAdmin!.from('practice_log')
-              .select('applied_at, applied_tools, note')
-              .eq('user_id', userId)
-              .order('applied_at', { ascending: false })
-              .limit(5)
-              .then(result => ({ type: 'practice', result }))
-              .catch(e => ({ type: 'practice', error: e }))
+            (async () => {
+              try {
+                // try filter by current_history_id if present
+                const ug = await (supabaseAdmin as any)
+                  .from('user_goal')
+                  .select('current_history_id')
+                  .eq('user_id', userId)
+                  .maybeSingle();
+                const hid = ug?.data?.current_history_id;
+                let q = (supabaseAdmin as any)
+                  .from('practice_log')
+                  .select('applied_at, applied_tools, note')
+                  .eq('user_id', userId)
+                  .order('applied_at', { ascending: false })
+                  .limit(5);
+                if (hid) {
+                  q = q.eq('goal_history_id', hid);
+                }
+                const result = await q;
+                return { type: 'practice', result };
+              } catch (e) {
+                return { type: 'practice', error: e };
+              }
+            })()
           );
         }
         

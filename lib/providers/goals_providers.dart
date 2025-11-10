@@ -111,6 +111,15 @@ final practiceLogWithLimitProvider =
   return repo.fetchPracticeLog(limit: limit);
 });
 
+/// История применений по текущей цели (фильтр по user_goal.current_history_id)
+final practiceLogByCurrentHistoryProvider =
+    FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  final repo = ref.read(goalsRepositoryProvider);
+  final goal = await ref.watch(userGoalProvider.future);
+  final String? hid = (goal?['current_history_id'] as String?);
+  return repo.fetchPracticeLogForHistory(historyId: hid, limit: 200);
+});
+
 /// Агрегаты журнала: дни с применениями, топ‑инструменты
 final practiceLogAggregatesProvider =
     FutureProvider<Map<String, dynamic>>((ref) async {

@@ -25,6 +25,13 @@ linter:
     avoid_redundant_argument_values: true
     prefer_const_constructors: true
     prefer_const_declarations: true
+    avoid_unnecessary_containers: true
+    prefer_final_locals: true
+    avoid_print: true
+    prefer_const_literals_to_create_immutables: true
+    always_declare_return_types: true
+    prefer_final_fields: true
+    unnecessary_nullable_for_final_variable_declarations: true
 
 # Additional information about this file can be found at
 # https://dart.dev/guides/language/analysis-options

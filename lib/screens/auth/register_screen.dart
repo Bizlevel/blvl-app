@@ -106,11 +106,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               padding: AppSpacing.insetsSymmetric(
                   h: AppSpacing.xl, v: AppSpacing.xl),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: AppColor.card,
                 borderRadius: BorderRadius.circular(24),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
+                    color: AppColor.shadow.withValues(alpha: 0.05),
                     blurRadius: 12,
                     offset: const Offset(0, 4),
                   ),
@@ -149,6 +149,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           controller: _passwordController,
           obscureText: _obscurePassword,
           suffix: IconButton(
+            tooltip:
+                _obscurePassword ? 'Показать пароль' : 'Скрыть пароль',
             icon: Icon(
                 _obscurePassword ? Icons.visibility_off : Icons.visibility),
             onPressed: () =>
@@ -163,6 +165,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           controller: _confirmController,
           obscureText: _obscureConfirm,
           suffix: IconButton(
+            tooltip:
+                _obscureConfirm ? 'Показать пароль' : 'Скрыть пароль',
             icon:
                 Icon(_obscureConfirm ? Icons.visibility_off : Icons.visibility),
             onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
@@ -175,9 +179,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             height: 48,
             width: double.infinity,
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [AppColor.primary, Color(0xFF1273C4)],
-              ),
+              gradient: AppColor.businessGradient,
               borderRadius: BorderRadius.circular(12),
             ),
             alignment: Alignment.center,
@@ -186,14 +188,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     width: 22,
                     height: 22,
                     child: CircularProgressIndicator(
-                      color: Colors.white,
+                      color: AppColor.onPrimary,
                       strokeWidth: 3,
                     ),
                   )
                 : const Text(
                     'Создать аккаунт',
                     style: TextStyle(
-                      color: Colors.white,
+                      color: AppColor.onPrimary,
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
                     ),
@@ -242,43 +244,39 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         Container(
           padding: AppSpacing.insetsAll(AppSpacing.lg),
           decoration: BoxDecoration(
-            color: Colors.green.withValues(alpha: 0.1),
+            color: AppColor.success.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+            border: Border.all(color: AppColor.success.withValues(alpha: 0.3)),
           ),
-          child: const Row(
+          child: Row(
             children: [
-              Icon(Icons.check_circle, color: Colors.green, size: 24),
-              SizedBox(width: 12),
+              const Icon(Icons.check_circle, color: AppColor.success, size: 24),
+              const SizedBox(width: 12),
               Expanded(
                 child: Text(
                   'Регистрация успешна!',
-                  style: TextStyle(
-                    color: Colors.green,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleSmall
+                      ?.copyWith(color: AppColor.success, fontWeight: FontWeight.w600),
                 ),
               ),
             ],
           ),
         ),
         AppSpacing.gapH(AppSpacing.xl),
-        const Text(
+        Text(
           'Проверьте почту для подтверждения аккаунта',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-          ),
+          style: Theme.of(context)
+              .textTheme
+              .titleSmall
+              ?.copyWith(fontWeight: FontWeight.w500),
           textAlign: TextAlign.center,
         ),
         AppSpacing.gapH(AppSpacing.lg),
-        const Text(
+        Text(
           'Мы отправили вам письмо со ссылкой для подтверждения. Перейдите по ссылке, а затем войдите в приложение.',
-          style: TextStyle(
-            fontSize: 14,
-            height: 1.4,
-          ),
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.4),
           textAlign: TextAlign.center,
         ),
         AppSpacing.gapH(AppSpacing.xl),
@@ -288,16 +286,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             height: 48,
             width: double.infinity,
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [AppColor.primary, Color(0xFF1273C4)],
-              ),
+              gradient: AppColor.businessGradient,
               borderRadius: BorderRadius.circular(12),
             ),
             alignment: Alignment.center,
             child: const Text(
               'Уже подтвердили? Войти',
               style: TextStyle(
-                color: Colors.white,
+                color: AppColor.onPrimary,
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
               ),

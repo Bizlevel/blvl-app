@@ -165,6 +165,9 @@ class LoginScreen extends HookConsumerWidget {
                           controller: passwordController,
                           obscureText: obscurePassword.value,
                           suffix: IconButton(
+                            tooltip: obscurePassword.value
+                                ? 'Показать пароль'
+                                : 'Скрыть пароль',
                             icon: Icon(obscurePassword.value
                                 ? Icons.visibility_off
                                 : Icons.visibility),
@@ -268,8 +271,8 @@ class _AnimatedGradientBackgroundState
               colors: [
                 Color.lerp(AppColor.bgGradient.colors.first,
                     AppColor.bgGradient.colors.last, t * 0.6)!,
-                Color.lerp(
-                    const Color(0xFFE0F2FE), const Color(0xFFEDE9FE), t * 0.6)!,
+                Color.lerp(AppColor.bgGradient.colors.last,
+                    AppColor.bgGradient.colors.first, t * 0.6)!,
               ],
             ),
           ),

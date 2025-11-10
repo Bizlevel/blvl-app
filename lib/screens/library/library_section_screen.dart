@@ -9,6 +9,7 @@ import 'package:bizlevel/providers/library_providers.dart';
 import 'package:bizlevel/widgets/common/breadcrumb.dart';
 import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/theme/spacing.dart';
+import 'package:bizlevel/widgets/common/bizlevel_card.dart';
 
 class LibrarySectionScreen extends ConsumerStatefulWidget {
   final String type; // 'courses' | 'grants' | 'accelerators'
@@ -262,65 +263,64 @@ class _ResourceCard extends StatelessWidget {
     final description = (data['description'] ?? '').toString();
     final url = (data['url'] ?? '').toString();
 
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleMedium
-                            ?.copyWith(fontWeight: FontWeight.w600),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(platform,
-                          style: Theme.of(context).textTheme.bodySmall),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  icon: Icon(expanded ? Icons.expand_less : Icons.expand_more),
-                  onPressed: onToggleExpand,
-                ),
-                IconButton(
-                  icon: Icon(isFavorite ? Icons.star : Icons.star_border),
-                  onPressed: onToggleFavorite,
-                ),
-              ],
-            ),
-            if (expanded) ...[
-              const SizedBox(height: 8),
-              Text(description, style: Theme.of(context).textTheme.bodyMedium),
-              const SizedBox(height: 8),
-              _DynamicInfo(type: type, data: data),
-              const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(minHeight: 44),
-                  child: Semantics(
-                    label: 'Открыть ресурс',
-                    button: true,
-                    child: ElevatedButton(
-                      onPressed: url.isEmpty ? null : onOpenLink,
-                      child: const Text('Перейти ↗'),
+    return BizLevelCard(
+      outlined: true,
+      padding: AppSpacing.insetsAll(AppSpacing.cardPadding),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w600),
                     ),
+                    const SizedBox(height: 4),
+                    Text(platform, style: Theme.of(context).textTheme.bodySmall),
+                  ],
+                ),
+              ),
+              IconButton(
+                tooltip: expanded ? 'Свернуть' : 'Развернуть',
+                icon: Icon(expanded ? Icons.expand_less : Icons.expand_more),
+                onPressed: onToggleExpand,
+              ),
+              IconButton(
+                tooltip: isFavorite ? 'Убрать из избранного' : 'В избранное',
+                icon: Icon(isFavorite ? Icons.star : Icons.star_border),
+                onPressed: onToggleFavorite,
+              ),
+            ],
+          ),
+          if (expanded) ...[
+            const SizedBox(height: 8),
+            Text(description, style: Theme.of(context).textTheme.bodyMedium),
+            const SizedBox(height: 8),
+            _DynamicInfo(type: type, data: data),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 44),
+                child: Semantics(
+                  label: 'Открыть ресурс',
+                  button: true,
+                  child: ElevatedButton(
+                    onPressed: url.isEmpty ? null : onOpenLink,
+                    child: const Text('Перейти ↗'),
                   ),
                 ),
               ),
-            ],
+            ),
           ],
-        ),
+        ],
       ),
     );
   }
