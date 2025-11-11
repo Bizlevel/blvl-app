@@ -16,6 +16,7 @@ import 'dart:async';
 import 'utils/deep_link.dart';
 
 import 'routing/app_router.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:go_router/go_router.dart';
 import 'services/supabase_service.dart';
 import 'theme/color.dart';
@@ -146,6 +147,16 @@ class MyApp extends ConsumerWidget {
       router: router,
       child: MaterialApp.router(
         routerConfig: router,
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: const [
+          Locale('ru'),
+          Locale('en'),
+        ],
+        // Локализации делегируем системным настройкам; ru-параметры передаются напрямую в showDatePicker
         builder: (context, child) {
           // создаём ResponsiveWrapper как обычно
           final wrapped = ResponsiveWrapper.builder(

@@ -22,7 +22,6 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
   final TextEditingController _metricCurrentCtrl = TextEditingController();
   final TextEditingController _metricTargetCtrl = TextEditingController();
   final TextEditingController _targetDateCtrl = TextEditingController();
-  final TextEditingController _metricTypeCtrl = TextEditingController();
   DateTime? _selectedTargetDate;
   bool _isEditing = false;
 
@@ -32,7 +31,6 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
     _metricCurrentCtrl.dispose();
     _metricTargetCtrl.dispose();
     _targetDateCtrl.dispose();
-    _metricTypeCtrl.dispose();
     super.dispose();
   }
 
@@ -49,7 +47,6 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
             _goalCtrl.text = (goal['goal_text'] ?? '').toString();
             _metricCurrentCtrl.text = (goal['metric_current'] ?? '').toString();
             _metricTargetCtrl.text = (goal['metric_target'] ?? '').toString();
-            _metricTypeCtrl.text = (goal['metric_type'] ?? '').toString();
             final String td = (goal['target_date'] ?? '').toString();
             try {
               final dt = DateTime.tryParse(td)?.toLocal();
@@ -61,8 +58,6 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
               _targetDateCtrl.text = '';
             }
           }
-
-          final metricType = (_metricTypeCtrl.text).toString();
 
           // Прогресс и дни до дедлайна (герой-блок)
           double? progress;
@@ -177,38 +172,6 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                       labelText: 'Короткое описание цели'),
                 ),
                 const SizedBox(height: 8),
-                // Блок метрики
-                DropdownButtonFormField<String>(
-                  value: () {
-                    const opts = [
-                      'Выручка (тенге)',
-                      'Количество клиентов',
-                      'Количество продаж',
-                      'Часы работы',
-                      'Конверсия (%)',
-                      'Другое',
-                    ];
-                    final t = _metricTypeCtrl.text.trim();
-                    return (t.isEmpty || !opts.contains(t)) ? null : t;
-                  }(),
-                  items: const [
-                    'Выручка (тенге)',
-                    'Количество клиентов',
-                    'Количество продаж',
-                    'Часы работы',
-                    'Конверсия (%)',
-                    'Другое',
-                  ]
-                      .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                      .toList(),
-                  onChanged: (v) {
-                    if (v != null) _metricTypeCtrl.text = v;
-                  },
-                  decoration: const InputDecoration(
-                    labelText: 'Метрика (тип)',
-                  ),
-                ),
-                const SizedBox(height: 8),
                 Row(children: [
                   Expanded(
                     child: TextField(
@@ -255,6 +218,18 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                               initialDate: initial,
                               firstDate: first,
                               lastDate: last,
+                              locale: const Locale('ru'),
+                              helpText: 'Выберите дату',
+                              cancelText: 'Отмена',
+                              confirmText: 'ОК',
+                              builder: (ctx, child) {
+                                return Theme(
+                                  data: Theme.of(ctx).copyWith(
+                                    dialogBackgroundColor: Colors.white,
+                                  ),
+                                  child: child!,
+                                );
+                              },
                             );
                             if (picked != null) {
                               setState(() {
@@ -275,104 +250,102 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
               ],
               const SizedBox(height: 8),
               const SizedBox(height: 12),
-              Wrap(spacing: 12, runSpacing: 8, children: [
-                if (!_isEditing)
-                  BizLevelButton(
-                    variant: BizLevelButtonVariant.text,
-                    label: 'Редактировать',
-                    onPressed: () => setState(() => _isEditing = true),
-                  )
-                else ...[
-                  BizLevelButton(
-                    label: 'Сохранить',
-                    onPressed: () async {
-                      try {
-                        try {
-                          Sentry.addBreadcrumb(Breadcrumb(
-                              category: 'goal',
-                              message: 'goal_edit_saved',
-                              level: SentryLevel.info));
-                        } catch (_) {}
-                        final repo = ref.read(goalsRepositoryProvider);
-                        // Авто‑старт: если не задан metric_start и задано текущее
-                        num? metricStartParam;
-                        try {
-                          final hasStart =
-                              (goal?['metric_start'] as num?) != null;
-                          final curParsed =
-                              num.tryParse(_metricCurrentCtrl.text.trim());
-                          if (!hasStart && curParsed != null) {
-                            metricStartParam = curParsed;
-                          }
-                        } catch (_) {}
-                        await repo.upsertUserGoal(
-                          goalText: _goalCtrl.text.trim(),
-                          targetDate: _selectedTargetDate,
-                          metricType: _metricTypeCtrl.text.trim().isEmpty
-                              ? null
-                              : _metricTypeCtrl.text.trim(),
-                          metricCurrent: num.tryParse(
-                              _metricCurrentCtrl.text.trim().isEmpty
-                                  ? ''
-                                  : _metricCurrentCtrl.text.trim()),
-                          metricTarget: num.tryParse(
-                              _metricTargetCtrl.text.trim().isEmpty
-                                  ? ''
-                                  : _metricTargetCtrl.text.trim()),
-                          metricStart: metricStartParam,
-                        );
-                        if (!context.mounted) return;
-                        final messenger = ScaffoldMessenger.of(context);
-                        ref.invalidate(userGoalProvider);
-                        setState(() => _isEditing = false);
-                        messenger.showSnackBar(
-                            const SnackBar(content: Text('Цель сохранена')));
-                      } catch (e) {
-                        if (!context.mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Ошибка: $e')));
-                      }
-                    },
+              Row(
+                children: [
+                  Expanded(
+                    child: !_isEditing
+                        ? BizLevelButton(
+                            variant: BizLevelButtonVariant.outline,
+                            label: 'Редактировать',
+                            onPressed: () => setState(() => _isEditing = true),
+                          )
+                        : BizLevelButton(
+                            label: 'Сохранить',
+                            onPressed: () async {
+                              try {
+                                try {
+                                  Sentry.addBreadcrumb(Breadcrumb(
+                                      category: 'goal',
+                                      message: 'goal_edit_saved',
+                                      level: SentryLevel.info));
+                                } catch (_) {}
+                                final repo = ref.read(goalsRepositoryProvider);
+                                // Авто‑старт: если не задан metric_start и задано текущее
+                                num? metricStartParam;
+                                try {
+                                  final hasStart =
+                                      (goal?['metric_start'] as num?) != null;
+                                  final curParsed = num.tryParse(
+                                      _metricCurrentCtrl.text.trim());
+                                  if (!hasStart && curParsed != null) {
+                                    metricStartParam = curParsed;
+                                  }
+                                } catch (_) {}
+                                await repo.upsertUserGoal(
+                                  goalText: _goalCtrl.text.trim(),
+                                  targetDate: _selectedTargetDate,
+                                  metricCurrent: num.tryParse(
+                                      _metricCurrentCtrl.text.trim().isEmpty
+                                          ? ''
+                                          : _metricCurrentCtrl.text.trim()),
+                                  metricTarget: num.tryParse(
+                                      _metricTargetCtrl.text.trim().isEmpty
+                                          ? ''
+                                          : _metricTargetCtrl.text.trim()),
+                                  metricStart: metricStartParam,
+                                );
+                                if (!context.mounted) return;
+                                final messenger = ScaffoldMessenger.of(context);
+                                ref.invalidate(userGoalProvider);
+                                setState(() => _isEditing = false);
+                                messenger.showSnackBar(const SnackBar(
+                                    content: Text('Цель сохранена')));
+                              } catch (e) {
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('Ошибка: $e')));
+                              }
+                            },
+                          ),
                   ),
-                  BizLevelButton(
-                    variant: BizLevelButtonVariant.text,
-                    label: 'Отмена',
-                    onPressed: () => setState(() => _isEditing = false),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: BizLevelButton(
+                      icon: const Icon(Icons.chat_bubble_outline),
+                      label: 'Обсудить с Максом',
+                      onPressed: () {
+                        Navigator.of(context).push(MaterialPageRoute(
+                          builder: (_) => LeoDialogScreen(
+                            bot: 'max',
+                            userContext: [
+                              'goal_text: ${_goalCtrl.text.trim()}',
+                              if (_metricCurrentCtrl.text.trim().isNotEmpty)
+                                'metric_current: ${_metricCurrentCtrl.text.trim()}',
+                              if (_metricTargetCtrl.text.trim().isNotEmpty)
+                                'metric_target: ${_metricTargetCtrl.text.trim()}',
+                            ].join('\n'),
+                            levelContext: '',
+                          ),
+                        ));
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: !_isEditing
+                        ? BizLevelButton(
+                            variant: BizLevelButtonVariant.outline,
+                            label: 'Новая цель',
+                            onPressed: () => _showStartNewGoalSheet(context),
+                          )
+                        : BizLevelButton(
+                            variant: BizLevelButtonVariant.text,
+                            label: 'Отмена',
+                            onPressed: () => setState(() => _isEditing = false),
+                          ),
                   ),
                 ],
-                if (!_isEditing)
-                  BizLevelButton(
-                    variant: BizLevelButtonVariant.text,
-                    label: 'Новая цель',
-                    onPressed: () => _showStartNewGoalSheet(context),
-                  ),
-                if (!_isEditing)
-                  BizLevelButton(
-                    variant: BizLevelButtonVariant.text,
-                    label: 'Обновить текущее',
-                    onPressed: () => _showUpdateCurrentSheet(context),
-                  ),
-                BizLevelButton(
-                  icon: const Icon(Icons.chat_bubble_outline),
-                  label: 'Обсудить с Максом',
-                  onPressed: () {
-                    Navigator.of(context).push(MaterialPageRoute(
-                      builder: (_) => LeoDialogScreen(
-                        bot: 'max',
-                        userContext: [
-                          'goal_text: ${_goalCtrl.text.trim()}',
-                          if (metricType.isNotEmpty) 'metric_type: $metricType',
-                          if (_metricCurrentCtrl.text.trim().isNotEmpty)
-                            'metric_current: ${_metricCurrentCtrl.text.trim()}',
-                          if (_metricTargetCtrl.text.trim().isNotEmpty)
-                            'metric_target: ${_metricTargetCtrl.text.trim()}',
-                        ].join('\n'),
-                        levelContext: '',
-                      ),
-                    ));
-                  },
-                ),
-              ]),
+              ),
             ],
           );
         },
@@ -380,74 +353,13 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
     );
   }
 
-  Future<void> _showUpdateCurrentSheet(BuildContext context) async {
-    final TextEditingController currentCtrl =
-        TextEditingController(text: _metricCurrentCtrl.text.trim());
-    await showModalBottomSheet(
-      context: context,
-      showDragHandle: true,
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text('Обновить текущее значение',
-                  style: Theme.of(ctx)
-                      .textTheme
-                      .titleMedium
-                      ?.copyWith(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 12),
-              TextField(
-                controller: currentCtrl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Текущее значение',
-                ),
-              ),
-              const SizedBox(height: 12),
-              ElevatedButton(
-                onPressed: () async {
-                  try {
-                    final repo = ref.read(goalsRepositoryProvider);
-                    await repo.upsertUserGoal(
-                      goalText: _goalCtrl.text.trim(),
-                      metricType: _metricTypeCtrl.text.trim().isEmpty
-                          ? null
-                          : _metricTypeCtrl.text.trim(),
-                      metricCurrent: num.tryParse(currentCtrl.text.trim()),
-                      metricTarget: num.tryParse(_metricTargetCtrl.text.trim()),
-                      targetDate: _selectedTargetDate,
-                    );
-                    _metricCurrentCtrl.text = currentCtrl.text.trim();
-                    if (mounted) {
-                      ref.invalidate(userGoalProvider);
-                      Navigator.of(ctx).pop();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Значение обновлено')),
-                      );
-                    }
-                  } catch (e) {
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Ошибка: $e')),
-                      );
-                    }
-                  }
-                },
-                child: const Text('Сохранить'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+  // Удалён sheet обновления текущего значения: теперь обновляем через Журнал применений
 
   Future<void> _showStartNewGoalSheet(BuildContext context) async {
     final TextEditingController textCtrl = TextEditingController();
     DateTime? newTarget;
+    final TextEditingController currentCtrl = TextEditingController();
+    final TextEditingController targetCtrl = TextEditingController();
     await showModalBottomSheet(
       context: context,
       showDragHandle: true,
@@ -473,6 +385,28 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
               Row(
                 children: [
                   Expanded(
+                    child: TextField(
+                      controller: currentCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration:
+                          const InputDecoration(labelText: 'Текущая метрика'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextField(
+                      controller: targetCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration:
+                          const InputDecoration(labelText: 'Целевая метрика'),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
                     child: Text(
                       newTarget == null
                           ? 'Дедлайн не выбран'
@@ -491,6 +425,18 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                         initialDate: newTarget ?? now,
                         firstDate: now,
                         lastDate: now.add(const Duration(days: 365 * 3)),
+                        locale: const Locale('ru'),
+                        helpText: 'Выберите дату',
+                        cancelText: 'Отмена',
+                        confirmText: 'ОК',
+                        builder: (bctx, child) {
+                          return Theme(
+                            data: Theme.of(bctx).copyWith(
+                              dialogBackgroundColor: Colors.white,
+                            ),
+                            child: child!,
+                          );
+                        },
                       );
                       if (picked != null) {
                         newTarget = picked;
@@ -513,10 +459,23 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                     );
                     return;
                   }
+                  final num? cur = num.tryParse(currentCtrl.text.trim());
+                  final num? tgt = num.tryParse(targetCtrl.text.trim());
+                  if (cur == null || tgt == null) {
+                    ScaffoldMessenger.of(ctx).showSnackBar(
+                      const SnackBar(content: Text('Заполните метрики')),
+                    );
+                    return;
+                  }
                   try {
                     final repo = ref.read(goalsRepositoryProvider);
                     await repo.startNewGoal(
-                        goalText: txt, targetDate: newTarget);
+                      goalText: txt,
+                      targetDate: newTarget,
+                      metricStart: cur,
+                      metricCurrent: cur,
+                      metricTarget: tgt,
+                    );
                     if (mounted) {
                       ref.invalidate(userGoalProvider);
                       Navigator.of(ctx).pop();
@@ -591,8 +550,5 @@ class _GoalProgressCircle extends StatelessWidget {
 // Простая обёртка, чтобы прокинуть цвет в индикатор (без кастомного painter)
 class _GradientColor extends Color {
   final List<Color> colors;
-  // Используем значение первого цвета как прокси для Color — линтер ругается из-за value,
-  // но нам нужен только числовой ARGB для базового Color. Градиент остаётся в логике выше.
-  // ignore: deprecated_member_use
   _GradientColor({required this.colors}) : super(colors.first.value);
 }

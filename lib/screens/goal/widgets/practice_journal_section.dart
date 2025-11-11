@@ -23,12 +23,14 @@ class PracticeJournalSection extends ConsumerStatefulWidget {
 class _PracticeJournalSectionState
     extends ConsumerState<PracticeJournalSection> {
   final TextEditingController _practiceNoteCtrl = TextEditingController();
+  final TextEditingController _metricUpdateCtrl = TextEditingController();
   final Set<String> _selectedTools = <String>{};
   bool _showMomentum = false;
 
   @override
   void dispose() {
     _practiceNoteCtrl.dispose();
+    _metricUpdateCtrl.dispose();
     super.dispose();
   }
 
@@ -119,22 +121,29 @@ class _PracticeJournalSectionState
                         for (final t in top3)
                           FilledButton.tonalIcon(
                             onPressed: () async {
+                              final String label =
+                                  (t is Map && t['label'] != null)
+                                      ? t['label'].toString()
+                                      : '';
+                              if (!mounted) return;
                               setState(() {
                                 _selectedTools
                                   ..clear()
-                                  ..add(t['label']?.toString() ?? '');
+                                  ..add(label);
                               });
                               try {
                                 await Sentry.addBreadcrumb(Breadcrumb(
                                   category: 'goal',
                                   message: 'top_tool_selected',
-                                  data: {'tool': t['label']},
+                                  data: {'tool': label},
                                   level: SentryLevel.info,
                                 ));
                               } catch (_) {}
                             },
                             icon: const Icon(Icons.flash_on, size: 18),
-                            label: Text((t['label'] ?? '').toString()),
+                            label: Text((t is Map && t['label'] != null)
+                                ? t['label'].toString()
+                                : ''),
                           ),
                       ],
                     ),
@@ -145,8 +154,21 @@ class _PracticeJournalSectionState
                 loading: () => const SizedBox.shrink(),
                 error: (_, __) => const SizedBox.shrink(),
                 data: (opts) {
-                  final String? selected =
+                  // Де-дубликат опций и безопасное выбранное значение
+                  final List<String> uniqueOpts = () {
+                    final List<String> out = [];
+                    final Set<String> seen = <String>{};
+                    for (final e in (opts)) {
+                      if (seen.add(e)) out.add(e);
+                    }
+                    return out;
+                  }();
+                  String? selected =
                       _selectedTools.isEmpty ? null : _selectedTools.first;
+                  if (selected != null &&
+                      uniqueOpts.where((e) => e == selected).length != 1) {
+                    selected = null;
+                  }
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -154,7 +176,7 @@ class _PracticeJournalSectionState
                         isExpanded: true,
                         value: selected,
                         hint: const Text('Другие навыки'),
-                        items: opts
+                        items: uniqueOpts
                             .map((e) => DropdownMenuItem(
                                   value: e,
                                   child: Row(
@@ -196,6 +218,14 @@ class _PracticeJournalSectionState
               ),
               const SizedBox(height: 8),
               TextField(
+                controller: _metricUpdateCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  hintText: 'Обновить текущее значение метрики',
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
                 controller: _practiceNoteCtrl,
                 maxLines: 2,
                 decoration: const InputDecoration(
@@ -209,6 +239,11 @@ class _PracticeJournalSectionState
                   onPressed: () async {
                     try {
                       final repo = ref.read(goalsRepositoryProvider);
+                      final String metricUpdateRaw =
+                          _metricUpdateCtrl.text.trim();
+                      final num? metricUpdate = metricUpdateRaw.isEmpty
+                          ? null
+                          : num.tryParse(metricUpdateRaw);
                       await repo.addPracticeEntry(
                         appliedTools: _selectedTools.toList(),
                         note: _practiceNoteCtrl.text.trim().isEmpty
@@ -216,9 +251,14 @@ class _PracticeJournalSectionState
                             : _practiceNoteCtrl.text.trim(),
                         appliedAt: DateTime.now(),
                       );
+                      if (metricUpdate != null) {
+                        await repo.updateMetricCurrent(metricUpdate);
+                        ref.invalidate(userGoalProvider);
+                      }
                       final String note = _practiceNoteCtrl.text.trim();
                       final String tools = _selectedTools.join(', ');
                       _practiceNoteCtrl.clear();
+                      _metricUpdateCtrl.clear();
                       _selectedTools.clear();
                       ref.invalidate(practiceLogProvider);
                       ref.invalidate(practiceLogAggregatesProvider);
@@ -254,6 +294,8 @@ class _PracticeJournalSectionState
                           userContext: [
                             if (note.isNotEmpty) 'practice_note: $note',
                             if (tools.isNotEmpty) 'applied_tools: $tools',
+                            if (metricUpdate != null)
+                              'metric_current_updated: $metricUpdate',
                           ].join('\n'),
                           levelContext: '',
                           autoUserMessage: note.isNotEmpty

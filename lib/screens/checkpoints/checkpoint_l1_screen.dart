@@ -20,6 +20,8 @@ class CheckpointL1Screen extends ConsumerStatefulWidget {
 class _CheckpointL1ScreenState extends ConsumerState<CheckpointL1Screen> {
   final TextEditingController _goalTextCtrl = TextEditingController();
   DateTime? _deadline;
+  final TextEditingController _metricCurrentCtrl = TextEditingController();
+  final TextEditingController _metricTargetCtrl = TextEditingController();
 
   @override
   void initState() {
@@ -32,6 +34,8 @@ class _CheckpointL1ScreenState extends ConsumerState<CheckpointL1Screen> {
   @override
   void dispose() {
     _goalTextCtrl.dispose();
+    _metricCurrentCtrl.dispose();
+    _metricTargetCtrl.dispose();
     super.dispose();
   }
 
@@ -42,6 +46,22 @@ class _CheckpointL1ScreenState extends ConsumerState<CheckpointL1Screen> {
       initialDate: _deadline ?? now,
       firstDate: now,
       lastDate: now.add(const Duration(days: 365 * 3)),
+      locale: const Locale('ru'),
+      helpText: 'Выберите дату',
+      cancelText: 'Отмена',
+      confirmText: 'ОК',
+      builder: (ctx, child) {
+        return Theme(
+          data: Theme.of(ctx).copyWith(
+            dialogBackgroundColor: Colors.white,
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(
+                  foregroundColor: Theme.of(ctx).primaryColor),
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
     if (picked != null) setState(() => _deadline = picked);
   }
@@ -50,9 +70,19 @@ class _CheckpointL1ScreenState extends ConsumerState<CheckpointL1Screen> {
     final repo = ref.read(goalsRepositoryProvider);
     try {
       final goalText = _goalTextCtrl.text.trim();
+      final num? metricCurrent = num.tryParse(_metricCurrentCtrl.text.trim());
+      final num? metricTarget = num.tryParse(_metricTargetCtrl.text.trim());
+      if (metricCurrent == null || metricTarget == null) {
+        NotificationCenter.showError(
+            context, 'Введите числовые значения метрик');
+        return;
+      }
       await repo.upsertUserGoal(
         goalText: goalText,
         targetDate: _deadline,
+        metricStart: metricCurrent,
+        metricCurrent: metricCurrent,
+        metricTarget: metricTarget,
       );
       try {
         Sentry.addBreadcrumb(Breadcrumb(
@@ -87,6 +117,31 @@ class _CheckpointL1ScreenState extends ConsumerState<CheckpointL1Screen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Интро-блок: картинка ~1/3 экрана и 3 строки текста
+              LayoutBuilder(builder: (context, cons) {
+                final double h = MediaQuery.of(context).size.height / 3;
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      height: h.clamp(180, 320),
+                      width: double.infinity,
+                      child: Image.asset(
+                        'assets/images/logo_light.png',
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    Text(
+                      'Сформулируйте первую цель. Сделайте её измеримой и достижимой — так вы увидите прогресс и поймёте, что работает.',
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                  ],
+                );
+              }),
               Text('Шаг 1: Опишите свою цель',
                   style: Theme.of(context)
                       .textTheme
@@ -98,6 +153,31 @@ class _CheckpointL1ScreenState extends ConsumerState<CheckpointL1Screen> {
                 hint:
                     'Коротко и измеримо: например, 5 клиентов в неделю или ₸100 000 в день',
                 controller: _goalTextCtrl,
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              Text('Шаг 2: Укажите метрики',
+                  style: Theme.of(context).textTheme.bodyMedium),
+              const SizedBox(height: AppSpacing.sm),
+              Row(
+                children: [
+                  Expanded(
+                    child: BizLevelTextField(
+                      label: 'Текущая',
+                      hint: 'например, 1',
+                      controller: _metricCurrentCtrl,
+                      keyboardType: TextInputType.number,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: BizLevelTextField(
+                      label: 'Цель',
+                      hint: 'например, 5',
+                      controller: _metricTargetCtrl,
+                      keyboardType: TextInputType.number,
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: AppSpacing.lg),
               Text('Шаг 2: Срок достижения (необязательно)',

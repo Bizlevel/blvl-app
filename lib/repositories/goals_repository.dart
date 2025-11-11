@@ -165,10 +165,13 @@ class GoalsRepository {
     return Map<String, dynamic>.from(row);
   }
 
-  /// Начать новую цель: закрыть текущую историю, создать новую, обнулить метрики.
+  /// Начать новую цель: закрыть текущую историю, создать новую; задать стартовые метрики при наличии.
   Future<Map<String, dynamic>> startNewGoal({
     required String goalText,
     DateTime? targetDate,
+    num? metricStart,
+    num? metricCurrent,
+    num? metricTarget,
   }) async {
     final String userId = _requireUserId();
     _ensureAnonApikey();
@@ -195,6 +198,9 @@ class GoalsRepository {
     final Map<String, dynamic> histPayload = {
       'user_id': userId,
       'goal_text': goalText,
+      if (metricStart != null) 'metric_start': metricStart,
+      if (metricCurrent != null) 'metric_current': metricCurrent,
+      if (metricTarget != null) 'metric_target': metricTarget,
       if (targetDate != null)
         'target_date': targetDate.toUtc().toIso8601String(),
       'status': 'active',
@@ -205,16 +211,16 @@ class GoalsRepository {
         .select('id')
         .single();
     final String newHistoryId = insertedHist['id'] as String;
-    // 3) обновить user_goal: текст/дедлайн, очистить метрики, привязать pointer
+    // 3) обновить user_goal: текст/дедлайн, стартовые метрики (если переданы), привязать pointer
     Map<String, dynamic> row = await _client
         .from('user_goal')
         .upsert({
           'user_id': userId,
           'goal_text': goalText,
           'metric_type': null,
-          'metric_start': null,
-          'metric_current': null,
-          'metric_target': null,
+          'metric_start': metricStart,
+          'metric_current': metricCurrent,
+          'metric_target': metricTarget,
           if (targetDate != null)
             'target_date': targetDate.toUtc().toIso8601String(),
           'current_history_id': newHistoryId,
@@ -298,6 +304,43 @@ class GoalsRepository {
         : base);
     return List<Map<String, dynamic>>.from(
         rows.map((e) => Map<String, dynamic>.from(e as Map)));
+  }
+
+  Future<void> updateMetricCurrent(num value) async {
+    final String userId = _requireUserId();
+    _ensureAnonApikey();
+    // 1) Обновляем активную историю, если есть указатель
+    String? currentHistoryId;
+    try {
+      final ug = await _client
+          .from('user_goal')
+          .select('current_history_id')
+          .eq('user_id', userId)
+          .maybeSingle();
+      currentHistoryId = (ug?['current_history_id'] as String?);
+    } catch (_) {}
+    if (currentHistoryId != null && currentHistoryId.isNotEmpty) {
+      await _client
+          .from('user_goal_history')
+          .update({'metric_current': value}).eq('id', currentHistoryId);
+    }
+    // 2) Обновляем основную запись user_goal
+    final updated = await _client
+        .from('user_goal')
+        .update({
+          'metric_current': value,
+          'updated_at': DateTime.now().toUtc().toIso8601String()
+        })
+        .eq('user_id', userId)
+        .select()
+        .maybeSingle();
+    // 3) Обновляем кеш, если получилось получить запись
+    try {
+      if (updated != null) {
+        final Box cache = Hive.box('user_goal');
+        await cache.put('self', updated);
+      }
+    } catch (_) {}
   }
 
   Future<List> _fetchPracticeRows(

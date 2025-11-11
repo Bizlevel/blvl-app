@@ -112,12 +112,13 @@ class HomeGoalCard extends ConsumerWidget {
                           ],
                           const SizedBox(height: 12),
                           Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Expanded(
                                 child: BizLevelButton(
                                   icon: const Icon(Icons.add_circle_outline,
                                       size: 18),
-                                  label: 'Действие к цели',
+                                  label: '+ Действие к цели',
                                   onPressed: () {
                                     try {
                                       Sentry.addBreadcrumb(Breadcrumb(
@@ -126,10 +127,10 @@ class HomeGoalCard extends ConsumerWidget {
                                         level: SentryLevel.info,
                                       ));
                                     } catch (_) {}
-                                    context.go('/goal');
+                                    context.go('/goal?scroll=journal');
                                   },
                                   variant: BizLevelButtonVariant.secondary,
-                                  size: BizLevelButtonSize.md,
+                                  size: BizLevelButtonSize.lg,
                                 ),
                               ),
                               const SizedBox(width: 12),
@@ -180,7 +181,7 @@ class HomeGoalCard extends ConsumerWidget {
                                     );
                                   },
                                   variant: BizLevelButtonVariant.primary,
-                                  size: BizLevelButtonSize.md,
+                                  size: BizLevelButtonSize.lg,
                                 ),
                               ),
                             ],

@@ -3,17 +3,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:sentry_flutter/sentry_flutter.dart';
 // import 'package:go_router/go_router.dart';
 // import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:bizlevel/providers/goals_providers.dart';
 import 'package:bizlevel/screens/goal/widgets/motivation_card.dart';
 // import 'package:bizlevel/providers/goals_repository_provider.dart';
-import 'package:bizlevel/utils/constant.dart';
 // import 'package:bizlevel/widgets/floating_chat_bubble.dart';
 // import 'package:bizlevel/providers/auth_provider.dart';
-import 'package:bizlevel/screens/leo_dialog_screen.dart';
 // import 'package:bizlevel/screens/goal/widgets/goal_compact_card.dart';
 // import 'package:bizlevel/screens/goal/widgets/crystallization_section.dart';
 // import 'package:bizlevel/screens/goal/widgets/progress_widget.dart'; // 🗑️ Удалён - виджет больше не используется
@@ -135,86 +132,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
         ),
         title: const Text('Цель'),
       ),
-      bottomNavigationBar: LayoutBuilder(
-        builder: (context, cons) {
-          // Простая эвристика мобайла: ширина < 600
-          if (cons.maxWidth >= 600 || !kGoalStickyCta) {
-            return const SizedBox.shrink();
-          }
-          return SafeArea(
-            top: false,
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-              decoration: BoxDecoration(
-                color: AppColor.card,
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColor.shadowColor.withValues(alpha: 0.08),
-                    blurRadius: 6,
-                    offset: const Offset(0, -2),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton(
-                      key: const ValueKey('goal_add_entry_cta'),
-                      onPressed: _scrollToJournal,
-                      child: const Text('Добавить запись'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: OutlinedButton(
-                      key: const ValueKey('goal_chat_max_cta'),
-                      onPressed: () {
-                        try {
-                          Sentry.addBreadcrumb(Breadcrumb(
-                              category: 'goal',
-                              message: 'chat_opened_from_goal',
-                              level: SentryLevel.info));
-                        } catch (_) {}
-                        final g = ref.read(userGoalProvider).asData?.value;
-                        final userCtxLines = <String>[
-                          if ((g?['goal_text'] ?? '')
-                              .toString()
-                              .trim()
-                              .isNotEmpty)
-                            'goal_text: ${g?['goal_text']}',
-                          if ((g?['metric_type'] ?? '')
-                              .toString()
-                              .trim()
-                              .isNotEmpty)
-                            'metric_type: ${g?['metric_type']}',
-                          if ((g?['metric_current'] ?? '')
-                              .toString()
-                              .trim()
-                              .isNotEmpty)
-                            'metric_current: ${g?['metric_current']}',
-                          if ((g?['metric_target'] ?? '')
-                              .toString()
-                              .trim()
-                              .isNotEmpty)
-                            'metric_target: ${g?['metric_target']}',
-                        ];
-                        Navigator.of(context).push(MaterialPageRoute(
-                          builder: (_) => LeoDialogScreen(
-                            bot: 'max',
-                            userContext: userCtxLines.join('\n'),
-                            levelContext: '',
-                          ),
-                        ));
-                      },
-                      child: const Text('Обсудить с Максом'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
+      // Нижние CTA удалены по новой спецификации
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 840),
@@ -223,6 +141,23 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Автопрокрутка к журналу, если указан параметр ?scroll=journal
+                Builder(builder: (context) {
+                  try {
+                    final loc = GoRouter.of(context)
+                        .routeInformationProvider
+                        .value
+                        .uri
+                        .toString();
+                    final uri = Uri.parse(loc);
+                    if (uri.queryParameters['scroll'] == 'journal') {
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        _scrollToJournal();
+                      });
+                    }
+                  } catch (_) {}
+                  return const SizedBox.shrink();
+                }),
                 const MotivationCard(),
                 const SizedBox(height: 16),
                 // Онбординг: если цель ещё не задана — предложить начать с L1
