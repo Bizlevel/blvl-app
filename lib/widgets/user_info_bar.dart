@@ -8,6 +8,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:bizlevel/services/supabase_service.dart';
+import 'package:bizlevel/theme/spacing.dart';
+import 'package:bizlevel/theme/typography.dart';
 
 /// Универсальный бар с аватаром, именем пользователя
 /// и подписью «Ты на N уровне!».
@@ -68,7 +70,7 @@ class UserInfoBar extends ConsumerWidget {
       final isNarrow = constraints.maxWidth < 380;
       final avatar = isNarrow ? 32.0 : 40.0;
       final gpIcon = isNarrow ? 28.0 : 36.0;
-      final gpFont = isNarrow ? 14.0 : 16.0;
+      // gp label size now comes from AppTypography (labelLarge/titleMedium)
       return Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -80,18 +82,18 @@ class UserInfoBar extends ConsumerWidget {
             isNetwork: isNetwork,
             isShadow: false,
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: AppSpacing.md),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 user.name,
-                style: const TextStyle(
-                  color: AppColor.labelColor,
-                  fontSize: 14,
-                ),
+                style: Theme.of(context)
+                    .textTheme
+                    .labelLarge
+                    ?.copyWith(color: AppColor.labelColor),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: AppSpacing.xs),
               FutureBuilder<int>(
                 future: SupabaseService.resolveCurrentLevelNumber(
                     user.currentLevel),
@@ -99,17 +101,14 @@ class UserInfoBar extends ConsumerWidget {
                   final n = snap.data ?? 0;
                   return Text(
                     'Ты на $n уровне!',
-                    style: const TextStyle(
-                      color: AppColor.textColor,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 16,
-                    ),
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: AppColor.textColor, fontWeight: FontWeight.w600),
                   );
                 },
               ),
             ],
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: AppSpacing.md),
           if (showGp && gpBalance != null)
             InkWell(
               onTap: () {
@@ -124,14 +123,13 @@ class UserInfoBar extends ConsumerWidget {
                     width: gpIcon,
                     height: gpIcon,
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: AppSpacing.sm),
                   Text(
                     '$gpBalance',
-                    style: TextStyle(
-                      color: const Color.fromARGB(255, 56, 56, 56),
-                      fontWeight: FontWeight.w600,
-                      fontSize: gpFont,
-                    ),
+                    style: (isNarrow
+                            ? AppTypography.textTheme.labelLarge
+                            : AppTypography.textTheme.titleMedium)
+                        ?.copyWith(color: AppColor.textColor),
                   ),
                 ],
               ),

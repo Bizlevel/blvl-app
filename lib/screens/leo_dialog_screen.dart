@@ -6,6 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:bizlevel/providers/leo_service_provider.dart';
 import 'package:bizlevel/theme/color.dart';
+import 'package:bizlevel/theme/spacing.dart';
+import 'package:bizlevel/theme/typography.dart';
+import 'package:bizlevel/theme/dimensions.dart';
 import 'package:bizlevel/widgets/leo_message_bubble.dart';
 import 'package:bizlevel/widgets/typing_indicator.dart';
 import 'package:bizlevel/services/leo_service.dart';
@@ -408,18 +411,17 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
             showDragHandle: true,
             builder: (ctx) => SafeArea(
               child: Padding(
-                padding: const EdgeInsets.all(16),
+                padding: AppSpacing.insetsAll(AppSpacing.lg),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Text(
+                    Text(
                       'Кейс завершён',
                       textAlign: TextAlign.center,
-                      style:
-                          TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                      style: AppTypography.textTheme.titleMedium,
                     ),
-                    const SizedBox(height: 12),
+                    AppSpacing.gapH(AppSpacing.md),
                     ElevatedButton(
                       onPressed: () {
                         Navigator.of(ctx).pop();
@@ -539,16 +541,17 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
       child: ListView.builder(
         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         controller: _scrollController,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg, vertical: AppSpacing.s10),
         itemCount: _messages.length + (_hasMore ? 1 : 0) + (_isSending ? 1 : 0),
         itemBuilder: (context, index) {
           // 1) Плашка загрузки предыдущих сообщений
           if (_hasMore && index == 0) {
             return Center(
               child: _isLoadingMore
-                  ? const Padding(
-                      padding: EdgeInsets.all(8.0),
-                      child: CircularProgressIndicator())
+                  ? Padding(
+                      padding: AppSpacing.insetsAll(AppSpacing.sm),
+                      child: const CircularProgressIndicator())
                   : TextButton(
                       onPressed: _loadMore,
                       child: Text(
@@ -568,16 +571,17 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
             return Align(
               alignment: Alignment.centerLeft,
               child: Container(
-                margin: const EdgeInsets.symmetric(vertical: 4),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                margin: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.md, vertical: AppSpacing.sm),
                 constraints: BoxConstraints(
                     maxWidth: MediaQuery.of(context).size.width * 0.8),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade200,
-                  borderRadius: BorderRadius.circular(12).copyWith(
+                  color: AppColor.appBarColor,
+                  borderRadius:
+                      BorderRadius.circular(AppDimensions.radiusLg).copyWith(
                     topLeft: const Radius.circular(0),
-                    topRight: const Radius.circular(12),
+                    topRight: Radius.circular(AppDimensions.radiusLg),
                   ),
                 ),
                 child: const TypingIndicator.small(),

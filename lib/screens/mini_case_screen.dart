@@ -17,6 +17,9 @@ import 'package:bizlevel/screens/leo_dialog_screen.dart';
 import 'package:bizlevel/providers/user_skills_provider.dart';
 import 'package:bizlevel/widgets/lesson_widget.dart'; // 🆕 Для видео
 import 'package:bizlevel/models/lesson_model.dart'; // 🆕 Для создания mock урока
+import 'package:bizlevel/theme/spacing.dart';
+import 'package:bizlevel/theme/typography.dart';
+import 'package:bizlevel/theme/dimensions.dart';
 
 class MiniCaseScreen extends ConsumerStatefulWidget {
   final int caseId;
@@ -30,17 +33,11 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
   Map<String, dynamic>? _caseMeta;
   Map<String, dynamic>?
       _script; // intro/context/questions/final from mini_cases.script
-  // ignore: unused_field
-  bool _dialogOpened = false;
   bool _loading = true;
 
   // 🆕 Для двухблоковой структуры
   late PageController _pageController;
-  // ignore: unused_field
-  int _currentPage = 0; // Готово для индикатора блоков (будущее улучшение)
-  // ignore: unused_field
-  bool _videoWatched =
-      false; // Готово для блокировки кнопки до просмотра (будущее улучшение)
+  // Индикаторы текущей страницы/просмотра видео не используются — удалены
 
   @override
   void initState() {
@@ -130,7 +127,6 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
               physics:
                   const NeverScrollableScrollPhysics(), // 🔒 Запретить свайпы
               onPageChanged: (index) {
-                setState(() => _currentPage = index);
                 // Breadcrumb для аналитики
                 try {
                   Sentry.addBreadcrumb(Breadcrumb(
@@ -157,33 +153,30 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
         : '';
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: AppSpacing.insetsAll(AppSpacing.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const SizedBox(height: 12),
+          AppSpacing.gapH(AppSpacing.md),
 
           // Картинка
           _buildCaseImage(slot: 2),
 
-          const SizedBox(height: 16),
+          AppSpacing.gapH(AppSpacing.lg),
 
           // Короткое описание (только intro, без context)
           if (introText.isNotEmpty)
             Text(
               introText,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
+              style: AppTypography.textTheme.titleMedium,
             ),
           if (introText.isEmpty)
-            const Text(
+            Text(
               'Прочитайте описание кейса и приготовьтесь к решению.',
-              style: TextStyle(fontSize: 16),
+              style: AppTypography.textTheme.bodyLarge,
             ),
 
-          const SizedBox(height: 24),
+          AppSpacing.gapH(AppSpacing.xl),
 
           // Кнопка "Далее" → переход на Блок 2
           ElevatedButton.icon(
@@ -228,17 +221,14 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
         Expanded(
           child: LessonWidget(
             lesson: mockLesson,
-            onWatched: () {
-              // Помечаем видео как просмотренное
-              setState(() => _videoWatched = true);
-            },
+            onWatched: () {},
           ),
         ),
 
         // Нижняя панель с кнопками
         SafeArea(
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: AppSpacing.insetsAll(AppSpacing.lg),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -252,7 +242,7 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
                   ),
                 ),
 
-                const SizedBox(height: 8),
+                AppSpacing.gapH(AppSpacing.sm),
 
                 // Кнопка "Назад" (опционально, чтобы вернуться к описанию)
                 TextButton.icon(
@@ -322,7 +312,6 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
         await _complete();
         return;
       }
-      setState(() => _dialogOpened = true);
     } catch (e, st) {
       try {
         await Sentry.captureException(e, stackTrace: st);
@@ -447,7 +436,7 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
   Widget _buildCaseImage({required int slot}) {
     final path = 'assets/images/cases/case_${widget.caseId}_$slot.png';
     return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(AppDimensions.radiusXl),
       child: Container(
         height: 180,
         decoration: const BoxDecoration(
@@ -514,7 +503,7 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
             context: context,
             builder: (_) => Dialog(
               backgroundColor: Colors.transparent,
-              insetPadding: const EdgeInsets.all(16),
+              insetPadding: AppSpacing.insetsAll(AppSpacing.lg),
               child: MilestoneCelebration(
                 gpGain: 200,
                 onClose: () => Navigator.of(context).maybePop(),

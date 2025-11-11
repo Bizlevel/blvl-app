@@ -74,7 +74,7 @@ class LoginScreen extends HookConsumerWidget {
           const _AnimatedGradientBackground(),
           Center(
             child: SingleChildScrollView(
-              padding: AppSpacing.insetsSymmetric(h: 24, v: 48),
+              padding: AppSpacing.insetsSymmetric(h: AppSpacing.lg, v: AppSpacing.x3l),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -82,11 +82,11 @@ class LoginScreen extends HookConsumerWidget {
                   if (registered) ...[
                     Container(
                       width: double.infinity,
-                      margin: const EdgeInsets.only(bottom: 16),
-                      padding: AppSpacing.insetsAll(16),
+                      margin: const EdgeInsets.only(bottom: AppSpacing.lg),
+                      padding: AppSpacing.insetsAll(AppSpacing.lg),
                       decoration: BoxDecoration(
                         color: AppColor.success.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(AppSpacing.xl), // visual radius = 24
                         border: Border.all(
                             color: AppColor.success.withValues(alpha: 0.3)),
                       ),
@@ -94,13 +94,13 @@ class LoginScreen extends HookConsumerWidget {
                         children: [
                           Icon(Icons.check_circle,
                               color: AppColor.success, size: 24),
-                          SizedBox(width: 12),
+                          SizedBox(width: AppSpacing.md),
                           Expanded(
                             child: Text(
                               'Вы успешно зарегистрировались!',
                               style: TextStyle(
                                 color: AppColor.success,
-                                fontSize: 16,
+                                fontSize: 16, // aligns with AppTypography.titleMedium
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -120,10 +120,10 @@ class LoginScreen extends HookConsumerWidget {
                       }
                       return 420.0;
                     }(),
-                    padding: AppSpacing.insetsSymmetric(h: 24, v: 32),
+                    padding: AppSpacing.insetsSymmetric(h: AppSpacing.lg, v: AppSpacing.xl),
                     decoration: BoxDecoration(
                       color: AppColor.surface,
-                      borderRadius: BorderRadius.circular(24),
+                      borderRadius: BorderRadius.circular(AppSpacing.xl), // 24
                       boxShadow: [
                         BoxShadow(
                           color: AppColor.textColor.withValues(alpha: 0.05),
@@ -149,14 +149,14 @@ class LoginScreen extends HookConsumerWidget {
                             height: 176,
                           ),
                         ),
-                        AppSpacing.gapH(32),
+                        AppSpacing.gapH(AppSpacing.x2l),
                         CustomTextBox(
                           key: const ValueKey('email_field'),
                           hint: 'Email',
                           prefix: const Icon(Icons.email_outlined),
                           controller: emailController,
                         ),
-                        AppSpacing.gapH(16),
+                        AppSpacing.gapH(AppSpacing.lg),
                         // поле пароля с глазом
                         CustomTextBox(
                           key: const ValueKey('password_field'),
@@ -175,15 +175,15 @@ class LoginScreen extends HookConsumerWidget {
                                 obscurePassword.value = !obscurePassword.value,
                           ),
                         ),
-                        AppSpacing.gapH(24),
+                        AppSpacing.gapH(AppSpacing.xl),
                         // Основная CTA: «Войти» – сразу под полем пароля
                         BizLevelButton(
                           label: isLoading ? 'Входим…' : 'Войти',
                           onPressed: isLoading ? null : submit,
                         ),
-                        AppSpacing.gapH(24),
+                        AppSpacing.gapH(AppSpacing.xl),
                         if (kEnableGoogleAuth) const _OrDivider(),
-                        if (kEnableGoogleAuth) AppSpacing.gapH(24),
+                        if (kEnableGoogleAuth) AppSpacing.gapH(AppSpacing.xl),
                         if (kEnableGoogleAuth)
                           SizedBox(
                             width: double.infinity,
@@ -196,9 +196,9 @@ class LoginScreen extends HookConsumerWidget {
                                     .signInWithGoogle();
                               },
                               style: OutlinedButton.styleFrom(
-                                padding: AppSpacing.insetsSymmetric(v: 12),
+                                padding: AppSpacing.insetsSymmetric(v: AppSpacing.md),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
+                                  borderRadius: BorderRadius.circular(AppSpacing.lg),
                                 ),
                                 side: BorderSide(
                                   color:
@@ -207,10 +207,10 @@ class LoginScreen extends HookConsumerWidget {
                               ),
                             ),
                           ),
-                        if (kEnableGoogleAuth) AppSpacing.gapH(16),
+                        if (kEnableGoogleAuth) AppSpacing.gapH(AppSpacing.lg),
                         // Social proof (лёгкий блок
                         const _SocialProofBlock(),
-                        AppSpacing.gapH(8),
+                        AppSpacing.gapH(AppSpacing.sm),
                         TextButton(
                           onPressed: () => context.go('/register'),
                           child: const Text('Нет аккаунта? Зарегистрироваться'),

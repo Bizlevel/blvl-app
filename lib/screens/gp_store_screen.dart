@@ -15,6 +15,8 @@ import 'package:bizlevel/widgets/common/gp_balance_widget.dart';
 import 'package:bizlevel/theme/color.dart' show AppColor;
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:bizlevel/theme/spacing.dart';
+import 'package:bizlevel/theme/dimensions.dart';
 
 class GpStoreScreen extends ConsumerStatefulWidget {
   const GpStoreScreen({super.key});
@@ -128,16 +130,16 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
         _selectedLabel ??= 'РАЗГОН: 1400 GP';
 
         return ListView(
-          padding: const EdgeInsets.all(16),
+          padding: AppSpacing.insetsAll(AppSpacing.lg),
           children: [
             // Вводный блок
             BizLevelCard(
-              padding: const EdgeInsets.all(12),
+              padding: AppSpacing.insetsAll(AppSpacing.md),
               outlined: true,
               child: Row(
                 children: [
                   const GpBalanceWidget(),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: AppSpacing.md),
                   Expanded(
                     child: Text(
                       'GP — внутренняя валюта BizLevel: 1 GP = 1 сообщение в чате тренеров, также GP открывают новые этажи.',
@@ -149,10 +151,10 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.md),
             // Подсказка: как получить GP (бонусы) — свёрнутый раздел
             BizLevelCard(
-              padding: const EdgeInsets.all(4),
+              padding: AppSpacing.insetsAll(AppSpacing.xs),
               child: ExpansionTile(
                 initiallyExpanded: _bonusExpanded,
                 onExpansionChanged: (v) => setState(() => _bonusExpanded = v),
@@ -183,7 +185,7 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.md),
             // Переключатель планов
             Semantics(
               label: 'Выбор плана',
@@ -226,7 +228,7 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.md),
             // Одна карточка выбранного плана
             if (_selectedPackageId == 'bizlevelgp_300')
               Semantics(
@@ -285,10 +287,10 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
                   onSelect: () {},
                 ),
               ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.md),
             // FAQ свернут по умолчанию
             BizLevelCard(
-              padding: const EdgeInsets.all(4),
+              padding: AppSpacing.insetsAll(AppSpacing.xs),
               child: ExpansionTile(
                 initiallyExpanded: _faqExpanded,
                 onExpansionChanged: (v) => setState(() => _faqExpanded = v),
@@ -316,7 +318,8 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
       bottomNavigationBar: SafeArea(
         top: false,
         child: Container(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+          padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg, AppSpacing.sm, AppSpacing.lg, AppSpacing.md),
           decoration: const BoxDecoration(
             color: AppColor.surface,
             border: Border(top: BorderSide(color: AppColor.borderStrong)),
@@ -336,7 +339,7 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
                           ),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: AppSpacing.md),
               BizLevelButton(
                 variant: BizLevelButtonVariant.secondary,
                 label: 'Проверить',
@@ -598,10 +601,11 @@ class _GpPlanCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      elevation: highlight ? 3 : 1,
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppDimensions.radiusLg)),
+      elevation: highlight ? 3 : AppDimensions.elevationHairline,
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: AppSpacing.insetsAll(AppSpacing.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -629,18 +633,18 @@ class _GpPlanCard extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: AppSpacing.s6),
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         SvgPicture.asset('assets/images/gp_coin.svg',
                             width: 18, height: 18),
-                        const SizedBox(width: 6),
+                        const SizedBox(width: AppSpacing.s6),
                         _GpLabelText(label: gpLabel, compact: true),
                       ],
                     ),
                     if (ribbon != null || selected) ...[
-                      const SizedBox(height: 8),
+                      const SizedBox(height: AppSpacing.sm),
                       _Ribbon(ribbon: ribbon, selected: selected),
                     ],
                   ],
@@ -658,15 +662,15 @@ class _GpPlanCard extends StatelessWidget {
                           fontWeight: FontWeight.w700,
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: AppSpacing.sm),
                       SvgPicture.asset('assets/images/gp_coin.svg',
                           width: 20, height: 20),
-                      const SizedBox(width: 6),
+                      const SizedBox(width: AppSpacing.s6),
                       Flexible(
                         child: _GpLabelText(label: gpLabel, compact: true),
                       ),
                       if (ribbon != null || selected) ...[
-                        const SizedBox(width: 8),
+                        const SizedBox(width: AppSpacing.sm),
                         _Ribbon(ribbon: ribbon, selected: selected),
                       ],
                     ],
@@ -681,7 +685,7 @@ class _GpPlanCard extends StatelessWidget {
                 ],
               );
             }),
-            const SizedBox(height: 10),
+            const SizedBox(height: AppSpacing.s10),
             Text(
               descriptionTitle,
               textAlign: TextAlign.left,
@@ -689,15 +693,15 @@ class _GpPlanCard extends StatelessWidget {
                 fontWeight: FontWeight.w700,
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: AppSpacing.s6),
             ...bullets.map((b) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Icon(Icons.check,
                           size: 16, color: AppColor.success),
-                      const SizedBox(width: 6),
+                      const SizedBox(width: AppSpacing.s6),
                       Expanded(
                         child: Text(
                           b,
@@ -707,7 +711,7 @@ class _GpPlanCard extends StatelessWidget {
                     ],
                   ),
                 )),
-            const SizedBox(height: 6),
+            const SizedBox(height: AppSpacing.s6),
             Text(
               italicNote,
               textAlign: TextAlign.left,
@@ -715,7 +719,7 @@ class _GpPlanCard extends StatelessWidget {
                 fontStyle: FontStyle.italic,
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: AppSpacing.s6),
           ],
         ),
       ),
@@ -776,10 +780,10 @@ class _Ribbon extends StatelessWidget {
     final text = selected ? 'Выбрано' : (ribbon ?? '');
     if (text.isEmpty) return const SizedBox.shrink();
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: AppSpacing.insetsSymmetric(h: AppSpacing.s10, v: AppSpacing.xs),
       decoration: BoxDecoration(
         color: bg.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(AppDimensions.radiusRound),
         border: Border.all(color: bg.withValues(alpha: 0.35)),
       ),
       child: Text(

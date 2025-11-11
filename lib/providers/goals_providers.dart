@@ -101,14 +101,18 @@ final userGoalProvider = FutureProvider<Map<String, dynamic>?>((ref) async {
 final practiceLogProvider =
     FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final repo = ref.read(goalsRepositoryProvider);
-  return repo.fetchPracticeLog();
+  final goal = await ref.watch(userGoalProvider.future);
+  final String? hid = (goal?['current_history_id'] as String?);
+  return repo.fetchPracticeLogForHistory(historyId: hid, limit: 200);
 });
 
 /// Список journal с параметром лимита
 final practiceLogWithLimitProvider =
     FutureProvider.family<List<Map<String, dynamic>>, int>((ref, limit) async {
   final repo = ref.read(goalsRepositoryProvider);
-  return repo.fetchPracticeLog(limit: limit);
+  final goal = await ref.watch(userGoalProvider.future);
+  final String? hid = (goal?['current_history_id'] as String?);
+  return repo.fetchPracticeLogForHistory(historyId: hid, limit: limit);
 });
 
 /// История применений по текущей цели (фильтр по user_goal.current_history_id)

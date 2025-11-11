@@ -7,6 +7,8 @@ import 'package:shimmer/shimmer.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:bizlevel/widgets/common/bizlevel_button.dart';
 import 'package:bizlevel/widgets/common/bizlevel_card.dart';
+import 'package:bizlevel/theme/spacing.dart';
+import 'package:bizlevel/theme/dimensions.dart';
 
 /// Экран «Артефакты» (этап 1: каркас и маршрут)
 /// Далее будет добавлена сетка 3xN и просмотр карточек.
@@ -23,7 +25,7 @@ class ArtifactsScreen extends ConsumerWidget {
         centerTitle: true,
         actions: [
           Padding(
-            padding: const EdgeInsets.only(right: 12),
+            padding: EdgeInsets.only(right: AppSpacing.md),
             child: _CollectedBadge(),
           )
         ],
@@ -33,7 +35,7 @@ class ArtifactsScreen extends ConsumerWidget {
         loading: () => const _ArtifactsSkeletonGrid(),
         error: (e, st) => Center(
           child: Padding(
-            padding: const EdgeInsets.all(24),
+            padding: AppSpacing.insetsAll(AppSpacing.xl),
             child: Text('Не удалось загрузить артефакты',
                 style: Theme.of(context)
                     .textTheme
@@ -106,7 +108,7 @@ class ArtifactsScreen extends ConsumerWidget {
 
           final allLocked = items.every((e) => e.isUnlocked != true);
           return Padding(
-            padding: const EdgeInsets.all(16),
+            padding: AppSpacing.insetsAll(AppSpacing.lg),
             child: Column(
               children: [
                 if (allLocked)
@@ -120,8 +122,8 @@ class ArtifactsScreen extends ConsumerWidget {
                     return GridView.builder(
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: crossAxisCount,
-                        crossAxisSpacing: 12,
-                        mainAxisSpacing: 12,
+                        crossAxisSpacing: AppSpacing.md,
+                        mainAxisSpacing: AppSpacing.md,
                         childAspectRatio: 3 / 4,
                       ),
                       itemCount: items.length,
@@ -162,11 +164,12 @@ class _CollectedBadge extends ConsumerWidget {
         .length;
     final progress = total == 0 ? 0.0 : collected / total;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: AppSpacing.insetsSymmetric(h: AppSpacing.s10, v: AppSpacing.s6),
       decoration: BoxDecoration(
         color: AppColor.glassTextColor.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColor.glassTextColor.withValues(alpha: 0.3)),
+        borderRadius: BorderRadius.circular(AppDimensions.radiusXxl),
+        border:
+            Border.all(color: AppColor.glassTextColor.withValues(alpha: 0.3)),
       ),
       child: SizedBox(
         width:
@@ -176,14 +179,15 @@ class _CollectedBadge extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text('Собрано $collected/$total', textAlign: TextAlign.center),
-            const SizedBox(height: 4),
+            SizedBox(height: AppSpacing.xs),
             SizedBox(
               height: 3,
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(3),
+                borderRadius: BorderRadius.circular(AppDimensions.radiusXs),
                 child: LinearProgressIndicator(
                   value: progress.clamp(0.0, 1.0),
-                  backgroundColor: AppColor.glassTextColor.withValues(alpha: 0.15),
+                  backgroundColor:
+                      AppColor.glassTextColor.withValues(alpha: 0.15),
                   valueColor: AlwaysStoppedAnimation<Color>(
                     AppColor.glassTextColor.withValues(alpha: 0.9),
                   ),
@@ -269,7 +273,8 @@ class _ArtifactTileState extends State<_ArtifactTile> {
                     Navigator.of(context).push(
                       PageRouteBuilder(
                         opaque: false,
-                        barrierColor: AppColor.surfaceDark.withValues(alpha: 0.85),
+                        barrierColor:
+                            AppColor.surfaceDark.withValues(alpha: 0.85),
                         pageBuilder: (ctx, _, __) => _ArtifactFullscreen(
                           front: widget.front!,
                           back: widget.back!,
@@ -321,46 +326,53 @@ class _ArtifactTileState extends State<_ArtifactTile> {
                             top: 8,
                             left: 8,
                             child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 4),
+                              padding: AppSpacing.insetsSymmetric(
+                                  h: AppSpacing.sm, v: AppSpacing.xs),
                               decoration: BoxDecoration(
                                 color: AppColor.premium.withValues(alpha: 0.9),
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(
+                                    AppDimensions.radiusMd),
                               ),
-                              child: const Text(
-                                'NEW',
-                                style: TextStyle(
-                                  color: AppColor.glassTextColor,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
+                              child: Text('NEW',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .labelSmall
+                                      ?.copyWith(
+                                          color: AppColor.glassTextColor,
+                                          fontWeight: FontWeight.w700)),
                             ),
                           ),
                         if (widget.isLocked) ...[
                           Container(
-                              color: AppColor.surfaceDark.withValues(alpha: 0.35)),
+                              color:
+                                  AppColor.surfaceDark.withValues(alpha: 0.35)),
                           const Positioned(
                             right: 8,
                             top: 8,
-                            child: Icon(Icons.lock, color: AppColor.glassTextColor),
+                            child: Icon(Icons.lock,
+                                color: AppColor.glassTextColor),
                           ),
                           Positioned(
                             left: 8,
                             right: 8,
                             bottom: 40,
                             child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 6),
+                              padding: AppSpacing.insetsSymmetric(
+                                  h: AppSpacing.sm, v: AppSpacing.s6),
                               decoration: BoxDecoration(
-                                color: AppColor.surfaceDark.withValues(alpha: 0.45),
-                                borderRadius: BorderRadius.circular(8),
+                                color: AppColor.surfaceDark
+                                    .withValues(alpha: 0.45),
+                                borderRadius: BorderRadius.circular(
+                                    AppDimensions.radiusMd),
                               ),
                               child: Text(
                                   'Откроется после Уровня ${widget.level}',
                                   textAlign: TextAlign.center,
-                                  style: const TextStyle(
-                                      color: AppColor.glassTextColor, fontSize: 12)),
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.copyWith(
+                                          color: AppColor.glassTextColor)),
                             ),
                           ),
                           Positioned(
@@ -372,11 +384,11 @@ class _ArtifactTileState extends State<_ArtifactTile> {
                               child: Semantics(
                                 label: 'Перейти к Башне',
                                 button: true,
-                        child: ElevatedButton(
+                                child: ElevatedButton(
                                   style: ElevatedButton.styleFrom(
-                            backgroundColor:
-                                AppColor.glassTextColor.withValues(alpha: 0.9),
-                            foregroundColor: AppColor.textColor,
+                                    backgroundColor: AppColor.glassTextColor
+                                        .withValues(alpha: 0.9),
+                                    foregroundColor: AppColor.textColor,
                                     padding: const EdgeInsets.symmetric(
                                         horizontal: 12, vertical: 10),
                                   ),
@@ -392,21 +404,26 @@ class _ArtifactTileState extends State<_ArtifactTile> {
                             right: 8,
                             top: 8,
                             child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 4),
+                              padding: AppSpacing.insetsSymmetric(
+                                  h: AppSpacing.sm, v: AppSpacing.xs),
                               decoration: BoxDecoration(
-                                color: AppColor.surfaceDark.withValues(alpha: 0.5),
-                                borderRadius: BorderRadius.circular(8),
+                                color:
+                                    AppColor.surfaceDark.withValues(alpha: 0.5),
+                                borderRadius: BorderRadius.circular(
+                                    AppDimensions.radiusMd),
                               ),
-                              child: const Row(
+                              child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.touch_app,
+                                  const Icon(Icons.touch_app,
                                       color: AppColor.glassTextColor, size: 14),
-                                  SizedBox(width: 4),
+                                  const SizedBox(width: AppSpacing.xs),
                                   Text('Тапните',
-                                      style: TextStyle(
-                                          color: AppColor.glassTextColor, fontSize: 12)),
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(
+                                              color: AppColor.glassTextColor)),
                                 ],
                               ),
                             ),
@@ -415,7 +432,7 @@ class _ArtifactTileState extends State<_ArtifactTile> {
                     ),
                   ),
                   Padding(
-                    padding: const EdgeInsets.all(8),
+                    padding: AppSpacing.insetsAll(AppSpacing.sm),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -424,7 +441,7 @@ class _ArtifactTileState extends State<_ArtifactTile> {
                                 .textTheme
                                 .labelMedium
                                 ?.copyWith(color: AppColor.labelColor)),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: AppSpacing.xs),
                         Text(widget.title,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -556,12 +573,13 @@ class _ArtifactFullscreenState extends State<_ArtifactFullscreen>
                       transform: Matrix4.identity()
                         ..setEntry(3, 2, 0.0012)
                         ..rotateY(displayAngle),
-                        child: Container(
+                      child: Container(
                         constraints: const BoxConstraints(maxWidth: 900),
                         decoration: BoxDecoration(
                           boxShadow: [
                             BoxShadow(
-                              color: AppColor.surfaceDark.withValues(alpha: 0.25),
+                              color:
+                                  AppColor.surfaceDark.withValues(alpha: 0.25),
                               blurRadius: 20,
                               spreadRadius: 2,
                             )
@@ -601,15 +619,17 @@ class _ArtifactFullscreenState extends State<_ArtifactFullscreen>
                           color: AppColor.surfaceDark.withValues(alpha: 0.45),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Row(
+                        child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.touch_app,
+                            const Icon(Icons.touch_app,
                                 color: AppColor.glassTextColor, size: 16),
-                            SizedBox(width: 6),
+                            const SizedBox(width: 6),
                             Text('Тапните или кнопка ниже',
-                                style: TextStyle(
-                                    color: AppColor.glassTextColor, fontSize: 13)),
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(color: AppColor.glassTextColor)),
                           ],
                         ),
                       ),
@@ -639,7 +659,7 @@ class _ArtifactsSkeletonGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(16),
+      padding: AppSpacing.insetsAll(AppSpacing.lg),
       child: LayoutBuilder(builder: (context, c) {
         final w = c.maxWidth;
         int crossAxisCount = 3;
@@ -648,8 +668,8 @@ class _ArtifactsSkeletonGrid extends StatelessWidget {
         return GridView.builder(
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: crossAxisCount,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
+            crossAxisSpacing: AppSpacing.md,
+            mainAxisSpacing: AppSpacing.md,
             childAspectRatio: 3 / 4,
           ),
           itemCount: 8,
@@ -660,7 +680,7 @@ class _ArtifactsSkeletonGrid extends StatelessWidget {
               child: Container(
                 decoration: BoxDecoration(
                   color: AppColor.card,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
                 ),
               ),
             );
@@ -677,7 +697,7 @@ class _ArtifactsEmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: AppSpacing.insetsSymmetric(v: AppSpacing.lg),
       child: BizLevelCard(
         outlined: true,
         child: Column(
@@ -688,7 +708,7 @@ class _ArtifactsEmptyState extends StatelessWidget {
                     .textTheme
                     .titleMedium
                     ?.copyWith(fontWeight: FontWeight.w600)),
-            const SizedBox(height: 6),
+            SizedBox(height: AppSpacing.s6),
             Text(
               'Проходите уровни, чтобы открывать карточки. Начните с Уровня 1 на Башне.',
               style: Theme.of(context)
@@ -696,7 +716,7 @@ class _ArtifactsEmptyState extends StatelessWidget {
                   .bodyMedium
                   ?.copyWith(color: AppColor.onSurfaceSubtle),
             ),
-            const SizedBox(height: 10),
+            SizedBox(height: AppSpacing.s10),
             SizedBox(
               height: 40,
               child: BizLevelButton(

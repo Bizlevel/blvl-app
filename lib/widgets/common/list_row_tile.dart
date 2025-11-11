@@ -65,7 +65,8 @@ class ListRowTile extends StatelessWidget {
     final body = ConstrainedBox(
       constraints: const BoxConstraints(minHeight: AppDimensions.minTouchTarget),
       child: Padding(
-        padding: padding ?? const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: padding ??
+            AppSpacing.insetsSymmetric(h: AppSpacing.md, v: AppSpacing.s6),
         child: content,
       ),
     );

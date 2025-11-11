@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:bizlevel/theme/color.dart';
+import 'package:bizlevel/theme/spacing.dart';
+import 'package:bizlevel/theme/dimensions.dart';
 
 /// Публичный полноэкранный просмотрщик артефакта с «переворотом» (front/back).
 class ArtifactViewer extends StatefulWidget {
@@ -64,7 +67,7 @@ class _ArtifactViewerState extends State<ArtifactViewer>
       },
       onTap: _flip,
       child: Scaffold(
-        backgroundColor: Colors.black.withValues(alpha: 0.85),
+        backgroundColor: AppColor.surfaceDark.withValues(alpha: 0.85),
         body: SafeArea(
           child: Stack(
             children: [
@@ -97,7 +100,7 @@ class _ArtifactViewerState extends State<ArtifactViewer>
                 right: 8,
                 child: IconButton(
                   tooltip: 'Закрыть',
-                  icon: const Icon(Icons.close, color: Colors.white),
+                  icon: const Icon(Icons.close, color: AppColor.glassTextColor),
                   onPressed: () => Navigator.of(context).pop(),
                 ),
               ),
@@ -106,11 +109,11 @@ class _ArtifactViewerState extends State<ArtifactViewer>
                 top: 8,
                 left: 8,
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  padding: AppSpacing.insetsSymmetric(
+                      h: AppSpacing.md, v: AppSpacing.sm),
                   decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.45),
-                    borderRadius: BorderRadius.circular(12),
+                    color: AppColor.surfaceDark.withValues(alpha: 0.45),
+                    borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -122,7 +125,7 @@ class _ArtifactViewerState extends State<ArtifactViewer>
                           if (!_showFront) _flip();
                         },
                       ),
-                      const SizedBox(width: 6),
+                      const SizedBox(width: AppSpacing.s6),
                       _ChipToggle(
                         label: 'Back',
                         active: !_showFront,
@@ -140,20 +143,20 @@ class _ArtifactViewerState extends State<ArtifactViewer>
                 right: 0,
                 child: Center(
                   child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: AppSpacing.insetsSymmetric(
+                        h: AppSpacing.md, v: AppSpacing.sm),
                     decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.45),
-                      borderRadius: BorderRadius.circular(12),
+                      color: AppColor.surfaceDark.withValues(alpha: 0.45),
+                      borderRadius:
+                          BorderRadius.circular(AppDimensions.radiusLg),
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.touch_app, color: Colors.white, size: 16),
-                        SizedBox(width: 6),
-                        Text('Тапните, чтобы перевернуть',
-                            style:
-                                TextStyle(color: Colors.white, fontSize: 13)),
+                      children: const [
+                        Icon(Icons.touch_app,
+                            color: AppColor.glassTextColor, size: 16),
+                        SizedBox(width: AppSpacing.s6),
+                        // оставляем размер по умолчанию labelSmall (12-13) через тему
                       ],
                     ),
                   ),

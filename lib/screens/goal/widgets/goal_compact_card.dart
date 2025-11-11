@@ -9,6 +9,10 @@ import 'package:bizlevel/widgets/common/bizlevel_button.dart';
 import 'package:bizlevel/widgets/common/bizlevel_card.dart';
 import 'package:bizlevel/theme/spacing.dart';
 import 'package:bizlevel/theme/color.dart';
+import 'package:bizlevel/utils/max_context_helper.dart';
+import 'package:bizlevel/utils/date_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:bizlevel/models/goal_update.dart';
 
 class GoalCompactCard extends ConsumerStatefulWidget {
   const GoalCompactCard({super.key});
@@ -80,7 +84,7 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                       .textTheme
                       .titleLarge
                       ?.copyWith(fontWeight: FontWeight.w700)),
-              const SizedBox(height: 12),
+              AppSpacing.gapH(AppSpacing.md),
               // Hero-прогресс: круг + дни до дедлайна (показываем только при наличии данных)
               if (!_isEditing && (progress != null || daysLeft != null))
                 Padding(
@@ -108,7 +112,8 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                             // Пояснение формулы прогресса
                             if (progress != null)
                               Padding(
-                                padding: const EdgeInsets.only(top: 4),
+                                padding:
+                                    const EdgeInsets.only(top: AppSpacing.xs),
                                 child: Text(
                                   'Прогресс = (Текущее − Старт) / (Цель − Старт)',
                                   style: Theme.of(context)
@@ -119,7 +124,8 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                               ),
                             if (progress != null)
                               Padding(
-                                padding: const EdgeInsets.only(top: 4),
+                                padding:
+                                    const EdgeInsets.only(top: AppSpacing.xs),
                                 child: Text(
                                   'Прогресс к цели',
                                   style: Theme.of(context)
@@ -146,12 +152,12 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                 ),
               if (goal == null || (goal['goal_text'] ?? '').toString().isEmpty)
                 const Padding(
-                  padding: EdgeInsets.only(bottom: 8),
+                  padding: EdgeInsets.only(bottom: AppSpacing.sm),
                   child: Row(
                     children: [
                       Icon(Icons.flag_outlined,
                           color: AppColor.onSurfaceSubtle),
-                      SizedBox(width: 8),
+                      SizedBox(width: AppSpacing.sm),
                       Expanded(
                           child: Text(
                               'Пока цель не задана. Начните с простого описания и метрики.')),
@@ -171,7 +177,7 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                   decoration: const InputDecoration(
                       labelText: 'Короткое описание цели'),
                 ),
-                const SizedBox(height: 8),
+                AppSpacing.gapH(AppSpacing.sm),
                 Row(children: [
                   Expanded(
                     child: TextField(
@@ -181,7 +187,7 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                           const InputDecoration(labelText: 'Текущее значение'),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: AppSpacing.md),
                   Expanded(
                     child: TextField(
                       controller: _metricTargetCtrl,
@@ -191,7 +197,7 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                     ),
                   ),
                 ]),
-                const SizedBox(height: 8),
+                AppSpacing.gapH(AppSpacing.sm),
                 Row(children: [
                   Expanded(
                     child: TextField(
@@ -213,23 +219,11 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                                     : _selectedTargetDate!.isAfter(last)
                                         ? last
                                         : _selectedTargetDate!;
-                            final picked = await showDatePicker(
+                            final picked = await showRuDatePicker(
                               context: context,
                               initialDate: initial,
                               firstDate: first,
                               lastDate: last,
-                              locale: const Locale('ru'),
-                              helpText: 'Выберите дату',
-                              cancelText: 'Отмена',
-                              confirmText: 'ОК',
-                              builder: (ctx, child) {
-                                return Theme(
-                                  data: Theme.of(ctx).copyWith(
-                                    dialogBackgroundColor: Colors.white,
-                                  ),
-                                  child: child!,
-                                );
-                              },
                             );
                             if (picked != null) {
                               setState(() {
@@ -249,7 +243,8 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                 ]),
               ],
               const SizedBox(height: 8),
-              const SizedBox(height: 12),
+              AppSpacing.gapH(AppSpacing.sm),
+              AppSpacing.gapH(AppSpacing.md),
               Row(
                 children: [
                   Expanded(
@@ -281,7 +276,12 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                                     metricStartParam = curParsed;
                                   }
                                 } catch (_) {}
-                                await repo.upsertUserGoal(
+                                final userId = Supabase
+                                        .instance.client.auth.currentUser?.id ??
+                                    '';
+                                await repo
+                                    .upsertUserGoalRequest(GoalUpsertRequest(
+                                  userId: userId,
                                   goalText: _goalCtrl.text.trim(),
                                   targetDate: _selectedTargetDate,
                                   metricCurrent: num.tryParse(
@@ -293,7 +293,7 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                                           ? ''
                                           : _metricTargetCtrl.text.trim()),
                                   metricStart: metricStartParam,
-                                );
+                                ));
                                 if (!context.mounted) return;
                                 final messenger = ScaffoldMessenger.of(context);
                                 ref.invalidate(userGoalProvider);
@@ -308,7 +308,7 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                             },
                           ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: AppSpacing.md),
                   Expanded(
                     child: BizLevelButton(
                       icon: const Icon(Icons.chat_bubble_outline),
@@ -317,20 +317,20 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                         Navigator.of(context).push(MaterialPageRoute(
                           builder: (_) => LeoDialogScreen(
                             bot: 'max',
-                            userContext: [
-                              'goal_text: ${_goalCtrl.text.trim()}',
-                              if (_metricCurrentCtrl.text.trim().isNotEmpty)
-                                'metric_current: ${_metricCurrentCtrl.text.trim()}',
-                              if (_metricTargetCtrl.text.trim().isNotEmpty)
-                                'metric_target: ${_metricTargetCtrl.text.trim()}',
-                            ].join('\n'),
+                            userContext: buildMaxUserContext(goal: {
+                              'goal_text': _goalCtrl.text.trim(),
+                              'metric_current': _metricCurrentCtrl.text.trim(),
+                              'metric_target': _metricTargetCtrl.text.trim(),
+                              'target_date':
+                                  _selectedTargetDate?.toIso8601String(),
+                            }),
                             levelContext: '',
                           ),
                         ));
                       },
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: AppSpacing.md),
                   Expanded(
                     child: !_isEditing
                         ? BizLevelButton(
@@ -365,7 +365,7 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
       showDragHandle: true,
       builder: (ctx) => SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: AppSpacing.insetsAll(AppSpacing.lg),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -375,13 +375,13 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                       .textTheme
                       .titleMedium
                       ?.copyWith(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 12),
+              AppSpacing.gapH(AppSpacing.md),
               TextField(
                 controller: textCtrl,
                 decoration:
                     const InputDecoration(labelText: 'Опишите новую цель'),
               ),
-              const SizedBox(height: 8),
+              AppSpacing.gapH(AppSpacing.sm),
               Row(
                 children: [
                   Expanded(
@@ -392,7 +392,7 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                           const InputDecoration(labelText: 'Текущая метрика'),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: AppSpacing.md),
                   Expanded(
                     child: TextField(
                       controller: targetCtrl,
@@ -403,7 +403,7 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
+              AppSpacing.gapH(AppSpacing.sm),
               Row(
                 children: [
                   Expanded(
@@ -420,23 +420,11 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                   TextButton(
                     onPressed: () async {
                       final now = DateTime.now();
-                      final picked = await showDatePicker(
+                      final picked = await showRuDatePicker(
                         context: ctx,
                         initialDate: newTarget ?? now,
                         firstDate: now,
                         lastDate: now.add(const Duration(days: 365 * 3)),
-                        locale: const Locale('ru'),
-                        helpText: 'Выберите дату',
-                        cancelText: 'Отмена',
-                        confirmText: 'ОК',
-                        builder: (bctx, child) {
-                          return Theme(
-                            data: Theme.of(bctx).copyWith(
-                              dialogBackgroundColor: Colors.white,
-                            ),
-                            child: child!,
-                          );
-                        },
                       );
                       if (picked != null) {
                         newTarget = picked;
@@ -448,7 +436,7 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                   )
                 ],
               ),
-              const SizedBox(height: 12),
+              AppSpacing.gapH(AppSpacing.md),
               ElevatedButton(
                 onPressed: () async {
                   final String txt = textCtrl.text.trim();
@@ -469,13 +457,16 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                   }
                   try {
                     final repo = ref.read(goalsRepositoryProvider);
-                    await repo.startNewGoal(
+                    final userId =
+                        Supabase.instance.client.auth.currentUser?.id ?? '';
+                    await repo.startNewGoalRequest(StartNewGoalRequest(
+                      userId: userId,
                       goalText: txt,
                       targetDate: newTarget,
                       metricStart: cur,
                       metricCurrent: cur,
                       metricTarget: tgt,
-                    );
+                    ));
                     if (mounted) {
                       ref.invalidate(userGoalProvider);
                       Navigator.of(ctx).pop();

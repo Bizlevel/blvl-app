@@ -3,6 +3,12 @@
 - 52.fix-2: Подсказки переведены в компактную горизонтальную ленту (1 строка, прокрутка) с кнопкой «Ещё…» (bottom‑sheet) и «Показать подсказки» при сворачивании.
 - 52.fix-3: Метки времени у сообщений (hh:mm), `SelectableText` для баблов ассистента. Пагинация/автоскролл и контракты LeoService без изменений. Линты чистые.
 
+## 2025-11-11 — Задача level-detail-refactor fix
+- Разбил `level_detail_screen.dart` на независимые блоки (`Intro/Lesson/Quiz/Artifact/ProfileForm/GoalV1`) и общий интерфейс `LevelPageBlock`.
+- Вынес UI‑элементы (`LevelNavBar`, `LevelProgressDots`, `ParallaxImage`, `ArtifactPreview`), добавил хелпер `level_page_index.dart`.
+- Перенёс запрос артефакта в `SupabaseService.fetchLevelArtifactMeta`, подчистил легаси/неиспользуемые импорты.
+- Поведение/навигация не изменены, линтеры по изменённым файлам — без ошибок.
+
 # Этап 53: IAP покупки GP (StoreKit/Google Billing)
 - Клиент:
   - Добавлен `in_app_purchase`, сервис `IapService` (запрос продуктов, покупка consumable), метод `GpService.verifyIapPurchase`.
@@ -308,3 +314,14 @@
 - «Цель/Моя цель»: убран выпадающий список «Метрика (тип)» и кнопка «Обновить текущее»; в шите «Новая цель» добавлены поля «Текущая/Цель».
 - Журнал: добавлено поле «обновить текущее значение»; при сохранении запись пишется в `practice_log`, затем обновляется `metric_current` через репозиторий; в чат «Макс» передаём `metric_current_updated`.
 - Локализация: включены `flutter_localizations`; `MaterialApp.router` поддерживает ru/en; `showDatePicker(locale: ru)` на экранах выбора даты.
+
+### 2025-11-11 — Задача goal‑context+rpc cleanup
+- Контекст Макса: удалён `metric_type`; добавлен общий helper `buildMaxUserContext(...)` и подключён в Home/Цели/Журнале.
+- Дата: создан единый helper `showRuDatePicker(...)`, применён в L1 и «Моя цель».
+- Журнал: debounce выбора «Топ‑3», сообщение «Метрика обновлена до N», фикс дублей в Dropdown.
+- Бэкенд: миграция `log_practice_and_update_metric` (транзакция — вставка `practice_log` + обновление `metric_current` в `user_goal`/`user_goal_history`), индексы на `practice_log` и `user_goal_history`.
+- Клиент: при сохранении записи используем RPC; на ошибке — фоллбек к прежней схеме (insert + update).
+
+## 2025-11-11 — Задача DS-001 fix: Аудит дизайн‑системы
+- Проведён аудит темы (`lib/theme/*`), найдены антипаттерны в экранах/виджетах; подготовлены рекомендации по Material 3, доступности и адаптиву.
+- Добавлен тестовый экран `ThemeGalleryScreen` (lib/widgets/dev/theme_gallery.dart) для визуальной проверки токенов/компонентов (экран не подключён в навигацию).

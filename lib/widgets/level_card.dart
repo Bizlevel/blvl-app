@@ -3,6 +3,8 @@ import 'package:bizlevel/theme/color.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:bizlevel/theme/spacing.dart';
+import 'package:bizlevel/theme/dimensions.dart';
+import 'package:bizlevel/theme/typography.dart';
 
 import 'custom_image.dart';
 import 'package:bizlevel/utils/formatters.dart';
@@ -69,7 +71,7 @@ class _LevelCardState extends State<LevelCard> {
                     : AppColor.labelColor.withValues(alpha: 0.3),
                 width: _isCurrent ? 2 : 1,
               ),
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(AppDimensions.radiusXxl),
               boxShadow: [
                 BoxShadow(
                   color: AppColor.shadowColor.withValues(
@@ -193,20 +195,19 @@ class _LevelCardState extends State<LevelCard> {
       width: widget.width == double.infinity
           ? double.infinity
           : widget.width - AppSpacing.medium,
-      padding: const EdgeInsets.fromLTRB(5, 0, 5, 0),
+      padding: AppSpacing.insetsSymmetric(h: AppSpacing.s5),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             widget.data["name"],
             softWrap: true,
-            style: TextStyle(
-              fontSize: (MediaQuery.of(context).size.width < 600) ? 15 : 10,
-              color: AppColor.textColor,
-              fontWeight: FontWeight.w600,
-            ),
+            style: (MediaQuery.of(context).size.width < 600
+                    ? AppTypography.textTheme.titleSmall
+                    : AppTypography.textTheme.labelSmall)
+                ?.copyWith(color: AppColor.textColor),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: AppSpacing.s10),
           _buildLessonsCount(),
         ],
       ),
@@ -224,10 +225,10 @@ class _LevelCardState extends State<LevelCard> {
       label = levelNum == 0 ? 'Первый шаг' : 'Уровень $levelNum';
     }
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: AppSpacing.insetsSymmetric(h: AppSpacing.md, v: AppSpacing.sm),
       decoration: BoxDecoration(
         color: AppColor.primary,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
         boxShadow: [
           BoxShadow(
             color: AppColor.shadowColor.withValues(alpha: 0.05),
@@ -238,11 +239,8 @@ class _LevelCardState extends State<LevelCard> {
       ),
       child: Text(
         label,
-        style: const TextStyle(
-          color: AppColor.surface,
-          fontWeight: FontWeight.w600,
-          fontSize: 12,
-        ),
+        style: AppTypography.textTheme.labelMedium
+            ?.copyWith(color: AppColor.surface),
       ),
     );
   }
@@ -255,12 +253,13 @@ class _LevelCardState extends State<LevelCard> {
           size: 18,
           color: AppColor.labelColor,
         ),
-        const SizedBox(width: 3),
+        const SizedBox(width: AppSpacing.xs3),
         Text(
           "${widget.data["lessons"]} уроков",
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(color: AppColor.labelColor, fontSize: 13),
+          style: AppTypography.textTheme.labelMedium
+              ?.copyWith(color: AppColor.labelColor),
         ),
       ],
     );

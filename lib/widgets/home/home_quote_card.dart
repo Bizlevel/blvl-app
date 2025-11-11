@@ -4,6 +4,7 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:bizlevel/providers/goals_providers.dart';
 import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/theme/spacing.dart';
+import 'package:bizlevel/theme/dimensions.dart';
 
 /// Компактная карточка цитаты дня без аватара, переиспользуемая на Главной.
 class HomeQuoteCard extends ConsumerWidget {
@@ -32,14 +33,15 @@ class HomeQuoteCard extends ConsumerWidget {
             },
             child: Container(
               width: double.infinity,
-              padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 14),
+              padding: EdgeInsets.fromLTRB(
+                  AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, AppSpacing.s14),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [AppColor.appBgColor, AppColor.appBarColor],
                 ),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
                 border: Border.all(color: AppColor.border),
                 boxShadow: [
                   BoxShadow(

@@ -14,6 +14,8 @@ import 'package:bizlevel/compat/ui_stub.dart'
 // ignore: avoid_web_libraries_in_flutter
 import 'package:bizlevel/compat/html_stub.dart'
     if (dart.library.html) 'dart:html' as html;
+import 'package:bizlevel/theme/spacing.dart';
+import 'package:bizlevel/theme/typography.dart';
 
 class LessonWidget extends ConsumerStatefulWidget {
   final LessonModel lesson;
@@ -189,9 +191,9 @@ class _LessonWidgetState extends ConsumerState<LessonWidget> {
             }),
           ),
           Padding(
-            padding: const EdgeInsets.all(16.0),
+            padding: AppSpacing.insetsAll(AppSpacing.lg),
             child: Text(widget.lesson.description,
-                style: const TextStyle(fontSize: 14)),
+                style: AppTypography.textTheme.bodyMedium),
           ),
         ],
       );
@@ -205,7 +207,7 @@ class _LessonWidgetState extends ConsumerState<LessonWidget> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const Text('Видео недоступно'),
-            const SizedBox(height: 16),
+            AppSpacing.gapH(AppSpacing.lg),
             ElevatedButton(
               onPressed: widget.onWatched,
               child: const Text('Пропустить'),
@@ -243,10 +245,10 @@ class _LessonWidgetState extends ConsumerState<LessonWidget> {
           ),
         ),
         Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: AppSpacing.insetsAll(AppSpacing.lg),
           child: Text(
             widget.lesson.description,
-            style: const TextStyle(fontSize: 14),
+            style: AppTypography.textTheme.bodyMedium,
           ),
         ),
       ],

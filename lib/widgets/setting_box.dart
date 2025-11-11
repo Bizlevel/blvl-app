@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:bizlevel/theme/color.dart';
+import 'package:bizlevel/theme/spacing.dart';
+import 'package:bizlevel/theme/dimensions.dart';
+import 'package:bizlevel/theme/typography.dart';
 
 class SettingBox extends StatelessWidget {
   const SettingBox({
@@ -17,10 +20,10 @@ class SettingBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(10),
+      padding: AppSpacing.insetsAll(AppSpacing.s10),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(5),
-        color: Colors.white,
+        borderRadius: BorderRadius.circular(AppDimensions.radiusSm),
+        color: AppColor.surface,
         boxShadow: [
           BoxShadow(
             color: AppColor.shadowColor.withValues(alpha: 0.1),
@@ -38,16 +41,11 @@ class SettingBox extends StatelessWidget {
             width: 22,
             height: 22,
           ),
-          const SizedBox(
-            height: 7,
-          ),
+          const SizedBox(height: AppSpacing.s6),
           Text(
             title,
-            style: TextStyle(
-              color: color,
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
+            style: AppTypography.textTheme.bodyMedium
+                ?.copyWith(color: color, fontWeight: FontWeight.w500),
           )
         ],
       ),

@@ -23,5 +23,10 @@ const List<BoxShadow> kTileShadows = [
       spreadRadius: 1,
       offset: Offset(0, 6)),
 ];
-const TextStyle kNodeLabelStyle =
-    TextStyle(fontSize: 13, fontWeight: FontWeight.w700, height: 1.2);
+const TextStyle kNodeLabelStyle = TextStyle(
+  // Используем scale из AppTypography: близко к labelMedium (12) с жирностью,
+  // но оставляем 13 как специфику карты, чтобы не ломать верстку.
+  fontSize: 13,
+  fontWeight: FontWeight.w700,
+  height: 1.2,
+);

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:bizlevel/theme/color.dart';
+import 'package:bizlevel/theme/spacing.dart';
+import 'package:bizlevel/theme/dimensions.dart';
+import 'package:bizlevel/theme/typography.dart';
 import 'package:bizlevel/models/user_skill_model.dart';
 
 /// Виджет блока «Дерево навыков» в профиле.
@@ -70,10 +73,10 @@ class _SkillsTreeViewState extends State<SkillsTreeView>
     });
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: AppSpacing.insetsAll(AppSpacing.lg),
       decoration: BoxDecoration(
         color: AppColor.surface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppDimensions.radiusXl),
         boxShadow: const [
           BoxShadow(
             color: AppColor.shadow,
@@ -87,11 +90,9 @@ class _SkillsTreeViewState extends State<SkillsTreeView>
         children: [
           Row(
             children: [
-              const Expanded(
-                child: Text(
-                  'Дерево навыков',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
-                ),
+              Expanded(
+                child: Text('Дерево навыков',
+                    style: AppTypography.textTheme.headlineSmall),
               ),
               IconButton(
                 tooltip: 'О дереве навыков',
@@ -105,34 +106,36 @@ class _SkillsTreeViewState extends State<SkillsTreeView>
                       borderRadius:
                           BorderRadius.vertical(top: Radius.circular(16)),
                     ),
-                    builder: (ctx) => const Padding(
-                      padding: EdgeInsets.fromLTRB(16, 8, 16, 24),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Дерево навыков',
-                              style: TextStyle(
-                                  fontSize: 18, fontWeight: FontWeight.w600)),
-                          SizedBox(height: 8),
-                          Text(
-                            'Здесь отображается прогресс прокачки ключевых навыков предпринимателя. '
-                            'Завершая уровни, вы получаете +1 к соответствующим навыкам.',
+                    builder: (ctx) => Padding(
+                          padding: AppSpacing.insetsSymmetric(
+                              h: AppSpacing.lg, v: AppSpacing.xl),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Дерево навыков',
+                                  style: AppTypography
+                                      .textTheme.titleMedium
+                                      ?.copyWith(fontWeight: FontWeight.w600)),
+                              AppSpacing.gapH(AppSpacing.sm),
+                              Text(
+                                'Здесь отображается прогресс прокачки ключевых навыков предпринимателя. '
+                                'Завершая уровни, вы получаете +1 к соответствующим навыкам.',
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                    ),
+                        ),
                   );
                 },
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          AppSpacing.gapH(AppSpacing.md),
           LayoutBuilder(
             builder: (context, constraints) {
               // Один столбец: навыки расположены вертикально, один под другим
               const crossAxisCount = 1;
-              const spacing = 12.0;
+              const spacing = AppSpacing.md;
               const totalSpacing = spacing * (crossAxisCount - 1);
               final tileWidth =
                   (constraints.maxWidth - totalSpacing) / crossAxisCount;
@@ -151,22 +154,23 @@ class _SkillsTreeViewState extends State<SkillsTreeView>
               );
             },
           ),
-          const SizedBox(height: 12),
+          AppSpacing.gapH(AppSpacing.md),
           const Divider(color: AppColor.divider),
-          const SizedBox(height: 8),
+          AppSpacing.gapH(AppSpacing.sm),
           if (nextSkill == null)
-            const Text(
-              'Все навыки освоены! 🎉',
-              style: TextStyle(fontWeight: FontWeight.w500),
-            )
+            Text('Все навыки освоены! 🎉',
+                style: AppTypography.textTheme.bodyMedium
+                    ?.copyWith(fontWeight: FontWeight.w500))
           else ...[
             Text(
               'Следующий навык: ${nextSkill.skillName}',
-              style: const TextStyle(fontWeight: FontWeight.w500),
+              style: AppTypography.textTheme.bodyMedium
+                  ?.copyWith(fontWeight: FontWeight.w500),
             ),
             Text(
               'Уровень ${widget.currentLevel}: +1 навык',
-              style: const TextStyle(color: AppColor.onSurfaceSubtle),
+              style: AppTypography.textTheme.bodySmall
+                  ?.copyWith(color: AppColor.onSurfaceSubtle),
             ),
           ],
         ],
@@ -204,10 +208,10 @@ class _SkillsTreeViewState extends State<SkillsTreeView>
       },
       child: Container(
         width: width,
-        padding: const EdgeInsets.all(12),
+        padding: AppSpacing.insetsAll(AppSpacing.md),
         decoration: BoxDecoration(
           color: AppColor.card,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
           border:
               Border.all(color: AppColor.borderColor.withValues(alpha: 0.6)),
           boxShadow: const [
@@ -237,7 +241,7 @@ class _SkillsTreeViewState extends State<SkillsTreeView>
                 ],
               ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: AppSpacing.s10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -246,9 +250,10 @@ class _SkillsTreeViewState extends State<SkillsTreeView>
                     skill.skillName,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w600),
+                    style: AppTypography.textTheme.bodyMedium
+                        ?.copyWith(fontWeight: FontWeight.w600),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: AppSpacing.s6),
                   _SegmentedProgressBar(
                     total: SkillsTreeView._maxPoints,
                     filled: skill.points,
@@ -257,9 +262,10 @@ class _SkillsTreeViewState extends State<SkillsTreeView>
                 ],
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: AppSpacing.sm),
             Text('${skill.points}/${SkillsTreeView._maxPoints}',
-                style: const TextStyle(fontWeight: FontWeight.w500)),
+                style: AppTypography.textTheme.bodyMedium
+                    ?.copyWith(fontWeight: FontWeight.w500)),
           ],
         ),
       ),
@@ -287,11 +293,12 @@ class _SegmentedProgressBar extends StatelessWidget {
           Expanded(
             child: Container(
               height: 8,
-              margin: EdgeInsets.only(right: i == total - 1 ? 0 : 4),
+              margin:
+                  EdgeInsets.only(right: i == total - 1 ? 0 : AppSpacing.xs),
               decoration: BoxDecoration(
                 color:
                     i < clampedFilled ? color : color.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(6),
+                borderRadius: BorderRadius.circular(AppDimensions.radiusSm),
               ),
             ),
           ),

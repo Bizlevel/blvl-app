@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/theme/animations.dart';
+import 'package:bizlevel/theme/spacing.dart';
+import 'package:bizlevel/theme/typography.dart';
 
 enum AchievementRarity { common, rare, epic }
 
@@ -70,16 +72,15 @@ class _AchievementBadgeState extends State<AchievementBadge>
     final double iconSize = widget.size == AchievementBadgeSize.s48 ? 22 : 36;
 
     final Gradient fill = switch (widget.rarity) {
-      AchievementRarity.common =>
-        const LinearGradient(colors: [Color(0xFFF8FAFC), Color(0xFFF1F5F9)]),
+      AchievementRarity.common => AppColor.badgeBgLight,
       AchievementRarity.rare => AppColor.growthGradient,
       AchievementRarity.epic => AppColor.achievementGradient,
     };
 
     final Color border = switch (widget.rarity) {
       AchievementRarity.common => AppColor.borderColor,
-      AchievementRarity.rare => const Color(0xFF06B6D4),
-      AchievementRarity.epic => const Color(0xFF9333EA),
+      AchievementRarity.rare => AppColor.cyan,
+      AchievementRarity.epic => AppColor.premium,
     };
 
     final Color iconColor = switch (widget.rarity) {
@@ -127,9 +128,9 @@ class _AchievementBadgeState extends State<AchievementBadge>
                           decoration: const BoxDecoration(
                             gradient: LinearGradient(
                               colors: [
-                                Color(0x00FFFFFF),
-                                Color(0x66FFFFFF),
-                                Color(0x00FFFFFF)
+                                AppColor.whiteA0,
+                                AppColor.whiteA40,
+                                AppColor.whiteA0
                               ],
                               stops: [0.0, 0.5, 1.0],
                             ),
@@ -152,13 +153,11 @@ class _AchievementBadgeState extends State<AchievementBadge>
       mainAxisSize: MainAxisSize.min,
       children: [
         badge,
-        const SizedBox(height: 8),
+        AppSpacing.gapH(AppSpacing.sm),
         Text(
           widget.label!,
-          style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: AppColor.onSurface),
+          style: AppTypography.textTheme.labelMedium
+              ?.copyWith(color: AppColor.onSurface),
           textAlign: TextAlign.center,
         ),
       ],

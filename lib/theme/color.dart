@@ -8,6 +8,9 @@ class AppColor {
   static const error = Color(0xFFDC2626);
   static const info = Color(0xFF3B82F6);
   static const warning = Color(0xFFF59E0B);
+  // Доп. акцентные цвета
+  static const teal = Color(0xFF14B8A6);
+  static const cyan = Color(0xFF06B6D4);
 
   static const darker = Color(0xFF475569);
   // Семантические роли поверхности/текста/границ
@@ -26,6 +29,9 @@ class AppColor {
   static const glassLabelColor = Color(0xFFFFFFFF);
   static const borderColor = Color(0xFFCBD5E1);
   static const dividerColor = Color(0xFFE2E8F0);
+  // Белый с альфой
+  static const whiteA0 = Color(0x00FFFFFF);
+  static const whiteA40 = Color(0x66FFFFFF);
 
   // Дополнительные токены (унификация и использования в виджетах)
   static const textTertiary = Color(0xFF64748B);
@@ -53,6 +59,9 @@ class AppColor {
     end: Alignment.bottomCenter,
     colors: [Color(0xFFF0F4FF), Color(0xFFDDE8FF)],
   );
+  // Светлый градиент для бейджей/фонов
+  static const badgeBgLight =
+      LinearGradient(colors: [Color(0xFFF8FAFC), Color(0xFFF1F5F9)]);
 
   // Бизнес‑токены градиентов
   static const businessGradient = LinearGradient(

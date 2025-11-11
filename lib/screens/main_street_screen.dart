@@ -62,7 +62,7 @@ class _MainStreetScreenState extends ConsumerState<MainStreetScreen> {
                 SizedBox(
                   height: AppDimensions.homeGreetingHeight,
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
                     child: _GreetingHeader(),
                   ),
                 ),
@@ -91,16 +91,16 @@ class _MainStreetScreenState extends ConsumerState<MainStreetScreen> {
                         },
                         child: SingleChildScrollView(
                           physics: const AlwaysScrollableScrollPhysics(),
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
                               // Цитата дня
                               const HomeQuoteCard(),
-                              const SizedBox(height: 12),
+                              const SizedBox(height: AppSpacing.md),
                               // Карточка «Моя цель»
                               const HomeGoalCard(),
-                              const SizedBox(height: 20),
+                              const SizedBox(height: AppSpacing.s20),
                               // Карточка «Продолжить обучение»
                               Consumer(
                                 builder: (context, ref, _) {
@@ -204,7 +204,7 @@ class _MainStreetScreenState extends ConsumerState<MainStreetScreen> {
                                   );
                                 },
                               ),
-                              const SizedBox(height: 24),
+                              const SizedBox(height: AppSpacing.xl),
                               const _QuickAccessSection(),
                               AppSpacing.gapH(12),
                             ],

@@ -70,13 +70,13 @@ class _ChatItemState extends State<ChatItem> {
             child: Row(
               children: [
                 if (showPhoto) _buildPhoto(imagePath, botLabel),
-                if (showPhoto) const SizedBox(width: 10),
+                if (showPhoto) const SizedBox(width: AppSpacing.s10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _buildNameAndTime(),
-                      const SizedBox(height: 5),
+                      const SizedBox(height: AppSpacing.s5),
                       _buildTextAndNotified(),
                     ],
                   ),
@@ -123,7 +123,7 @@ class _ChatItemState extends State<ChatItem> {
           width: widget.profileSize,
           height: widget.profileSize,
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: AppSpacing.xs),
         if (botLabel.isNotEmpty)
           Text(
             botLabel,
@@ -153,7 +153,7 @@ class _ChatItemState extends State<ChatItem> {
                 ?.copyWith(fontWeight: FontWeight.w700),
           ),
         ),
-        const SizedBox(width: 5),
+        const SizedBox(width: AppSpacing.s5),
         Text(
           widget.chatData['date'] ?? '',
           maxLines: 1,

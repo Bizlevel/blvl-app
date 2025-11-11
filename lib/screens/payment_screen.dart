@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:bizlevel/theme/color.dart';
+import 'package:bizlevel/theme/dimensions.dart';
+import 'package:bizlevel/theme/spacing.dart';
 
 class PaymentScreen extends StatelessWidget {
   const PaymentScreen({super.key});
@@ -10,10 +12,10 @@ class PaymentScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Оплата'),
         backgroundColor: AppColor.appBgColor,
-        elevation: 0,
+        elevation: AppDimensions.elevationNone,
       ),
       body: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: AppSpacing.insetsAll(AppSpacing.xl),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -24,7 +26,7 @@ class PaymentScreen extends StatelessWidget {
                   .headlineSmall
                   ?.copyWith(fontWeight: FontWeight.w600),
             ),
-            const SizedBox(height: 16),
+            AppSpacing.gapH(AppSpacing.lg),
             Text(
               '1. Откройте приложение Kaspi.kz на вашем телефоне.\n'
               '2. Перейдите в раздел "Платежи" → "Перевод по номеру".\n'
@@ -33,9 +35,10 @@ class PaymentScreen extends StatelessWidget {
               '5. Сумма к оплате: 9 990 ₸.\n'
               '6. Нажмите "Оплатить".\n\n'
               'После подтверждения платежа пакет GP будет зачислен на ваш баланс в течение 10 минут.',
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(height: 1.5),
+              style:
+                  Theme.of(context).textTheme.bodyLarge?.copyWith(height: 1.5),
             ),
-            const SizedBox(height: 24),
+            AppSpacing.gapH(AppSpacing.xl),
             Text(
               'Если возникли вопросы, свяжитесь с поддержкой support@bizlevel.kz.',
               style: Theme.of(context)

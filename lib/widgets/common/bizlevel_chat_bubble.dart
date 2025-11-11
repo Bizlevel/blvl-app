@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:bizlevel/theme/color.dart';
+import 'package:bizlevel/theme/spacing.dart';
+import 'package:bizlevel/theme/dimensions.dart';
+import 'package:bizlevel/theme/typography.dart';
 
 enum ChatBubbleRole { user, assistant, system, error }
 
@@ -38,37 +41,40 @@ class BizLevelChatBubble extends StatelessWidget {
       children: [
         if (showReaction)
           Padding(
-            padding: const EdgeInsets.only(left: 4, bottom: 2),
+            padding: EdgeInsets.only(left: AppSpacing.xs, bottom: 2),
             child: TweenAnimationBuilder<double>(
               tween: Tween(begin: 0, end: 1),
               duration: const Duration(milliseconds: 220),
               curve: Curves.easeOut,
               builder: (context, v, child) => Opacity(opacity: v, child: child),
-              child: const Text('💡', style: TextStyle(fontSize: 14)),
+              child: Text('💡', style: AppTypography.textTheme.bodySmall),
             ),
           ),
         Container(
-          margin: const EdgeInsets.symmetric(vertical: 4),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          margin: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+          padding:
+              AppSpacing.insetsSymmetric(h: AppSpacing.md, v: AppSpacing.md),
           constraints:
               BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.8),
           decoration: BoxDecoration(
             color: role == ChatBubbleRole.assistant
                 ? bg.withValues(alpha: 0.98)
                 : bg,
-            borderRadius: BorderRadius.circular(12).copyWith(
-              topLeft: Radius.circular(isUser ? 12 : 0),
-              topRight: Radius.circular(isUser ? 0 : 12),
+            borderRadius: BorderRadius.circular(AppDimensions.radiusLg).copyWith(
+              topLeft:
+                  Radius.circular(isUser ? AppDimensions.radiusLg : 0),
+              topRight:
+                  Radius.circular(isUser ? 0 : AppDimensions.radiusLg),
             ),
           ),
           child: role == ChatBubbleRole.assistant
               ? SelectableText(
                   text,
-                  style: TextStyle(color: fg, fontSize: 15),
+                  style: AppTypography.textTheme.bodyMedium?.copyWith(color: fg),
                 )
               : Text(
                   text,
-                  style: TextStyle(color: fg, fontSize: 15),
+                  style: AppTypography.textTheme.bodyMedium?.copyWith(color: fg),
                 ),
         ),
       ],

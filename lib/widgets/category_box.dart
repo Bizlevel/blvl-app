@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:bizlevel/theme/color.dart';
+import 'package:bizlevel/theme/spacing.dart';
+import 'package:bizlevel/theme/typography.dart';
 
 class CategoryBox extends StatelessWidget {
   const CategoryBox({
@@ -25,9 +27,9 @@ class CategoryBox extends StatelessWidget {
           AnimatedContainer(
             duration: const Duration(milliseconds: 500),
             curve: Curves.fastOutSlowIn,
-            padding: const EdgeInsets.all(15),
+            padding: AppSpacing.insetsAll(AppSpacing.s15),
             decoration: BoxDecoration(
-              color: isSelected ? AppColor.red : Colors.white,
+              color: isSelected ? AppColor.error : AppColor.surface,
               boxShadow: [
                 BoxShadow(
                   color: AppColor.shadowColor.withValues(alpha: 0.1),
@@ -48,17 +50,13 @@ class CategoryBox extends StatelessWidget {
               height: 30,
             ),
           ),
-          const SizedBox(
-            height: 10,
-          ),
+          const SizedBox(height: AppSpacing.s10),
           Text(
             data["name"],
             maxLines: 1,
             overflow: TextOverflow.fade,
-            style: const TextStyle(
-              color: AppColor.textColor,
-              fontWeight: FontWeight.w500,
-            ),
+            style: AppTypography.textTheme.bodyMedium
+                ?.copyWith(color: AppColor.textColor, fontWeight: FontWeight.w500),
           )
         ],
       ),

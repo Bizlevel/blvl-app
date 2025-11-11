@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:bizlevel/providers/goals_repository_provider.dart';
 import 'package:bizlevel/providers/goals_providers.dart';
 import 'package:go_router/go_router.dart';
+import 'package:bizlevel/utils/date_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:bizlevel/models/goal_update.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:bizlevel/widgets/common/bizlevel_button.dart';
 import 'package:bizlevel/widgets/common/bizlevel_card.dart';
@@ -41,27 +44,11 @@ class _CheckpointL1ScreenState extends ConsumerState<CheckpointL1Screen> {
 
   Future<void> _pickDate() async {
     final now = DateTime.now();
-    final picked = await showDatePicker(
+    final picked = await showRuDatePicker(
       context: context,
       initialDate: _deadline ?? now,
       firstDate: now,
       lastDate: now.add(const Duration(days: 365 * 3)),
-      locale: const Locale('ru'),
-      helpText: 'Выберите дату',
-      cancelText: 'Отмена',
-      confirmText: 'ОК',
-      builder: (ctx, child) {
-        return Theme(
-          data: Theme.of(ctx).copyWith(
-            dialogBackgroundColor: Colors.white,
-            textButtonTheme: TextButtonThemeData(
-              style: TextButton.styleFrom(
-                  foregroundColor: Theme.of(ctx).primaryColor),
-            ),
-          ),
-          child: child!,
-        );
-      },
     );
     if (picked != null) setState(() => _deadline = picked);
   }
@@ -77,13 +64,15 @@ class _CheckpointL1ScreenState extends ConsumerState<CheckpointL1Screen> {
             context, 'Введите числовые значения метрик');
         return;
       }
-      await repo.upsertUserGoal(
+      final userId = Supabase.instance.client.auth.currentUser?.id ?? '';
+      await repo.upsertUserGoalRequest(GoalUpsertRequest(
+        userId: userId,
         goalText: goalText,
         targetDate: _deadline,
         metricStart: metricCurrent,
         metricCurrent: metricCurrent,
         metricTarget: metricTarget,
-      );
+      ));
       try {
         Sentry.addBreadcrumb(Breadcrumb(
             category: 'checkpoint',

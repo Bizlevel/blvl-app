@@ -13,6 +13,8 @@ import '../../providers/login_controller.dart';
 import '../../widgets/custom_textfield.dart';
 // custom_image больше не используется для логотипа на этом экране
 import '../../theme/spacing.dart';
+import '../../theme/dimensions.dart';
+import '../../theme/typography.dart';
 import '../../utils/constant.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
@@ -107,7 +109,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   h: AppSpacing.xl, v: AppSpacing.xl),
               decoration: BoxDecoration(
                 color: AppColor.card,
-                borderRadius: BorderRadius.circular(24),
+                borderRadius: BorderRadius.circular(AppDimensions.radiusXxl),
                 boxShadow: [
                   BoxShadow(
                     color: AppColor.shadow.withValues(alpha: 0.05),
@@ -149,8 +151,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           controller: _passwordController,
           obscureText: _obscurePassword,
           suffix: IconButton(
-            tooltip:
-                _obscurePassword ? 'Показать пароль' : 'Скрыть пароль',
+            tooltip: _obscurePassword ? 'Показать пароль' : 'Скрыть пароль',
             icon: Icon(
                 _obscurePassword ? Icons.visibility_off : Icons.visibility),
             onPressed: () =>
@@ -165,8 +166,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           controller: _confirmController,
           obscureText: _obscureConfirm,
           suffix: IconButton(
-            tooltip:
-                _obscureConfirm ? 'Показать пароль' : 'Скрыть пароль',
+            tooltip: _obscureConfirm ? 'Показать пароль' : 'Скрыть пароль',
             icon:
                 Icon(_obscureConfirm ? Icons.visibility_off : Icons.visibility),
             onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
@@ -180,7 +180,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             width: double.infinity,
             decoration: BoxDecoration(
               gradient: AppColor.businessGradient,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
             ),
             alignment: Alignment.center,
             child: _isLoading
@@ -192,13 +192,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       strokeWidth: 3,
                     ),
                   )
-                : const Text(
+                : Text(
                     'Создать аккаунт',
-                    style: TextStyle(
-                      color: AppColor.onPrimary,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: AppTypography.textTheme.titleMedium
+                        ?.copyWith(color: AppColor.onPrimary),
                   ),
           ),
         ),
@@ -215,11 +212,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 ref.read(loginControllerProvider.notifier).signInWithGoogle();
               },
               style: OutlinedButton.styleFrom(
-                padding: AppSpacing.insetsSymmetric(v: 12),
+                padding: AppSpacing.insetsSymmetric(v: AppSpacing.md),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
                 ),
-                side: const BorderSide(color: Color(0x33000000)),
+                side: BorderSide(
+                    color: AppColor.textColor.withValues(alpha: 0.2)),
               ),
             ),
           ),
@@ -255,10 +253,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               Expanded(
                 child: Text(
                   'Регистрация успешна!',
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleSmall
-                      ?.copyWith(color: AppColor.success, fontWeight: FontWeight.w600),
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: AppColor.success, fontWeight: FontWeight.w600),
                 ),
               ),
             ],
@@ -290,13 +286,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               borderRadius: BorderRadius.circular(12),
             ),
             alignment: Alignment.center,
-            child: const Text(
+            child: Text(
               'Уже подтвердили? Войти',
-              style: TextStyle(
-                color: AppColor.onPrimary,
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
+              style: AppTypography.textTheme.titleMedium
+                  ?.copyWith(color: AppColor.onPrimary),
             ),
           ),
         ),

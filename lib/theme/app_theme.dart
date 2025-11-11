@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/theme/typography.dart';
 import 'package:bizlevel/theme/input_decoration_theme.dart';
+import 'package:bizlevel/theme/dimensions.dart';
 
 class AppTheme {
   static ThemeData light() {
@@ -9,16 +10,17 @@ class AppTheme {
       colorScheme: ColorScheme.fromSeed(seedColor: AppColor.primary),
       textTheme: AppTypography.textTheme,
       scaffoldBackgroundColor: Colors.transparent,
-      appBarTheme: const AppBarTheme(
+      appBarTheme: AppBarTheme(
         centerTitle: true,
         backgroundColor: Colors.transparent,
         elevation: 0,
-        titleTextStyle: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+        titleTextStyle: AppTypography
+            .textTheme.headlineSmall, // 20, w600 по токенам типографики
       ),
       inputDecorationTheme: AppInputDecoration.theme(),
       snackBarTheme: const SnackBarThemeData(
         backgroundColor: AppColor.primary,
-        contentTextStyle: TextStyle(color: Colors.white),
+        contentTextStyle: TextStyle(color: AppColor.onPrimary),
         actionTextColor: AppColor.premium,
         behavior: SnackBarBehavior.floating,
       ),
@@ -33,26 +35,26 @@ class AppTheme {
         brightness: Brightness.dark,
       ),
       scaffoldBackgroundColor: Colors.transparent,
-      appBarTheme: const AppBarTheme(
+      appBarTheme: AppBarTheme(
         centerTitle: true,
         backgroundColor: Colors.transparent,
         elevation: 0,
-        titleTextStyle: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+        titleTextStyle: AppTypography.textTheme.headlineSmall,
       ),
       inputDecorationTheme: AppInputDecoration.theme().copyWith(
         fillColor: AppColor.surfaceDark,
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
           borderSide: const BorderSide(color: AppColor.borderStrong),
         ),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
           borderSide: const BorderSide(color: AppColor.borderStrong),
         ),
       ),
       snackBarTheme: const SnackBarThemeData(
         backgroundColor: AppColor.primary,
-        contentTextStyle: TextStyle(color: Colors.white),
+        contentTextStyle: TextStyle(color: AppColor.onPrimary),
         actionTextColor: AppColor.premium,
         behavior: SnackBarBehavior.floating,
       ),

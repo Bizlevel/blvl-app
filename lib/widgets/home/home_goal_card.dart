@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/theme/dimensions.dart';
+import 'package:bizlevel/theme/spacing.dart';
 import 'package:bizlevel/providers/goals_providers.dart';
 import 'package:bizlevel/providers/goals_repository_provider.dart';
 import 'package:bizlevel/screens/leo_dialog_screen.dart';
@@ -10,6 +11,7 @@ import 'package:bizlevel/widgets/common/bizlevel_button.dart';
 import 'package:bizlevel/widgets/common/donut_progress.dart';
 import 'package:intl/intl.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
+import 'package:bizlevel/utils/max_context_helper.dart';
 
 class HomeGoalCard extends ConsumerWidget {
   const HomeGoalCard({super.key});
@@ -27,7 +29,7 @@ class HomeGoalCard extends ConsumerWidget {
           child: Container(
             constraints: const BoxConstraints(
                 minHeight: AppDimensions.homeGoalMinHeight),
-            padding: const EdgeInsets.all(20),
+            padding: AppSpacing.insetsAll(AppSpacing.s20),
             decoration: BoxDecoration(
               // fix: цвета/радиусы/тени → токены
               color: AppColor.card,
@@ -70,14 +72,14 @@ class HomeGoalCard extends ConsumerWidget {
                                 .titleMedium
                                 ?.copyWith(fontWeight: FontWeight.w600),
                           ),
-                          const SizedBox(height: 12),
+                          AppSpacing.gapH(AppSpacing.md),
                           Text(
                             goalText.isEmpty ? 'Цель не задана' : goalText,
                             maxLines: 3,
                             overflow: TextOverflow.ellipsis,
                             style: Theme.of(context).textTheme.bodyMedium,
                           ),
-                          const SizedBox(height: 10),
+                          AppSpacing.gapH(AppSpacing.s10),
                           if (targetDate != null)
                             Row(
                               children: [
@@ -101,7 +103,7 @@ class HomeGoalCard extends ConsumerWidget {
                               ],
                             ),
                           if (progress == null) ...[
-                            const SizedBox(height: 8),
+                            AppSpacing.gapH(AppSpacing.sm),
                             Text(
                               'Добавьте метрику (тип, текущее и целевое значение), чтобы видеть прогресс.',
                               style: Theme.of(context)
@@ -110,7 +112,7 @@ class HomeGoalCard extends ConsumerWidget {
                                   ?.copyWith(color: AppColor.onSurfaceSubtle),
                             ),
                           ],
-                          const SizedBox(height: 12),
+                          AppSpacing.gapH(AppSpacing.md),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
@@ -133,7 +135,7 @@ class HomeGoalCard extends ConsumerWidget {
                                   size: BizLevelButtonSize.lg,
                                 ),
                               ),
-                              const SizedBox(width: 12),
+                              SizedBox(width: AppSpacing.md),
                               Expanded(
                                 child: BizLevelButton(
                                   icon: const Icon(Icons.chat_bubble_outline,
@@ -151,30 +153,8 @@ class HomeGoalCard extends ConsumerWidget {
                                       MaterialPageRoute(
                                         builder: (_) => LeoDialogScreen(
                                           bot: 'max',
-                                          userContext: [
-                                            if (goalText.isNotEmpty)
-                                              'goal_text: $goalText',
-                                            if ((goal?['metric_type'] ?? '')
-                                                .toString()
-                                                .trim()
-                                                .isNotEmpty)
-                                              'metric_type: ${(goal?['metric_type']).toString()}',
-                                            if ((goal?['metric_current'] ?? '')
-                                                .toString()
-                                                .trim()
-                                                .isNotEmpty)
-                                              'metric_current: ${(goal?['metric_current']).toString()}',
-                                            if ((goal?['metric_target'] ?? '')
-                                                .toString()
-                                                .trim()
-                                                .isNotEmpty)
-                                              'metric_target: ${(goal?['metric_target']).toString()}',
-                                            if ((goal?['target_date'] ?? '')
-                                                .toString()
-                                                .trim()
-                                                .isNotEmpty)
-                                              'target_date: ${(goal?['target_date']).toString()}',
-                                          ].join('\n'),
+                                          userContext:
+                                              buildMaxUserContext(goal: goal),
                                           levelContext: '',
                                         ),
                                       ),
@@ -189,7 +169,7 @@ class HomeGoalCard extends ConsumerWidget {
                         ],
                       ),
                     ),
-                    const SizedBox(width: 16),
+                    SizedBox(width: AppSpacing.lg),
                     // Правая колонка: донат‑прогресс
                     if (progress != null)
                       DonutProgress(value: progress.clamp(0.0, 1.0)),

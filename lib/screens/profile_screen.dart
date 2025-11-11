@@ -13,10 +13,10 @@ import 'package:bizlevel/widgets/custom_image.dart';
 import 'package:bizlevel/providers/levels_provider.dart';
 import 'package:bizlevel/models/user_model.dart';
 import 'package:go_router/go_router.dart';
-import 'package:file_picker/file_picker.dart';
+//import 'package:file_picker/file_picker.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'dart:io';
+//import 'package:supabase_flutter/supabase_flutter.dart';
+//import 'dart:io';
 import 'package:bizlevel/providers/gp_providers.dart';
 import 'package:bizlevel/widgets/common/bizlevel_error.dart';
 import 'package:bizlevel/widgets/common/bizlevel_loading.dart';
@@ -27,6 +27,7 @@ import 'package:bizlevel/widgets/common/bizlevel_text_field.dart';
 import 'package:bizlevel/widgets/reminders_settings_sheet.dart';
 import 'package:bizlevel/widgets/common/achievement_badge.dart';
 import 'package:bizlevel/providers/theme_provider.dart';
+import 'package:bizlevel/theme/dimensions.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -397,8 +398,7 @@ class _Body extends ConsumerStatefulWidget {
 }
 
 class _BodyState extends ConsumerState<_Body> {
-  // ignore: unused_field
-  bool _isUploading = false;
+  // Upload артефактов убран — состояние загрузки не требуется
 
   // Плюрализация артефактов больше не используется
 
@@ -510,63 +510,7 @@ class _BodyState extends ConsumerState<_Body> {
     }
   }
 
-  // ignore: unused_element
-  Future<void> _uploadFile() async {
-    setState(() {
-      _isUploading = true;
-    });
-
-    try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['pdf'],
-      );
-
-      if (result == null || result.files.single.path == null) {
-        debugPrint('File picking cancelled.');
-        setState(() {
-          _isUploading = false;
-        });
-        return;
-      }
-
-      final file = result.files.single;
-      final filePath = file.path!;
-      final fileName = file.name;
-
-      debugPrint('Attempting to upload: $fileName');
-
-      final response =
-          await Supabase.instance.client.storage.from('artifacts').upload(
-                fileName,
-                File(filePath),
-              );
-
-      debugPrint('Upload successful: $response');
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Upload successful!')),
-      );
-    } on StorageException catch (e) {
-      debugPrint('Detailed Storage Error: ${e.message}');
-      debugPrint('Detailed Storage Error statusCode: ${e.statusCode}');
-      debugPrint('Detailed Storage Error error: ${e.error}');
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Storage Error: ${e.message}')),
-      );
-    } catch (e) {
-      debugPrint('An unexpected error occurred: $e');
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('An unexpected error occurred: $e')),
-      );
-    } finally {
-      setState(() {
-        _isUploading = false;
-      });
-    }
-  }
+  // _uploadFile удалён
 
   @override
   Widget build(BuildContext context) {
@@ -654,7 +598,8 @@ class _BodyState extends ConsumerState<_Body> {
                   child: Container(
                     decoration: BoxDecoration(
                       color: AppColor.surface,
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius:
+                          BorderRadius.circular(AppDimensions.radiusXxl),
                       boxShadow: const [
                         BoxShadow(
                           color: AppColor.shadow,
@@ -662,9 +607,9 @@ class _BodyState extends ConsumerState<_Body> {
                         ),
                       ],
                     ),
-                    child: const Padding(
-                      padding: EdgeInsets.all(4.0),
-                      child: Icon(
+                    child: Padding(
+                      padding: AppSpacing.insetsAll(AppSpacing.xs),
+                      child: const Icon(
                         Icons.camera_alt,
                         size: 16,
                         color: AppColor.primary,
@@ -696,7 +641,7 @@ class _BodyState extends ConsumerState<_Body> {
                                   .headlineMedium
                                   ?.copyWith(fontWeight: FontWeight.w600),
                             ),
-                            const SizedBox(height: 6),
+                            AppSpacing.gapH(AppSpacing.s6),
                             Builder(builder: (context) {
                               final n = ref
                                       .watch(currentLevelNumberProvider)
@@ -724,8 +669,8 @@ class _BodyState extends ConsumerState<_Body> {
                             child: OutlinedButton(
                               onPressed: _openAboutMeModal,
                               style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 10, vertical: 6),
+                                padding: AppSpacing.insetsSymmetric(
+                                    h: AppSpacing.s10, v: AppSpacing.s6),
                                 minimumSize: const Size(0, 0),
                                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                 side: BorderSide(

@@ -8,11 +8,18 @@ class AppDimensions {
   static const double iconXxl = 64.0;
 
   // Радиусы
+  static const double radiusXs = 3.0;
   static const double radiusSm = 4.0;
   static const double radiusMd = 8.0;
+  static const double radius10 = 10.0;
   static const double radiusLg = 12.0;
   static const double radiusXl = 16.0;
+  static const double radiusXxl = 20.0;
   static const double radiusRound = 999.0;
+
+  // Элевации
+  static const double elevationNone = 0.0;
+  static const double elevationHairline = 1.0;
 
   // Минимальные размеры
   static const double minTouchTarget = 48.0;

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:bizlevel/theme/spacing.dart';
+import 'package:bizlevel/theme/dimensions.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:bizlevel/providers/leo_service_provider.dart';
 import 'package:bizlevel/widgets/leo_message_bubble.dart';
@@ -334,10 +336,10 @@ class _Header extends StatelessWidget {
         : 'Вопрос';
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: AppSpacing.insetsSymmetric(h: AppSpacing.md, v: AppSpacing.sm),
       decoration: BoxDecoration(
         color: AppColor.primary, // тот же цвет, что и AppBar чата
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
       ),
       child: Row(
         children: [
@@ -346,7 +348,7 @@ class _Header extends StatelessWidget {
             backgroundImage: AssetImage('assets/images/avatars/avatar_leo.png'),
             backgroundColor: AppColor.onPrimary,
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: AppSpacing.sm),
           Text(
             'Лео',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -354,18 +356,18 @@ class _Header extends StatelessWidget {
           ),
           const Spacer(),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            padding:
+                AppSpacing.insetsSymmetric(h: AppSpacing.s10, v: AppSpacing.s6),
             decoration: BoxDecoration(
               color: AppColor.surface,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(AppDimensions.radiusXl),
             ),
             child: Text(
               chipText,
-              style: const TextStyle(
-                color: AppColor.onSurface,
-                fontWeight: FontWeight.w600,
-                fontSize: 12,
-              ),
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: AppColor.onSurface,
+                    fontWeight: FontWeight.w600,
+                  ),
             ),
           ),
         ],

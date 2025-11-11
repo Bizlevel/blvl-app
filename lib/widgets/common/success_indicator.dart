@@ -80,7 +80,7 @@ class _CheckPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round
       ..shader = const LinearGradient(
-        colors: [AppColor.success, Color(0xFF14B8A6)],
+        colors: [AppColor.success, AppColor.teal],
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
       ).createShader(rect);
