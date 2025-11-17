@@ -49,4 +49,3 @@ class ParallaxImage extends StatelessWidget {
     );
   }
 }
-

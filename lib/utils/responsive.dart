@@ -16,7 +16,6 @@ class Responsive {
       MediaQuery.of(context).size.width >= 1024;
 }
 
-
 class ResponsiveBreakpoints {
   static const double mobile = 600;
   static const double tablet = 1024;

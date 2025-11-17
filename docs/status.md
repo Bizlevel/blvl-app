@@ -3,6 +3,44 @@
 - 52.fix-2: Подсказки переведены в компактную горизонтальную ленту (1 строка, прокрутка) с кнопкой «Ещё…» (bottom‑sheet) и «Показать подсказки» при сворачивании.
 - 52.fix-3: Метки времени у сообщений (hh:mm), `SelectableText` для баблов ассистента. Пагинация/автоскролл и контракты LeoService без изменений. Линты чистые.
 
+## 2025-11-14 — Задача startup-bootstrap fix
+- Добавлен `BootstrapGate` с FutureProvider: обязательный bootstrap переносится за первый кадр без блокировки runApp.
+- dotenv, Supabase service и Hive (notifications) инициализируются последовательно, логируются тайминги и ошибки.
+- Splash/ошибка показываются отдельным `MaterialApp`, после успеха запускаются `MyApp` и фоновые сервисы.
+
+## 2025-11-14 — Задача ios-black-screen fix
+- Firebase конфигурируется синхронно (Dart bootstrap + `AppDelegate`), `PushService` ждёт готовности через completer, iOS логи больше не ругаются на `No app configured`.
+- Оставшиеся `Hive.openBox` вынесены в `HiveBoxHelper`, heavy I/O boxes открываются лениво без блокировки первого кадра.
+- Sentry больше не собирает скриншоты/ViewHierarchy на старте; release формируется из `APP_VERSION/APP_BUILD`, PackageInfo не трогается до UI.
+
+## 2025-11-16 — Задача ios-black-screen-stage2 fix
+- `AppDelegate` явно читает `GoogleService-Info.plist` и конфигурирует Firebase до Flutter, логи без `No app configured`.
+- Маршрут запуска хранится в `SharedPreferences`, Notifications/Push стартуют только после авторизации пользователя.
+- Фоновые сервисы запускаются от Riverpod-listener с задержкой, PushService больше не трогает Firebase init повторно.
+
+## 2025-11-16 — Задача ios-black-screen-stage3 fix
+- Переехали на ленивый SWR-кеш: `Goals/Cases/Library/Levels/Lessons/GpService` больше не вызывают `Hive.openBox()` до запроса, запись и инвалидация выполняются отложенно через `HiveBoxHelper`.
+- Firebase на iOS конфигурируется ещё в `willFinishLaunching`, поэтому SDK не успевает логировать `I-COR000003`, Dart часть не вызывает повторный init.
+- Практика/GP кеши чистятся через helper без блокировок, `saveBalanceCache`/purchase id пишутся defer — стартап не делает синхронного диска.
+
+## 2025-11-16 — Задача ios-black-screen-stage4 fix
+- Bootstrap больше не трогает `FirebaseMessaging`: auto-init/permissions запускаются в `PushService` уже после первого кадра и входа пользователя.
+- `FirebaseMessaging.onBackgroundMessage` регистрируется только на Android, iOS не создаёт `flutter_callback_cache.json` во время старта.
+- `AppDelegate` конфигурирует Firebase уже в `init` + `willFinish`, предупреждение `I-COR000003` исчезает до инициализации плагинов.
+
+## 2025-11-16 — Задача ios-black-screen-final fix
+- Firebase конфигурируется в `main.swift` до `UIApplicationMain`, устраняя `I-COR000003`.
+- PushService использует платформенные хуки: фоновые обработчики собираются только на Android, на iOS добавлена безопасная задержка.
+- Auto-init FCM выключен в bootstrap и включается после отложенной инициализации сервиса.
+
+## 2025-11-17 — Задача ios-prelaunch-rollback fix
+- Локально откатил кодовую базу к `origin/prelaunch`, оставив в актуальном виде только `docs` и новые UI-файлы (`lib/theme`, `lib/widgets`, `lib/screens` + утилиты, от которых они зависят).
+- Обновил `pubspec` (добавлен `dynamic_color`) и проверил сборку `flutter analyze`, чтобы убедиться, что дизайн компилируется на прежнем стеке.
+
+## 2025-11-17 — Задача ios-black-screen-fcm fix
+- Bootstrap не вызывает `FirebaseMessaging.setAutoInitEnabled` на iOS до регистрации native-плагина.
+- `_ensureIosMessagingRegistered` через MethodChannel регистрирует плагин и отключает auto-init, чтобы Dart bootstrap не падал и не блокировал первый кадр.
+
 ## 2025-11-11 — Задача level-detail-refactor fix
 - Разбил `level_detail_screen.dart` на независимые блоки (`Intro/Lesson/Quiz/Artifact/ProfileForm/GoalV1`) и общий интерфейс `LevelPageBlock`.
 - Вынес UI‑элементы (`LevelNavBar`, `LevelProgressDots`, `ParallaxImage`, `ArtifactPreview`), добавил хелпер `level_page_index.dart`.
@@ -325,3 +363,23 @@
 ## 2025-11-11 — Задача DS-001 fix: Аудит дизайн‑системы
 - Проведён аудит темы (`lib/theme/*`), найдены антипаттерны в экранах/виджетах; подготовлены рекомендации по Material 3, доступности и адаптиву.
 - Добавлен тестовый экран `ThemeGalleryScreen` (lib/widgets/dev/theme_gallery.dart) для визуальной проверки токенов/компонентов (экран не подключён в навигацию).
+‑ Включён Material 3, добавлены ThemeExtensions (Chat/Quiz/GP/GameProgress/Video), компонентные темы (Buttons/Chips/NavBar/TabBar/Cards/ListTile/Dialog/BottomSheet/Progress/Tooltip/SnackBar), Dynamic Color (Android 12+), OLED‑тёмная тема. Частичный token hygiene на ключевых экранах + `scripts/lint_tokens.sh` для контроля.
+
+## 2025-11-12 — Задача mobile-iap-store-only fix
+- Мобилки: отключён веб‑фолбэк оплат. В `GpStoreScreen` веб‑инициация/verify по `purchase_id` заблокированы на iOS/Android; покупки только через StoreKit/Google Billing.
+- Клиент: `GpService` добавляет заголовок `x-client-platform` (`web|android|ios`) для Edge.
+- Сервер: `gp-purchase-verify` принимает ветку `purchase_id` только при `x-client-platform=web`; на мобилках возвращает 403 `web_verify_not_allowed_on_mobile`. CORS обновлён.
+- Деплой: edge `gp-purchase-verify` v67. Линтеры по изменённым файлам — без ошибок.
+
+## 2025-11-13 — Задача iap-store-fix fix
+- Стандартизированы productId: `gp_300/gp_1000/gp_2000` (клиент `GpStoreScreen` + сервер `gp-purchase-verify` v68).
+- Мобилки: отключён веб‑фолбэк; добавлены `x-client-platform` и серверная проверка (web‑verify запрещён на iOS/Android).
+- iOS: обновлён `Sentry/HybridSDK` до 8.56.2, переустановлены Pods; вход Google переведён на OAuth Supabase.
+- Обновлены SDK/пакеты: Flutter 3.35.7 / Dart 3.9.2, `in_app_purchase` (+ StoreKit plugin).
+- ТЗ по ASC: вывести IAP из Draft в Ready to Submit и прикрепить к версии.
+
+## 2025-11-14 — Задача ios-bootstrap fix:
+- Bootstrap: синхронным остался только dotenv + Supabase, Hive перенесён в фон.
+- Deferred: Firebase, PushService, Hive‑боксы и таймзоны/уведомления запускаются fire-and-forget.
+- Мониторинг: добавлены логи POSTBOOT и отложенная инициализация Sentry после первого кадра.
+- Кеши: добавлен `HiveBoxHelper`, все сервисы/репозитории используют ленивое открытие боксов без блокировки главного потока.

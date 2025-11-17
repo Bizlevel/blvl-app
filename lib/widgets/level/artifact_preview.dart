@@ -91,6 +91,3 @@ class ArtifactPreview extends StatelessWidget {
     );
   }
 }
-
-
-

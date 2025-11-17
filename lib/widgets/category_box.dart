@@ -55,8 +55,8 @@ class CategoryBox extends StatelessWidget {
             data["name"],
             maxLines: 1,
             overflow: TextOverflow.fade,
-            style: AppTypography.textTheme.bodyMedium
-                ?.copyWith(color: AppColor.textColor, fontWeight: FontWeight.w500),
+            style: AppTypography.textTheme.bodyMedium?.copyWith(
+                color: AppColor.textColor, fontWeight: FontWeight.w500),
           )
         ],
       ),

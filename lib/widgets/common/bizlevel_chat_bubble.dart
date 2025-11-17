@@ -41,7 +41,7 @@ class BizLevelChatBubble extends StatelessWidget {
       children: [
         if (showReaction)
           Padding(
-            padding: EdgeInsets.only(left: AppSpacing.xs, bottom: 2),
+            padding: const EdgeInsets.only(left: AppSpacing.xs, bottom: 2),
             child: TweenAnimationBuilder<double>(
               tween: Tween(begin: 0, end: 1),
               duration: const Duration(milliseconds: 220),
@@ -60,21 +60,22 @@ class BizLevelChatBubble extends StatelessWidget {
             color: role == ChatBubbleRole.assistant
                 ? bg.withValues(alpha: 0.98)
                 : bg,
-            borderRadius: BorderRadius.circular(AppDimensions.radiusLg).copyWith(
-              topLeft:
-                  Radius.circular(isUser ? AppDimensions.radiusLg : 0),
-              topRight:
-                  Radius.circular(isUser ? 0 : AppDimensions.radiusLg),
+            borderRadius:
+                BorderRadius.circular(AppDimensions.radiusLg).copyWith(
+              topLeft: Radius.circular(isUser ? AppDimensions.radiusLg : 0),
+              topRight: Radius.circular(isUser ? 0 : AppDimensions.radiusLg),
             ),
           ),
           child: role == ChatBubbleRole.assistant
               ? SelectableText(
                   text,
-                  style: AppTypography.textTheme.bodyMedium?.copyWith(color: fg),
+                  style:
+                      AppTypography.textTheme.bodyMedium?.copyWith(color: fg),
                 )
               : Text(
                   text,
-                  style: AppTypography.textTheme.bodyMedium?.copyWith(color: fg),
+                  style:
+                      AppTypography.textTheme.bodyMedium?.copyWith(color: fg),
                 ),
         ),
       ],

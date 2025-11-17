@@ -100,4 +100,3 @@ class GoalV1Block extends LevelPageBlock {
     });
   }
 }
-

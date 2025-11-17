@@ -50,6 +50,7 @@ dependencies:
   google_sign_in:
   in_app_purchase:
   intl: ^0.20.2
+  dynamic_color: ^1.6.9
 
 dev_dependencies:
   flutter_test:

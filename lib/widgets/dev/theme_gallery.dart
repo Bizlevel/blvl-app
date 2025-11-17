@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:bizlevel/theme/color.dart';
-import 'package:bizlevel/theme/spacing.dart';
-import 'package:bizlevel/theme/dimensions.dart';
-import 'package:bizlevel/theme/typography.dart';
+import 'package:bizlevel/theme/design_tokens.dart';
 
 class ThemeGalleryScreen extends StatelessWidget {
   const ThemeGalleryScreen({super.key});
@@ -18,7 +15,7 @@ class ThemeGalleryScreen extends StatelessWidget {
         title: const Text('Theme Gallery'),
       ),
       body: ListView(
-        padding: EdgeInsets.all(AppSpacing.screenPadding),
+        padding: const EdgeInsets.all(AppSpacing.screenPadding),
         children: [
           _Section(
             title: 'Типографика',
@@ -62,16 +59,16 @@ class ThemeGalleryScreen extends StatelessWidget {
             title: 'Поля ввода',
             child: Column(
               children: [
-                TextField(
-                  decoration: const InputDecoration(
+                const TextField(
+                  decoration: InputDecoration(
                     labelText: 'E-mail',
                     hintText: 'user@example.com',
                   ),
                 ),
                 AppSpacing.gapH(AppSpacing.lg),
-                TextField(
+                const TextField(
                   obscureText: true,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Пароль',
                   ),
                 ),
@@ -91,10 +88,10 @@ class ThemeGalleryScreen extends StatelessWidget {
                   backgroundColor: colors.primaryContainer,
                   labelStyle: TextStyle(color: colors.onPrimaryContainer),
                 ),
-                Chip(
-                  label: const Text('Success'),
+                const Chip(
+                  label: Text('Success'),
                   backgroundColor: AppColor.backgroundSuccess,
-                  labelStyle: const TextStyle(color: AppColor.success),
+                  labelStyle: TextStyle(color: AppColor.success),
                 ),
               ],
             ),
@@ -104,7 +101,7 @@ class ThemeGalleryScreen extends StatelessWidget {
             child: Card(
               elevation: AppDimensions.elevationHairline,
               child: Padding(
-                padding: EdgeInsets.all(AppSpacing.cardPadding),
+                padding: const EdgeInsets.all(AppSpacing.cardPadding),
                 child: Row(
                   children: [
                     CircleAvatar(
@@ -125,41 +122,26 @@ class ThemeGalleryScreen extends StatelessWidget {
                       ),
                     ),
                     Icon(Icons.chevron_right,
-                        color: colors.onSurface.withOpacity(0.4)),
+                        color: colors.onSurface.withValues(alpha: 0.4)),
                   ],
                 ),
               ),
             ),
           ),
           _Section(
-            title: 'Прогресс и стрик',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                LinearProgressIndicator(
-                  value: 0.6,
-                  backgroundColor: colors.surfaceVariant,
-                  color: colors.primary,
-                  minHeight: 8,
-                ),
-                AppSpacing.gapH(AppSpacing.sm),
-                Row(
-                  children: [
-                    Icon(Icons.local_fire_department,
-                        color: AppColor.warmAccent),
-                    AppSpacing.gapW(AppSpacing.xs),
-                    Text('Streak: 5 дней', style: textTheme.bodyMedium),
-                  ],
-                ),
-              ],
-            ),
+            title: 'Domain Themes (Chat/Quiz/GP/Progress)',
+            child: _DomainThemesPreview(),
           ),
           _Section(
+            title: 'Diagnostics',
+            child: _Diagnostics(),
+          ),
+          const _Section(
             title: 'Палитра',
             child: Wrap(
               spacing: AppSpacing.sm,
               runSpacing: AppSpacing.sm,
-              children: const [
+              children: [
                 _Swatch(tokenName: 'Primary', color: AppColor.primary),
                 _Swatch(tokenName: 'Premium', color: AppColor.premium),
                 _Swatch(tokenName: 'Success', color: AppColor.success),
@@ -177,6 +159,231 @@ class ThemeGalleryScreen extends StatelessWidget {
   }
 }
 
+class _DomainThemesPreview extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final chat = theme.extension<ChatTheme>();
+    final quiz = theme.extension<QuizTheme>();
+    final gp = theme.extension<GpTheme>();
+    final prog = theme.extension<GameProgressTheme>();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: AppSpacing.sm,
+          runSpacing: AppSpacing.sm,
+          children: [
+            _BubbleSample('AI', chat?.colors.aiBg ?? Colors.grey.shade200,
+                chat?.colors.aiText ?? theme.colorScheme.onSurface),
+            _BubbleSample(
+                'You',
+                chat?.colors.userBg ?? theme.colorScheme.primary,
+                chat?.colors.userText ?? theme.colorScheme.onPrimary),
+          ],
+        ),
+        AppSpacing.gapH(AppSpacing.md),
+        if (quiz != null)
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  decoration: BoxDecoration(
+                    color: quiz.colors.optionBg,
+                    borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
+                    border: Border.all(color: quiz.colors.borderColor),
+                  ),
+                  child: const Text('Option'),
+                ),
+              ),
+              AppSpacing.gapW(AppSpacing.sm),
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  decoration: BoxDecoration(
+                    color: quiz.colors.selectedBg,
+                    borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
+                  ),
+                  child: const Text('Selected'),
+                ),
+              ),
+              AppSpacing.gapW(AppSpacing.sm),
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  decoration: BoxDecoration(
+                    color: quiz.colors.correctBg,
+                    borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
+                  ),
+                  child: const Text('Correct'),
+                ),
+              ),
+            ],
+          ),
+        if (quiz != null) AppSpacing.gapH(AppSpacing.md),
+        Wrap(
+          spacing: AppSpacing.sm,
+          children: [
+            _Badge('GP +50', gp?.colors.badgeBg ?? Colors.blue.shade50,
+                gp?.colors.badgeText ?? Colors.blue),
+            _Badge(
+                'Spend -5',
+                (gp?.colors.negative ?? Colors.red).withValues(alpha: 0.1),
+                gp?.colors.negative ?? Colors.red),
+          ],
+        ),
+        AppSpacing.gapH(AppSpacing.md),
+        LinearProgressIndicator(
+          value: 0.6,
+          backgroundColor:
+              prog?.progressBg ?? theme.colorScheme.surfaceContainerHighest,
+          color: prog?.progressFg ?? theme.colorScheme.primary,
+          minHeight: 8,
+        ),
+        AppSpacing.gapH(AppSpacing.md),
+        _PreviewThemesRow(),
+      ],
+    );
+  }
+}
+
+class _PreviewThemesRow extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: _ThemePreviewCard(title: 'Light', theme: AppTheme.light()),
+        ),
+        AppSpacing.gapW(AppSpacing.sm),
+        Expanded(
+          child: _ThemePreviewCard(title: 'Dark', theme: AppTheme.dark()),
+        ),
+        AppSpacing.gapW(AppSpacing.sm),
+        Expanded(
+          child: _ThemePreviewCard(title: 'OLED', theme: AppTheme.darkOled()),
+        ),
+      ],
+    );
+  }
+}
+
+class _Diagnostics extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(AppDimensions.radiusSm),
+        border: Border.all(color: cs.outlineVariant),
+      ),
+      child: DefaultTextStyle.merge(
+        style: Theme.of(context).textTheme.bodySmall!,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Brightness: ${cs.brightness}'),
+            Text('onSurface: 0x${cs.onSurface.toARGB32().toRadixString(16)}'),
+            Text('surface:   0x${cs.surface.toARGB32().toRadixString(16)}'),
+            Text('primary:   0x${cs.primary.toARGB32().toRadixString(16)}'),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ThemePreviewCard extends StatelessWidget {
+  final String title;
+  final ThemeData theme;
+  const _ThemePreviewCard({required this.title, required this.theme});
+  @override
+  Widget build(BuildContext context) {
+    return Theme(
+      data: theme,
+      child: Builder(
+        builder: (context) {
+          final t = Theme.of(context);
+          return Card(
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: t.textTheme.titleMedium),
+                  AppSpacing.gapH(AppSpacing.sm),
+                  Wrap(
+                    spacing: AppSpacing.sm,
+                    children: [
+                      FilledButton(
+                        onPressed: () {},
+                        child: const Text('Button'),
+                      ),
+                      const Chip(label: Text('Chip')),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _BubbleSample extends StatelessWidget {
+  final String text;
+  final Color bg;
+  final Color fg;
+  const _BubbleSample(this.text, this.bg, this.fg);
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm,
+      ),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
+      ),
+      child: Text(text, style: TextStyle(color: fg)),
+    );
+  }
+}
+
+class _Badge extends StatelessWidget {
+  final String label;
+  final Color bg;
+  final Color fg;
+  const _Badge(this.label, this.bg, this.fg);
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.xs,
+      ),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(AppDimensions.radiusSm),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: fg,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+}
+
 class _Section extends StatelessWidget {
   final String title;
   final Widget child;
@@ -186,12 +393,12 @@ class _Section extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.only(bottom: AppSpacing.sectionSpacing),
+      padding: const EdgeInsets.only(bottom: AppSpacing.sectionSpacing),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: EdgeInsets.only(bottom: AppSpacing.md),
+            padding: const EdgeInsets.only(bottom: AppSpacing.md),
             child: Text(title, style: AppTypography.textTheme.titleLarge),
           ),
           child,
@@ -212,11 +419,12 @@ class _Swatch extends StatelessWidget {
     final theme = Theme.of(context);
     return Container(
       width: 120,
-      padding: EdgeInsets.all(AppSpacing.sm),
+      padding: const EdgeInsets.all(AppSpacing.sm),
       decoration: BoxDecoration(
         color: color,
         borderRadius: BorderRadius.circular(AppDimensions.radiusSm),
-        border: Border.all(color: theme.colorScheme.outline.withOpacity(0.2)),
+        border:
+            Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.2)),
       ),
       child: Text(
         tokenName,

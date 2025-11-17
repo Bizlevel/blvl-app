@@ -24,5 +24,3 @@ class AppIconButton extends StatelessWidget {
     );
   }
 }
-
-

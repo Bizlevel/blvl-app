@@ -18,12 +18,12 @@ Future<DateTime?> showRuDatePicker({
     builder: (ctx, child) {
       return Theme(
         data: Theme.of(ctx).copyWith(
-          dialogBackgroundColor: Colors.white,
           textButtonTheme: TextButtonThemeData(
             style: TextButton.styleFrom(
               foregroundColor: Theme.of(ctx).primaryColor,
             ),
           ),
+          dialogTheme: const DialogThemeData(backgroundColor: Colors.white),
         ),
         child: child!,
       );

@@ -35,9 +35,6 @@ target 'Runner' do
   # Подхватываем плагины, сгенерированные Flutter
   flutter_install_all_ios_pods(File.dirname(File.realpath(__FILE__)))
 
-  # Используем стабильную версию AppAuth из CocoaPods trunk
-  pod 'AppAuth', '1.7.6'
-
   # Явно указываем Sentry/HybridSDK из GitHub, чтобы podspec точно подтянулся
   pod 'Sentry/HybridSDK',
     :git => 'https://github.com/getsentry/sentry-cocoa.git',

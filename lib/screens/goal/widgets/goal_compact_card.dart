@@ -210,7 +210,7 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                           icon: const Icon(Icons.calendar_today),
                           onPressed: () async {
                             final now = DateTime.now();
-                            final first = DateTime(now.year - 5, 1, 1);
+                            final first = DateTime(now.year - 5);
                             final last = DateTime(now.year + 5, 12, 31);
                             final initial = _selectedTargetDate == null
                                 ? now
@@ -467,6 +467,7 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                       metricCurrent: cur,
                       metricTarget: tgt,
                     ));
+                    if (!context.mounted || !ctx.mounted) return;
                     if (mounted) {
                       ref.invalidate(userGoalProvider);
                       Navigator.of(ctx).pop();
@@ -475,7 +476,7 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                       );
                     }
                   } catch (e) {
-                    if (mounted) {
+                    if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(content: Text('Ошибка: $e')),
                       );
@@ -541,5 +542,6 @@ class _GoalProgressCircle extends StatelessWidget {
 // Простая обёртка, чтобы прокинуть цвет в индикатор (без кастомного painter)
 class _GradientColor extends Color {
   final List<Color> colors;
-  _GradientColor({required this.colors}) : super(colors.first.value);
+  _GradientColor({required this.colors})
+      : super(colors.first.toARGB32());
 }

@@ -62,7 +62,9 @@ class _MainStreetScreenState extends ConsumerState<MainStreetScreen> {
                 SizedBox(
                   height: AppDimensions.homeGreetingHeight,
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.lg,
+                    ),
                     child: _GreetingHeader(),
                   ),
                 ),
@@ -81,9 +83,11 @@ class _MainStreetScreenState extends ConsumerState<MainStreetScreen> {
                               ref.refresh(userGoalProvider.future),
                               ref.refresh(levelsProvider.future),
                             ]);
-                            if (mounted) {
+                            if (context.mounted) {
                               NotificationCenter.showSuccess(
-                                  context, 'Обновлено');
+                                context,
+                                'Обновлено',
+                              );
                             }
                           } catch (_) {
                             // Без падения, индикатор скрываем
@@ -91,7 +95,9 @@ class _MainStreetScreenState extends ConsumerState<MainStreetScreen> {
                         },
                         child: SingleChildScrollView(
                           physics: const AlwaysScrollableScrollPhysics(),
-                          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.s20,
+                          ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
@@ -120,21 +126,23 @@ class _MainStreetScreenState extends ConsumerState<MainStreetScreen> {
                                       final levelTitle =
                                           (next['levelTitle'] as String?)
                                               ?.trim();
-                                      // Подзаголовок «Уровень N: Название»
+                                      // Подзаголовок: только название уровня без префикса «Уровень N»
                                       String subtitle;
                                       if (levelTitle != null &&
                                           levelTitle.isNotEmpty) {
-                                        final hasPrefix = levelTitle
-                                            .trimLeft()
-                                            .toLowerCase()
-                                            .startsWith('уровень');
-                                        subtitle = (!hasPrefix && levelNum > 0)
-                                            ? 'Уровень $levelNum: $levelTitle'
+                                        // Удаляем возможный префикс «Уровень X: »
+                                        final cleaned = levelTitle.replaceFirst(
+                                          RegExp(
+                                            r'^\s*Уровень\s*\d*\s*:?\s*',
+                                            caseSensitive: false,
+                                          ),
+                                          '',
+                                        );
+                                        subtitle = cleaned.isNotEmpty
+                                            ? cleaned
                                             : levelTitle;
                                       } else {
-                                        subtitle = levelNum > 0
-                                            ? 'Уровень $levelNum: $label'
-                                            : label;
+                                        subtitle = label;
                                       }
                                       return HomeContinueCard(
                                         subtitle: subtitle,
@@ -163,7 +171,7 @@ class _MainStreetScreenState extends ConsumerState<MainStreetScreen> {
                                             }
                                             final levelNumber =
                                                 next['levelNumber'] as int? ??
-                                                    0;
+                                                0;
                                             final levelId =
                                                 next['levelId'] as int? ?? 0;
                                             context.go(
@@ -263,9 +271,9 @@ class _GreetingHeader extends ConsumerWidget {
                     overflow: TextOverflow.ellipsis,
                     // fix: inline типографика → Theme.textTheme
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurface,
-                          height: 1.15,
-                        ),
+                      color: Theme.of(context).colorScheme.onSurface,
+                      height: 1.15,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   FutureBuilder<int>(
@@ -277,7 +285,9 @@ class _GreetingHeader extends ConsumerWidget {
                       // Капсула‑чип «Уровень N»
                       return Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 6),
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
                           color: AppColor.backgroundInfo,
                           borderRadius: BorderRadius.circular(12),
@@ -286,11 +296,11 @@ class _GreetingHeader extends ConsumerWidget {
                         child: Text(
                           'Уровень $level',
                           overflow: TextOverflow.ellipsis,
-                          style:
-                              Theme.of(context).textTheme.labelLarge?.copyWith(
-                                    color: AppColor.primary,
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                          style: Theme.of(context).textTheme.labelLarge
+                              ?.copyWith(
+                                color: AppColor.primary,
+                                fontWeight: FontWeight.w600,
+                              ),
                         ),
                       );
                     },
@@ -364,8 +374,9 @@ class _QuickAccessSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final levels = ref.watch(levelsProvider).value ?? const [];
-    final collected =
-        levels.where((l) => (l['isCompleted'] as bool? ?? false)).length;
+    final collected = levels
+        .where((l) => (l['isCompleted'] as bool? ?? false))
+        .length;
     final totalAsync = ref.watch(libraryTotalCountProvider);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -453,8 +464,10 @@ class _QuickTile extends StatelessWidget {
                   scale: scale,
                   duration: const Duration(milliseconds: 120),
                   child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: AppColor.border),
@@ -463,7 +476,7 @@ class _QuickTile extends StatelessWidget {
                           color: AppColor.shadow,
                           blurRadius: 8,
                           offset: Offset(0, 2),
-                        )
+                        ),
                       ],
                     ),
                     child: ListRowTile(

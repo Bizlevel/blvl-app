@@ -343,8 +343,7 @@ class _FavResourceCard extends StatelessWidget {
                 onPressed: onToggleExpand,
               ),
               AppIconButton(
-                tooltip:
-                    isFavorite ? 'Убрать из избранного' : 'В избранное',
+                tooltip: isFavorite ? 'Убрать из избранного' : 'В избранное',
                 icon: Icon(isFavorite ? Icons.star : Icons.star_border),
                 onPressed: onToggleFavorite,
               ),

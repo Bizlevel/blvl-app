@@ -53,4 +53,3 @@ class ArtifactBlock extends LevelPageBlock {
     );
   }
 }
-

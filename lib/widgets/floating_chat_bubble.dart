@@ -139,7 +139,8 @@ class _FloatingChatBubbleState extends ConsumerState<FloatingChatBubble>
                     color: AppColor.error, shape: BoxShape.circle),
                 child: Text(
                   '$unread',
-                  style: const TextStyle(fontSize: 10, color: AppColor.onPrimary),
+                  style:
+                      const TextStyle(fontSize: 10, color: AppColor.onPrimary),
                 ),
               ),
             ),

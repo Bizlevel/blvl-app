@@ -22,7 +22,7 @@ class ArtifactCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: EdgeInsets.only(bottom: AppSpacing.s10),
+      margin: const EdgeInsets.only(bottom: AppSpacing.s10),
       padding: AppSpacing.insetsAll(AppSpacing.s10),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(AppDimensions.radiusXxl),
