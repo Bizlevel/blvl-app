@@ -25,6 +25,7 @@ import '../screens/artifacts_screen.dart';
 import '../screens/checkpoints/checkpoint_l1_screen.dart';
 import '../screens/checkpoints/checkpoint_l4_screen.dart';
 import '../screens/checkpoints/checkpoint_l7_screen.dart';
+import '../widgets/dev/theme_gallery.dart';
 
 /// Riverpod provider that exposes the [GoRouter] instance used across the app.
 ///
@@ -121,6 +122,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/notifications',
         builder: (context, state) => const NotificationsSettingsScreen(),
+      ),
+      // Dev previews
+      GoRoute(
+        path: '/dev/theme',
+        builder: (context, state) => const ThemeGalleryScreen(),
       ),
     ],
   );

@@ -15,4 +15,3 @@ class LessonBlock extends LevelPageBlock {
     );
   }
 }
-

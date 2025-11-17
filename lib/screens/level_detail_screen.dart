@@ -105,7 +105,7 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
                 );
               },
             ),
-          const SizedBox(height: 6),
+          AppSpacing.gapH(AppSpacing.s6),
           if ((widget.levelNumber ?? -1) != 0)
             BizLevelButton(
               label: (widget.levelNumber ?? -1) == 1

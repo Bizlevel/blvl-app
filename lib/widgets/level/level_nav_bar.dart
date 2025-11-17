@@ -42,4 +42,3 @@ class LevelNavBar extends StatelessWidget {
     );
   }
 }
-

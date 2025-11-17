@@ -7,4 +7,3 @@ final casesRepositoryProvider = Provider<CasesRepository>((ref) {
   final SupabaseClient client = ref.watch(supabaseClientProvider);
   return CasesRepository(client);
 });
-

@@ -1,4 +1,4 @@
-import 'package:collection/collection.dart';
+// removed need for 'collection' by using core Iterable.nonNulls
 
 String buildMaxUserContext({
   Map<String, dynamic>? goal,
@@ -24,7 +24,7 @@ String buildMaxUserContext({
   }
   if (appliedTools != null && appliedTools.isNotEmpty) {
     final String tools = appliedTools
-        .whereNotNull()
+        .nonNulls
         .map((e) => e.trim())
         .where((e) => e.isNotEmpty)
         .join(', ');

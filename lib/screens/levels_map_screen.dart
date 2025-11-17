@@ -126,7 +126,7 @@ class LevelsMapScreen extends ConsumerWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               const Text('Ошибка загрузки уровней'),
-              SizedBox(height: AppSpacing.sm),
+              const SizedBox(height: AppSpacing.sm),
               ElevatedButton(
                 onPressed: () => ref.invalidate(levelsProvider),
                 child: const Text('Повторить'),

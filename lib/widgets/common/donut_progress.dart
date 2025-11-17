@@ -72,5 +72,3 @@ class _DonutProgressState extends State<DonutProgress> {
     );
   }
 }
-
-

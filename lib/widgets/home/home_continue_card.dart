@@ -81,7 +81,6 @@ class _HomeContinueCardState extends State<HomeContinueCard> {
                     child: BizLevelButton(
                       label: 'Продолжить обучение',
                       onPressed: widget.onTap,
-                      variant: BizLevelButtonVariant.primary,
                       size: BizLevelButtonSize.sm,
                     ),
                   ),

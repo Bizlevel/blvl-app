@@ -32,8 +32,9 @@ class CustomTextBox extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       alignment: Alignment.center,
-      padding: EdgeInsets.only(bottom: AppSpacing.xs3),
-      constraints: BoxConstraints(minHeight: AppDimensions.minButtonHeight),
+      padding: const EdgeInsets.only(bottom: AppSpacing.xs3),
+      constraints:
+          const BoxConstraints(minHeight: AppDimensions.minButtonHeight),
       decoration: BoxDecoration(
         color: (readOnly && readOnlySoftBackground)
             ? AppColor.appBarColor
@@ -64,8 +65,8 @@ class CustomTextBox extends StatelessWidget {
           suffixIcon: suffix,
           border: InputBorder.none,
           hintText: hint,
-          hintStyle:
-              AppTypography.textTheme.bodyMedium?.copyWith(color: AppColor.labelColor),
+          hintStyle: AppTypography.textTheme.bodyMedium
+              ?.copyWith(color: AppColor.labelColor),
           isDense: false,
           contentPadding:
               AppSpacing.insetsSymmetric(h: AppSpacing.md, v: AppSpacing.s10),

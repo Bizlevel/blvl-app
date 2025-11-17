@@ -59,7 +59,8 @@ class ListSectionTile extends StatelessWidget {
     );
 
     final body = ConstrainedBox(
-      constraints: const BoxConstraints(minHeight: AppDimensions.minTouchTarget),
+      constraints:
+          const BoxConstraints(minHeight: AppDimensions.minTouchTarget),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         child: row,
@@ -80,5 +81,3 @@ class ListSectionTile extends StatelessWidget {
         : tappable;
   }
 }
-
-

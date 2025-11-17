@@ -1,4 +1,5 @@
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:bizlevel/utils/hive_box_helper.dart';
 
 enum NotificationKind { success, info, warn, error }
 
@@ -8,7 +9,7 @@ class NotificationLogService {
 
   static const String _boxName = 'notifications';
 
-  Box? get _box => Hive.isBoxOpen(_boxName) ? Hive.box(_boxName) : null;
+  Box? get _box => HiveBoxHelper.maybeBox(_boxName);
 
   Future<void> record({
     required NotificationKind kind,

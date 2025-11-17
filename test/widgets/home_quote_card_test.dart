@@ -15,5 +15,3 @@ void main() {
     expect(find.byType(HomeQuoteCard), findsOneWidget);
   });
 }
-
-

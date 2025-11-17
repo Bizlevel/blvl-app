@@ -60,7 +60,8 @@ class _ChatItemState extends State<ChatItem> {
               boxShadow: [
                 BoxShadow(
                   // fix: тень → AppColor.shadow
-                  color: AppColor.shadow.withValues(alpha: _isHover ? 0.2 : 0.1),
+                  color:
+                      AppColor.shadow.withValues(alpha: _isHover ? 0.2 : 0.1),
                   spreadRadius: _isHover ? 2 : 1,
                   blurRadius: _isHover ? 4 : 1,
                   offset: const Offset(1, 1),

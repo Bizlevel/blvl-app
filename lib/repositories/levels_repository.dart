@@ -1,8 +1,8 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 import 'dart:io';
 
 import '../services/supabase_service.dart';
+import 'package:bizlevel/utils/hive_box_helper.dart';
 
 class LevelsRepository {
   // ignore: unused_field
@@ -11,8 +11,18 @@ class LevelsRepository {
 
   /// Загружает уровни. Если [userId] передан, включает прогресс.
   Future<List<Map<String, dynamic>>> fetchLevels({String? userId}) async {
-    final Box cache = Hive.box('levels');
     final String cacheKey = userId == null ? 'public' : 'user_$userId';
+    Future<List<Map<String, dynamic>>?> readCached() async {
+      final cached = await HiveBoxHelper.readValue('levels', cacheKey);
+      if (cached == null) return null;
+      try {
+        return List<Map<String, dynamic>>.from(
+          (cached as List).map((e) => Map<String, dynamic>.from(e as Map)),
+        );
+      } catch (_) {
+        return null;
+      }
+    }
 
     // Сначала пытаемся запросить сервер.
     try {
@@ -32,21 +42,15 @@ class LevelsRepository {
         return level;
       }));
 
-      await cache.put(cacheKey, resolved);
+      HiveBoxHelper.putDeferred('levels', cacheKey, resolved);
       return resolved;
     } on SocketException {
-      // Нет интернета → читаем из кеша
-      final cached = cache.get(cacheKey);
-      if (cached != null) {
-        return List<Map<String, dynamic>>.from(cached);
-      }
+      final cached = await readCached();
+      if (cached != null) return cached;
       rethrow;
     } catch (_) {
-      // При любой другой ошибке пробуем вернуть кеш
-      final cached = cache.get(cacheKey);
-      if (cached != null) {
-        return List<Map<String, dynamic>>.from(cached);
-      }
+      final cached = await readCached();
+      if (cached != null) return cached;
       rethrow;
     }
   }

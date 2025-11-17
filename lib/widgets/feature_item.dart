@@ -130,8 +130,8 @@ class FeatureItem extends StatelessWidget {
           info,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style:
-              AppTypography.textTheme.labelMedium?.copyWith(color: AppColor.labelColor),
+          style: AppTypography.textTheme.labelMedium
+              ?.copyWith(color: AppColor.labelColor),
         ),
       ],
     );

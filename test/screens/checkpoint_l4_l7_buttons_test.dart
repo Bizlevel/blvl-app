@@ -38,4 +38,3 @@ void main() {
     expect(find.text('Продолжить текущий темп'), findsOneWidget);
   });
 }
-

@@ -74,7 +74,8 @@ class LoginScreen extends HookConsumerWidget {
           const _AnimatedGradientBackground(),
           Center(
             child: SingleChildScrollView(
-              padding: AppSpacing.insetsSymmetric(h: AppSpacing.lg, v: AppSpacing.x3l),
+              padding: AppSpacing.insetsSymmetric(
+                  h: AppSpacing.lg, v: AppSpacing.x3l),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -86,7 +87,8 @@ class LoginScreen extends HookConsumerWidget {
                       padding: AppSpacing.insetsAll(AppSpacing.lg),
                       decoration: BoxDecoration(
                         color: AppColor.success.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(AppSpacing.xl), // visual radius = 24
+                        borderRadius: BorderRadius.circular(
+                            AppSpacing.xl), // visual radius = 24
                         border: Border.all(
                             color: AppColor.success.withValues(alpha: 0.3)),
                       ),
@@ -100,7 +102,8 @@ class LoginScreen extends HookConsumerWidget {
                               'Вы успешно зарегистрировались!',
                               style: TextStyle(
                                 color: AppColor.success,
-                                fontSize: 16, // aligns with AppTypography.titleMedium
+                                fontSize:
+                                    16, // aligns with AppTypography.titleMedium
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -120,7 +123,8 @@ class LoginScreen extends HookConsumerWidget {
                       }
                       return 420.0;
                     }(),
-                    padding: AppSpacing.insetsSymmetric(h: AppSpacing.lg, v: AppSpacing.xl),
+                    padding: AppSpacing.insetsSymmetric(
+                        h: AppSpacing.lg, v: AppSpacing.xl),
                     decoration: BoxDecoration(
                       color: AppColor.surface,
                       borderRadius: BorderRadius.circular(AppSpacing.xl), // 24
@@ -196,9 +200,11 @@ class LoginScreen extends HookConsumerWidget {
                                     .signInWithGoogle();
                               },
                               style: OutlinedButton.styleFrom(
-                                padding: AppSpacing.insetsSymmetric(v: AppSpacing.md),
+                                padding: AppSpacing.insetsSymmetric(
+                                    v: AppSpacing.md),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(AppSpacing.lg),
+                                  borderRadius:
+                                      BorderRadius.circular(AppSpacing.lg),
                                 ),
                                 side: BorderSide(
                                   color:

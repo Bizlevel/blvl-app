@@ -107,24 +107,23 @@ class _SkillsTreeViewState extends State<SkillsTreeView>
                           BorderRadius.vertical(top: Radius.circular(16)),
                     ),
                     builder: (ctx) => Padding(
-                          padding: AppSpacing.insetsSymmetric(
-                              h: AppSpacing.lg, v: AppSpacing.xl),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Дерево навыков',
-                                  style: AppTypography
-                                      .textTheme.titleMedium
-                                      ?.copyWith(fontWeight: FontWeight.w600)),
-                              AppSpacing.gapH(AppSpacing.sm),
-                              Text(
-                                'Здесь отображается прогресс прокачки ключевых навыков предпринимателя. '
-                                'Завершая уровни, вы получаете +1 к соответствующим навыкам.',
-                              ),
-                            ],
+                      padding: AppSpacing.insetsSymmetric(
+                          h: AppSpacing.lg, v: AppSpacing.xl),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Дерево навыков',
+                              style: AppTypography.textTheme.titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.w600)),
+                          AppSpacing.gapH(AppSpacing.sm),
+                          const Text(
+                            'Здесь отображается прогресс прокачки ключевых навыков предпринимателя. '
+                            'Завершая уровни, вы получаете +1 к соответствующим навыкам.',
                           ),
-                        ),
+                        ],
+                      ),
+                    ),
                   );
                 },
               ),

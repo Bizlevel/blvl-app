@@ -44,8 +44,7 @@ void main() {
           .thenAnswer((_) async => _FakeFunctionResponse({'url': redirectUrl}));
 
       // Act
-      final result =
-          await service.startCheckout(amount: amount);
+      final result = await service.startCheckout(amount: amount);
 
       // Assert
       expect(result.url, redirectUrl);

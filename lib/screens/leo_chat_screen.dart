@@ -101,7 +101,8 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
         final formattedDate =
             '${dt.day.toString().padLeft(2, '0')}.${dt.month.toString().padLeft(2, '0')}';
 
-        final String bot = (chat['bot'] as String?)?.toLowerCase() == 'max' ? 'max' : 'leo';
+        final String bot =
+            (chat['bot'] as String?)?.toLowerCase() == 'max' ? 'max' : 'leo';
         final String botLabel = bot == 'max' ? 'Max AI' : 'Leo AI';
         final String avatarPath = bot == 'max'
             ? 'assets/images/avatars/avatar_max.png'
@@ -121,19 +122,20 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
           onTap: () {
             Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (_) => FutureBuilder<List<String?>>( 
-                  future: Future.wait([_getUserContext(), _getLevelContext()]),
-                  builder: (context, snap) {
-                    final userCtx = (snap.data!=null) ? snap.data![0] : null;
-                    final lvlCtx = (snap.data!=null) ? snap.data![1] : null;
-                    return LeoDialogScreen(
-                  chatId: chat['id'],
-                  userContext: userCtx,
-                  levelContext: lvlCtx,
-                  bot: bot,
-                );
-                  }
-                ),
+                builder: (_) => FutureBuilder<List<String?>>(
+                    future:
+                        Future.wait([_getUserContext(), _getLevelContext()]),
+                    builder: (context, snap) {
+                      final userCtx =
+                          (snap.data != null) ? snap.data![0] : null;
+                      final lvlCtx = (snap.data != null) ? snap.data![1] : null;
+                      return LeoDialogScreen(
+                        chatId: chat['id'],
+                        userContext: userCtx,
+                        levelContext: lvlCtx,
+                        bot: bot,
+                      );
+                    }),
               ),
             );
           },
@@ -145,11 +147,11 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
   void _onNewChat(String bot) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => FutureBuilder<List<String?>>( 
+        builder: (_) => FutureBuilder<List<String?>>(
           future: Future.wait([_getUserContext(), _getLevelContext()]),
           builder: (context, snap) {
-            final userCtx = (snap.data!=null) ? snap.data![0] : null;
-            final lvlCtx = (snap.data!=null) ? snap.data![1] : null;
+            final userCtx = (snap.data != null) ? snap.data![0] : null;
+            final lvlCtx = (snap.data != null) ? snap.data![1] : null;
             return LeoDialogScreen(
               userContext: userCtx,
               levelContext: lvlCtx,

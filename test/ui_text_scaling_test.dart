@@ -3,7 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:bizlevel/widgets/common/list_row_tile.dart';
 
 void main() {
-  testWidgets('UI renders without overflow at increased text scale', (tester) async {
+  testWidgets('UI renders without overflow at increased text scale',
+      (tester) async {
     final widget = MaterialApp(
       home: MediaQuery(
         data: const MediaQueryData(textScaler: TextScaler.linear(1.6)),
@@ -26,5 +27,3 @@ void main() {
     expect(find.byType(ListRowTile), findsOneWidget);
   });
 }
-
-

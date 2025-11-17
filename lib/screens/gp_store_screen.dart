@@ -6,7 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:bizlevel/providers/gp_providers.dart';
 import 'package:bizlevel/services/gp_service.dart';
 import 'package:bizlevel/services/iap_service.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:bizlevel/utils/hive_box_helper.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:bizlevel/widgets/common/bizlevel_card.dart';
@@ -48,9 +48,9 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
         final iap = IapService.instance;
         if (await iap.isAvailable()) {
           final resp = await iap.queryProducts({
-            'bizlevelgp_300',
-            'bizlevelgp_1000',
-            'bizlevelgp_2000',
+            'gp_300',
+            'gp_1000',
+            'gp_2000',
           });
           try {
             await Sentry.addBreadcrumb(Breadcrumb(
@@ -124,9 +124,9 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
       body: LayoutBuilder(builder: (context, constraints) {
         final bool isXs = constraints.maxWidth < 360;
         // Устанавливаем дефолтный выбранный план (середина) если не выбрано
-        _selectedPackageId ??= 'bizlevelgp_1000';
+        _selectedPackageId ??= 'gp_1000';
         _selectedAmount ??=
-            (_serverPricing['bizlevelgp_1000']?['amount_kzt'] as int?) ?? 9960;
+            (_serverPricing['gp_1000']?['amount_kzt'] as int?) ?? 9960;
         _selectedLabel ??= 'РАЗГОН: 1400 GP';
 
         return ListView(
@@ -194,10 +194,10 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
                 children: [
                   ChoiceChip(
                     label: const Text('СТАРТ'),
-                    selected: _selectedPackageId == 'bizlevelgp_300',
+                    selected: _selectedPackageId == 'gp_300',
                     onSelected: (_) {
                       setState(() {
-                        _selectedPackageId = 'bizlevelgp_300';
+                        _selectedPackageId = 'gp_300';
                         _selectedAmount = 3000;
                         _selectedLabel = 'СТАРТ: 300 GP';
                       });
@@ -205,10 +205,10 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
                   ),
                   ChoiceChip(
                     label: const Text('РАЗГОН'),
-                    selected: _selectedPackageId == 'bizlevelgp_1000',
+                    selected: _selectedPackageId == 'gp_1000',
                     onSelected: (_) {
                       setState(() {
-                        _selectedPackageId = 'bizlevelgp_1000';
+                        _selectedPackageId = 'gp_1000';
                         _selectedAmount = 9960;
                         _selectedLabel = 'РАЗГОН: 1400 GP';
                       });
@@ -216,10 +216,10 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
                   ),
                   ChoiceChip(
                     label: const Text('ТРАНСФОРМ'),
-                    selected: _selectedPackageId == 'bizlevelgp_2000',
+                    selected: _selectedPackageId == 'gp_2000',
                     onSelected: (_) {
                       setState(() {
-                        _selectedPackageId = 'bizlevelgp_2000';
+                        _selectedPackageId = 'gp_2000';
                         _selectedAmount = 19960;
                         _selectedLabel = 'ТРАНСФОРМАЦИЯ: 3000 GP';
                       });
@@ -230,7 +230,7 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
             ),
             const SizedBox(height: AppSpacing.md),
             // Одна карточка выбранного плана
-            if (_selectedPackageId == 'bizlevelgp_300')
+            if (_selectedPackageId == 'gp_300')
               Semantics(
                 label: 'План СТАРТ, 300 GP',
                 child: _GpPlanCard(
@@ -243,12 +243,12 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
                     'Получить второе мнение',
                   ],
                   italicNote: 'Каждый успешный бизнес начинался с первого шага',
-                  priceLabel: _priceLabelFor('bizlevelgp_300', '₸3 000'),
+                  priceLabel: _priceLabelFor('gp_300', '₸3 000'),
                   selected: true,
                   onSelect: () {},
                 ),
               ),
-            if (_selectedPackageId == 'bizlevelgp_1000')
+            if (_selectedPackageId == 'gp_1000')
               Semantics(
                 label: 'План РАЗГОН, 1400 GP',
                 child: _GpPlanCard(
@@ -261,14 +261,14 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
                     'Открыть новые горизонты',
                   ],
                   italicNote: 'Выбор 80% предпринимателей',
-                  priceLabel: _priceLabelFor('bizlevelgp_1000', '₸9 960'),
+                  priceLabel: _priceLabelFor('gp_1000', '₸9 960'),
                   highlight: true,
                   ribbon: isXs ? null : 'Хит',
                   selected: true,
                   onSelect: () {},
                 ),
               ),
-            if (_selectedPackageId == 'bizlevelgp_2000')
+            if (_selectedPackageId == 'gp_2000')
               Semantics(
                 label: 'План ТРАНСФОРМАЦИЯ, 3000 GP',
                 child: _GpPlanCard(
@@ -281,7 +281,7 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
                     'От мечты к результату',
                   ],
                   italicNote: 'Для тех, кто настроен серьезно',
-                  priceLabel: _priceLabelFor('bizlevelgp_2000', '₸19 960'),
+                  priceLabel: _priceLabelFor('gp_2000', '₸19 960'),
                   ribbon: isXs ? null : 'Выгоднее всего',
                   selected: true,
                   onSelect: () {},
@@ -355,7 +355,16 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
 
 Future<void> _verifyLastPurchase(BuildContext context) async {
   try {
-    final box = Hive.box('gp');
+    // Блокируем web-verify по purchase_id в мобильных приложениях
+    final platform = IapService.currentPlatform();
+    if (platform == 'android' || platform == 'ios') {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text(
+              'В мобильных приложениях подтверждение доступно только через Google/Apple. Запустите проверку из флоу покупки в сторе.')));
+      return;
+    }
+    final box = await HiveBoxHelper.openBox('gp');
     final lastId = (box.get('last_purchase_id') as String?) ?? '';
     if (lastId.isEmpty) {
       if (!context.mounted) return;
@@ -394,8 +403,9 @@ Future<void> _startPurchaseIapOrWeb(
 ) async {
   try {
     // Попытка IAP на iOS/Android
-    if (IapService.currentPlatform() == 'ios' ||
-        IapService.currentPlatform() == 'android') {
+    final isMobile = IapService.currentPlatform() == 'ios' ||
+        IapService.currentPlatform() == 'android';
+    if (isMobile) {
       final iap = IapService.instance;
       final available = await iap.isAvailable();
       if (available) {
@@ -497,10 +507,31 @@ Future<void> _startPurchaseIapOrWeb(
               },
             ));
           } catch (_) {}
-        }
+        } else {
+          // На мобилке продукт не найден/стоp недоступен
+          if (!context.mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text(
+                  'Оплата в приложении доступна только через Google/Apple. Попробуйте позже.')));
+          return;
+      }
+      } else {
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text(
+                'Оплата в приложении доступна только через Google/Apple. Магазин временно недоступен.')));
+        return;
       }
     }
-    // Фолбэк: текущий web/mock флоу
+    // Фолбэк (web) — только для web-платформы
+    if (!(IapService.currentPlatform() == 'web')) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text(
+              'В мобильных приложениях веб‑оплата отключена. Используйте Google/Apple Pay в сторе.')));
+      return;
+    }
+    // Фолбэк: текущий web/mock флоу (разрешён только в web)
     final gp = GpService(Supabase.instance.client);
     try {
       await Sentry.addBreadcrumb(Breadcrumb(

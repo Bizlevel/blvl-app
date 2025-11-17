@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:bizlevel/utils/hive_box_helper.dart';
 
 /// Репозиторий прогресса мини‑кейсов (user_case_progress) с SWR‑кешем (Hive).
 class CasesRepository {
@@ -15,8 +15,13 @@ class CasesRepository {
       throw Exception('Пользователь не авторизован');
     }
 
-    final Box cache = await Hive.openBox('cases_progress');
     final String cacheKey = 'user_${userId}_case_$caseId';
+
+    Future<Map<String, dynamic>?> readCached() async {
+      final cached = await HiveBoxHelper.readValue('cases_progress', cacheKey);
+      if (cached == null) return null;
+      return Map<String, dynamic>.from(cached as Map);
+    }
 
     try {
       final response = await _client
@@ -32,27 +37,20 @@ class CasesRepository {
           .toList();
       final result = rows.isEmpty ? null : rows.first;
 
-      await cache.put(cacheKey, result);
+      HiveBoxHelper.putDeferred('cases_progress', cacheKey, result);
       return result;
     } on PostgrestException catch (e, st) {
       await Sentry.captureException(e, stackTrace: st);
-      // Фолбэк на кеш
-      final cached = cache.get(cacheKey);
-      if (cached != null) {
-        return Map<String, dynamic>.from(cached as Map);
-      }
+      final cached = await readCached();
+      if (cached != null) return cached;
       rethrow;
     } on SocketException {
-      final cached = cache.get(cacheKey);
-      if (cached != null) {
-        return Map<String, dynamic>.from(cached as Map);
-      }
+      final cached = await readCached();
+      if (cached != null) return cached;
       rethrow;
     } catch (_) {
-      final cached = cache.get(cacheKey);
-      if (cached != null) {
-        return Map<String, dynamic>.from(cached as Map);
-      }
+      final cached = await readCached();
+      if (cached != null) return cached;
       rethrow;
     }
   }
@@ -124,11 +122,8 @@ class CasesRepository {
           .from('user_case_progress')
           .upsert(payload, onConflict: 'user_id,case_id');
 
-      // Обновим кеш
-      final Box cache = await Hive.openBox('cases_progress');
       final String cacheKey = 'user_${userId}_case_$caseId';
-      final cached = await getCaseStatus(caseId);
-      await cache.put(cacheKey, cached);
+      HiveBoxHelper.deleteValue('cases_progress', cacheKey);
     } on PostgrestException catch (e, st) {
       await Sentry.captureException(e, stackTrace: st);
       rethrow;

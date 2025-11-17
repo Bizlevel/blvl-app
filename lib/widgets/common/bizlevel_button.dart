@@ -68,13 +68,23 @@ class BizLevelButton extends StatelessWidget {
     }
 
     final child = icon == null
-        ? Text(label)
+        ? Text(
+            label,
+            softWrap: true,
+            maxLines: 2,
+          )
         : Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               icon!,
               const SizedBox(width: 8),
-              Flexible(child: Text(label, overflow: TextOverflow.ellipsis)),
+              Flexible(
+                child: Text(
+                  label,
+                  softWrap: true,
+                  maxLines: 2,
+                ),
+              ),
             ],
           );
 

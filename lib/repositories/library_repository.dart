@@ -1,71 +1,50 @@
 import 'dart:io';
 
-import 'package:hive_flutter/hive_flutter.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:bizlevel/utils/hive_box_helper.dart';
 
 /// Репозиторий Библиотеки (курсы/гранты/акселераторы/избранное) с SWR‑кешем на Hive.
 class LibraryRepository {
   final SupabaseClient _client;
   LibraryRepository(this._client);
 
-  Future<Box> _openBox() => Hive.openBox('library');
+  static const String _boxName = 'library';
 
   // === Общие хелперы кеша/логирования ===
   Future<void> _capture(Object error, StackTrace st) async {
     await Sentry.captureException(error, stackTrace: st);
   }
 
-  List<Map<String, dynamic>>? _readCached(Box box, String cacheKey) {
-    final cached = box.get(cacheKey);
+  Future<List<Map<String, dynamic>>?> _readCachedList(String cacheKey) async {
+    final cached = await HiveBoxHelper.readValue(_boxName, cacheKey);
     if (cached == null) return null;
-    return List<Map<String, dynamic>>.from(cached as List);
+    try {
+      return List<Map<String, dynamic>>.from(
+        (cached as List).map((e) => Map<String, dynamic>.from(e as Map)),
+      );
+    } catch (_) {
+      return null;
+    }
   }
 
-  Future<void> _saveCached(
-    Box box,
-    String cacheKey,
-    List<Map<String, dynamic>> data,
-  ) async {
-    await box.put(cacheKey, data);
+  void _saveCachedList(String cacheKey, List<Map<String, dynamic>> data) {
+    HiveBoxHelper.putDeferred(_boxName, cacheKey, data);
   }
 
   Future<List<Map<String, dynamic>>> _fetchListSWR({
     required String cacheKey,
     required Future<List<dynamic>> Function() fetch,
   }) async {
-    final box = await _openBox();
-    int? prevCount;
-    DateTime? lastDigest;
-    try {
-      final cached = _readCached(box, cacheKey);
-      prevCount = cached?.length;
-      final ts = box.get('digest_ts') as String?;
-      if (ts != null) lastDigest = DateTime.tryParse(ts);
-    } catch (_) {}
     try {
       final rows = await fetch();
       final data =
           rows.map((e) => Map<String, dynamic>.from(e as Map)).toList();
-      await _saveCached(box, cacheKey, data);
-      try {
-        // Уведомление о новых материалах (простая эвристика): выросло количество
-        final now = DateTime.now().toUtc();
-        final bool cooldownPassed =
-            lastDigest == null || now.difference(lastDigest).inHours >= 24;
-        if ((prevCount ?? 0) < data.length && cooldownPassed) {
-          // Отправим локальный пуш (образовательный канал)
-          // Игнорируем ошибки — нет жёсткой зависимости в репозитории
-          // Пользователь увидит один пуш не чаще 1 раза в 24ч
-          // ignore: unnecessary_statements
-          // NotificationsService.instance.showLibraryDigestOnce();
-          await box.put('digest_ts', now.toIso8601String());
-        }
-      } catch (_) {}
+      _saveCachedList(cacheKey, data);
       return data;
     } catch (e, st) {
       await _capture(e, st);
-      final cached = _readCached(box, cacheKey);
+      final cached = await _readCachedList(cacheKey);
       if (cached != null) return cached;
       rethrow;
     }
@@ -165,8 +144,10 @@ class LibraryRepository {
     if (userId == null) {
       throw Exception('Пользователь не авторизован');
     }
-    final box = await _openBox();
     final cacheKey = 'favorites:user_$userId';
+    Future<List<Map<String, dynamic>>?> readCached() async {
+      return _readCachedList(cacheKey);
+    }
     try {
       final rows = await _client
           .from('library_favorites')
@@ -174,27 +155,21 @@ class LibraryRepository {
           .order('created_at', ascending: false) as List<dynamic>;
       final data =
           rows.map((e) => Map<String, dynamic>.from(e as Map)).toList();
-      await box.put(cacheKey, data);
+      _saveCachedList(cacheKey, data);
       return data;
     } on PostgrestException catch (e, st) {
       await Sentry.captureException(e, stackTrace: st);
-      final cached = box.get(cacheKey);
-      if (cached != null) {
-        return List<Map<String, dynamic>>.from(cached as List);
-      }
+      final cached = await readCached();
+      if (cached != null) return cached;
       rethrow;
     } on SocketException {
-      final cached = box.get(cacheKey);
-      if (cached != null) {
-        return List<Map<String, dynamic>>.from(cached as List);
-      }
+      final cached = await readCached();
+      if (cached != null) return cached;
       rethrow;
     } catch (e, st) {
       await Sentry.captureException(e, stackTrace: st);
-      final cached = box.get(cacheKey);
-      if (cached != null) {
-        return List<Map<String, dynamic>>.from(cached as List);
-      }
+      final cached = await readCached();
+      if (cached != null) return cached;
       rethrow;
     }
   }

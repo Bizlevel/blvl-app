@@ -14,5 +14,3 @@ void main() {
     expect(find.textContaining('%'), findsOneWidget);
   });
 }
-
-

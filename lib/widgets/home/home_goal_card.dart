@@ -28,7 +28,8 @@ class HomeGoalCard extends ConsumerWidget {
           borderRadius: BorderRadius.circular(AppDimensions.radiusXl),
           child: Container(
             constraints: const BoxConstraints(
-                minHeight: AppDimensions.homeGoalMinHeight),
+              minHeight: AppDimensions.homeGoalMinHeight,
+            ),
             padding: AppSpacing.insetsAll(AppSpacing.s20),
             decoration: BoxDecoration(
               // fix: цвета/радиусы/тени → токены
@@ -39,7 +40,7 @@ class HomeGoalCard extends ConsumerWidget {
                   color: AppColor.shadow,
                   blurRadius: 16,
                   offset: Offset(0, 4),
-                )
+                ),
               ],
             ),
             child: goalAsync.when(
@@ -53,8 +54,9 @@ class HomeGoalCard extends ConsumerWidget {
                 DateTime? targetDate;
                 try {
                   final td = (goal?['target_date']?.toString());
-                  targetDate =
-                      td == null ? null : DateTime.tryParse(td)?.toLocal();
+                  targetDate = td == null
+                      ? null
+                      : DateTime.tryParse(td)?.toLocal();
                 } catch (_) {}
 
                 return Row(
@@ -67,9 +69,7 @@ class HomeGoalCard extends ConsumerWidget {
                         children: [
                           Text(
                             'Моя цель',
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleMedium
+                            style: Theme.of(context).textTheme.titleMedium
                                 ?.copyWith(fontWeight: FontWeight.w600),
                           ),
                           AppSpacing.gapH(AppSpacing.md),
@@ -83,22 +83,23 @@ class HomeGoalCard extends ConsumerWidget {
                           if (targetDate != null)
                             Row(
                               children: [
-                                Text('⏱ ',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleMedium),
+                                Text(
+                                  '⏱ ',
+                                  style: Theme.of(
+                                    context,
+                                  ).textTheme.titleMedium,
+                                ),
                                 Text(
                                   targetDate.isBefore(DateTime.now())
                                       ? 'Поставить новый дедлайн'
                                       : 'до ${DateFormat('dd.MM.yyyy').format(targetDate)}',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .bodyMedium
+                                  style: Theme.of(context).textTheme.bodyMedium
                                       ?.copyWith(
-                                          color: targetDate
-                                                  .isBefore(DateTime.now())
-                                              ? AppColor.error
-                                              : AppColor.onSurfaceSubtle),
+                                        color:
+                                            targetDate.isBefore(DateTime.now())
+                                            ? AppColor.error
+                                            : AppColor.onSurfaceSubtle,
+                                      ),
                                 ),
                               ],
                             ),
@@ -106,28 +107,30 @@ class HomeGoalCard extends ConsumerWidget {
                             AppSpacing.gapH(AppSpacing.sm),
                             Text(
                               'Добавьте метрику (тип, текущее и целевое значение), чтобы видеть прогресс.',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .labelMedium
+                              style: Theme.of(context).textTheme.labelMedium
                                   ?.copyWith(color: AppColor.onSurfaceSubtle),
                             ),
                           ],
                           AppSpacing.gapH(AppSpacing.md),
+                          // Кнопки в один ряд, каждая занимает половину ширины; текст заворачивается до 2 строк
                           Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Expanded(
                                 child: BizLevelButton(
-                                  icon: const Icon(Icons.add_circle_outline,
-                                      size: 18),
+                                  icon: const Icon(
+                                    Icons.add_circle_outline,
+                                    size: 18,
+                                  ),
                                   label: '+ Действие к цели',
                                   onPressed: () {
                                     try {
-                                      Sentry.addBreadcrumb(Breadcrumb(
-                                        category: 'ui.tap',
-                                        message: 'home_goal_action_tap',
-                                        level: SentryLevel.info,
-                                      ));
+                                      Sentry.addBreadcrumb(
+                                        Breadcrumb(
+                                          category: 'ui.tap',
+                                          message: 'home_goal_action_tap',
+                                          level: SentryLevel.info,
+                                        ),
+                                      );
                                     } catch (_) {}
                                     context.go('/goal?scroll=journal');
                                   },
@@ -135,32 +138,36 @@ class HomeGoalCard extends ConsumerWidget {
                                   size: BizLevelButtonSize.lg,
                                 ),
                               ),
-                              SizedBox(width: AppSpacing.md),
+                              const SizedBox(width: AppSpacing.md),
                               Expanded(
                                 child: BizLevelButton(
-                                  icon: const Icon(Icons.chat_bubble_outline,
-                                      size: 18),
+                                  icon: const Icon(
+                                    Icons.chat_bubble_outline,
+                                    size: 18,
+                                  ),
                                   label: 'Обсудить с Максом',
                                   onPressed: () {
                                     try {
-                                      Sentry.addBreadcrumb(Breadcrumb(
-                                        category: 'ui.tap',
-                                        message: 'home_goal_max_tap',
-                                        level: SentryLevel.info,
-                                      ));
+                                      Sentry.addBreadcrumb(
+                                        Breadcrumb(
+                                          category: 'ui.tap',
+                                          message: 'home_goal_max_tap',
+                                          level: SentryLevel.info,
+                                        ),
+                                      );
                                     } catch (_) {}
                                     Navigator.of(context).push(
                                       MaterialPageRoute(
                                         builder: (_) => LeoDialogScreen(
                                           bot: 'max',
-                                          userContext:
-                                              buildMaxUserContext(goal: goal),
+                                          userContext: buildMaxUserContext(
+                                            goal: goal,
+                                          ),
                                           levelContext: '',
                                         ),
                                       ),
                                     );
                                   },
-                                  variant: BizLevelButtonVariant.primary,
                                   size: BizLevelButtonSize.lg,
                                 ),
                               ),
@@ -169,7 +176,7 @@ class HomeGoalCard extends ConsumerWidget {
                         ],
                       ),
                     ),
-                    SizedBox(width: AppSpacing.lg),
+                    const SizedBox(width: AppSpacing.lg),
                     // Правая колонка: донат‑прогресс
                     if (progress != null)
                       DonutProgress(value: progress.clamp(0.0, 1.0)),

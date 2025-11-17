@@ -24,8 +24,7 @@ void main() {
 
     test('Fetch levels succeeds', () async {
       try {
-        final response =
-            await Supabase.instance.client.from('levels').select();
+        final response = await Supabase.instance.client.from('levels').select();
         expect(response, isA<List<dynamic>>());
       } on PostgrestException {
         // In widget test environment, real HTTP calls return 400. We still consider it a successful

@@ -1,11 +1,11 @@
 import 'dart:io';
 
-import 'package:hive_flutter/hive_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bizlevel/services/gp_service.dart';
 import 'package:bizlevel/services/supabase_service.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:bizlevel/models/goal_update.dart';
+import 'package:bizlevel/utils/hive_box_helper.dart';
 
 /// Репозиторий для работы с фичей «Цель»: версии цели, спринты, напоминания, цитаты.
 ///
@@ -33,10 +33,6 @@ class GoalsRepository {
     return userId;
   }
 
-  Future<Box> _getBox(String name) async {
-    return Hive.isBoxOpen(name) ? Hive.box(name) : await Hive.openBox(name);
-  }
-
   // ============================
   // Generic кеширование (DRY)
   // ============================
@@ -44,23 +40,34 @@ class GoalsRepository {
   /// Generic метод для кеширования с offline-fallback
   /// Устраняет дублирование паттерна try-cache-fallback в 6+ методах
   Future<T?> _cachedQuery<T>({
-    required Box cache,
+    required String cacheBox,
     required String cacheKey,
     required Future<T?> Function() query,
     required T Function(dynamic) fromCache,
   }) async {
+    Future<T?> readCached() async {
+      final cached = await HiveBoxHelper.readValue(cacheBox, cacheKey);
+      if (cached == null) {
+        return null;
+      }
+      try {
+        return fromCache(cached);
+      } catch (_) {
+        return null;
+      }
+    }
+
     try {
       final data = await query();
       if (data != null) {
-        await cache.put(cacheKey, data);
+        HiveBoxHelper.putDeferred(cacheBox, cacheKey, data);
       }
       return data;
     } on SocketException {
-      final cached = cache.get(cacheKey);
-      return cached == null ? null : fromCache(cached);
+      return await readCached();
     } catch (_) {
-      final cached = cache.get(cacheKey);
-      if (cached != null) return fromCache(cached);
+      final cached = await readCached();
+      if (cached != null) return cached;
       rethrow;
     }
   }
@@ -72,12 +79,10 @@ class GoalsRepository {
   Future<Map<String, dynamic>?> fetchUserGoal() async {
     final String? userId = _client.auth.currentUser?.id;
     if (userId == null) return null;
-    final Box cache = await _getBox('user_goal');
-    const String cacheKey = 'self';
 
     return _cachedQuery<Map<String, dynamic>>(
-      cache: cache,
-      cacheKey: cacheKey,
+      cacheBox: 'user_goal',
+      cacheKey: 'self',
       query: () {
         _ensureAnonApikey();
         return _client
@@ -87,7 +92,7 @@ class GoalsRepository {
             .limit(1)
             .maybeSingle();
       },
-      fromCache: (cached) => Map<String, dynamic>.from(cached),
+      fromCache: (cached) => Map<String, dynamic>.from(cached as Map),
     );
   }
 
@@ -140,10 +145,7 @@ class GoalsRepository {
     } catch (_) {}
 
     // refresh cache
-    try {
-      final Box cache = Hive.box('user_goal');
-      await cache.put('self', row);
-    } catch (_) {}
+    HiveBoxHelper.putDeferred('user_goal', 'self', row);
 
     return Map<String, dynamic>.from(row);
   }
@@ -189,7 +191,7 @@ class GoalsRepository {
         .single();
     final String newHistoryId = insertedHist['id'] as String;
     // 3) обновить user_goal: текст/дедлайн, стартовые метрики (если переданы), привязать pointer
-    Map<String, dynamic> row = await _client
+    final Map<String, dynamic> row = await _client
         .from('user_goal')
         .upsert({
           'user_id': r.userId,
@@ -205,10 +207,7 @@ class GoalsRepository {
         .select()
         .single();
     // refresh cache
-    try {
-      final Box cache = Hive.box('user_goal');
-      await cache.put('self', row);
-    } catch (_) {}
+    HiveBoxHelper.putDeferred('user_goal', 'self', row);
     return Map<String, dynamic>.from(row);
   }
 
@@ -240,12 +239,10 @@ class GoalsRepository {
   Future<List<Map<String, dynamic>>> fetchPracticeLog({int limit = 20}) async {
     final String? userId = _client.auth.currentUser?.id;
     if (userId == null) return <Map<String, dynamic>>[];
-    final Box cache = await _getBox('practice_log');
-    final String cacheKey = 'list_$limit';
 
     final result = await _cachedQuery<List>(
-      cache: cache,
-      cacheKey: cacheKey,
+      cacheBox: 'practice_log',
+      cacheKey: 'list_$limit',
       query: () async => _fetchPracticeRows(userId: userId, limit: limit),
       fromCache: (cached) => List.from(cached),
     );
@@ -305,12 +302,9 @@ class GoalsRepository {
         .select()
         .maybeSingle();
     // 3) Обновляем кеш, если получилось получить запись
-    try {
       if (updated != null) {
-        final Box cache = Hive.box('user_goal');
-        await cache.put('self', updated);
+      HiveBoxHelper.putDeferred('user_goal', 'self', updated);
       }
-    } catch (_) {}
   }
 
   Future<List> _fetchPracticeRows(
@@ -368,10 +362,7 @@ class GoalsRepository {
     await _claimDailyBonusAndRefresh();
 
     // Invalidate/refresh cache roughly
-    try {
-      final Box cache = Hive.box('practice_log');
-      await cache.delete('list_20');
-    } catch (_) {}
+    HiveBoxHelper.deleteValue('practice_log', 'list_20');
 
     return Map<String, dynamic>.from(inserted);
   }
@@ -393,9 +384,8 @@ class GoalsRepository {
     await _client.rpc('log_practice_and_update_metric', params: params);
     try {
       await _claimDailyBonusAndRefresh();
-      final Box cache = Hive.box('practice_log');
-      await cache.delete('list_20');
     } catch (_) {}
+    HiveBoxHelper.deleteValue('practice_log', 'list_20');
   }
 
   Future<void> _claimDailyBonusAndRefresh() async {
@@ -553,12 +543,9 @@ class GoalsRepository {
 
   /// Возвращает случайную цитату из активных. Кэширует список активных.
   Future<Map<String, dynamic>?> getDailyQuote() async {
-    final Box cache = Hive.box('quotes');
-    const String cacheKey = 'active';
-
     final result = await _cachedQuery<List>(
-      cache: cache,
-      cacheKey: cacheKey,
+      cacheBox: 'quotes',
+      cacheKey: 'active',
       query: () async {
         final resp = await _client
             .from('motivational_quotes')

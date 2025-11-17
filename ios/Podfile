@@ -35,13 +35,10 @@ target 'Runner' do
   # Подхватываем плагины, сгенерированные Flutter
   flutter_install_all_ios_pods(File.dirname(File.realpath(__FILE__)))
 
-  # Используем стабильную версию AppAuth из CocoaPods trunk
-  pod 'AppAuth', '1.7.6'
-
   # Явно указываем Sentry/HybridSDK из GitHub, чтобы podspec точно подтянулся
   pod 'Sentry/HybridSDK',
     :git => 'https://github.com/getsentry/sentry-cocoa.git',
-    :tag => '8.52.1'
+    :tag => '8.56.2'
 
 
 end
@@ -53,6 +50,10 @@ post_install do |installer|
     flutter_additional_ios_build_settings(target)
     target.build_configurations.each do |config|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
+      # Ensure modern Swift toolchain across all pods (fixes GTMAppAuth import issues)
+      config.build_settings['SWIFT_VERSION'] = '5.0'
+      # Generate stable Swift interfaces to avoid module incompatibilities between pods
+      config.build_settings['BUILD_LIBRARY_FOR_DISTRIBUTION'] = 'YES'
     end
   end
 end

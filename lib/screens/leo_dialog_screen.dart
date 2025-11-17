@@ -581,7 +581,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
                   borderRadius:
                       BorderRadius.circular(AppDimensions.radiusLg).copyWith(
                     topLeft: const Radius.circular(0),
-                    topRight: Radius.circular(AppDimensions.radiusLg),
+                    topRight: const Radius.circular(AppDimensions.radiusLg),
                   ),
                 ),
                 child: const TypingIndicator.small(),

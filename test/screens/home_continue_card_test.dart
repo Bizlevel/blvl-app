@@ -19,5 +19,3 @@ void main() {
     expect(find.text('Продолжить обучение'), findsOneWidget);
   }, skip: false);
 }
-
-

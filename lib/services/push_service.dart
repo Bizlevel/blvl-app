@@ -2,30 +2,22 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/widgets.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bizlevel/services/notifications_service.dart';
 
-// Топ-левел background handler обязателен для Android
-@pragma('vm:entry-point')
-Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  try {
-    await Firebase.initializeApp();
-    Sentry.addBreadcrumb(Breadcrumb(
-      category: 'notif_push_received',
-      data: {'from': 'background', 'hasData': message.data.isNotEmpty},
-      level: SentryLevel.info,
-    ));
-  } catch (_) {}
-}
+import 'push_service_android.dart' show AndroidPushPlatformHooks;
+import 'push_service_ios.dart' show IosPushPlatformHooks;
+import 'push_service_platform.dart';
 
 class PushService {
-  PushService._();
-  static final PushService instance = PushService._();
+  PushService._(this._hooks);
+  static final PushService instance = PushService._(_resolveHooks());
 
+  final PushPlatformHooks _hooks;
   late final FirebaseMessaging _fm;
 
   Future<void> initialize() async {
@@ -33,20 +25,27 @@ class PushService {
     if (kIsWeb) return;
 
     try {
-      // Пытаемся инициализировать Firebase безопасно
       if (Firebase.apps.isEmpty) {
-        await Firebase.initializeApp();
+        throw StateError('Firebase not initialized before PushService.start');
       }
+
+      if (Platform.isIOS) {
+        await _awaitFirstFrame();
+      }
+
       _fm = FirebaseMessaging.instance;
 
       // Mobile permissions
       if (Platform.isIOS || Platform.isAndroid) {
+        await _hooks.beforePermissionRequest();
         await _fm.requestPermission();
       }
 
-      FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+      await _hooks.setupBackgroundHandling(_fm);
 
       // Foreground messages
+      await _fm.setAutoInitEnabled(true);
+
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
         Sentry.addBreadcrumb(Breadcrumb(
           category: 'notif_push_received',
@@ -86,8 +85,7 @@ class PushService {
       });
 
       // Cold start
-      final initial =
-          (Firebase.apps.isNotEmpty) ? await _fm.getInitialMessage() : null;
+      final initial = await _fm.getInitialMessage();
       if (initial != null) {
         final route = initial.data['route']?.toString();
         if (route != null && route.isNotEmpty) {
@@ -153,8 +151,33 @@ class PushService {
 
   Future<void> _storeLaunchRoute(String route) async {
     try {
-      final box = await Hive.openBox('notifications');
-      await box.put('launch_route', route);
+      await NotificationsService.instance.persistLaunchRoute(route);
     } catch (_) {}
   }
+}
+
+PushPlatformHooks _resolveHooks() {
+  if (kIsWeb) {
+    return const DefaultPushPlatformHooks();
+  }
+  if (Platform.isAndroid) {
+    return const AndroidPushPlatformHooks();
+  }
+  if (Platform.isIOS) {
+    return const IosPushPlatformHooks();
+  }
+  return const DefaultPushPlatformHooks();
+}
+
+Future<void> _awaitFirstFrame() async {
+  final binding = WidgetsBinding.instance;
+  final completer = Completer<void>();
+  binding.addPostFrameCallback((_) {
+    if (!completer.isCompleted) {
+      completer.complete();
+    }
+  });
+  await completer.future;
+  // Небольшая пауза, чтобы убедиться, что UI стабилизировался.
+  await Future<void>.delayed(const Duration(milliseconds: 300));
 }

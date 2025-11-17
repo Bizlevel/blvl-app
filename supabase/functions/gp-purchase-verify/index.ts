@@ -20,14 +20,11 @@ type VerifyRequest = {
 type RpcResponse = { balance_after?: number } | number[] | number | Record<string, unknown>;
 
 const PRODUCT_TO_GP: Record<string, number> = {
-  // Старые ID (dev)
+  // Единые ID продуктов для всех платформ
+  // Отображение: 1000 → 1400 GP (1000 + 400 бонус), 2000 → 3000 GP (2000 + 1000 бонус)
   gp_300: 300,
-  gp_1400: 1400, // 1000 + 400 бонус
-  gp_3000: 3000,
-  // Новые ID (App Store / Google Play)
-  bizlevelgp_300: 300,
-  bizlevelgp_1000: 1400, // в магазине отображается как 1000 + 400 бонус
-  bizlevelgp_2000: 3000,
+  gp_1000: 1400,
+  gp_2000: 3000,
 };
 
 function extractUserJwt(req: Request): string | null {
@@ -240,7 +237,7 @@ Deno.serve(async (req: Request) => {
       status: 204,
       headers: {
         'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'authorization, x-user-jwt, apikey, content-type',
+        'Access-Control-Allow-Headers': 'authorization, x-user-jwt, apikey, content-type, x-client-platform',
         'Access-Control-Allow-Methods': 'POST, OPTIONS',
       },
     });
@@ -253,6 +250,7 @@ Deno.serve(async (req: Request) => {
   let dbgTokenPrefix = "";
   let dbgTokenHash = "";
   try {
+    const clientPlatformHeader = (req.headers.get('x-client-platform') || '').toLowerCase();
     const body = (await req.json()) as VerifyRequest;
     dbgPlatform = body?.platform || "";
     dbgProductId = body?.product_id || "";
@@ -280,6 +278,21 @@ Deno.serve(async (req: Request) => {
 
     // --- Web branch: verify by purchase_id only ---
     if (body?.purchase_id && !body.platform && !body.product_id && !body.token) {
+      // Разрешаем web-ветку только для настоящего web-клиента
+      if (clientPlatformHeader !== 'web') {
+        try {
+          await insertLog({
+            platform: 'web',
+            product_id: dbgProductId,
+            package_name: dbgPackageName,
+            token_prefix: dbgTokenPrefix,
+            token_hash: dbgTokenHash,
+            step: "error",
+            error: "web_verify_not_allowed_on_mobile"
+          }, dbgUserJwt);
+        } catch (_) {}
+        return jsonResponse({ error: "web_verify_not_allowed_on_mobile" }, 403);
+      }
       const rpcData = await callPostgrestRpc("gp_purchase_verify", {
         p_purchase_id: body.purchase_id,
       }, dbgUserJwt);

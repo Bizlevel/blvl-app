@@ -1,3 +1,4 @@
+// ignore_for_file: long-parameter-list, number-of-arguments
 class GoalUpsertRequest {
   final String userId;
   final String goalText;

@@ -248,4 +248,3 @@ class ProfileFormBlock extends LevelPageBlock {
     });
   }
 }
-

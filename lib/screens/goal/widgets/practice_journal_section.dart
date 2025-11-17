@@ -180,7 +180,7 @@ class _PracticeJournalSectionState
                     children: [
                       DropdownButtonFormField<String>(
                         isExpanded: true,
-                        value: selected,
+                        initialValue: selected,
                         hint: const Text('Другие навыки'),
                         items: uniqueOpts
                             .map((e) => DropdownMenuItem(
@@ -276,7 +276,7 @@ class _PracticeJournalSectionState
                         }
                       }
                       ref.invalidate(userGoalProvider);
-                      if (mounted && metricUpdate != null) {
+                      if (metricUpdate != null) {
                         try {
                           await Sentry.addBreadcrumb(Breadcrumb(
                             category: 'goal',
@@ -285,6 +285,7 @@ class _PracticeJournalSectionState
                             level: SentryLevel.info,
                           ));
                         } catch (_) {}
+                        if (!context.mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                               content:

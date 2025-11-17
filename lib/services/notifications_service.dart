@@ -6,6 +6,8 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
+import 'package:bizlevel/utils/hive_box_helper.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class NotificationsService {
   NotificationsService._();
@@ -17,6 +19,7 @@ class NotificationsService {
   static const String _kWeekdays = 'practice_reminder_weekdays';
   static const String _kHour = 'practice_reminder_hour';
   static const String _kMinute = 'practice_reminder_minute';
+  static const String _launchRouteKey = 'launch_route';
 
   final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
@@ -75,9 +78,7 @@ class NotificationsService {
   Future<(Set<int> weekdays, int hour, int minute)>
       getPracticeReminderPrefs() async {
     try {
-      final Box box = Hive.isBoxOpen(_boxName)
-          ? Hive.box(_boxName)
-          : await Hive.openBox(_boxName);
+      final Box box = await HiveBoxHelper.openBox(_boxName);
       final List<dynamic>? rawDays = box.get(_kWeekdays) as List<dynamic>?;
       final int hour = (box.get(_kHour) as int?) ?? 19;
       final int minute = (box.get(_kMinute) as int?) ?? 0;
@@ -101,16 +102,12 @@ class NotificationsService {
         pendingRoute = null;
       }
       if (route == null) {
-        try {
-          final box = Hive.isBoxOpen('notifications')
-              ? Hive.box('notifications')
-              : await Hive.openBox('notifications');
-          final stored = box.get('launch_route');
-          if (stored is String && stored.isNotEmpty) {
+        final prefs = await SharedPreferences.getInstance();
+        final stored = prefs.getString(_launchRouteKey);
+        if (stored != null && stored.isNotEmpty) {
             route = stored;
-            await box.delete('launch_route');
+          await prefs.remove(_launchRouteKey);
           }
-        } catch (_) {}
       }
       if (route == null) {
         try {
@@ -244,9 +241,7 @@ class NotificationsService {
     }
     // Persist selected weekdays/hour
     try {
-      final Box box = Hive.isBoxOpen(_boxName)
-          ? Hive.box(_boxName)
-          : await Hive.openBox(_boxName);
+      final Box box = await HiveBoxHelper.openBox(_boxName);
       await box.put(_kWeekdays, weekdays.toSet().toList());
       await box.put(_kHour, hour);
       await box.put(_kMinute, 0);
@@ -301,6 +296,13 @@ class NotificationsService {
         await _plugin.cancel(id);
       } catch (_) {}
     }
+  }
+
+  Future<void> persistLaunchRoute(String route) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_launchRouteKey, route);
+    } catch (_) {}
   }
 
   tz.TZDateTime _nextInstanceOf(

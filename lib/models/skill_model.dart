@@ -16,4 +16,3 @@ class SkillModel with _$SkillModel {
   factory SkillModel.fromJson(Map<String, dynamic> json) =>
       _$SkillModelFromJson(json);
 }
-

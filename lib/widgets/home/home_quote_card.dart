@@ -33,7 +33,7 @@ class HomeQuoteCard extends ConsumerWidget {
             },
             child: Container(
               width: double.infinity,
-              padding: EdgeInsets.fromLTRB(
+              padding: const EdgeInsets.fromLTRB(
                   AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, AppSpacing.s14),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
@@ -84,5 +84,3 @@ class HomeQuoteCard extends ConsumerWidget {
     );
   }
 }
-
-

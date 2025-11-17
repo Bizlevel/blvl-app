@@ -1,3 +1,4 @@
+// ignore_for_file: number-of-arguments, long-parameter-list, excessive-parameter-list
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -14,31 +15,7 @@ class _FakeRepo extends GoalsRepository {
   @override
   Future<Map<String, dynamic>?> fetchUserGoal() async => storedGoal;
 
-  @override
-  Future<Map<String, dynamic>> upsertUserGoal({
-    required String goalText,
-    String? metricType,
-    num? metricStart,
-    num? metricCurrent,
-    num? metricTarget,
-    DateTime? startDate,
-    DateTime? targetDate,
-    String? financialFocus,
-    String? actionPlanNote,
-  }) async {
-    storedGoal = {
-      'goal_text': goalText,
-      'metric_type': metricType,
-      'metric_start': metricStart,
-      'metric_current': metricCurrent,
-      'metric_target': metricTarget,
-      'start_date': startDate?.toIso8601String(),
-      'target_date': targetDate?.toIso8601String(),
-      'financial_focus': financialFocus,
-      'action_plan_note': actionPlanNote,
-    }..removeWhere((k, v) => v == null);
-    return Map<String, dynamic>.from(storedGoal!);
-  }
+  // upsertUserGoalRequest не требуется для данного smoke-теста
 
   @override
   Future<List<Map<String, dynamic>>> fetchPracticeLog({int limit = 20}) async {
@@ -73,9 +50,7 @@ void main() {
         'target_date': DateTime.now().toIso8601String(),
       };
 
-    // Эмулируем завершение L7: вызовем upsertUserGoal с action_plan_note и добавим запись
-    await fake.upsertUserGoal(
-        goalText: 'Цель', actionPlanNote: 'Усилить применение');
+    // Эмулируем завершение L7: зафиксируем системную запись
     await fake.addPracticeEntry(note: '[SYS] L7 decision: Усилить применение');
 
     // Проверяем провайдеры

@@ -19,13 +19,15 @@ class UserRepository {
     try {
       if (kDebugMode) {
         debugPrint(
-            'UserRepository.fetchProfile: querying users table for $userId');
+          'UserRepository.fetchProfile: querying users table for $userId',
+        );
       }
 
       final response = await _client
           .from('users')
           .select(
-              'id, name, email, about, goal, business_area, experience_level, onboarding_completed, current_level, avatar_id, business_size, key_challenges, learning_style, business_region')
+            'id, name, email, about, goal, business_area, experience_level, onboarding_completed, current_level, avatar_id, business_size, key_challenges, learning_style, business_region',
+          )
           .eq('id', userId)
           .maybeSingle();
 
@@ -50,7 +52,8 @@ class UserRepository {
     } on PostgrestException catch (e) {
       if (kDebugMode) {
         debugPrint(
-            'UserRepository.fetchProfile: PostgrestException ${e.code} ${e.message}');
+          'UserRepository.fetchProfile: PostgrestException ${e.code} ${e.message}',
+        );
       }
       // таблица существует, но записи нет или другая ошибка – вернём null
       return null;
@@ -92,8 +95,7 @@ class UserRepository {
           skillName: e.value,
           points: pointsBySkill[e.key] ?? 0,
         );
-      }).toList()
-        ..sort((a, b) => a.skillId.compareTo(b.skillId));
+      }).toList()..sort((a, b) => a.skillId.compareTo(b.skillId));
 
       return result;
     } catch (e) {

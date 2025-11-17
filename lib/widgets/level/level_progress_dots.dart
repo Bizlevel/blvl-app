@@ -36,4 +36,3 @@ class LevelProgressDots extends StatelessWidget {
           );
   }
 }
-

@@ -4,7 +4,7 @@ import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/providers/levels_provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shimmer/shimmer.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:bizlevel/utils/hive_box_helper.dart';
 import 'package:bizlevel/widgets/common/bizlevel_button.dart';
 import 'package:bizlevel/widgets/common/bizlevel_card.dart';
 import 'package:bizlevel/theme/spacing.dart';
@@ -25,7 +25,7 @@ class ArtifactsScreen extends ConsumerWidget {
         centerTitle: true,
         actions: [
           Padding(
-            padding: EdgeInsets.only(right: AppSpacing.md),
+            padding: const EdgeInsets.only(right: AppSpacing.md),
             child: _CollectedBadge(),
           )
         ],
@@ -179,7 +179,7 @@ class _CollectedBadge extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text('Собрано $collected/$total', textAlign: TextAlign.center),
-            SizedBox(height: AppSpacing.xs),
+            const SizedBox(height: AppSpacing.xs),
             SizedBox(
               height: 3,
               child: ClipRRect(
@@ -231,8 +231,7 @@ class _ArtifactTileState extends State<_ArtifactTile> {
     super.initState();
     // Простая эвристика «Новый»: показываем, пока не откроют полноэкранный просмотр
     try {
-      final box =
-          Hive.isBoxOpen('artifacts_seen') ? Hive.box('artifacts_seen') : null;
+      final box = HiveBoxHelper.maybeBox('artifacts_seen');
       final key = 'seen_${widget.level}';
       _isNew = !(box?.get(key) == true);
     } catch (_) {
@@ -262,9 +261,8 @@ class _ArtifactTileState extends State<_ArtifactTile> {
                       final key = 'seen_${widget.level}';
                       () async {
                         try {
-                          final box = Hive.isBoxOpen('artifacts_seen')
-                              ? Hive.box('artifacts_seen')
-                              : await Hive.openBox('artifacts_seen');
+                          final box =
+                              await HiveBoxHelper.openBox('artifacts_seen');
                           await box.put(key, true);
                         } catch (_) {}
                       }();
@@ -708,7 +706,7 @@ class _ArtifactsEmptyState extends StatelessWidget {
                     .textTheme
                     .titleMedium
                     ?.copyWith(fontWeight: FontWeight.w600)),
-            SizedBox(height: AppSpacing.s6),
+            const SizedBox(height: AppSpacing.s6),
             Text(
               'Проходите уровни, чтобы открывать карточки. Начните с Уровня 1 на Башне.',
               style: Theme.of(context)
@@ -716,7 +714,7 @@ class _ArtifactsEmptyState extends StatelessWidget {
                   .bodyMedium
                   ?.copyWith(color: AppColor.onSurfaceSubtle),
             ),
-            SizedBox(height: AppSpacing.s10),
+            const SizedBox(height: AppSpacing.s10),
             SizedBox(
               height: 40,
               child: BizLevelButton(

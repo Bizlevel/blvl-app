@@ -27,7 +27,8 @@ class ListRowTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final content = Row(
       children: [
-        Icon(leadingIcon, size: 26, color: Theme.of(context).colorScheme.onSurface),
+        Icon(leadingIcon,
+            size: 26, color: Theme.of(context).colorScheme.onSurface),
         AppSpacing.gapW(AppSpacing.itemSpacing),
         Expanded(
           child: Column(
@@ -63,7 +64,8 @@ class ListRowTile extends StatelessWidget {
     );
 
     final body = ConstrainedBox(
-      constraints: const BoxConstraints(minHeight: AppDimensions.minTouchTarget),
+      constraints:
+          const BoxConstraints(minHeight: AppDimensions.minTouchTarget),
       child: Padding(
         padding: padding ??
             AppSpacing.insetsSymmetric(h: AppSpacing.md, v: AppSpacing.s6),
@@ -90,5 +92,3 @@ class ListRowTile extends StatelessWidget {
         : tappable;
   }
 }
-
-

@@ -12,10 +12,9 @@ class UserSkillModel with _$UserSkillModel {
     @JsonKey(name: 'skill_id') required int skillId,
     @Default(0) int points,
     // This field will be populated by a JOIN query
-    @JsonKey(name: 'name') required String skillName, 
+    @JsonKey(name: 'name') required String skillName,
   }) = _UserSkillModel;
 
   factory UserSkillModel.fromJson(Map<String, dynamic> json) =>
       _$UserSkillModelFromJson(json);
 }
-

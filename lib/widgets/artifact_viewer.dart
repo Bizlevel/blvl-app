@@ -150,9 +150,9 @@ class _ArtifactViewerState extends State<ArtifactViewer>
                       borderRadius:
                           BorderRadius.circular(AppDimensions.radiusLg),
                     ),
-                    child: Row(
+                    child: const Row(
                       mainAxisSize: MainAxisSize.min,
-                      children: const [
+                      children: [
                         Icon(Icons.touch_app,
                             color: AppColor.glassTextColor, size: 16),
                         SizedBox(width: AppSpacing.s6),

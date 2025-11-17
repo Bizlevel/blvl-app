@@ -3,10 +3,10 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 
 import 'package:dio/dio.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bizlevel/utils/env_helper.dart';
+import 'package:bizlevel/utils/hive_box_helper.dart';
 
 // Private options holder for building Edge headers in a type-safe way
 class _EdgeHeadersOptions {
@@ -16,6 +16,7 @@ class _EdgeHeadersOptions {
     this.idempotencyKey,
     this.xUserJwt,
     this.json = true,
+    this.xClientPlatform,
   });
 
   final String authorization;
@@ -23,6 +24,7 @@ class _EdgeHeadersOptions {
   final String? idempotencyKey;
   final String? xUserJwt;
   final bool json;
+  final String? xClientPlatform;
 }
 
 class GpFailure implements Exception {
@@ -85,6 +87,9 @@ class GpService {
     if (o.xUserJwt != null && o.xUserJwt!.isNotEmpty) {
       headers['x-user-jwt'] = o.xUserJwt!;
     }
+    if (o.xClientPlatform != null && o.xClientPlatform!.isNotEmpty) {
+      headers['x-client-platform'] = o.xClientPlatform!;
+    }
     return headers;
   }
 
@@ -96,6 +101,7 @@ class GpService {
         apikey: envOrDefine('SUPABASE_ANON_KEY'),
         idempotencyKey: idempotencyKey,
         json: json,
+        xClientPlatform: _detectClientPlatform(),
       ));
 
   Map<String, String> _edgeHeadersAnonWithUserJwt(Session session,
@@ -105,9 +111,19 @@ class GpService {
         apikey: envOrDefine('SUPABASE_ANON_KEY'),
         xUserJwt: session.accessToken,
         json: json,
+        xClientPlatform: _detectClientPlatform(),
       ));
 
   // reserved for future use
+
+  String _detectClientPlatform() {
+    if (kIsWeb) return 'web';
+    try {
+      if (Platform.isAndroid) return 'android';
+      if (Platform.isIOS) return 'ios';
+    } catch (_) {}
+    return 'other';
+    }
 
   Future<Map<String, int>> _getBalanceViaEdge(Session session) async {
     final resp = await _edgeDio.get('/gp-balance',
@@ -335,12 +351,10 @@ class GpService {
       if (resp.statusCode == 200 && resp.data is Map<String, dynamic>) {
         final m = Map<String, dynamic>.from(resp.data);
         // Сохраним purchase_id локально для кнопки «Проверить покупку»
-        try {
-          if (m['purchase_id'] != null) {
-            final box = Hive.box(_boxName);
-            await box.put('last_purchase_id', m['purchase_id'].toString());
+        final purchaseId = m['purchase_id']?.toString();
+        if (purchaseId != null) {
+          HiveBoxHelper.putDeferred(_boxName, 'last_purchase_id', purchaseId);
           }
-        } catch (_) {}
         return {
           'payment_url':
               (m['payment_url'] as String?) ?? (m['url'] as String? ?? ''),
@@ -598,15 +612,13 @@ class GpService {
   static const String _keyBalance = 'balance_cache';
 
   static Future<void> saveBalanceCache(Map<String, int> data) async {
-    try {
-      final box = Hive.box(_boxName);
-      await box.put(_keyBalance, data);
-    } catch (_) {}
+    HiveBoxHelper.putDeferred(_boxName, _keyBalance, data);
   }
 
   static Map<String, int>? readBalanceCache() {
     try {
-      final box = Hive.box(_boxName);
+      final box = HiveBoxHelper.maybeBox(_boxName);
+      if (box == null) return null;
       final raw = box.get(_keyBalance);
       if (raw is Map) {
         final m = Map<String, dynamic>.from(raw);
