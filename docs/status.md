@@ -3,6 +3,25 @@
 - 52.fix-2: Подсказки переведены в компактную горизонтальную ленту (1 строка, прокрутка) с кнопкой «Ещё…» (bottom‑sheet) и «Показать подсказки» при сворачивании.
 - 52.fix-3: Метки времени у сообщений (hh:mm), `SelectableText` для баблов ассистента. Пагинация/автоскролл и контракты LeoService без изменений. Линты чистые.
 
+## 2025-11-18 — Задача ios-update-stage1 fix
+- Этап 1 из `docs/ios-update-plan.md`: `flutter pub upgrade --major-versions`, синхронизация `pubspec.yaml/.lock`, пересборка Pods с `Firebase 12.4`, `GoogleSignIn 9.0`, `Sentry 8.56.2`.
+- Подняли `platform :ios` до 15.0 и обновили `Podfile.lock`, `windows/flutter/generated_plugins.cmake`, `pubspec.lock`.
+- Привели код под новые версии пакетов: `ResponsiveBreakpoints.builder`, `RadioGroup`, `TimezoneInfo`, `flutter_local_notifications` ≥19, новый `GoogleSignIn.instance`. `flutter analyze` проходит без предупреждений.
+- `flutter upgrade` отложен (SDK содержит локальные правки, `flutter upgrade` требует `--force`); нужно решить отдельно, прежде чем форсить.
+
+## 2025-11-20
+- Задача ios-update-stage2 fix: `FIRLogBasic` breakpoint подтвердил ранний вызов `[FIRApp configure]`, `I-COR000003` исчез (`docs/draft-2.md`/`draft-3.md`).
+- `FirebaseEnableDebugLogging` в Info.plist возвращён в `false`, `EnableIosFcm` остаётся `false` до завершения StoreKit 2.
+- Stage 2 помечен выполненным в `docs/ios-update-plan.md`, следующая задача — начать Этап 3 (StoreKit 2).
+
+## 2025-11-18 — Задача ios-update-stage2 fix
+- Ранняя `Firebase.initializeApp()` из `lib/main.dart` убрана: Firebase и PushService стартуют только после первого кадра через `_ensureFirebaseInitialized()`, поэтому плагин не дёргается до регистрации.
+- `main.m`/`FirebaseEarlyInit.m` подключены к таргету, `@main` убран у `AppDelegate`, добавлено диагностическое логирование, если после `configure()` дефолтного приложения всё ещё нет.
+- ObjC-хук (`FirebaseEarlyInit.m`) теперь напрямую импортирует `FirebaseCore` и вызывает `[FIRApp configure]` до Swift; если `FIRApp` уже существует, в логах фиксируется предупреждение вместо повторного init.
+- В Info.plist добавлен флаг `FirebaseEnableDebugLogging`: при значении `true` автоматически включаются `FIRDebugEnabled` и `FIRAppDiagnosticsEnabled`, а лог-уровень переключается на `.debug`.
+- Добавлен дополнительный `__attribute__((constructor(0)))` в `FirebaseEarlyInit.m`, чтобы вызвать `[FIRApp configure]` максимально рано (до Swift и до остальных конструкторов).
+- Release #4 (с `FirebaseEnableDebugLogging=true`) показал, что `I-COR000003` всё ещё приходит до нашего лога `FIRApp configure() executed`, сразу после него стартуют `FirebaseInstallations`. После этого добавлен `FirebaseEarlyInitSentinel +load`, который логирует call stack и конфигурирует Firebase до конструкторов, а также ключи `FirebaseInstallationsAutoInitEnabled=false` и `GULAppDelegateSwizzlerEnabled=false` в Info.plist. Дополнительно `PushService` на iOS теперь гейтится флагом `kEnableIosFcm`: при значении `false` сервис не запускает `FirebaseMessaging` и пишет crumb в Sentry. 19.11 добавили зеркальный флаг в Info.plist (`EnableIosFcm`), поэтому пуши на iOS полностью исключены из цепочки старта, пока мы не решим `I-COR000003`. Следующий шаг тот же: Release-сборка с debug logging, подтверждение, что предупреждение исчезло → можно переходить к StoreKit. После Stage 2 возвращаем пуши, просто включив оба флага.
+
 ## 2025-11-14 — Задача startup-bootstrap fix
 - Добавлен `BootstrapGate` с FutureProvider: обязательный bootstrap переносится за первый кадр без блокировки runApp.
 - dotenv, Supabase service и Hive (notifications) инициализируются последовательно, логируются тайминги и ошибки.

@@ -15,6 +15,7 @@ import '../utils/env_helper.dart';
 /// Wraps Supabase Auth calls and provides typed error handling.
 class AuthService {
   final SupabaseClient _client;
+  static bool _googleSdkInitialized = false;
 
   AuthService(this._client);
 
@@ -219,18 +220,23 @@ class AuthService {
         return AuthResponse();
       } else if (Platform.isAndroid || Platform.isIOS) {
         final googleWebClientId = envOrDefine('GOOGLE_WEB_CLIENT_ID');
-        final googleSignIn = GoogleSignIn(
+        final googleSignIn = GoogleSignIn.instance;
+        if (!_googleSdkInitialized) {
+          await googleSignIn.initialize(
           serverClientId:
               googleWebClientId.isNotEmpty ? googleWebClientId : null,
         );
-        final account = await googleSignIn.signIn();
-        if (account == null) {
-          throw AuthFailure('Вход через Google отменён пользователем');
+          _googleSdkInitialized = true;
         }
-        final auth = await account.authentication;
+        final account = await googleSignIn.authenticate();
+        final auth = account.authentication;
+        final authClient = account.authorizationClient;
+        final authorization = await authClient.authorizeScopes(
+          const <String>['email', 'profile'],
+        );
         final idToken = auth.idToken;
-        final accessToken = auth.accessToken;
-        if (idToken == null || accessToken == null) {
+        final accessToken = authorization.accessToken;
+        if (idToken == null || accessToken.isEmpty) {
           throw AuthFailure('Не удалось получить токены Google');
         }
         final resp = await _client.auth.signInWithIdToken(

@@ -189,7 +189,7 @@ class GoalsRepository {
         .single();
     final String newHistoryId = insertedHist['id'] as String;
     // 3) обновить user_goal: текст/дедлайн, стартовые метрики (если переданы), привязать pointer
-    Map<String, dynamic> row = await _client
+    final Map<String, dynamic> row = await _client
         .from('user_goal')
         .upsert({
           'user_id': r.userId,

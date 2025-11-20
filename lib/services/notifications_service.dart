@@ -236,8 +236,6 @@ class NotificationsService {
         _nextInstanceOf(weekday: wd, hour: hour, minute: 0),
         details,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
         matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
         payload: '{"route":"/goal"}',
       );

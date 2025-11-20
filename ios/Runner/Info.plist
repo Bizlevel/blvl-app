@@ -33,6 +33,20 @@
 	</array>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>FirebaseAppDelegateProxyEnabled</key>
+	<false/>
+	<key>FirebaseMessagingAutoInitEnabled</key>
+	<false/>
+	<key>FirebaseAppCheckUseDebugProvider</key>
+	<false/>
+	<key>EnableIosFcm</key>
+	<false/>
+	<key>FirebaseEnableDebugLogging</key>
+	<false/>
+	<key>FirebaseInstallationsAutoInitEnabled</key>
+	<false/>
+	<key>GULAppDelegateSwizzlerEnabled</key>
+	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>

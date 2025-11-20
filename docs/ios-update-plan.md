@@ -1,0 +1,82 @@
+- ## План пошагового обновления iOS (18.11.2025)
+- Каждый этап выполняем из ветки `ios-prelaunch-with-design`. После правок запускаем `flutter clean && flutter pub get && cd ios && pod install`, далее собираем **Release** в Xcode на устройстве (запуск делает пользователь). Результаты и логи фиксируем здесь.
+-
+- ### Этап 1. Синхронизация окружения
+- **Задачи**
+- 1. Убедиться, что локально установлен актуальный Flutter stable (>=3.35.7) и соответствующий Dart; при необходимости `flutter upgrade`.
+- 2. Запустить `flutter pub upgrade --major-versions`, проверить `pubspec.lock` на конфликтующие зависимости.
+- 3. Обновить CocoaPods (`pod repo update`) и переустановить Pods.
+- 4. Зафиксировать состояние `pubspec.lock`, `ios/Podfile.lock` в git без лишних правок.
+- **Проверка**
+- - Сборка Release в Xcode. Должен появиться первый кадр, без регрессии (ожидаем сохранение текущего поведения, но без новых warning/ошибок).
+- **Статус/заметки**
+- 18.11 — Обновлены `pubspec.yaml`/`pubspec.lock`, пересозданы Pods (`Firebase 12.4`, `GoogleSignIn 9.0`, `Sentry 8.56.2`), `platform :ios` поднят до `15.0`. `flutter upgrade` не запущен из‑за локальных правок в SDK (см. stdout), оставили текущую 3.35.7. Обновлены Flutter‑плагины (ResponsiveFramework, flutter_timezone, flutter_local_notifications, google_sign_in), приведён код под новые API (ResponsiveBreakpoints, TimezoneInfo, RadioGroup, GoogleSignIn singleton, iOS notification params). `flutter analyze` проходит без ошибок. Release‑сборка (Xcode, устройство) прошла успешно, UI показывается; в логах остались предупреждения `FirebaseCore I-COR000005` и Performance Diagnostics (IO/StoreKit 1) — переносим их в Этапы 2–3.
+-
+- ### Этап 2. Firebase Bootstrap и App Check
+- **Задачи**
+- 1. Актуализировать `main.m`, `FirebaseEarlyInit.m`, `AppDelegate` по мануалу Firebase (ранняя конфигурация, App Check, Installations).
+- 2. Убедиться, что MethodChannel для отложенного Messaging подключён, но регистрация происходит после первого кадра.
+- 3. Добавить в `docs/black-screein-ios-17-11.md` ссылки на обновлённую конфигурацию.
+- 4. Добавить Objective-C вызов `[FIRApp configure]` до Swift и управляемый флаг `FirebaseEnableDebugLogging`, который включает `FIRDebugEnabled/FIRAppDiagnosticsEnabled` для снятия стеков `I-COR000003`.
+- **Проверка**
+- - В логах должны пропасть `I-COR000003/I-COR000005`. Приложение стартует без главного потока блокировок.
+- **Статус/заметки**
+- 18.11 — Исправили точку входа: `main.m` и `FirebaseEarlyInit.m` добавлены в таргет, `@main` убран у `AppDelegate`, поэтому `configureFirebaseBeforeMain()` гарантированно выполняется до `UIApplicationMain` (добавлен `NSLog`). В Info.plist появился флаг `FirebaseAppCheckUseDebugProvider`: пока инфраструктура DeviceCheck/App Attest не готова, держим `true`, чтобы `AppCheckDebugProviderFactory` работал даже в Release; когда включим реальный DeviceCheck, переключаем на `false` (используется `DeviceCheckProviderFactory`). Release‑сборка нужна повторно: ждём подтверждения, что `I-COR000003` исчез и что при выключенном debug‑флаге App Check перестаёт отвечать 403. До получения логов остаёмся в Этапе 2.
+- 18.11 — Рефактор: ранний `Firebase.initializeApp()` убран из `lib/main.dart`, теперь Firebase поднимается после первого кадра через `_ensureFirebaseInitialized()` и только потом стартует `PushService`. В `AppDelegate` добавлено логирование, если после `configure()` дефолтного приложения всё ещё нет. App Check по умолчанию использует DeviceCheck (`FirebaseAppCheckUseDebugProvider=false` для Release, в Debug — `AppCheckDebugProviderFactory`).
+- 18.11 — Release #3 (логи в `docs/draft-2.md`, `draft-3.md`, `docs/draft-4.md`): App Check действительно работает через DeviceCheck (лог `debugProvider=OFF`), но предупреждение `FirebaseCore I-COR000003` всё ещё появляется сразу после `FirebaseEarlyInit` и до вывода из `AppDelegate`. Значит, один из pods (`FirebaseInstallations`/`GULAppDelegateSwizzler`) опережает наш конструктор. Требуется: (1) попробовать вызвать `[FIRApp configure]` напрямую из Objective‑C в `main.m` (без Swift-обёртки), (2) включить `-FIRDebugEnabled`, чтобы получить стек вызова предупреждения, (3) зафиксировать результат в отчёте. Пока эти действия не сделаны, Этап 2 остаётся открытым и к Этапу 3 переходить рано.
+- 18.11 — Objective-C bootstrap: `FirebaseEarlyInit.m` теперь импортирует `FirebaseCore` и вызывает `[FIRApp configure]` до Swift; `AppDelegate` логирует повторные init, а Info.plist получил флаг `FirebaseEnableDebugLogging`, который включает `FIRDebugEnabled`/`FIRAppDiagnosticsEnabled`.
+- 18.11 — Release #4 (с `FirebaseEnableDebugLogging=true`): предупреждение `I-COR000003` появляется до лога `FIRApp configure() executed`, и сразу после него фиксируются `FirebaseInstallations I-FIS002001` — значит, Pods всё ещё успевают раньше. В `FirebaseEarlyInit.m` добавлен дополнительный `__attribute__((constructor(0)))`, который конфигурирует Firebase максимально рано. Следующий шаг: повторно собрать Release (можно оставить DebugLogging включённым), убедиться, что `I-COR000003` исчез, задокументировать результат и только после этого переходить к StoreKit 2.
+- 18.11 — Ultra-early init v2: добавлен класс `FirebaseEarlyInitSentinel` с `+load`, который вызывает `FIRApp configure` ещё до конструкторов и логирует call stack (через `NSThread callStackSymbols`). `FirebaseInstallationsAutoInitEnabled` и `GULAppDelegateSwizzlerEnabled` принудительно выключены в Info.plist, чтобы Pods не успевали конфигурировать Firebase до нас. В `PushService` добавлен флаг `kEnableIosFcm`: на iOS Release сервис теперь просто возвращает управление и пишет crumb в Sentry, чтобы исключить побочные вызовы `FirebaseMessaging`. Алгоритм проверки: (1) оставить `FirebaseEnableDebugLogging=true`, `flutter clean && flutter pub get && cd ios && pod install`; (2) собрать Release на устройстве в Xcode; (3) убедиться в `docs/draft-2.md`, что сначала идут логи `FirebaseEarlyInit: +load/constructor`, **нет** `I-COR000003`, и PushService не пишет о старте; (4) после фиксации результата вернуть `FirebaseEnableDebugLogging=false` и повторить сборку для чистого режима. Только после этого Stage 2 считаем закрытым.
+- 19.11 — FCM выделен в отдельный фиче-флаг: в Info.plist появился `EnableIosFcm` (по умолчанию `false`), а в Dart — `kEnableIosFcm` (`--dart-define ENABLE_IOS_FCM=true` для включения). Пока флаг `false`, `PushService` на iOS даже не вызывается, а `AppDelegate` пропускает присвоение APNs-токена — Firebase Messaging полностью исключён из цепочки запуска. Цель Stage 2 теперь сводится к проверке раннего Firebase bootstrap без участия FCM: запускаем Release на устройстве, убеждаемся, что `I-COR000003` исчез, и фиксируем это в `docs/draft-*.md`. После подтверждения можно переходить к Этапу 3; при возвращении к пушам нужно будет включить флаг в Info.plist и `--dart-define`.
+- 20.11 — Release #5 (Xcode 26.1, `FirebaseEnableDebugLogging=true`): брейкпоинт на `FIRLogBasic` попадает внутрь нашего `+[FirebaseEarlyInitSentinel load]`, стек в `docs/draft-3.md` показывает только `FIRLogDebug I-COR000001` (конфигурация по плану), строк `I-COR000003` в `docs/draft-2.md` больше нет. После фиксации результата `FirebaseEnableDebugLogging` выключен, `EnableIosFcm` остаётся `false` до завершения StoreKit 2. Stage 2 закрыт, можно переходить к Этапу 3.
+- 20.11 — Postmortem Stage 2: проблема заключалась в предупреждении `FirebaseCore I-COR000003`, которое появлялось до `UIApplicationMain`, даже после переноса `FIRApp.configure()` в `AppDelegate`. Решение: добавлены `__attribute__((constructor(0)))` и `+load` в `FirebaseEarlyInit.m`, а вызов `+[FIRApp defaultApp]` заменён на приватный `+[FIRApp isDefaultAppConfigured]`, чтобы не триггерить внутренний логгер раньше времени. Для диагностики в Release задействован breakpoint `FIRLogBasic` и временно включён `FirebaseEnableDebugLogging`; после подтверждения стеков флаг возвращён в `false`, breakpoint можно удалить. Все изменения зафиксированы в `docs/draft-2.md`, `docs/draft-3.md` и статусе Stage 2.
+-
+- ### Этап 3. StoreKit / In-App Purchase (переход на StoreKit 2)
+- **Задачи**
+- 1. Обновить `in_app_purchase` и связанные Pods до версий с StoreKit 2.
+- 2. Переписать инициализацию сервиса покупок: подключение `SKPaymentQueue`/`Product.products` только при открытии магазина или после `WidgetsBinding.instance.endOfFrame`.
+- 3. Протестировать покупки/restore на тестовом аккаунте.
+- **Проверка**
+- - Performance Diagnostics больше не фиксирует `SKPaymentQueue` на старте; UI появляется без «main thread hang».
+- **Статус/заметки**
+- _не выполнен_
+-
+- ### Этап 4. Галерея и файловые плагины
+- **Задачи**
+- 1. Обновить/заменить `dk_image_picker`, `DKPhotoGallery`, `file_picker` на поддерживаемые iOS17/18 варианты (`photo_manager`, `file_selector`).
+- 2. Вынести регистрацию/инициализацию плагинов в lazy-фазы (после первого кадра или при первом обращении).
+- 3. Удалить legacy nib-загрузки и проверить совместимость существующих экранов.
+- **Проверка**
+- - В логах нет синхронных `NSFileManager`/`keyWindow` предупреждений до UI.
+- **Статус/заметки**
+- _не выполнен_
+-
+- ### Этап 5. AppAuth и Google Sign-In
+- **Задачи**
+- 1. Обновить `AppAuth`, `google_sign_in` (включая iOS pod) до версий с `ASWebAuthenticationSession`.
+- 2. Отложить инициализацию `GoogleSignInPlatform` до первого запроса пользователя.
+- 3. Протестировать вход/выход и убедиться, что сессии сохраняются.
+- **Проверка**
+- - Логи SafariServices не появляются до открытия экранов авторизации; главный поток свободен.
+- **Статус/заметки**
+- _не выполнен_
+-
+- ### Этап 6. Локальные сервисы, уведомления и профайлинг
+- **Задачи**
+- 1. Обновить `flutter_local_notifications`, `timezone`, внутренние сервисы (Hive/Supabase) так, чтобы тяжёлые операции выполнялись после первого кадра или в изолятах.
+- 2. Добавить Timeline-трассировку/бренчмарки в Sentry Performance.
+- 3. После подтверждения стабильности вернуть отложенные сервисы по одному, проверяя, что нет новых подвисаний.
+- **Проверка**
+- - Performance Diagnostics показывает свободный главный поток первые 2–3 секунды, Sentry не фиксирует длительных блокировок.
+- **Статус/заметки**
+- _не выполнен_
+-
+- ### Журнал выполнения
+- _После завершения каждого этапа сюда добавляем короткий отчёт: что делали → результат → ссылки на логи/коммиты._
+- 18.11 — Этап 1: `flutter pub upgrade --major-versions`, `pod repo update`, `pod install --repo-update` (с удалением старого Podfile.lock), переход iOS min target → 15.0, адаптация к новым версиям ResponsiveFramework / flutter_timezone / flutter_local_notifications / google_sign_in / RadioGroup. Версии Flutter/Dart прежние из‑за незакоммиченных правок в SDK. Release‑сборка (Xcode, устройство) выполнена: приложение стартует, но в логах остаются `FirebaseCore I-COR000005` и main-thread I/O/StoreKit предупреждения (учтём в Этапах 2–3).
+- 18.11 — Этап 2 (завершён): `main.m`/`FirebaseEarlyInit.m` реально подключены, `@main` убран, App Check переключается между Debug и DeviceCheck через Info.plist. В `lib/main.dart` убран ранний `Firebase.initializeApp()` — теперь Firebase и PushService стартуют в post-frame bootstrap, что исключает вызовы плагинов до регистрации. В `AppDelegate` добавлено диагностическое логирование. Готовы переходить к Этапу 3 после подтверждения логами с устройства.
+- 18.11 — Этап 2 (запуск #2): в логах Xcode/устройства (`docs/draft-2.md`, `draft-3.md`) всё ещё присутствует `FirebaseCore I-COR000003`, а Performance Diagnostics показывает синхронный `NSFileManager/NSData/sqlite` и ранний `SKPaymentQueue`. Нужно докопаться до источника (Firebase Messaging/Installations, GDTCCTUploader) и отложить эти операции до первого кадра.
+- 19.11 — Этап 2 (изолированный FCM): добавлены флаги `EnableIosFcm` (Info.plist) и `kEnableIosFcm` (Dart). При значении `false` PushService на iOS не инициализируется, APNs‑токен не отдаётся в Firebase, а лог в `_schedulePostFrameBootstraps` фиксирует пропуск. Это позволяет тестировать ранний Firebase bootstrap без того, чтобы Firebase Messaging вмешивался в запуск. Задача: собрать Release с `FirebaseEnableDebugLogging=true`, удостовериться, что `I-COR000003` исчез, и задокументировать результат → после этого Stage 2 можно закрывать и переходить к StoreKit (Stage 3). Восстановление пушей делаем после Stage 3, просто вернув флаг в true.
+- 20.11 — Этап 2 (финал): `docs/draft-2.md` чист от `I-COR000003`, а стек из `docs/draft-3.md` показывает, что предупреждение `I-COR000001` идёт из нашего вызова `+[FIRApp configure]`. `FirebaseEnableDebugLogging` отключён, `EnableIosFcm=false` до конца Этапа 3. Stage 2 закрыт, готовимся к StoreKit.
+- 20.11 — Этап 2 (postmortem): исходная проблема — ранний `I-COR000003`, который появлялся до Swift-кода. Исправлено добавлением ObjC-`+load`, `constructor(0)` и проверкой `+[FIRApp isDefaultAppConfigured]`. Диагностический breakpoint `FIRLogBasic` подтвердил, что предупреждение теперь только `I-COR000001` (штатное сообщение при конфигурации). Все диагностические флаги выключены, можно приступать к StoreKit 2.
+

@@ -28,6 +28,7 @@ import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'services/push_service.dart';
+import 'constants/push_flags.dart';
 
 import 'package:firebase_core/firebase_core.dart';
 
@@ -35,7 +36,7 @@ Future<void> main() async {
   // КРИТИЧНО для web: Все инициализации должны быть в одной зоне
   WidgetsFlutterBinding.ensureInitialized();
   if (!kIsWeb) {
-    await _tryInitFirebase();
+    debugPrint('INFO: Firebase bootstrap deferred to post-frame stage');
   }
 
   // Чистые URL без # — только для Web
@@ -66,27 +67,23 @@ Future<void> main() async {
   // Инициализация таймзон и локальных уведомлений (M0)
   try {
     tz.initializeTimeZones();
-    final String timeZoneName = await FlutterTimezone.getLocalTimezone();
-    tz.setLocalLocation(tz.getLocation(timeZoneName));
+    final timeZoneInfo = await FlutterTimezone.getLocalTimezone();
+    tz.setLocalLocation(tz.getLocation(timeZoneInfo.identifier));
     await NotificationsService.instance.initialize();
     // Убрали недельные напоминания; остаются ежедневные напоминания практики на экране настроек
     // Открываем лог уведомлений
     await Hive.openBox('notifications');
   } catch (_) {}
 
-  // Инициализация FCM (только для мобильных).
-  if (!kIsWeb) {
-    try {
-      await PushService.instance.initialize();
-    } catch (_) {}
-  }
+  const rootApp = ProviderScope(child: MyApp());
 
   final dsn = envOrDefine('SENTRY_DSN');
 
   if (dsn.isEmpty) {
     // Без Sentry - просто запускаем приложение
     debugPrint('INFO: Sentry DSN not configured, running without Sentry');
-    runApp(const ProviderScope(child: MyApp()));
+    runApp(rootApp);
+    _schedulePostFrameBootstraps();
   } else {
     // С Sentry, но в той же зоне
     final packageInfo = await PackageInfo.fromPlatform();
@@ -111,20 +108,8 @@ Future<void> main() async {
     );
 
     // Запускаем приложение в той же зоне
-    runApp(const ProviderScope(child: MyApp()));
-  }
-}
-
-// Пытаемся инициализировать Firebase, но не падаем, если конфиг отсутствует
-Future<void> _tryInitFirebase() async {
-  try {
-    if (Firebase.apps.isEmpty) {
-      await Firebase.initializeApp();
-    }
-  } catch (e) {
-    // В Dev/CI окружениях файл GoogleService-Info.plist может отсутствовать
-    // Это не блокирует работу приложения (FCM будет отключён)
-    debugPrint('WARN: Firebase is not initialized: $e');
+    runApp(rootApp);
+    _schedulePostFrameBootstraps();
   }
 }
 
@@ -159,14 +144,15 @@ class MyApp extends ConsumerWidget {
         // Локализации делегируем системным настройкам; ru-параметры передаются напрямую в showDatePicker
         builder: (context, child) {
           // создаём ResponsiveWrapper как обычно
-          final wrapped = ResponsiveWrapper.builder(
-            BouncingScrollWrapper.builder(context, child!),
-            minWidth: 320,
-            defaultScale: true,
+          if (child == null) {
+            return const SizedBox.shrink();
+          }
+          final wrapped = ResponsiveBreakpoints.builder(
+            child: BouncingScrollWrapper.builder(context, child),
             breakpoints: const [
-              ResponsiveBreakpoint.resize(320, name: MOBILE),
-              ResponsiveBreakpoint.autoScale(600, name: TABLET),
-              ResponsiveBreakpoint.autoScale(1024, name: DESKTOP),
+              Breakpoint(start: 0, end: 599, name: MOBILE),
+              Breakpoint(start: 600, end: 1023, name: TABLET),
+              Breakpoint(start: 1024, end: double.infinity, name: DESKTOP),
             ],
           );
 
@@ -224,6 +210,37 @@ class MyApp extends ConsumerWidget {
         // Навигатор теперь управляется GoRouter; SentryObserver добавлен в конфигурацию роутера
       ),
     );
+  }
+}
+
+void _schedulePostFrameBootstraps() {
+  WidgetsBinding.instance.addPostFrameCallback((_) async {
+    if (kIsWeb) return;
+    await _ensureFirebaseInitialized('post_frame_bootstrap');
+    final bool runningOniOS =
+        defaultTargetPlatform == TargetPlatform.iOS && !kIsWeb;
+    if (kEnableIosFcm || !runningOniOS) {
+      try {
+        await PushService.instance.initialize();
+      } catch (error, stackTrace) {
+        debugPrint('WARN: PushService init failed: $error');
+        await Sentry.captureException(error, stackTrace: stackTrace);
+      }
+    } else {
+      debugPrint('INFO: iOS PushService skipped (kEnableIosFcm=false)');
+    }
+  });
+}
+
+Future<void> _ensureFirebaseInitialized(String caller) async {
+  if (kIsWeb) return;
+  try {
+    if (Firebase.apps.isEmpty) {
+      await Firebase.initializeApp();
+      debugPrint('INFO: Firebase.initializeApp() completed ($caller)');
+    }
+  } catch (e) {
+    debugPrint('WARN: Firebase initialize failed ($caller): $e');
   }
 }
 

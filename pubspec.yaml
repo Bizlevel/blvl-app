@@ -19,7 +19,7 @@ dependencies:
   shared_preferences: ^2.2.2
   cached_network_image: ^3.4.1
   badges: ^3.1.2
-  flutter_riverpod: ^2.4.0
+  flutter_riverpod: ^2.5.1
   supabase_flutter: ^2.3.0
   dio: ^5.4.0
   video_player: ^2.8.1
@@ -30,23 +30,23 @@ dependencies:
   package_info_plus:
   sentry_flutter: ^9.4.1
   webview_flutter:
-  responsive_framework: ^0.2.0
-  shimmer: ^2.0.0
+  responsive_framework: ^1.5.1
+  shimmer: ^3.0.0
   freezed_annotation: ^2.4.1
   json_annotation: ^4.9.0
-  flutter_dotenv: ^5.0.2
+  flutter_dotenv: ^6.0.0
   file_picker:
-  go_router: ^10.1.0
-  hooks_riverpod: ^2.4.0
-  flutter_hooks: ^0.20.1
+  go_router: ^17.0.0
+  hooks_riverpod: ^2.5.1
+  flutter_hooks: ^0.21.3+1
   app_links: ^6.4.0
   hive: ^2.2.3
   hive_flutter: ^1.1.0
   flutter_local_notifications:
-  timezone: ^0.9.4
-  firebase_core: ^3.5.0
-  firebase_messaging: ^15.1.4
-  flutter_timezone: ^4.1.1
+  timezone: ^0.10.1
+  firebase_core: ^4.2.1
+  firebase_messaging: ^16.0.4
+  flutter_timezone: ^5.0.1
   google_sign_in:
   in_app_purchase:
   intl: ^0.20.2
@@ -61,7 +61,7 @@ dev_dependencies:
   json_serializable: ^6.7.1
   integration_test:
     sdk: flutter
-  flutter_lints: ^3.0.1
+  flutter_lints: ^6.0.0
   mocktail: ^1.0.2
   hive_generator: ^2.0.0
   path: any
