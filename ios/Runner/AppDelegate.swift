@@ -6,13 +6,15 @@ import FirebaseMessaging
 import DeviceCheck
 import Darwin
 
+private let nativeBootstrapChannelName = "bizlevel/native_bootstrap"
+
 @objc class AppDelegate: FlutterAppDelegate {
-  private var bootstrapChannel: FlutterMethodChannel?
   private static var didConfigureFirebase = false
   private static var didLogBootstrap = false
   private static var isIosFcmEnabled: Bool {
     Bundle.main.object(forInfoDictionaryKey: "EnableIosFcm") as? Bool ?? false
   }
+  private var bootstrapChannel: FlutterMethodChannel?
 
   private static var isAppCheckDebugEnabled: Bool {
     #if DEBUG
@@ -87,8 +89,14 @@ import Darwin
   ) -> Bool {
     Self.configureFirebaseBeforeMain()
     UNUserNotificationCenter.current().delegate = self
-    BizPluginRegistrant.registerEssentialPlugins(self)
-    setupNativeBootstrapChannel()
+    if let controller = window?.rootViewController as? FlutterViewController {
+      BizPluginRegistrant.registerEssentialPlugins(self)
+      setupNativeBootstrapChannel(on: controller)
+      StoreKit2Bridge.shared.install(on: controller)
+      NSLog("AppDelegate: StoreKit2Bridge installed on Flutter controller")
+    } else {
+      BizPluginRegistrant.registerEssentialPlugins(self)
+    }
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 
@@ -103,30 +111,26 @@ import Darwin
     Messaging.messaging().apnsToken = deviceToken
     super.application(application, didRegisterForRemoteNotificationsWithDeviceToken: deviceToken)
   }
-}
 
-private extension AppDelegate {
-  func setupNativeBootstrapChannel() {
-    guard let controller = window?.rootViewController as? FlutterViewController else {
-      NSLog("AppDelegate: FlutterViewController missing, skip bootstrap channel")
-      return
-    }
+  private func setupNativeBootstrapChannel(on controller: FlutterViewController) {
+    if bootstrapChannel != nil { return }
     let channel = FlutterMethodChannel(
-      name: "bizlevel/native_bootstrap",
+      name: nativeBootstrapChannelName,
       binaryMessenger: controller.binaryMessenger
     )
+    NSLog("AppDelegate: native bootstrap channel created")
     channel.setMethodCallHandler { [weak self] call, result in
-      guard let self else {
-        result(FlutterError(code: "bootstrap_missing_app_delegate", message: "AppDelegate nil", details: nil))
+      guard call.method == "registerIapPlugin" else {
+        result(FlutterMethodNotImplemented)
         return
       }
-      switch call.method {
-      case "registerIapPlugin":
-        BizPluginRegistrant.registerDeferredIap(self)
-        result(nil)
-      default:
-        result(FlutterMethodNotImplemented)
+      guard let registry = self else {
+        result(FlutterError(code: "registry_unavailable", message: "AppDelegate deallocated", details: nil))
+        return
       }
+      BizPluginRegistrant.registerDeferredIap(registry)
+      NSLog("AppDelegate: registerDeferredIap triggered from Flutter")
+      result(nil)
     }
     bootstrapChannel = channel
   }

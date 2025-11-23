@@ -39,11 +39,12 @@
 - **Проверка**
 - - Performance Diagnostics больше не фиксирует `SKPaymentQueue` на старте; UI появляется без «main thread hang».
 - **Статус/заметки**
-- - 20.11 — Введён `BizPluginRegistrant`: все плагины, кроме `InAppPurchasePlugin`, регистрируются сразу; IAP-плагин вынесен в отдельный метод и вызывается через MethodChannel `bizlevel/native_bootstrap` после первого кадра.
-- - `NativeBootstrap.ensureIapRegistered()` и `IapService` теперь лениво инициализируют `InAppPurchase.instance`, поэтому StoreKit 2 подключается только после `_schedulePostFrameBootstraps`, и ранние логи `SKPaymentQueue`/`AppSSOAgent` исчезают.
-- - Через `curl https://pub.dev/api/packages/...` подтверждено, что версии `in_app_purchase` (3.2.3) и `in_app_purchase_storekit` (0.4.6+2) — последние доступные релизы с StoreKit 2; обновлять нечего.
-- - TODO: собрать Release в Xcode и зафиксировать логи (`docs/draft-2.md`, `docs/draft-3.md`, `docs/draft-4.md`), что StoreKit больше не запускается до UI. После подтверждения можно возвращать `EnableIosFcm=true`.
-- - 20.11 (запуск #1) — В логах `docs/draft-3.md` всё ещё появляются `[SKPaymentQueue]` сразу после старта, потому что `NativeBootstrap.ensureIapRegistered` вызывался в `_schedulePostFrameBootstraps`. Исправление: убрать вызов из раннего пост-фрейма и оставлять регистрацию IAP только при первом обращении к `IapService` (т.е. при открытии магазина). Требуется повторный Release после этого фикса.
+- 21.11 — восстановлена кастомная регистрация плагинов: `BizPluginRegistrant` вызывает `GeneratedPluginRegistrant`, но `InAppPurchasePlugin` убран из `GeneratedPluginRegistrant.m` и подключается только по MethodChannel `bizlevel/native_bootstrap`. Скрипт `tool/strip_iap_from_registrant.dart` чистит файл при каждой сборке.
+- 21.11 — добавлен `StoreKit2Bridge.swift` (fetch/purchase/restore/Transaction.updates), а также Dart-слой `storekit2_service.dart`. IAP‑сервис делегирует Android старому `in_app_purchase`, а iOS — StoreKit 2; экран `GpStoreScreen` загружает продукты только после появления маршрута и разделяет flow на iOS/Android/Web.
+- TODO: собрать Release, убедиться, что в Performance Diagnostics нет раннего `SKPaymentQueue`, и приложить логи (`docs/draft-2/3/4.md`). После подтверждения протестировать покупки/restore на тестовом Apple ID и задокументировать результат.
+- 22.11 — `Podfile` вычищает исходники `in_app_purchase_storekit`, поэтому Xcode больше не компилирует устаревшие `SKPayment*` классы; build phase `Strip In-App Purchase Plugin` теперь пишет `strip_iap_from_registrant.stamp`, и Xcode не запускает его без изменений.
+- 23.11 — `StoreKit2Bridge.fetchProducts` логирует `requestId`, возвращает `invalidProductIds` и ошибки; `StoreKit2Service`/`GpStoreScreen` показывают пользователю статус («продукт появится после загрузки метаданных») и не дают нажать «Оплатить», пока App Store не подтвердит SKU. `tool/strip_iap_from_registrant.dart` теперь падает, если в `GeneratedPluginRegistrant.m` снова появился `InAppPurchasePlugin`, чтобы не пропустить регрессию. `BizPluginRegistrant` и `AppDelegate` пишут диагностические логи о регистрации плагинов/каналов.
+- Чек-лист перед тестом: `flutter clean && flutter pub get && (cd ios && LANG=en_US.UTF-8 pod install)`, затем в Xcode `Product ▸ Clean Build Folder` и Release на устройстве; выполнить sandbox-покупки/restore всех пакетов, выгрузить логи в `docs/draft-*.md`, после подтверждения Stage 3 — вернуть `EnableIosFcm=true` и добавить запись в `docs/status.md`.
 -
 - ### Этап 4. Галерея и файловые плагины
 - **Задачи**

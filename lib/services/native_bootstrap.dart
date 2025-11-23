@@ -12,18 +12,37 @@ class NativeBootstrap {
   static bool _iapRegistered = false;
 
   static Future<void> ensureIapRegistered({String caller = 'unknown'}) async {
-    if (_iapRegistered || kIsWeb || !Platform.isIOS) return;
+    if (_iapRegistered || kIsWeb || !Platform.isIOS) {
+      return;
+    }
+    final stackPreview = StackTrace.current
+        .toString()
+        .split('\n')
+        .where((line) => line.trim().isNotEmpty)
+        .take(8)
+        .join('\n');
+    final message =
+        '[NativeBootstrap] ensureIapRegistered caller=$caller\n$stackPreview';
+    debugPrint(message);
     try {
       await _channel.invokeMethod<void>('registerIapPlugin');
       _iapRegistered = true;
-      await Sentry.addBreadcrumb(Breadcrumb(
-        category: 'iap_bootstrap',
+      await Sentry.captureMessage(
+        'native_bootstrap.ensure_iap_registered',
         level: SentryLevel.info,
-        message: 'Native IAP plugin registered',
-        data: {'caller': caller},
-      ));
+        params: [message],
+        withScope: (scope) {
+          scope.setExtra('caller', caller);
+          scope.setExtra('stack', stackPreview);
+        },
+      );
     } catch (error, stackTrace) {
       await Sentry.captureException(error, stackTrace: stackTrace);
     }
   }
 }
+
+
+
+
+

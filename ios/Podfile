@@ -4,6 +4,8 @@ platform :ios, '15.0'
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
+ENV['LANG'] = ENV['LANG'] || 'en_US.UTF-8'
+ENV['LC_ALL'] = ENV['LC_ALL'] || 'en_US.UTF-8'
 
 project 'Runner', {
   'Debug' => :debug,
@@ -58,6 +60,26 @@ post_install do |installer|
   nanopb_dir = File.join(__dir__, 'Pods', 'nanopb')
   Dir.glob(File.join(nanopb_dir, 'pb_* 3.*')).each do |path|
     File.delete(path) if File.file?(path)
+  end
+
+  iap_target = installer.pods_project.targets.find do |target|
+    target.name == 'in_app_purchase_storekit'
+  end
+
+  if iap_target
+    if (sources = iap_target.source_build_phase)
+      sources.files.to_a.each do |build_file|
+        sources.remove_build_file(build_file)
+      end
+    end
+    if (headers = iap_target.headers_build_phase)
+      headers.files.to_a.each do |build_file|
+        headers.remove_build_file(build_file)
+      end
+    end
+    iap_target.build_configurations.each do |config|
+      config.build_settings['GCC_WARN_INHIBIT_ALL_WARNINGS'] = 'YES'
+    end
   end
 end
 
