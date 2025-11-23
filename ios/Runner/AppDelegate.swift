@@ -7,6 +7,7 @@ import DeviceCheck
 import Darwin
 
 @objc class AppDelegate: FlutterAppDelegate {
+  private var bootstrapChannel: FlutterMethodChannel?
   private static var didConfigureFirebase = false
   private static var didLogBootstrap = false
   private static var isIosFcmEnabled: Bool {
@@ -86,7 +87,8 @@ import Darwin
   ) -> Bool {
     Self.configureFirebaseBeforeMain()
     UNUserNotificationCenter.current().delegate = self
-    GeneratedPluginRegistrant.register(with: self)
+    BizPluginRegistrant.registerEssentialPlugins(self)
+    setupNativeBootstrapChannel()
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 
@@ -100,5 +102,32 @@ import Darwin
     }
     Messaging.messaging().apnsToken = deviceToken
     super.application(application, didRegisterForRemoteNotificationsWithDeviceToken: deviceToken)
+  }
+}
+
+private extension AppDelegate {
+  func setupNativeBootstrapChannel() {
+    guard let controller = window?.rootViewController as? FlutterViewController else {
+      NSLog("AppDelegate: FlutterViewController missing, skip bootstrap channel")
+      return
+    }
+    let channel = FlutterMethodChannel(
+      name: "bizlevel/native_bootstrap",
+      binaryMessenger: controller.binaryMessenger
+    )
+    channel.setMethodCallHandler { [weak self] call, result in
+      guard let self else {
+        result(FlutterError(code: "bootstrap_missing_app_delegate", message: "AppDelegate nil", details: nil))
+        return
+      }
+      switch call.method {
+      case "registerIapPlugin":
+        BizPluginRegistrant.registerDeferredIap(self)
+        result(nil)
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
+    bootstrapChannel = channel
   }
 }

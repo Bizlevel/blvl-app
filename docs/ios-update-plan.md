@@ -39,7 +39,11 @@
 - **Проверка**
 - - Performance Diagnostics больше не фиксирует `SKPaymentQueue` на старте; UI появляется без «main thread hang».
 - **Статус/заметки**
-- _не выполнен_
+- - 20.11 — Введён `BizPluginRegistrant`: все плагины, кроме `InAppPurchasePlugin`, регистрируются сразу; IAP-плагин вынесен в отдельный метод и вызывается через MethodChannel `bizlevel/native_bootstrap` после первого кадра.
+- - `NativeBootstrap.ensureIapRegistered()` и `IapService` теперь лениво инициализируют `InAppPurchase.instance`, поэтому StoreKit 2 подключается только после `_schedulePostFrameBootstraps`, и ранние логи `SKPaymentQueue`/`AppSSOAgent` исчезают.
+- - Через `curl https://pub.dev/api/packages/...` подтверждено, что версии `in_app_purchase` (3.2.3) и `in_app_purchase_storekit` (0.4.6+2) — последние доступные релизы с StoreKit 2; обновлять нечего.
+- - TODO: собрать Release в Xcode и зафиксировать логи (`docs/draft-2.md`, `docs/draft-3.md`, `docs/draft-4.md`), что StoreKit больше не запускается до UI. После подтверждения можно возвращать `EnableIosFcm=true`.
+- - 20.11 (запуск #1) — В логах `docs/draft-3.md` всё ещё появляются `[SKPaymentQueue]` сразу после старта, потому что `NativeBootstrap.ensureIapRegistered` вызывался в `_schedulePostFrameBootstraps`. Исправление: убрать вызов из раннего пост-фрейма и оставлять регистрацию IAP только при первом обращении к `IapService` (т.е. при открытии магазина). Требуется повторный Release после этого фикса.
 -
 - ### Этап 4. Галерея и файловые плагины
 - **Задачи**

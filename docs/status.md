@@ -14,6 +14,15 @@
 - `FirebaseEnableDebugLogging` в Info.plist возвращён в `false`, `EnableIosFcm` остаётся `false` до завершения StoreKit 2.
 - Stage 2 помечен выполненным в `docs/ios-update-plan.md`, следующая задача — начать Этап 3 (StoreKit 2).
 
+## 2025-11-21 — Задача ios-update-stage3 rebuild
+- После ручного удаления файлов Stage 3 полностью восстановлены `BizPluginRegistrant`, `StoreKit2Bridge.swift`, `native_bootstrap.dart`, `storekit2_service.dart` и скрипт `tool/strip_iap_from_registrant.dart`.
+- `GeneratedPluginRegistrant.m` снова очищен от `InAppPurchasePlugin`, AppDelegate регистрирует плагины через `BizPluginRegistrant`, поднимает MethodChannel `bizlevel/native_bootstrap` и устанавливает StoreKit 2 мост.
+- `IapService` разделяет Android (старый `in_app_purchase`) и iOS (StoreKit 2), `GpStoreScreen` лениво подгружает продукты только после появления маршрута и ведёт отдельные purchase flow для iOS/Android/Web.
+- Следующий шаг: Release-билд в Xcode → прислать логи (`docs/draft-2/3/4.md`), подтвердить отсутствие раннего `SKPaymentQueue`, затем протестировать sandbox-покупки и restore.
+
+## 2025-11-21
+- Задача ios-update-stage3-build fix: `StoreKit2Bridge.rawStoreValue` теперь корректно обрабатывает скрытый кейс `.subscription` на iOS 17.4+ без падений на 15.6, добавлен JWS маппинг и проверены Pods (`flutter pub get`, `pod install`). Для ошибки `resource fork…` нужно запускать `xattr -cr build/ios`/`Flutter.framework` уже после того, как Xcode создаст артефакты.
+
 ## 2025-11-18 — Задача ios-update-stage2 fix
 - Ранняя `Firebase.initializeApp()` из `lib/main.dart` убрана: Firebase и PushService стартуют только после первого кадра через `_ensureFirebaseInitialized()`, поэтому плагин не дёргается до регистрации.
 - `main.m`/`FirebaseEarlyInit.m` подключены к таргету, `@main` убран у `AppDelegate`, добавлено диагностическое логирование, если после `configure()` дефолтного приложения всё ещё нет.
@@ -402,3 +411,15 @@
 - Deferred: Firebase, PushService, Hive‑боксы и таймзоны/уведомления запускаются fire-and-forget.
 - Мониторинг: добавлены логи POSTBOOT и отложенная инициализация Sentry после первого кадра.
 - Кеши: добавлен `HiveBoxHelper`, все сервисы/репозитории используют ленивое открытие боксов без блокировки главного потока.
+
+### Задача asc-mcp fix
+- Обновил `integrations/app-store-connect-mcp-server`: `npm install && npm run build`, устранил missing deps вручную (пересобрал `zod` из tarball).
+- Добавил `app-store-connect` в `/Users/Erlan/.cursor/mcp.json` (команда `npx -y appstore-connect-mcp-server` + env c `AuthKey_8H5Y57BHT3.p8`).
+- Проверил запуск локального бинаря через `node dist/src/index.js` с переменными окружения (stdout: “App Store Connect MCP server running on stdio”).
+- Для активации в Cursor достаточно Reload Servers / перезапуск приложения.
+
+## 2025-11-23 — Задача ios-update-stage3 diagnostics fix
+- StoreKit2Bridge теперь возвращает `requestId`, `invalidProductIds` и текст ошибки; `StoreKit2Service` формирует диагностический ответ, а `GpStoreScreen` блокирует кнопку оплаты и показывает подсказку, если App Store не вернул SKU (метаданные будут добавлены позже).
+- Добавлен баннер на iOS, который объясняет пользователю статус IAP, и отдельный текст возле кнопки «Оплатить». При отсутствии продуктов StoreKit UI не даёт начать покупку и пишет, что товары появятся после публикации.
+- Скрипт `tool/strip_iap_from_registrant.dart` переводит сборку в ошибку, если в `GeneratedPluginRegistrant.m` снова встретился `InAppPurchasePlugin`; `BizPluginRegistrant` и `AppDelegate` логируют установку каналов/моста.
+- Создан `docs/draft-5.md` для логов следующего Release-прогона Stage 3; обновлён `docs/ios-update-plan.md` с подробным чек-листом.

@@ -4,19 +4,22 @@ import 'dart:io' show Platform;
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
+import 'native_bootstrap.dart';
+
 /// Сервис для работы с In‑App Purchases (StoreKit 2 / Google Billing)
 /// Минимальная обёртка: загрузка продуктов и покупка одного consumable товара.
 class IapService {
   IapService._();
 
-  static final IapService instance = IapService._();
-  final InAppPurchase _iap = InAppPurchase.instance;
+  static IapService? _singleton;
+  static IapService get instance => _singleton ??= IapService._();
 
   StreamSubscription<List<PurchaseDetails>>? _sub;
 
   Future<bool> isAvailable() async {
     try {
-      return await _iap.isAvailable();
+      final iap = await _iapSafe();
+      return await iap.isAvailable();
     } catch (_) {
       return false;
     }
@@ -24,7 +27,8 @@ class IapService {
 
   /// Загружает детали продуктов по списку идентификаторов.
   Future<ProductDetailsResponse> queryProducts(Set<String> productIds) async {
-    return _iap.queryProductDetails(productIds);
+    final iap = await _iapSafe();
+    return iap.queryProductDetails(productIds);
   }
 
   /// Покупка одного consumable продукта и одноразовое ожидание результата.
@@ -35,8 +39,9 @@ class IapService {
 
     final completer = Completer<PurchaseDetails?>();
 
-    _sub?.cancel();
-    _sub = _iap.purchaseStream.listen((purchases) async {
+    final iap = await _iapSafe();
+    await _sub?.cancel();
+    _sub = iap.purchaseStream.listen((purchases) async {
       for (final p in purchases) {
         if (p.productID == product.id) {
           // Сообщаем вызывающему коду как только появится результат.
@@ -44,7 +49,7 @@ class IapService {
           // Для consumable требуется завершить покупку.
           if (p.pendingCompletePurchase) {
             try {
-              await _iap.completePurchase(p);
+              await iap.completePurchase(p);
             } catch (_) {}
           }
         }
@@ -54,7 +59,7 @@ class IapService {
     });
 
     final param = PurchaseParam(productDetails: product);
-    await _iap.buyConsumable(purchaseParam: param);
+    await iap.buyConsumable(purchaseParam: param);
 
     final result = await completer.future
         .timeout(const Duration(seconds: 90), onTimeout: () => null);
@@ -74,5 +79,12 @@ class IapService {
       // На всякий случай гасим любые UnsupportedError
     }
     return 'other';
+  }
+
+  Future<InAppPurchase> _iapSafe() async {
+    if (!kIsWeb) {
+      await NativeBootstrap.ensureIapRegistered(caller: 'iap_service');
+    }
+    return InAppPurchase.instance;
   }
 }

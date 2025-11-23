@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */ = {isa = PBXBuildFile; fileRef = 1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */; };
+		28F1B2A72C6C3606009C0C8E /* BizPluginRegistrant.m in Sources */ = {isa = PBXBuildFile; fileRef = 28F1B2A62C6C3606009C0C8E /* BizPluginRegistrant.m */; };
 		3B3967161E833CAA004F5970 /* AppFrameworkInfo.plist in Resources */ = {isa = PBXBuildFile; fileRef = 3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */; };
 		4D018519F95D003DEC6621EA /* Pods_Runner.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 16A017369BC1210AD9CA023E /* Pods_Runner.framework */; };
 		74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74858FAE1ED2DC5600515810 /* AppDelegate.swift */; };
@@ -35,6 +36,8 @@
 /* Begin PBXFileReference section */
 		1498D2321E8E86230040F4C2 /* GeneratedPluginRegistrant.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = GeneratedPluginRegistrant.h; sourceTree = "<group>"; };
 		1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = GeneratedPluginRegistrant.m; sourceTree = "<group>"; };
+		28F1B2A52C6C3606009C0C8E /* BizPluginRegistrant.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BizPluginRegistrant.h; sourceTree = "<group>"; };
+		28F1B2A62C6C3606009C0C8E /* BizPluginRegistrant.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = BizPluginRegistrant.m; sourceTree = "<group>"; };
 		16A017369BC1210AD9CA023E /* Pods_Runner.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Runner.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = AppFrameworkInfo.plist; path = Flutter/AppFrameworkInfo.plist; sourceTree = "<group>"; };
 		5786FF366FC6D1798A3A73BC /* Pods-Runner.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.release.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.release.xcconfig"; sourceTree = "<group>"; };
@@ -121,6 +124,8 @@
 				1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */,
 				B5A1E5B41CFB90AA00AA00AA /* main.m */,
 				B5A1E5B61CFB90AA00AA00AA /* FirebaseEarlyInit.m */,
+				28F1B2A52C6C3606009C0C8E /* BizPluginRegistrant.h */,
+				28F1B2A62C6C3606009C0C8E /* BizPluginRegistrant.m */,
 				74858FAE1ED2DC5600515810 /* AppDelegate.swift */,
 				74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */,
 			);
@@ -307,6 +312,7 @@
 				B5A1E5B71CFB90AA00AA00AA /* FirebaseEarlyInit.m in Sources */,
 				74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */,
 				B5A1E5B51CFB90AA00AA00AA /* main.m in Sources */,
+				28F1B2A72C6C3606009C0C8E /* BizPluginRegistrant.m in Sources */,
 				1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
