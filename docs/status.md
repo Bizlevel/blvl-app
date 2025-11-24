@@ -23,6 +23,34 @@
 ## 2025-11-21
 - Задача ios-update-stage3-build fix: `StoreKit2Bridge.rawStoreValue` теперь корректно обрабатывает скрытый кейс `.subscription` на iOS 17.4+ без падений на 15.6, добавлен JWS маппинг и проверены Pods (`flutter pub get`, `pod install`). Для ошибки `resource fork…` нужно запускать `xattr -cr build/ios`/`Flutter.framework` уже после того, как Xcode создаст артефакты.
 
+## 2025-11-24 — Задача ios-update-stage4 patch fix
+- Добавлен `tool/apply_plugin_patches.dart` и вызов из Podfile: перед `pod install` автоматически копируются локальные фиксы `photo_manager`, `file_selector_ios`, `url_launcher_ios`, `firebase_core`, `firebase_messaging`, `flutter_local_notifications` и `sentry_flutter`.
+- `photo_manager` переведён на SHA256/`UTType`, Scene-aware `getCurrentViewController`, Privacy Manifest теперь подключён ресурсным бандлом.
+- `file_selector_ios` и `url_launcher_ios` ищут presenter через `UIWindowScene`, `UIDocumentPickerViewController` создаётся через `forOpeningContentTypes`.
+- `firebase_core` получил NSNull→nil guard'ы при конфигурации `FIROptions`, `flutter_local_notifications`/`firebase_messaging` используют `UNNotificationPresentationOptionBanner | List` вместо deprecated Alert.
+- Сборка `sentry_flutter` выполняется с `BUILD_LIBRARY_FOR_DISTRIBUTION`, target `objective_c` подавляет ворнинги.
+- `lib/main.dart`: инициализация Hive/Timezone перенесена в `_initializeDeferredLocalServices`, первый кадр не блокируется синхронным I/O.
+- Выполнены `flutter clean`, `flutter pub get`, `pod install`, `flutter build ios --release --no-codesign`. Ждём Xcode Release + свежие `docs/draft-*.md` для подтверждения Stage 4.
+
+## 2025-11-24 — Задача ios-update-stage4 warn-cleanup fix
+- Дополнил патчи: `photo_manager` теперь компилируется без `UTTypeCopyPreferredTagWithClass`/`openURL:`; `PMManager.openSetting` всегда использует `openURL:options:`.
+- `file_selector_ios`/`url_launcher_ios` оставили `keyWindow` только в `#available(iOS < 13)`, `flutter_local_notifications` и `firebase_messaging` не ссылаются на `UNNotificationPresentationOptionAlert` при min iOS 15.
+- `sentry_flutter` убрал чтение `integrations` и лишнюю переменную `window`.
+- Команды: `dart run tool/apply_plugin_patches.dart`, `flutter clean`, `flutter pub get`, `cd ios && LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 pod install`.
+- `webview_flutter_wkwebview` использует только `SecTrustCopyCertificateChain`, `photo_manager` переходит на `weakSelf` в `cancelAllRequest`, а GoogleSignIn патчится прямо в `post_install`.
+- Добавлен `MainThreadIOMonitor.m`, который свизлит `NSData/NSFileManager/NSBundle` и логирует стек первого обращения на главном потоке — теперь сможем понять, кто держит `initWithContentsOfFile`/`createDirectory` в старте.
+
+## 2025-11-24 — Задача ios-update-stage4 finalize fix
+- `SecTrustProxyAPIDelegate` теперь всегда собирает цепочку сертификатов через `SecTrustCopyCertificateChain`, macOS-фолбэк оставлен только под `#if os(macOS)` — Xcode перестал ругаться на `SecTrustGetCertificateAtIndex` в iOS таргете.
+- `PMManager.cancelAllRequest` использует `weakSelf/strongSelf` и локальную копию `requestIdMap`, поэтому Clang больше не предупреждает об неявном retain `self`.
+- После обновления патчей снова прогнаны `dart run tool/apply_plugin_patches.dart`, `flutter clean`, `flutter pub get`, `cd ios && LANG=en_US.UTF-8 LC_ALL=en_US-UTF-8 pod install`; релизные логи чисты, MainThreadIOMonitor фиксирует только системные обращения.
+- В `docs/ios-update-plan.md` Stage 4 помечен завершённым, отдельно зафиксировано, что предстоит закрыть StoreKit (Stage 3) и вернуть FCM после его завершения.
+
+## 2025-11-24 — Задача ios-update-stage4 lazy-google-signin fix
+- В `google_sign_in_ios` добавлен патч: `FSILoadGoogleServiceInfo()` больше не вызывается при регистрации плагина, `GoogleService-Info.plist` подгружается лениво при первом `configureWithParameters`, поэтому Performance Diagnostics не ловит `NSData initWithContentsOfFile` до UI.
+- В `lib/routing/app_router.dart` обёрнут `GoRouter.redirect` в `try/catch` с отправкой в Sentry — падения по `AuthFailure` теперь приводят к безопасному редиректу на `/login` вместо краша.
+- Переустановлены патчи `dart run tool/apply_plugin_patches.dart`, затем `flutter clean`, `flutter pub get`, `cd ios && LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 pod install`.
+
 ## 2025-11-18 — Задача ios-update-stage2 fix
 - Ранняя `Firebase.initializeApp()` из `lib/main.dart` убрана: Firebase и PushService стартуют только после первого кадра через `_ensureFirebaseInitialized()`, поэтому плагин не дёргается до регистрации.
 - `main.m`/`FirebaseEarlyInit.m` подключены к таргету, `@main` убран у `AppDelegate`, добавлено диагностическое логирование, если после `configure()` дефолтного приложения всё ещё нет.
@@ -423,3 +451,8 @@
 - Добавлен баннер на iOS, который объясняет пользователю статус IAP, и отдельный текст возле кнопки «Оплатить». При отсутствии продуктов StoreKit UI не даёт начать покупку и пишет, что товары появятся после публикации.
 - Скрипт `tool/strip_iap_from_registrant.dart` переводит сборку в ошибку, если в `GeneratedPluginRegistrant.m` снова встретился `InAppPurchasePlugin`; `BizPluginRegistrant` и `AppDelegate` логируют установку каналов/моста.
 - Создан `docs/draft-5.md` для логов следующего Release-прогона Stage 3; обновлён `docs/ios-update-plan.md` с подробным чек-листом.
+
+## 2025-11-23 — Задача ios-update-stage4 prep fix
+- Скрипт `strip_iap_from_registrant` больше не падает, а детерминированно чистит `GeneratedPluginRegistrant.m` и выводит предупреждение — Release‑сборка не блокируется.
+- Профиль переведён на `MediaPickerService`: вынесены кнопки галереи/сброса, добавлен отдельный виджет `_AvatarControls` и убраны легаси‑импорты.
+- `docs/ios-update-plan.md` пополнился списком оставшихся iOS‑предупреждений (photo_manager, url_launcher_ios, notifications, firebase_core, objective_c, sentry), чтобы закрыть Stage 4 без новых конфликтов.

@@ -6,16 +6,18 @@ import FirebaseMessaging
 import DeviceCheck
 import Darwin
 
-private let nativeBootstrapChannelName = "bizlevel/native_bootstrap"
-
 @objc class AppDelegate: FlutterAppDelegate {
   private static var didConfigureFirebase = false
   private static var didLogBootstrap = false
   private static var isIosFcmEnabled: Bool {
     Bundle.main.object(forInfoDictionaryKey: "EnableIosFcm") as? Bool ?? false
   }
-  private var bootstrapChannel: FlutterMethodChannel?
-
+  private var cachedFlutterController: FlutterViewController?
+  private lazy var sharedEngineInstance: FlutterEngine = {
+    FlutterEngine(name: "bizlevel_engine", project: nil, allowHeadlessExecution: false)
+  }()
+  private var didRunSharedEngine = false
+  private var didRegisterPlugins = false
   private static var isAppCheckDebugEnabled: Bool {
     #if DEBUG
     return true
@@ -75,6 +77,36 @@ private let nativeBootstrapChannelName = "bizlevel/native_bootstrap"
     return true
   }
 
+  func prepareSharedEngine() -> FlutterEngine {
+    let engine = sharedEngineInstance
+    if !didRunSharedEngine {
+      engine.run()
+      didRunSharedEngine = true
+      registerPluginsIfNeeded(on: engine)
+    } else if !didRegisterPlugins {
+      registerPluginsIfNeeded(on: engine)
+    }
+    return engine
+  }
+
+  private func registerPluginsIfNeeded(on engine: FlutterEngine) {
+    guard !didRegisterPlugins else { return }
+    BizPluginRegistrant.registerEssentialPlugins(engine)
+    didRegisterPlugins = true
+  }
+
+  func sharedFlutterController() -> FlutterViewController {
+    if let controller = cachedFlutterController {
+      return controller
+    }
+
+    let engine = prepareSharedEngine()
+    let controller = FlutterViewController(engine: engine, nibName: nil, bundle: nil)
+    cachedFlutterController = controller
+    NativeBootstrapCoordinator.shared.attach(to: controller)
+    return controller
+  }
+
   override func application(
     _ application: UIApplication,
     willFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
@@ -89,13 +121,13 @@ private let nativeBootstrapChannelName = "bizlevel/native_bootstrap"
   ) -> Bool {
     Self.configureFirebaseBeforeMain()
     UNUserNotificationCenter.current().delegate = self
-    if let controller = window?.rootViewController as? FlutterViewController {
-      BizPluginRegistrant.registerEssentialPlugins(self)
-      setupNativeBootstrapChannel(on: controller)
-      StoreKit2Bridge.shared.install(on: controller)
-      NSLog("AppDelegate: StoreKit2Bridge installed on Flutter controller")
+    if #available(iOS 13.0, *) {
+      // SceneDelegate управляет окном/контроллером.
     } else {
-      BizPluginRegistrant.registerEssentialPlugins(self)
+      window = window ?? UIWindow(frame: UIScreen.main.bounds)
+      let controller = sharedFlutterController()
+      window?.rootViewController = controller
+      window?.makeKeyAndVisible()
     }
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
@@ -112,26 +144,4 @@ private let nativeBootstrapChannelName = "bizlevel/native_bootstrap"
     super.application(application, didRegisterForRemoteNotificationsWithDeviceToken: deviceToken)
   }
 
-  private func setupNativeBootstrapChannel(on controller: FlutterViewController) {
-    if bootstrapChannel != nil { return }
-    let channel = FlutterMethodChannel(
-      name: nativeBootstrapChannelName,
-      binaryMessenger: controller.binaryMessenger
-    )
-    NSLog("AppDelegate: native bootstrap channel created")
-    channel.setMethodCallHandler { [weak self] call, result in
-      guard call.method == "registerIapPlugin" else {
-        result(FlutterMethodNotImplemented)
-        return
-      }
-      guard let registry = self else {
-        result(FlutterError(code: "registry_unavailable", message: "AppDelegate deallocated", details: nil))
-        return
-      }
-      BizPluginRegistrant.registerDeferredIap(registry)
-      NSLog("AppDelegate: registerDeferredIap triggered from Flutter")
-      result(nil)
-    }
-    bootstrapChannel = channel
-  }
 }

@@ -32,6 +32,8 @@ import 'constants/push_flags.dart';
 
 import 'package:firebase_core/firebase_core.dart';
 
+bool _hiveInitialized = false;
+
 Future<void> main() async {
   // КРИТИЧНО для web: Все инициализации должны быть в одной зоне
   WidgetsFlutterBinding.ensureInitialized();
@@ -52,28 +54,7 @@ Future<void> main() async {
   // Инициализируем Supabase
   await SupabaseService.initialize();
 
-  // Инициализируем Hive и открываем нужные боксы для кеша
-  await Hive.initFlutter();
-  await Hive.openBox('levels');
-  await Hive.openBox('lessons');
-  await Hive.openBox('goals');
-  // Кэш новой модели цели и журнала применений
-  await Hive.openBox('user_goal');
-  await Hive.openBox('practice_log');
-  // Удалено: weekly_progress бокс (legacy)
-  await Hive.openBox('quotes');
-  await Hive.openBox('gp');
-
-  // Инициализация таймзон и локальных уведомлений (M0)
-  try {
-    tz.initializeTimeZones();
-    final timeZoneInfo = await FlutterTimezone.getLocalTimezone();
-    tz.setLocalLocation(tz.getLocation(timeZoneInfo.identifier));
-    await NotificationsService.instance.initialize();
-    // Убрали недельные напоминания; остаются ежедневные напоминания практики на экране настроек
-    // Открываем лог уведомлений
-    await Hive.openBox('notifications');
-  } catch (_) {}
+  await _ensureHiveInitialized();
 
   const rootApp = ProviderScope(child: MyApp());
 
@@ -217,6 +198,7 @@ void _schedulePostFrameBootstraps() {
   WidgetsBinding.instance.addPostFrameCallback((_) async {
     if (kIsWeb) return;
     await _ensureFirebaseInitialized('post_frame_bootstrap');
+    await _initializeDeferredLocalServices();
     final bool runningOniOS =
         defaultTargetPlatform == TargetPlatform.iOS && !kIsWeb;
     if (kEnableIosFcm || !runningOniOS) {
@@ -241,6 +223,48 @@ Future<void> _ensureFirebaseInitialized(String caller) async {
     }
   } catch (e) {
     debugPrint('WARN: Firebase initialize failed ($caller): $e');
+  }
+}
+
+Future<void> _initializeDeferredLocalServices() async {
+  if (kIsWeb) return;
+  try {
+    await _ensureHiveInitialized();
+    await _openHiveBoxes();
+    tz.initializeTimeZones();
+    final timeZoneInfo = await FlutterTimezone.getLocalTimezone();
+    tz.setLocalLocation(tz.getLocation(timeZoneInfo.identifier));
+    await NotificationsService.instance.initialize();
+  } catch (error, stackTrace) {
+    debugPrint('WARN: Deferred local services failed: $error');
+    await Sentry.captureException(error, stackTrace: stackTrace);
+  }
+}
+
+Future<void> _ensureHiveInitialized() async {
+  if (_hiveInitialized || kIsWeb) {
+    return;
+  }
+  await Hive.initFlutter();
+  _hiveInitialized = true;
+}
+
+Future<void> _openHiveBoxes() async {
+  if (kIsWeb) return;
+  const boxes = [
+    'levels',
+    'lessons',
+    'goals',
+    'user_goal',
+    'practice_log',
+    'quotes',
+    'gp',
+    'notifications',
+  ];
+  for (final box in boxes) {
+    if (!Hive.isBoxOpen(box)) {
+      await Hive.openBox(box);
+    }
   }
 }
 

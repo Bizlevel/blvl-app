@@ -7,6 +7,8 @@ ENV['COCOAPODS_DISABLE_STATS'] = 'true'
 ENV['LANG'] = ENV['LANG'] || 'en_US.UTF-8'
 ENV['LC_ALL'] = ENV['LC_ALL'] || 'en_US.UTF-8'
 
+require 'fileutils'
+
 project 'Runner', {
   'Debug' => :debug,
   'Profile' => :release,
@@ -28,7 +30,54 @@ end
 
 require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), flutter_root)
 
+def apply_plugin_patches
+  script = File.expand_path(File.join('..', 'tool', 'apply_plugin_patches.dart'), __FILE__)
+  return unless File.exist?(script)
+  puts 'Applying Flutter plugin patches…'
+  success = system('cd .. && dart run tool/apply_plugin_patches.dart')
+  raise 'Failed to apply plugin patches.' unless success
+end
+
+def patch_google_sign_in_indicator
+  file = File.join(__dir__, 'Pods', 'GoogleSignIn', 'GoogleSignIn', 'Sources',
+                   'GIDAppCheck', 'UI', 'GIDActivityIndicatorViewController.m')
+  return unless File.exist?(file)
+
+  contents = File.read(file)
+  return if contents.include?('__IPHONE_OS_VERSION_MIN_REQUIRED < 130000')
+
+  legacy_block = [
+    "  UIActivityIndicatorViewStyle style;",
+    "  if (@available(iOS 13.0, *)) {",
+    "    style = UIActivityIndicatorViewStyleLarge;",
+    "  } else {",
+    "    style = UIActivityIndicatorViewStyleGray;",
+    "  }"
+  ].join("\n")
+
+  replacement = [
+    "  #if __IPHONE_OS_VERSION_MIN_REQUIRED < 130000",
+    "    UIActivityIndicatorViewStyle style;",
+    "    if (@available(iOS 13.0, *)) {",
+    "      style = UIActivityIndicatorViewStyleLarge;",
+    "    } else {",
+    "      style = UIActivityIndicatorViewStyleGray;",
+    "    }",
+    "  #else",
+    "    UIActivityIndicatorViewStyle style = UIActivityIndicatorViewStyleLarge;",
+    "  #endif"
+  ].join("\n")
+
+  if contents.include?(legacy_block)
+    File.write(file, contents.sub(legacy_block, replacement))
+    puts 'Patched GoogleSignIn activity indicator style for iOS 15+.'
+  end
+rescue => e
+  warn "Failed to patch GoogleSignIn indicator: #{e}"
+end
+
 flutter_ios_podfile_setup
+apply_plugin_patches
 
 target 'Runner' do
   # Линкуем все Flutter‑плагины как статические фреймворки (совместимо с Firebase/GoogleUtilities)
@@ -54,12 +103,23 @@ post_install do |installer|
     flutter_additional_ios_build_settings(target)
     target.build_configurations.each do |config|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
+      if target.name == 'Sentry'
+        config.build_settings['BUILD_LIBRARY_FOR_DISTRIBUTION'] = 'YES'
+      end
+      if target.name == 'objective_c'
+        config.build_settings['GCC_WARN_INHIBIT_ALL_WARNINGS'] = 'YES'
+        config.build_settings['SWIFT_SUPPRESS_WARNINGS'] = 'YES'
+      end
     end
   end
 
   nanopb_dir = File.join(__dir__, 'Pods', 'nanopb')
-  Dir.glob(File.join(nanopb_dir, 'pb_* 3.*')).each do |path|
-    File.delete(path) if File.file?(path)
+  # Remove stray nanopb duplicates that occasionally appear (e.g. "pb 2.h")
+  Dir.glob(File.join(nanopb_dir, '* 2.*')).each do |path|
+    FileUtils.rm_f(path)
+  end
+  Dir.glob(File.join(nanopb_dir, '* 2')).each do |path|
+    FileUtils.rm_rf(path)
   end
 
   iap_target = installer.pods_project.targets.find do |target|
@@ -81,5 +141,7 @@ post_install do |installer|
       config.build_settings['GCC_WARN_INHIBIT_ALL_WARNINGS'] = 'YES'
     end
   end
+
+  patch_google_sign_in_indicator
 end
 

@@ -8,15 +8,10 @@ import 'package:bizlevel/providers/auth_provider.dart';
 import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/theme/spacing.dart';
 import 'package:bizlevel/widgets/custom_image.dart';
-// import 'package:bizlevel/widgets/stat_card.dart';
-// import 'package:bizlevel/widgets/setting_item.dart';
 import 'package:bizlevel/providers/levels_provider.dart';
 import 'package:bizlevel/models/user_model.dart';
 import 'package:go_router/go_router.dart';
-//import 'package:file_picker/file_picker.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-//import 'package:supabase_flutter/supabase_flutter.dart';
-//import 'dart:io';
 import 'package:bizlevel/providers/gp_providers.dart';
 import 'package:bizlevel/widgets/common/bizlevel_error.dart';
 import 'package:bizlevel/widgets/common/bizlevel_loading.dart';
@@ -25,6 +20,7 @@ import 'package:bizlevel/widgets/common/gp_balance_widget.dart';
 import 'package:bizlevel/widgets/common/bizlevel_card.dart';
 import 'package:bizlevel/widgets/common/bizlevel_text_field.dart';
 import 'package:bizlevel/widgets/reminders_settings_sheet.dart';
+import 'package:bizlevel/services/media_picker_service.dart';
 import 'package:bizlevel/widgets/common/achievement_badge.dart';
 import 'package:bizlevel/providers/theme_provider.dart';
 import 'package:bizlevel/theme/dimensions.dart';
@@ -398,6 +394,28 @@ class _Body extends ConsumerStatefulWidget {
 }
 
 class _BodyState extends ConsumerState<_Body> {
+  Uint8List? _avatarPreviewBytes;
+
+  Future<void> _pickAvatarFromGallery() async {
+    final result =
+        await MediaPickerService.instance.pickImageFromGallery(context);
+    if (!mounted || result == null) return;
+    setState(() {
+      _avatarPreviewBytes = result.bytes;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Фото выбрано. Синхронизация с профилем появится позже.'),
+      ),
+    );
+  }
+
+  void _clearAvatarPreview() {
+    if (_avatarPreviewBytes == null) return;
+    setState(() {
+      _avatarPreviewBytes = null;
+    });
+  }
   // Upload артефактов убран — состояние загрузки не требуется
 
   // Плюрализация артефактов больше не используется
@@ -510,8 +528,6 @@ class _BodyState extends ConsumerState<_Body> {
     }
   }
 
-  // _uploadFile удалён
-
   @override
   Widget build(BuildContext context) {
     final skillsAsync = ref.watch(userSkillsProvider);
@@ -572,52 +588,37 @@ class _BodyState extends ConsumerState<_Body> {
         ? 'assets/images/avatars/avatar_${widget.avatarId}.png'
         : '';
 
+    final Widget avatarImage = _avatarPreviewBytes != null
+        ? ClipRRect(
+            borderRadius: BorderRadius.circular(40),
+            child: Image.memory(
+              _avatarPreviewBytes!,
+              width: 80,
+              height: 80,
+              fit: BoxFit.cover,
+            ),
+          )
+        : CustomImage(
+            (localAsset.isNotEmpty
+                ? localAsset
+                : "https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=800&q=60"),
+            width: 80,
+            height: 80,
+            radius: 40,
+            isNetwork: localAsset.isEmpty,
+          );
+
     return Semantics(
         label: 'Аватар пользователя',
         button: true,
         child: Row(
           children: [
-            Stack(
-              alignment: Alignment.bottomRight,
-              children: [
-                GestureDetector(
-                  onTap: _showAvatarPicker,
-                  child: CustomImage(
-                    (localAsset.isNotEmpty
-                        ? localAsset
-                        : "https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=800&q=60"),
-                    width: 80,
-                    height: 80,
-                    radius: 40,
-                    isNetwork: localAsset.isEmpty,
-                  ),
-                ),
-                Positioned(
-                  bottom: 0,
-                  right: 0,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: AppColor.surface,
-                      borderRadius:
-                          BorderRadius.circular(AppDimensions.radiusXxl),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: AppColor.shadow,
-                          blurRadius: 2,
-                        ),
-                      ],
-                    ),
-                    child: Padding(
-                      padding: AppSpacing.insetsAll(AppSpacing.xs),
-                      child: const Icon(
-                        Icons.camera_alt,
-                        size: 16,
-                        color: AppColor.primary,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+            _AvatarControls(
+              avatarImage: avatarImage,
+              onPickPreset: _showAvatarPicker,
+              onPickGallery: _pickAvatarFromGallery,
+              onResetPreview: _clearAvatarPreview,
+              hasPreview: _avatarPreviewBytes != null,
             ),
             const SizedBox(width: AppSpacing.medium),
             Expanded(
@@ -699,6 +700,107 @@ class _BodyState extends ConsumerState<_Body> {
   // Секции настроек/платежей/выхода перенесены в меню шестерёнки AppBar
 
   // Секция артефактов удалена согласно задаче 31.16 — используется модалка
+}
+
+class _AvatarControls extends StatelessWidget {
+  const _AvatarControls({
+    required this.avatarImage,
+    required this.onPickPreset,
+    required this.onPickGallery,
+    required this.onResetPreview,
+    required this.hasPreview,
+  });
+
+  final Widget avatarImage;
+  final VoidCallback onPickPreset;
+  final VoidCallback onPickGallery;
+  final VoidCallback onResetPreview;
+  final bool hasPreview;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Stack(
+          alignment: Alignment.bottomRight,
+          children: [
+            GestureDetector(
+              onTap: onPickPreset,
+              child: avatarImage,
+            ),
+            Positioned(
+              bottom: 0,
+              right: 0,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: AppColor.surface,
+                  borderRadius: BorderRadius.circular(AppDimensions.radiusXxl),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: AppColor.shadow,
+                      blurRadius: 2,
+                    ),
+                  ],
+                ),
+                child: Padding(
+                  padding: AppSpacing.insetsAll(AppSpacing.xs),
+                  child: const Icon(
+                    Icons.camera_alt,
+                    size: 16,
+                    color: AppColor.primary,
+                  ),
+                ),
+              ),
+            ),
+            if (hasPreview)
+              Positioned(
+                top: 0,
+                left: 0,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColor.orange,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text(
+                    'BETA',
+                    style: TextStyle(
+                      color: AppColor.onPrimary,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        TextButton.icon(
+          onPressed: onPickGallery,
+          style: TextButton.styleFrom(
+            padding: EdgeInsets.zero,
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+          icon: const Icon(Icons.photo_library_outlined, size: 16),
+          label: const Text('Галерея (beta)'),
+        ),
+        if (hasPreview)
+          TextButton(
+            onPressed: onResetPreview,
+            style: TextButton.styleFrom(
+              padding: EdgeInsets.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: const Text(
+              'Сбросить фото',
+              style: TextStyle(fontSize: 12),
+            ),
+          ),
+      ],
+    );
+  }
 }
 
 class _AboutMeCard extends ConsumerStatefulWidget {

@@ -10,6 +10,9 @@
 		1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */ = {isa = PBXBuildFile; fileRef = 1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */; };
 		3325E98F2C23B84800A3AA01 /* BizPluginRegistrant.m in Sources */ = {isa = PBXBuildFile; fileRef = 3325E98E2C23B84800A3AA01 /* BizPluginRegistrant.m */; };
 		3325E9912C23B88F00A3AA01 /* StoreKit2Bridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3325E9902C23B88F00A3AA01 /* StoreKit2Bridge.swift */; };
+		33EED0022CB4458C00D28B74 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33EED0012CB4458C00D28B74 /* SceneDelegate.swift */; };
+		33EED0042CB4458C00D28B74 /* NativeBootstrapCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33EED0032CB4458C00D28B74 /* NativeBootstrapCoordinator.swift */; };
+		C0A9B6B22DA3C8F600EFB7AC /* MainThreadIOMonitor.m in Sources */ = {isa = PBXBuildFile; fileRef = C0A9B6B12DA3C8F600EFB7AC /* MainThreadIOMonitor.m */; };
 		3B3967161E833CAA004F5970 /* AppFrameworkInfo.plist in Resources */ = {isa = PBXBuildFile; fileRef = 3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */; };
 		4D018519F95D003DEC6621EA /* Pods_Runner.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 16A017369BC1210AD9CA023E /* Pods_Runner.framework */; };
 		74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74858FAE1ED2DC5600515810 /* AppDelegate.swift */; };
@@ -40,8 +43,11 @@
 		3325E98D2C23B84700A3AA01 /* BizPluginRegistrant.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BizPluginRegistrant.h; sourceTree = "<group>"; };
 		3325E98E2C23B84800A3AA01 /* BizPluginRegistrant.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = BizPluginRegistrant.m; sourceTree = "<group>"; };
 		3325E9902C23B88F00A3AA01 /* StoreKit2Bridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreKit2Bridge.swift; sourceTree = "<group>"; };
+		33EED0012CB4458C00D28B74 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
+		33EED0032CB4458C00D28B74 /* NativeBootstrapCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeBootstrapCoordinator.swift; sourceTree = "<group>"; };
 		16A017369BC1210AD9CA023E /* Pods_Runner.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Runner.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = AppFrameworkInfo.plist; path = Flutter/AppFrameworkInfo.plist; sourceTree = "<group>"; };
+		C0A9B6B12DA3C8F600EFB7AC /* MainThreadIOMonitor.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = MainThreadIOMonitor.m; sourceTree = "<group>"; };
 		5786FF366FC6D1798A3A73BC /* Pods-Runner.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.release.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.release.xcconfig"; sourceTree = "<group>"; };
 		74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Runner-Bridging-Header.h"; sourceTree = "<group>"; };
 		74858FAE1ED2DC5600515810 /* AppDelegate.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
@@ -127,8 +133,11 @@
 				3325E98D2C23B84700A3AA01 /* BizPluginRegistrant.h */,
 				3325E98E2C23B84800A3AA01 /* BizPluginRegistrant.m */,
 				3325E9902C23B88F00A3AA01 /* StoreKit2Bridge.swift */,
+				33EED0032CB4458C00D28B74 /* NativeBootstrapCoordinator.swift */,
+				33EED0012CB4458C00D28B74 /* SceneDelegate.swift */,
 				B5A1E5B41CFB90AA00AA00AA /* main.m */,
 				B5A1E5B61CFB90AA00AA00AA /* FirebaseEarlyInit.m */,
+				C0A9B6B12DA3C8F600EFB7AC /* MainThreadIOMonitor.m */,
 				74858FAE1ED2DC5600515810 /* AppDelegate.swift */,
 				74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */,
 			);
@@ -269,7 +278,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -e\ncd \"$FLUTTER_APPLICATION_PATH\"\n\"$FLUTTER_ROOT/bin/dart\" tool/strip_iap_from_registrant.dart\nif [ -n \"$DERIVED_FILE_DIR\" ]; then\n  touch \"$DERIVED_FILE_DIR/strip_iap_from_registrant.stamp\"\nfi\n";
+			shellScript = "set -e\ncd \"$FLUTTER_APPLICATION_PATH\"\nDART_BIN=\"$FLUTTER_ROOT/bin/dart\"\nif [ ! -x \"$DART_BIN\" ]; then\n  if command -v dart >/dev/null 2>&1; then\n    DART_BIN=\"$(command -v dart)\"\n  elif command -v flutter >/dev/null 2>&1; then\n    DART_BIN=\"$(dirname \"$(command -v flutter)\")/cache/dart-sdk/bin/dart\"\n  else\n    echo \"[strip_iap_from_registrant] Dart SDK not found in PATH or FLUTTER_ROOT.\" >&2\n    exit 1\n  fi\nfi\n\"$DART_BIN\" tool/strip_iap_from_registrant.dart\nif [ -n \"$DERIVED_FILE_DIR\" ]; then\n  touch \"$DERIVED_FILE_DIR/strip_iap_from_registrant.stamp\"\nfi\n";
 		};
 		9740EEB61CF901F6004384FC /* Run Script */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -335,6 +344,9 @@
 				1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */,
 				3325E98F2C23B84800A3AA01 /* BizPluginRegistrant.m in Sources */,
 				3325E9912C23B88F00A3AA01 /* StoreKit2Bridge.swift in Sources */,
+				33EED0022CB4458C00D28B74 /* SceneDelegate.swift in Sources */,
+				33EED0042CB4458C00D28B74 /* NativeBootstrapCoordinator.swift in Sources */,
+				C0A9B6B22DA3C8F600EFB7AC /* MainThreadIOMonitor.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

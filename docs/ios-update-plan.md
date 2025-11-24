@@ -54,7 +54,13 @@
 - **Проверка**
 - - В логах нет синхронных `NSFileManager`/`keyWindow` предупреждений до UI.
 - **Статус/заметки**
-- _не выполнен_
+- 23.11 — `file_picker` удалён из `pubspec.yaml`, Pods пересобраны без `DKImagePickerController`/`DKPhotoGallery`. На iOS добавлены `SceneDelegate`, `NativeBootstrapCoordinator` и `UIApplicationSceneManifest`; тяжёлые сервисы (timezone/notifications/Hive box) перенесены в post-frame, что устранило предупреждения Performance Diagnostics о синхронном I/O. В `ProfileScreen` подключён `MediaPickerService` с локальным предпросмотром, добавлены зависимости `photo_manager` и `file_selector`.
+- 24.11 — добавлен `tool/apply_plugin_patches.dart` (вызывается из Podfile перед `pod install`), который автоматически накатывает локальные фиксы плагинов: `photo_manager` (SHA256 + `UTType`, Scene-aware window lookup и корректный Privacy Manifest), `file_selector_ios`/`url_launcher_ios` (SceneDelegate-friendly presenter), `firebase_core` (NSNull → nil guards), `firebase_messaging`/`flutter_local_notifications` (Banner/List вместо deprecated Alert) и `sentry_flutter` (Scene API). Одновременно `Podfile` включает `BUILD_LIBRARY_FOR_DISTRIBUTION` для `Sentry` и подавляет ворнинги `objective_c`. `lib/main.dart` переносит инициализацию Hive/timezone в `_initializeDeferredLocalServices`, `flutter build ios --release --no-codesign` завершается успешно.
+- 24.11 — патч `google_sign_in_ios`: чтение `GoogleService-Info.plist` переносится на ленивую фазу (нет `NSData initWithContentsOfFile` до UI), `GoRouter.redirect` защищён `try/catch` и шлёт исключения в Sentry. После правок повторно выполнены `dart run tool/apply_plugin_patches.dart`, `flutter clean`, `flutter pub get`, `cd ios && LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 pod install`.
+- 24.11 — финальный прогон: `SecTrustProxyAPIDelegate` переведён на `SecTrustCopyCertificateChain`, `PMManager.cancelAllRequest` использует `weakSelf/strongSelf`. Release‑билд без ворнингов, `MainThreadIOMonitor` фиксирует только системные вызовы. Stage 4 закрыт; дальше возвращаемся к Stage 3 (StoreKit 2) и, после его подтверждения, к включению iOS FCM.
+
+- **Оставшиеся предупреждения Release build (`docs/draft-4.md`)**
+- Ворнингов от Pods больше нет; остаются только информационные сообщения Xcode о скриптовых фазах (`Flutter Pub Get`, `Run Script`, `Thin Binary`), которые выполняются по условию `Based on dependency analysis`.
 -
 - ### Этап 5. AppAuth и Google Sign-In
 - **Задачи**

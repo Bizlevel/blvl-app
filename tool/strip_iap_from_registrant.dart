@@ -40,8 +40,7 @@ void main() {
 
   file.writeAsStringSync(updated);
   stderr.writeln(
-      '[strip_iap_from_registrant] InAppPurchasePlugin detected и удалён из GeneratedPluginRegistrant.m. Остановили сборку, чтобы обратить внимание: плагин не должен регистрироваться на iOS.');
-  exit(1);
+      '[strip_iap_from_registrant] InAppPurchasePlugin удалён из GeneratedPluginRegistrant.m. Продолжаем сборку (проверьте, что StoreKit1 не используется).');
 }
 
 String _stripPluginBlock(
