@@ -40,6 +40,21 @@ final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
   // Сначала сортируем по номеру на случай, если order потерян
   rows.sort((a, b) => (a['number'] as int).compareTo(b['number'] as int));
 
+  // Для уровня 1 дополнительно проверяем наличие цели в БД
+  Map<String, dynamic>? userGoalForLevel1;
+  if (userId != null) {
+    try {
+      userGoalForLevel1 = await supa
+          .from('user_goal')
+          .select('goal_text')
+          .eq('user_id', userId)
+          .limit(1)
+          .maybeSingle();
+    } catch (_) {
+      // Если ошибка загрузки, продолжаем без проверки цели
+    }
+  }
+
   bool previousCompleted = false;
 
   int floorForLevelJson(Map<String, dynamic> json, LevelModel level) {
@@ -64,9 +79,18 @@ final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
 
     // Определяем, завершён ли текущий уровень пользователем
     final progressArr = json['user_progress'] as List?;
-    final bool isCompleted = progressArr != null && progressArr.isNotEmpty
+    bool isCompleted = progressArr != null && progressArr.isNotEmpty
         ? (progressArr.first['is_completed'] as bool? ?? false)
         : false;
+
+    // Для уровня 1 дополнительно проверяем наличие цели в БД
+    // Если цель есть, считаем уровень завершенным даже если is_completed = false
+    if (level.number == 1 && !isCompleted && userGoalForLevel1 != null) {
+      final goalText = userGoalForLevel1['goal_text'] as String?;
+      if (goalText != null && goalText.trim().isNotEmpty) {
+        isCompleted = true;
+      }
+    }
 
     // Доступность уровня
     bool isAccessible;

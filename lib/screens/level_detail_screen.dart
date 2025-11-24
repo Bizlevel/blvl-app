@@ -21,7 +21,7 @@ import 'package:bizlevel/widgets/common/bizlevel_text_field.dart';
 import 'package:bizlevel/services/auth_service.dart';
 import 'package:bizlevel/providers/user_skills_provider.dart';
 // import 'package:bizlevel/providers/goals_repository_provider.dart';
-// import 'package:bizlevel/providers/goals_providers.dart';
+import 'package:bizlevel/providers/goals_providers.dart';
 import 'package:go_router/go_router.dart';
 import 'package:bizlevel/widgets/common/breadcrumb.dart';
 import 'package:bizlevel/widgets/common/bizlevel_button.dart';
@@ -310,7 +310,39 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
     final prefs = await SharedPreferences.getInstance();
     final user = ref.read(currentUserProvider).value;
     final key = 'goal_v1_saved_${user?.id ?? 'anonymous'}_${widget.levelId}';
-    return prefs.getBool(key) ?? false;
+    final fromPrefs = prefs.getBool(key) ?? false;
+    
+    // Также проверяем наличие цели в БД для надежности
+    if (fromPrefs) {
+      try {
+        final goal = await ref.read(userGoalProvider.future);
+        final hasGoal = goal?['goal_text'] != null && 
+                       (goal!['goal_text'] as String).trim().isNotEmpty;
+        if (hasGoal) return true;
+        // Если в БД нет цели, но флаг был установлен, сбрасываем флаг
+        if (mounted) {
+          await prefs.setBool(key, false);
+        }
+      } catch (_) {
+        // Если ошибка загрузки, используем значение из SharedPreferences
+      }
+    }
+    
+    // Если флаг не установлен, дополнительно проверяем БД
+    try {
+      final goal = await ref.read(userGoalProvider.future);
+      final hasGoal = goal?['goal_text'] != null && 
+                     (goal!['goal_text'] as String).trim().isNotEmpty;
+      if (hasGoal && mounted) {
+        // Обновляем флаг, если цель найдена в БД
+        await prefs.setBool(key, true);
+        return true;
+      }
+    } catch (_) {
+      // Если ошибка загрузки, используем значение из SharedPreferences
+    }
+    
+    return fromPrefs;
   }
 
   Future<void> _markGoalV1AsSaved() async {
@@ -473,10 +505,30 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
         _GoalV1Block(
           onSaved: () async {
             if (mounted) {
-              setState(() => _goalV1Saved = true);
+              // Сначала устанавливаем флаг синхронно
+              _goalV1Saved = true;
+              setState(() {});
               await _markGoalV1AsSaved();
+              
+              // ВАЖНО: После сохранения цели v1, проверяем, можно ли завершить уровень
+              // Если все условия выполнены (видео, квизы, цель v1), автоматически завершаем уровень
+              final lessons = ref.read(lessonsProvider(widget.levelId)).value ?? [];
+              if (_isLevelCompleted(lessons)) {
+                try {
+                  await SupabaseService.completeLevel(widget.levelId);
+                  ref.invalidate(levelsProvider);
+                  ref.invalidate(currentUserProvider);
+                  ref.invalidate(userSkillsProvider);
+                } catch (e) {
+                  // Логируем ошибку, но не блокируем UI
+                  if (mounted) {
+                    print('Ошибка при автоматическом завершении уровня: $e');
+                  }
+                }
+              }
+              
               // Инвалидация провайдеров целей для синхронизации страницы «Цель»
-              // legacy invalidates removed
+              ref.invalidate(userGoalProvider);
             }
           },
         ),
