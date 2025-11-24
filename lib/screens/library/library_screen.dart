@@ -7,6 +7,8 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'package:bizlevel/providers/library_providers.dart';
 import 'package:bizlevel/widgets/common/bizlevel_card.dart';
+import 'package:bizlevel/widgets/common/list_row_tile.dart';
+import 'package:bizlevel/widgets/common/app_icon_button.dart';
 import 'package:bizlevel/theme/spacing.dart';
 import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/widgets/common/bizlevel_button.dart';
@@ -153,33 +155,14 @@ class _SectionCard extends StatelessWidget {
       onTap: onTap,
       padding: AppSpacing.insetsAll(AppSpacing.cardPadding),
       semanticsLabel: title,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: 44),
-        child: Row(
-          children: [
-            Icon(icon, size: 32),
-            AppSpacing.gapW(AppSpacing.itemSpacing),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                  ),
-                  AppSpacing.gapH(4),
-                  Text(
-                    subtitle,
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                ],
-              ),
-            ),
-            const Icon(Icons.chevron_right),
-          ],
-        ),
+      outlined: true,
+      child: ListRowTile(
+        leadingIcon: icon,
+        title: title,
+        subtitle: subtitle,
+        trailing: const Icon(Icons.chevron_right),
+        onTap: onTap,
+        semanticsLabel: title,
       ),
     );
   }
@@ -354,11 +337,14 @@ class _FavResourceCard extends StatelessWidget {
                   ],
                 ),
               ),
-              IconButton(
+              AppIconButton(
+                tooltip: expanded ? 'Свернуть' : 'Развернуть',
                 icon: Icon(expanded ? Icons.expand_less : Icons.expand_more),
                 onPressed: onToggleExpand,
               ),
-              IconButton(
+              AppIconButton(
+                tooltip:
+                    isFavorite ? 'Убрать из избранного' : 'В избранное',
                 icon: Icon(isFavorite ? Icons.star : Icons.star_border),
                 onPressed: onToggleFavorite,
               ),

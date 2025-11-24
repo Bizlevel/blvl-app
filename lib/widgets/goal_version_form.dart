@@ -311,8 +311,8 @@ class GoalVersionForm extends StatelessWidget {
   }
 
   Widget _buildGrowthIndicator(BuildContext context) {
-    double? curr = double.tryParse((metricFromCtrl?.text.trim() ?? ''));
-    double? targ = double.tryParse((metricToCtrl?.text.trim() ?? ''));
+    final double? curr = double.tryParse((metricFromCtrl?.text.trim() ?? ''));
+    final double? targ = double.tryParse((metricToCtrl?.text.trim() ?? ''));
     if (curr == null || targ == null || curr == 0) {
       return const SizedBox.shrink();
     }

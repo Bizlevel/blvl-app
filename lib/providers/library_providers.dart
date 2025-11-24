@@ -47,3 +47,11 @@ final libraryCategoriesProvider =
   final repo = ref.watch(libraryRepositoryProvider);
   return repo.fetchCategories(type);
 });
+
+/// Суммарное количество материалов в библиотеке (курсы + гранты + акселерации)
+final libraryTotalCountProvider = FutureProvider<int>((ref) async {
+  final courses = await ref.watch(coursesProvider(null).future);
+  final grants = await ref.watch(grantsProvider(null).future);
+  final accels = await ref.watch(acceleratorsProvider(null).future);
+  return (courses.length) + (grants.length) + (accels.length);
+});

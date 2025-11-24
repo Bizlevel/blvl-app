@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bizlevel/services/gp_service.dart';
@@ -23,8 +22,7 @@ class GoalsRepository {
   String _requireUserId() {
     final String? userId = _client.auth.currentUser?.id;
     if (userId == null) {
-      throw const PostgrestException(
-          message: 'Not authorized', code: '401');
+      throw const PostgrestException(message: 'Not authorized', code: '401');
     }
     return userId;
   }
@@ -114,11 +112,49 @@ class GoalsRepository {
       actionPlanNote: actionPlanNote,
     );
 
-    final Map<String, dynamic> row = await _client
+    Map<String, dynamic> row = await _client
         .from('user_goal')
         .upsert(payload, onConflict: 'user_id')
         .select()
         .single();
+
+    // Ensure goal history exists and is activated
+    try {
+      // If no pointer or goal changed — create new history row
+      final String? currentHistoryId = (row['current_history_id'] as String?);
+      final bool noPointer =
+          currentHistoryId == null || currentHistoryId.isEmpty;
+      final bool goalChanged =
+          ((row['goal_text'] ?? '') as String).trim().isNotEmpty;
+      if (noPointer && goalChanged) {
+        final Map<String, dynamic> hist = {
+          'user_id': userId,
+          'goal_text': (row['goal_text'] ?? '').toString(),
+          if (row['metric_type'] != null) 'metric_type': row['metric_type'],
+          if (row['metric_start'] != null) 'metric_start': row['metric_start'],
+          if (row['metric_current'] != null)
+            'metric_current': row['metric_current'],
+          if (row['metric_target'] != null)
+            'metric_target': row['metric_target'],
+          if (row['start_date'] != null) 'start_date': row['start_date'],
+          if (row['target_date'] != null) 'target_date': row['target_date'],
+          'status': 'active',
+        };
+        final Map<String, dynamic> inserted = await _client
+            .from('user_goal_history')
+            .insert(hist)
+            .select('id')
+            .single();
+        final String newId = inserted['id'] as String;
+        // pointer
+        row = await _client
+            .from('user_goal')
+            .update({'current_history_id': newId})
+            .eq('user_id', userId)
+            .select()
+            .single();
+      }
+    } catch (_) {}
 
     // refresh cache
     try {
@@ -126,6 +162,70 @@ class GoalsRepository {
       await cache.put('self', row);
     } catch (_) {}
 
+    return Map<String, dynamic>.from(row);
+  }
+
+  /// Начать новую цель: закрыть текущую историю, создать новую, обнулить метрики.
+  Future<Map<String, dynamic>> startNewGoal({
+    required String goalText,
+    DateTime? targetDate,
+  }) async {
+    final String userId = _requireUserId();
+    _ensureAnonApikey();
+    // 1) закрыть текущую history (best-effort)
+    try {
+      final Map<String, dynamic>? ug = await _client
+          .from('user_goal')
+          .select('current_history_id')
+          .eq('user_id', userId)
+          .maybeSingle();
+      final String? hid = ug?['current_history_id'] as String?;
+      if (hid != null && hid.isNotEmpty) {
+        await _client
+            .from('user_goal_history')
+            .update({
+              'status': 'completed',
+              'closed_at': DateTime.now().toUtc().toIso8601String()
+            })
+            .eq('id', hid)
+            .eq('user_id', userId);
+      }
+    } catch (_) {}
+    // 2) создать новую history (active)
+    final Map<String, dynamic> histPayload = {
+      'user_id': userId,
+      'goal_text': goalText,
+      if (targetDate != null)
+        'target_date': targetDate.toUtc().toIso8601String(),
+      'status': 'active',
+    };
+    final Map<String, dynamic> insertedHist = await _client
+        .from('user_goal_history')
+        .insert(histPayload)
+        .select('id')
+        .single();
+    final String newHistoryId = insertedHist['id'] as String;
+    // 3) обновить user_goal: текст/дедлайн, очистить метрики, привязать pointer
+    Map<String, dynamic> row = await _client
+        .from('user_goal')
+        .upsert({
+          'user_id': userId,
+          'goal_text': goalText,
+          'metric_type': null,
+          'metric_start': null,
+          'metric_current': null,
+          'metric_target': null,
+          if (targetDate != null)
+            'target_date': targetDate.toUtc().toIso8601String(),
+          'current_history_id': newHistoryId,
+        }, onConflict: 'user_id')
+        .select()
+        .single();
+    // refresh cache
+    try {
+      final Box cache = Hive.box('user_goal');
+      await cache.put('self', row);
+    } catch (_) {}
     return Map<String, dynamic>.from(row);
   }
 
@@ -179,6 +279,27 @@ class GoalsRepository {
             result.map((e) => Map<String, dynamic>.from(e)));
   }
 
+  Future<List<Map<String, dynamic>>> fetchPracticeLogForHistory({
+    required String? historyId,
+    int limit = 100,
+  }) async {
+    final String? userId = _client.auth.currentUser?.id;
+    if (userId == null) return <Map<String, dynamic>>[];
+    _ensureAnonApikey();
+    final dynamic base = _client
+        .from('practice_log')
+        .select(
+            'id, user_id, applied_at, applied_tools, note, created_at, updated_at')
+        .eq('user_id', userId)
+        .order('applied_at', ascending: false)
+        .limit(limit);
+    final List rows = await ((historyId != null && historyId.isNotEmpty)
+        ? base.eq('goal_history_id', historyId)
+        : base);
+    return List<Map<String, dynamic>>.from(
+        rows.map((e) => Map<String, dynamic>.from(e as Map)));
+  }
+
   Future<List> _fetchPracticeRows(
       {required String userId, required int limit}) async {
     _ensureAnonApikey();
@@ -197,11 +318,23 @@ class GoalsRepository {
     DateTime? appliedAt,
   }) async {
     final String userId = _requireUserId();
+    // Try attach current history pointer
+    String? historyId;
+    try {
+      final Map<String, dynamic>? ug = await _client
+          .from('user_goal')
+          .select('current_history_id')
+          .eq('user_id', userId)
+          .maybeSingle();
+      final String? cid = ug?['current_history_id'] as String?;
+      if (cid != null && cid.isNotEmpty) historyId = cid;
+    } catch (_) {}
     final Map<String, dynamic> payload = <String, dynamic>{
       'user_id': userId,
       'applied_tools': appliedTools,
       if (note != null) 'note': note,
       if (appliedAt != null) 'applied_at': appliedAt.toUtc().toIso8601String(),
+      if (historyId != null) 'goal_history_id': historyId,
     };
 
     _ensureAnonApikey();
@@ -339,279 +472,7 @@ class GoalsRepository {
     return value.clamp(0.0, 1.0);
   }
 
-  // ===== Legacy core_goals/weekly/daily APIs удалены в новой концепции =====
-
-  // streak-бонусы удалены по новой концепции
-
-  /// Получить daily_progress пользователя (MVP): если в БД нет таблицы,
-  /// используем локальный Hive-кеш 'daily_progress_local'.
-  Future<List<Map<String, dynamic>>> fetchDailyProgress() async {
-    try {
-      final List rows = await _client
-          .from('daily_progress')
-          .select(
-              'id, user_id, day_number, date, task_text, completion_status, user_note, max_suggestion, created_at, updated_at')
-          .order('day_number', ascending: true);
-      return List<Map<String, dynamic>>.from(
-          rows.map((e) => Map<String, dynamic>.from(e as Map)));
-    } on PostgrestException {
-      // Fallback на локальный кэш
-      final Box cache = Hive.isBoxOpen('daily_progress_local')
-          ? Hive.box('daily_progress_local')
-          : await Hive.openBox('daily_progress_local');
-      final List data = (cache.get('items') as List?) ?? const <dynamic>[];
-      return List<Map<String, dynamic>>.from(
-          data.map((e) => Map<String, dynamic>.from(e as Map)));
-    } on SocketException {
-      final Box cache = Hive.isBoxOpen('daily_progress_local')
-          ? Hive.box('daily_progress_local')
-          : await Hive.openBox('daily_progress_local');
-      final List data = (cache.get('items') as List?) ?? const <dynamic>[];
-      return List<Map<String, dynamic>>.from(
-          data.map((e) => Map<String, dynamic>.from(e as Map)));
-    }
-  }
-
-  /// Заполняет daily_progress.task_text из week*_focus версии v3
-  /// Не перезаписывает существующие task_text.
-  Future<void> backfillDailyTasksFromV3() async {
-    try {
-      final String? userId = _client.auth.currentUser?.id;
-      if (userId == null) return;
-
-      // 1) Получаем v3.version_data
-      final Map<String, dynamic>? v3row = await _client
-          .from('core_goals')
-          .select('version, version_data')
-          .eq('user_id', userId)
-          .eq('version', 3)
-          .order('updated_at', ascending: false)
-          .limit(1)
-          .maybeSingle();
-      final Map<String, dynamic> v3data = (v3row?['version_data'] is Map)
-          ? Map<String, dynamic>.from(v3row!['version_data'] as Map)
-          : const <String, dynamic>{};
-
-      if (v3data.isEmpty) return;
-
-      // 2) Получаем уже созданные daily_progress
-      final existing = await fetchDailyProgress();
-      final Map<int, String> hasTask = <int, String>{};
-      for (final m in existing) {
-        final int? d = m['day_number'] as int?;
-        if (d != null) {
-          hasTask[d] = (m['task_text'] ?? '').toString();
-        }
-      }
-
-      // 3) Для 1..28 устанавливаем task_text из соответствующего weekN_focus, если пусто
-      for (int day = 1; day <= 28; day++) {
-        final bool empty = (hasTask[day] ?? '').trim().isEmpty;
-        if (!empty) continue;
-        final int week = ((day - 1) ~/ 7) + 1;
-        final String key = 'week${week}_focus';
-        final String text = (v3data[key] ?? '').toString().trim();
-        if (text.isEmpty) continue;
-        // Обновляем только task_text
-        await upsertDailyProgress(dayNumber: day, taskText: text);
-      }
-    } catch (e) {
-      // swallow — не критично для UX
-      debugPrint('backfillDailyTasksFromV3 error: $e');
-    }
-  }
-
-  Future<Map<String, dynamic>?> fetchDailyDay(int dayNumber) async {
-    try {
-      final row = await _client
-          .from('daily_progress')
-          .select(
-              'id, user_id, day_number, date, task_text, completion_status, user_note, max_suggestion, created_at, updated_at')
-          .eq('day_number', dayNumber)
-          .maybeSingle();
-      return row == null ? null : Map<String, dynamic>.from(row);
-    } on PostgrestException {
-      final Box cache = Hive.isBoxOpen('daily_progress_local')
-          ? Hive.box('daily_progress_local')
-          : await Hive.openBox('daily_progress_local');
-      final List data = (cache.get('items') as List?) ?? const <dynamic>[];
-      for (final e in data) {
-        final m = Map<String, dynamic>.from(e as Map);
-        if ((m['day_number'] as int?) == dayNumber) return m;
-      }
-      return null;
-    } on SocketException {
-      final Box cache = Hive.isBoxOpen('daily_progress_local')
-          ? Hive.box('daily_progress_local')
-          : await Hive.openBox('daily_progress_local');
-      final List data = (cache.get('items') as List?) ?? const <dynamic>[];
-      for (final e in data) {
-        final m = Map<String, dynamic>.from(e as Map);
-        if ((m['day_number'] as int?) == dayNumber) return m;
-      }
-      return null;
-    }
-  }
-
-  Future<Map<String, dynamic>> upsertDailyProgress({
-    required int dayNumber,
-    String? taskText,
-    String? status, // 'completed'|'partial'|'missed'|'pending'
-    String? note,
-    DateTime? date,
-  }) async {
-    final payload = _buildDailyProgressPayload(
-      dayNumber: dayNumber,
-      taskText: taskText,
-      status: status,
-      note: note,
-      date: date,
-    );
-
-    try {
-      final result = await _upsertDailyProgressRemote(payload);
-      await _checkStreakBonusIfCompleted(status);
-      return result;
-    } catch (e) {
-      return await _upsertDailyProgressLocal(payload, dayNumber);
-    }
-  }
-
-  /// Строит payload для daily_progress
-  Map<String, dynamic> _buildDailyProgressPayload({
-    required int dayNumber,
-    String? taskText,
-    String? status,
-    String? note,
-    DateTime? date,
-  }) {
-    return <String, dynamic>{
-      'day_number': dayNumber,
-      if (taskText != null) 'task_text': taskText,
-      if (status != null) 'completion_status': status,
-      if (note != null) 'user_note': note,
-      if (date != null) 'date': date.toUtc().toIso8601String(),
-    };
-  }
-
-  /// Remote upsert в daily_progress
-  Future<Map<String, dynamic>> _upsertDailyProgressRemote(
-    Map<String, dynamic> payload,
-  ) async {
-    final upserted = await _client
-        .from('daily_progress')
-        .upsert(payload, onConflict: 'user_id,day_number')
-        .select()
-        .single();
-    return Map<String, dynamic>.from(upserted);
-  }
-
-  /// Проверяет и начисляет GP-бонусы за серии выполненных дней
-  Future<void> _checkStreakBonusIfCompleted(String? status) async {
-    if (status == 'completed' || status == 'partial') {
-      // streak-бонусы удалены
-    }
-  }
-
-  /// Fallback: сохранение в локальный Hive при отсутствии сети
-  Future<Map<String, dynamic>> _upsertDailyProgressLocal(
-    Map<String, dynamic> payload,
-    int dayNumber,
-  ) async {
-    final Box cache = Hive.isBoxOpen('daily_progress_local')
-        ? Hive.box('daily_progress_local')
-        : await Hive.openBox('daily_progress_local');
-    final List data = (cache.get('items') as List?)?.toList() ?? <dynamic>[];
-
-    bool found = false;
-    for (int i = 0; i < data.length; i++) {
-      final m = Map<String, dynamic>.from(data[i] as Map);
-      if ((m['day_number'] as int?) == dayNumber) {
-        m.addAll(payload);
-        data[i] = m;
-        found = true;
-        break;
-      }
-    }
-    if (!found) data.add(payload);
-
-    await cache.put('items', data);
-    return Map<String, dynamic>.from(payload);
-  }
-
-  /// Partial update of a single field in core_goals.version_data via RPC.
-  /// Server ensures editing only latest version and merges JSONB atomically.
-  Future<Map<String, dynamic>> upsertGoalField({
-    required int version,
-    required String field,
-    required dynamic value,
-  }) async {
-    return _withRetry<Map<String, dynamic>>(() async {
-      try {
-        final result = await _client.rpc(
-          'upsert_goal_field',
-          params: {
-            'p_version': version,
-            'p_field': field,
-            'p_value': value,
-          },
-        );
-        if (result is Map<String, dynamic>) {
-          return result;
-        }
-        return Map<String, dynamic>.from(result as Map);
-      } on PostgrestException {
-        // Fallback: если RPC отсутствует/недоступно — делаем client-side merge последней версии
-        // 1) Находим последнюю запись версии для текущего пользователя
-        final String? userId = _client.auth.currentUser?.id;
-        if (userId == null) rethrow;
-        final row = await _client
-            .from('core_goals')
-            .select('id, version, user_id, version_data')
-            .eq('user_id', userId)
-            .eq('version', version)
-            .order('updated_at', ascending: false)
-            .limit(1)
-            .maybeSingle();
-
-        Map<String, dynamic> vdata = <String, dynamic>{};
-        String? goalId;
-        if (row != null) {
-          goalId = row['id'] as String?;
-          final raw = row['version_data'];
-          if (raw is Map) {
-            vdata = Map<String, dynamic>.from(raw);
-          }
-        }
-
-        // 2) Мержим поле и сохраняем
-        vdata[field] = value;
-
-        if (goalId != null) {
-          final updated = await _client
-              .from('core_goals')
-              .update({'version_data': vdata})
-              .eq('id', goalId)
-              .select()
-              .single();
-          return Map<String, dynamic>.from(updated);
-        } else {
-          // Если записи нет — создаём новую оболочку версии
-          final created = await _client
-              .from('core_goals')
-              .insert({
-                'user_id': userId,
-                'version': version,
-                'goal_text': '',
-                'version_data': vdata,
-              })
-              .select()
-              .single();
-          return Map<String, dynamic>.from(created);
-        }
-      }
-    });
-  }
+  // ===== Legacy core_goals/weekly/daily APIs удалены окончательно =====
 
   // Удалено: fetchGoalProgress/goal_checkpoint_progress — legacy таблицы отсутствуют
 
@@ -731,27 +592,5 @@ class GoalsRepository {
     }
 
     return sb.toString();
-  }
-}
-
-extension on GoalsRepository {
-  Future<T> _withRetry<T>(Future<T> Function() op) async {
-    final List<Duration> delays = <Duration>[
-      const Duration(milliseconds: 300),
-      const Duration(milliseconds: 1000),
-      const Duration(milliseconds: 2500),
-    ];
-    int attempt = 0;
-    while (true) {
-      try {
-        return await op();
-      } on SocketException {
-        if (attempt >= delays.length) rethrow;
-      } on PostgrestException {
-        if (attempt >= delays.length) rethrow;
-      }
-      await Future.delayed(delays[attempt]);
-      attempt += 1;
-    }
   }
 }

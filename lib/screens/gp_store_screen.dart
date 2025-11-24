@@ -14,6 +14,7 @@ import 'package:bizlevel/widgets/common/bizlevel_button.dart';
 import 'package:bizlevel/widgets/common/gp_balance_widget.dart';
 import 'package:bizlevel/theme/color.dart' show AppColor;
 import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 class GpStoreScreen extends ConsumerStatefulWidget {
   const GpStoreScreen({super.key});
@@ -130,16 +131,17 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
           padding: const EdgeInsets.all(16),
           children: [
             // Вводный блок
-            const BizLevelCard(
-              padding: EdgeInsets.all(12),
+            BizLevelCard(
+              padding: const EdgeInsets.all(12),
+              outlined: true,
               child: Row(
                 children: [
-                  GpBalanceWidget(),
-                  SizedBox(width: 12),
+                  const GpBalanceWidget(),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       'GP — внутренняя валюта BizLevel: 1 GP = 1 сообщение в чате тренеров, также GP открывают новые этажи.',
-                      style: TextStyle(fontSize: 14),
+                      style: Theme.of(context).textTheme.bodyMedium,
                       maxLines: 3,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -417,6 +419,14 @@ Future<void> _startPurchaseIapOrWeb(
             final gp = GpService(Supabase.instance.client);
             final token = purchase.verificationData.serverVerificationData;
             final platform = IapService.currentPlatform();
+            // Имя пакета нужно передать на сервер для Android (устранение рассинхрона с env)
+            String? packageName;
+            if (platform == 'android') {
+              try {
+                final pi = await PackageInfo.fromPlatform();
+                packageName = pi.packageName;
+              } catch (_) {}
+            }
             try {
               await Sentry.addBreadcrumb(Breadcrumb(
                 message: 'gp_verify_started',
@@ -429,6 +439,7 @@ Future<void> _startPurchaseIapOrWeb(
                 platform: platform,
                 productId: product.id,
                 token: token,
+                packageName: packageName,
               );
             } catch (e) {
               // Android fallback: извлечь чистый purchaseToken из localVerificationData
@@ -451,6 +462,7 @@ Future<void> _startPurchaseIapOrWeb(
                     platform: platform,
                     productId: product.id,
                     token: fallbackToken,
+                    packageName: packageName,
                   );
                 } else {
                   rethrow;
@@ -772,7 +784,10 @@ class _Ribbon extends StatelessWidget {
       ),
       child: Text(
         text,
-        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+        style: Theme.of(context)
+            .textTheme
+            .labelMedium
+            ?.copyWith(fontWeight: FontWeight.w600),
       ),
     );
   }

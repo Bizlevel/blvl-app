@@ -12,16 +12,19 @@ class PaymentScreen extends StatelessWidget {
         backgroundColor: AppColor.appBgColor,
         elevation: 0,
       ),
-      body: const Padding(
-        padding: EdgeInsets.all(24),
+      body: Padding(
+        padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               'Инструкция по оплате',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+              style: Theme.of(context)
+                  .textTheme
+                  .headlineSmall
+                  ?.copyWith(fontWeight: FontWeight.w600),
             ),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             Text(
               '1. Откройте приложение Kaspi.kz на вашем телефоне.\n'
               '2. Перейдите в раздел "Платежи" → "Перевод по номеру".\n'
@@ -30,12 +33,15 @@ class PaymentScreen extends StatelessWidget {
               '5. Сумма к оплате: 9 990 ₸.\n'
               '6. Нажмите "Оплатить".\n\n'
               'После подтверждения платежа пакет GP будет зачислен на ваш баланс в течение 10 минут.',
-              style: TextStyle(fontSize: 16, height: 1.5),
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(height: 1.5),
             ),
-            SizedBox(height: 24),
+            const SizedBox(height: 24),
             Text(
               'Если возникли вопросы, свяжитесь с поддержкой support@bizlevel.kz.',
-              style: TextStyle(fontSize: 14, color: AppColor.labelColor),
+              style: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.copyWith(color: AppColor.labelColor),
             ),
           ],
         ),

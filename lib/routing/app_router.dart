@@ -39,7 +39,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
 
   final initialLocation = session == null ? '/login' : '/home';
 
-  ShellRoute appShell = ShellRoute(
+  final ShellRoute appShell = ShellRoute(
     builder: (context, state, child) => AppShell(child: child),
     routes: [
       GoRoute(

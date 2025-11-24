@@ -230,12 +230,12 @@ class ProfileScreen extends ConsumerWidget {
                     }
                   },
                   itemBuilder: (context) => [
-                    PopupMenuItem(
+                    const PopupMenuItem(
                       value: 'theme',
                       child: Row(
                         children: [
-                          const Icon(Icons.brightness_6, size: 18),
-                          const SizedBox(width: 10),
+                          Icon(Icons.brightness_6, size: 18),
+                          SizedBox(width: 10),
                           Text('Тема: переключить'),
                         ],
                       ),
@@ -427,15 +427,17 @@ class _BodyState extends ConsumerState<_Body> {
                   ),
                   child: Row(
                     children: [
-                      const Text(
+                      Text(
                         'Информация обо мне',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                        ),
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w600),
                       ),
                       const Spacer(),
+                      // fix: добавить tooltip для IconButton (accessibility)
                       IconButton(
+                        tooltip: 'Закрыть',
                         icon: const Icon(Icons.close),
                         onPressed: () => Navigator.of(context).pop(),
                       ),
@@ -576,7 +578,7 @@ class _BodyState extends ConsumerState<_Body> {
         children: [
           _buildProfile(),
           const SizedBox(height: AppSpacing.medium),
-          
+
           // Блок статистики (уровень/артефакты) убран по новой спецификации
           skillsAsync.when(
             data: (skills) => SkillsTreeView(
@@ -595,26 +597,20 @@ class _BodyState extends ConsumerState<_Body> {
                     ?.copyWith(fontWeight: FontWeight.w600)),
           ),
           const SizedBox(height: 8),
-          SingleChildScrollView(
+          const SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
-              children: const [
-                AchievementBadge(
-                    icon: Icons.flag,
-                    rarity: AchievementRarity.common,
-                    size: AchievementBadgeSize.s48,
-                    label: 'Первая цель'),
+              children: [
+                AchievementBadge(icon: Icons.flag, label: 'Первая цель'),
                 SizedBox(width: 12),
                 AchievementBadge(
                     icon: Icons.rocket_launch,
                     rarity: AchievementRarity.rare,
-                    size: AchievementBadgeSize.s48,
                     label: '5 уровней'),
                 SizedBox(width: 12),
                 AchievementBadge(
                     icon: Icons.stars,
                     rarity: AchievementRarity.epic,
-                    size: AchievementBadgeSize.s48,
                     label: 'AI‑навык +50'),
               ],
             ),
@@ -877,7 +873,11 @@ class _AboutMeCardState extends ConsumerState<_AboutMeCard> {
                   border: Border.all(
                       color: AppColor.primary.withValues(alpha: 0.2)),
                 ),
-                child: Text(e, style: const TextStyle(color: AppColor.primary)),
+                child: Text(e,
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodyMedium
+                        ?.copyWith(color: AppColor.primary)),
               ))
           .toList();
 
@@ -954,9 +954,12 @@ class _AboutMeCardState extends ConsumerState<_AboutMeCard> {
               Wrap(children: chips),
             ],
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'Чем подробнее вы заполните профиль, тем точнее советы Лео и Макса.',
-              style: TextStyle(color: AppColor.onSurfaceSubtle),
+              style: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.copyWith(color: AppColor.onSurfaceSubtle),
             ),
             const SizedBox(height: 10),
             Align(
@@ -1221,11 +1224,13 @@ class _ExperienceChips extends StatelessWidget {
                   ),
                   child: Text(
                     o,
-                    style: TextStyle(
-                      color: isSelected ? AppColor.primary : AppColor.textColor,
-                      fontWeight:
-                          isSelected ? FontWeight.w600 : FontWeight.w400,
-                    ),
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: isSelected
+                              ? AppColor.primary
+                              : AppColor.textColor,
+                          fontWeight:
+                              isSelected ? FontWeight.w600 : FontWeight.w400,
+                        ),
                   ),
                 ),
               ),
@@ -1343,12 +1348,13 @@ class _ChallengesEditorState extends State<_ChallengesEditor> {
                     ),
                     child: Text(
                       o,
-                      style: TextStyle(
-                        color:
-                            isSelected ? AppColor.primary : AppColor.textColor,
-                        fontWeight:
-                            isSelected ? FontWeight.w600 : FontWeight.w400,
-                      ),
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: isSelected
+                                ? AppColor.primary
+                                : AppColor.textColor,
+                            fontWeight:
+                                isSelected ? FontWeight.w600 : FontWeight.w400,
+                          ),
                     ),
                   ),
                 ),
@@ -1390,13 +1396,15 @@ class _ChallengesEditorState extends State<_ChallengesEditor> {
                       children: [
                         Text(
                           o,
-                          style: TextStyle(
-                            color: isSelected
-                                ? AppColor.primary
-                                : AppColor.textColor,
-                            fontWeight:
-                                isSelected ? FontWeight.w600 : FontWeight.w400,
-                          ),
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: isSelected
+                                        ? AppColor.primary
+                                        : AppColor.textColor,
+                                    fontWeight: isSelected
+                                        ? FontWeight.w600
+                                        : FontWeight.w400,
+                                  ),
                         ),
                         const SizedBox(width: 6),
                         const Icon(Icons.close,

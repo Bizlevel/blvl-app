@@ -171,8 +171,8 @@ class _LessonWidgetState extends ConsumerState<LessonWidget> {
           Expanded(
             child: LayoutBuilder(builder: (context, constraints) {
               const ratio = 9 / 16; // width / height for portrait
-              double maxH = constraints.maxHeight;
-              double maxW = constraints.maxWidth;
+              final double maxH = constraints.maxHeight;
+              final double maxW = constraints.maxWidth;
               double h = maxW / ratio;
               double w = maxW;
               if (h > maxH) {
@@ -224,8 +224,8 @@ class _LessonWidgetState extends ConsumerState<LessonWidget> {
               final ratio = _videoController!.value.aspectRatio == 0
                   ? 9 / 16
                   : _videoController!.value.aspectRatio;
-              double maxH = constraints.maxHeight;
-              double maxW = constraints.maxWidth;
+              final double maxH = constraints.maxHeight;
+              final double maxW = constraints.maxWidth;
               double h = maxW / ratio;
               double w = maxW;
               if (h > maxH) {

@@ -96,6 +96,7 @@ class _ArtifactViewerState extends State<ArtifactViewer>
                 top: 8,
                 right: 8,
                 child: IconButton(
+                  tooltip: 'Закрыть',
                   icon: const Icon(Icons.close, color: Colors.white),
                   onPressed: () => Navigator.of(context).pop(),
                 ),

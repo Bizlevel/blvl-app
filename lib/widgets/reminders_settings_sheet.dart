@@ -43,6 +43,24 @@ class _RemindersSettingsContentState extends State<RemindersSettingsContent> {
 
   @override
   Widget build(BuildContext context) {
+    DateTime _computeNextOccurrence() {
+      final now = DateTime.now();
+      // ближайший выбранный день на/после сегодняшнего
+      if (_days.isEmpty) return now;
+      int addDays = 0;
+      while (addDays < 14) {
+        final cand = now.add(Duration(days: addDays));
+        final matchDay = _days.contains(cand.weekday);
+        final time = TimeOfDay(hour: _time.hour, minute: 0);
+        final at =
+            DateTime(cand.year, cand.month, cand.day, time.hour, time.minute);
+        if (matchDay && at.isAfter(now)) return at;
+        addDays++;
+      }
+      return now.add(const Duration(days: 1));
+    }
+
+    final next = _computeNextOccurrence();
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -92,6 +110,14 @@ class _RemindersSettingsContentState extends State<RemindersSettingsContent> {
           ],
         ),
         const SizedBox(height: 16),
+        if (_loaded)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              'Следующее напоминание: ${next.day.toString().padLeft(2, '0')}.${next.month.toString().padLeft(2, '0')}.${next.year} ${_fmt(_time)}',
+              style: Theme.of(context).textTheme.labelMedium,
+            ),
+          ),
         SizedBox(
           width: double.infinity,
           child: ElevatedButton(
@@ -100,6 +126,8 @@ class _RemindersSettingsContentState extends State<RemindersSettingsContent> {
                 : () async {
                     try {
                       await NotificationsService.instance.cancelWeeklyPlan();
+                      await NotificationsService.instance
+                          .cancelDailyPracticeReminder();
                       await NotificationsService.instance
                           .schedulePracticeReminders(
                         weekdays: _days.toList(),
