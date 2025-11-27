@@ -123,6 +123,11 @@
 - Асинхронная инициализация остаётся в utility-очереди (delay из Info.plist), но результат дожидается завершения, устраняя гонку breadcrumbs и native hub.
 - Патчи применены через `dart run tool/apply_plugin_patches.dart`, фактический Pod получает обновлённый Swift-файл.
 
+## 2025-11-27 — Задача android-radio-dropdown fix
+- `DropdownButtonFormField` переведены на `value` вместо удалённого `initialValue` (`lib/screens/profile_screen.dart`, `lib/screens/goal/widgets/practice_journal_section.dart`), Android-сборка на свежем Flutter снова компилируется.
+- `QuizWidget` больше не использует отсутствующий `RadioGroup` и параметр `RadioListTile.enabled`: стандартные `RadioListTile` получают `groupValue` и отключаются через `onChanged: null` после проверки ответа.
+- Проверены линтеры (`read_lints`) по затронутым файлам — предупреждений нет.
+
 ## 2025-11-26 — Задача ios-update-stage6 sentry-mainthread-guard fix
 - `SentryDependencyContainer` и `UIApplication.unsafeApplicationState` теперь всегда обращаются к `UIApplication` на главном потоке, поэтому Main Thread Checker не ловит `applicationState` из utility-очереди.
 - `SentryInstallation` читает/пишет файл INSTALLATION только через очередь `dispatchQueueWrapper`, а Podfile добавлен с новыми патчами, чтобы фиксы автоматически накатились при `pod install`.

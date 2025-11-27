@@ -1318,7 +1318,7 @@ class _DropdownLabeled extends StatelessWidget {
         ),
         AppSpacing.gapH(AppSpacing.s6),
         DropdownButtonFormField<String>(
-          initialValue: value,
+          value: value,
           items: options
               .map((e) => DropdownMenuItem<String>(
                     value: e,

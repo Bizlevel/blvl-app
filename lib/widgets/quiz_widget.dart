@@ -41,21 +41,20 @@ class _QuizWidgetState extends State<QuizWidget> {
           style: AppTypography.textTheme.titleMedium,
         ),
         AppSpacing.gapH(AppSpacing.sm),
-        RadioGroup<int>(
-          groupValue: _selected,
-          onChanged: (value) {
-            if (_checked) return;
-            setState(() => _selected = value);
-          },
-          child: Column(
-            children: List.generate(options.length, (idx) {
-          return RadioListTile<int>(
-            value: idx,
-                enabled: !_checked,
-            title: Text(options[idx]),
-          );
-        }),
-          ),
+        Column(
+          children: List.generate(options.length, (idx) {
+            return RadioListTile<int>(
+              value: idx,
+              groupValue: _selected,
+              onChanged: _checked
+                  ? null
+                  : (value) {
+                      if (value == null) return;
+                      setState(() => _selected = value);
+                    },
+              title: Text(options[idx]),
+            );
+          }),
         ),
         AppSpacing.gapH(AppSpacing.sm),
         if (!_checked)

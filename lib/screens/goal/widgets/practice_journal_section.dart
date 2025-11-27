@@ -180,7 +180,7 @@ class _PracticeJournalSectionState
                     children: [
                       DropdownButtonFormField<String>(
                         isExpanded: true,
-                        initialValue: selected,
+                        value: selected,
                         hint: const Text('Другие навыки'),
                         items: uniqueOpts
                             .map((e) => DropdownMenuItem(
