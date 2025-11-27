@@ -46,12 +46,15 @@ dependencies:
   firebase_core: ^4.2.1
   firebase_messaging: ^16.0.4
   flutter_timezone: ^5.0.1
-  google_sign_in:
+  google_sign_in: ^7.2.0
   in_app_purchase:
   intl: ^0.20.2
   dynamic_color: ^1.6.9
   photo_manager: ^3.8.0
   file_selector: ^1.1.0
+  path: ^1.9.0
+  path_provider: ^2.1.4
+  crypto: ^3.0.3
 
 dev_dependencies:
   flutter_test:
@@ -65,7 +68,6 @@ dev_dependencies:
   flutter_lints: ^6.0.0
   mocktail: ^1.0.2
   hive_generator: ^2.0.0
-  path: any
   video_player_platform_interface: any
   flutter_launcher_icons: ^0.14.4
 

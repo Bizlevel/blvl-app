@@ -33,13 +33,13 @@ class HomeGoalCard extends ConsumerWidget {
             padding: AppSpacing.insetsAll(AppSpacing.s20),
             decoration: BoxDecoration(
               // fix: цвета/радиусы/тени → токены
-              color: AppColor.card,
+              color: Theme.of(context).cardTheme.color ?? AppColor.card,
               borderRadius: BorderRadius.circular(AppDimensions.radiusXl),
               boxShadow: const [
                 BoxShadow(
-                  color: AppColor.shadow,
-                  blurRadius: 16,
-                  offset: Offset(0, 4),
+                  color: AppColor.shadowSoft,
+                  blurRadius: 24,
+                  offset: Offset(0, 8),
                 ),
               ],
             ),
@@ -118,10 +118,10 @@ class HomeGoalCard extends ConsumerWidget {
                               Expanded(
                                 child: BizLevelButton(
                                   icon: const Icon(
-                                    Icons.add_circle_outline,
+                                    Icons.track_changes,
                                     size: 18,
                                   ),
-                                  label: '+ Действие к цели',
+                                  label: 'Действие',
                                   onPressed: () {
                                     try {
                                       Sentry.addBreadcrumb(
@@ -135,17 +135,25 @@ class HomeGoalCard extends ConsumerWidget {
                                     context.go('/goal?scroll=journal');
                                   },
                                   variant: BizLevelButtonVariant.secondary,
-                                  size: BizLevelButtonSize.lg,
+                                  size: BizLevelButtonSize.sm,
                                 ),
                               ),
                               const SizedBox(width: AppSpacing.md),
                               Expanded(
                                 child: BizLevelButton(
-                                  icon: const Icon(
-                                    Icons.chat_bubble_outline,
-                                    size: 18,
+                                  icon: Container(
+                                    width: 24,
+                                    height: 24,
+                                    decoration: const BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      image: DecorationImage(
+                                        image: AssetImage(
+                                            'assets/images/avatars/avatar_max.png'),
+                                        fit: BoxFit.cover,
+                                      ),
+                                    ),
                                   ),
-                                  label: 'Обсудить с Максом',
+                                  label: 'Обсудить',
                                   onPressed: () {
                                     try {
                                       Sentry.addBreadcrumb(
@@ -168,7 +176,7 @@ class HomeGoalCard extends ConsumerWidget {
                                       ),
                                     );
                                   },
-                                  size: BizLevelButtonSize.lg,
+                                  size: BizLevelButtonSize.sm,
                                 ),
                               ),
                             ],

@@ -29,7 +29,6 @@ class NativeBootstrap {
       _iapRegistered = true;
       await Sentry.captureMessage(
         'native_bootstrap.ensure_iap_registered',
-        level: SentryLevel.info,
         params: [message],
         withScope: (scope) {
           scope.setExtra('caller', caller);

@@ -21,6 +21,7 @@ class AppColor {
   static const bottomBarColor = surface;
   static const inActiveColor = Color(0xFF9CA3AF);
   static const shadowColor = Color(0x08000000);
+  static const shadowSoft = Color(0x05000000); // Новый, более мягкий токен
   static const textBoxColor = surface;
   static const textColor = Color(0xFF0F172A);
   static const glassTextColor = Color(0xFFFFFFFF);
@@ -58,6 +59,11 @@ class AppColor {
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
     colors: [Color(0xFFF0F4FF), Color(0xFFDDE8FF)],
+  );
+  static const bgGradientDark = LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
   );
   // Светлый градиент для бейджей/фонов
   static const badgeBgLight =

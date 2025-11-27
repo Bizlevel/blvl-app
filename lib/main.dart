@@ -13,6 +13,7 @@ import 'compat/url_strategy_noop.dart'
 import 'package:responsive_framework/responsive_framework.dart';
 import 'package:app_links/app_links.dart';
 import 'dart:async';
+import 'dart:developer' as dev;
 import 'utils/deep_link.dart';
 
 import 'routing/app_router.dart';
@@ -24,13 +25,20 @@ import 'theme/app_theme.dart';
 import 'providers/theme_provider.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:bizlevel/services/notifications_service.dart';
-import 'package:timezone/data/latest.dart' as tz;
+import 'package:timezone/data/latest.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:flutter_timezone/flutter_timezone.dart';
+import 'package:bizlevel/services/timezone_gate.dart';
 import 'services/push_service.dart';
 import 'constants/push_flags.dart';
 
 import 'package:firebase_core/firebase_core.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
+import 'dart:convert';
+import 'dart:io';
+import 'dart:isolate';
+import 'package:crypto/crypto.dart' as crypto;
 
 bool _hiveInitialized = false;
 
@@ -55,43 +63,20 @@ Future<void> main() async {
   await SupabaseService.initialize();
 
   await _ensureHiveInitialized();
+  await _preloadNotificationsLaunchData();
 
   const rootApp = ProviderScope(child: MyApp());
 
   final dsn = envOrDefine('SENTRY_DSN');
-
   if (dsn.isEmpty) {
-    // Без Sentry - просто запускаем приложение
     debugPrint('INFO: Sentry DSN not configured, running without Sentry');
-    runApp(rootApp);
-    _schedulePostFrameBootstraps();
   } else {
-    // С Sentry, но в той же зоне
-    final packageInfo = await PackageInfo.fromPlatform();
-    await SentryFlutter.init(
-      (options) {
-        options
-          ..dsn = dsn
-          ..tracesSampleRate = kReleaseMode ? 0.3 : 1.0
-          ..environment = kReleaseMode ? 'prod' : 'dev'
-          ..release =
-              'bizlevel@${packageInfo.version}+${packageInfo.buildNumber}'
-          ..enableAutoSessionTracking = true
-          ..attachScreenshot = true
-          ..attachViewHierarchy = true
-          ..beforeSend = (SentryEvent event, Hint hint) {
-            event.request?.headers
-                .removeWhere((k, _) => k.toLowerCase() == 'authorization');
-            return event;
-          };
-      },
-      // НЕ используем appRunner - это создает разные зоны
-    );
-
-    // Запускаем приложение в той же зоне
-    runApp(rootApp);
-    _schedulePostFrameBootstraps();
+    await _prewarmSentryCache(dsn);
+    await _initializeSentry(dsn);
   }
+
+  runApp(rootApp);
+  _schedulePostFrameBootstraps();
 }
 
 class MyApp extends ConsumerWidget {
@@ -150,8 +135,10 @@ class MyApp extends ConsumerWidget {
               : textTheme;
 
           return Container(
-            decoration: const BoxDecoration(
-              gradient: AppColor.bgGradient,
+            decoration: BoxDecoration(
+              gradient: Theme.of(context).brightness == Brightness.dark
+                  ? AppColor.bgGradientDark
+                  : AppColor.bgGradient,
             ),
             child: Theme(
               data: Theme.of(context).copyWith(
@@ -214,6 +201,62 @@ void _schedulePostFrameBootstraps() {
   });
 }
 
+Future<void> _initializeSentry(String dsn) async {
+  try {
+    final packageInfo = await PackageInfo.fromPlatform();
+    await SentryFlutter.init(
+      (options) {
+        options
+          ..dsn = dsn
+          ..tracesSampleRate = kReleaseMode ? 0.3 : 1.0
+          ..environment = kReleaseMode ? 'prod' : 'dev'
+          ..release =
+              'bizlevel@${packageInfo.version}+${packageInfo.buildNumber}'
+          ..enableAutoSessionTracking = false
+          ..attachScreenshot = true
+          ..attachViewHierarchy = true
+          ..enableAutoPerformanceTracing = false
+          ..enableTimeToFullDisplayTracing = false
+          ..enableAppHangTracking = false
+          ..enableWatchdogTerminationTracking = false
+          ..enableFramesTracking = false
+          ..enableAutoNativeBreadcrumbs = false
+          ..enableAppLifecycleBreadcrumbs = false
+          ..enableWindowMetricBreadcrumbs = false
+          ..enableUserInteractionBreadcrumbs = false
+          ..enableUserInteractionTracing = false
+          ..addInAppExclude('SentryFileIOTrackingIntegration')
+          ..beforeSend = (SentryEvent event, Hint hint) {
+            event.request?.headers
+                .removeWhere((k, _) => k.toLowerCase() == 'authorization');
+            return event;
+          };
+      },
+    );
+  } catch (error, stackTrace) {
+    debugPrint('WARN: Sentry init failed: $error');
+    await Sentry.captureException(error, stackTrace: stackTrace);
+  }
+}
+
+Future<void> _prewarmSentryCache(String dsn) async {
+  if (kIsWeb || !Platform.isIOS) return;
+  try {
+    final libraryDir = await getLibraryDirectory();
+    final cachesRoot = Directory(p.join(libraryDir.path, 'Caches'));
+    final hash = crypto.sha1.convert(utf8.encode(dsn)).toString();
+    final sentryPath = p.join(cachesRoot.path, 'io.sentry', hash);
+    final envelopesPath = p.join(sentryPath, 'envelopes');
+    // Выполняем блокирующий I/O в отдельном изоляте, чтобы не задевать UI-поток.
+    await Isolate.run(() {
+      Directory(sentryPath).createSync(recursive: true);
+      Directory(envelopesPath).createSync(recursive: true);
+    });
+  } catch (error) {
+    debugPrint('WARN: Failed to prewarm Sentry cache: $error');
+  }
+}
+
 Future<void> _ensureFirebaseInitialized(String caller) async {
   if (kIsWeb) return;
   try {
@@ -228,16 +271,30 @@ Future<void> _ensureFirebaseInitialized(String caller) async {
 
 Future<void> _initializeDeferredLocalServices() async {
   if (kIsWeb) return;
+  ISentrySpan? transaction;
+  dev.Timeline.startSync('startup.local_services');
   try {
-    await _ensureHiveInitialized();
-    await _openHiveBoxes();
-    tz.initializeTimeZones();
-    final timeZoneInfo = await FlutterTimezone.getLocalTimezone();
-    tz.setLocalLocation(tz.getLocation(timeZoneInfo.identifier));
-    await NotificationsService.instance.initialize();
+    transaction = Sentry.startTransaction(
+      'startup.local_services',
+      'task',
+      trimEnd: true,
+    );
+    final hiveSpan = transaction.startChild('local.hive_init');
+    final tzSpan = transaction.startChild('local.timezone_init');
+    final notifSpan = transaction.startChild('local.notifications_init');
+
+    await Future.wait([
+      _ensureHiveInitialized().whenComplete(() => hiveSpan.finish()),
+      _warmUpTimezone().whenComplete(() => tzSpan.finish()),
+      _initializeNotifications().whenComplete(() => notifSpan.finish()),
+    ]);
+    transaction.finish(status: const SpanStatus.ok());
   } catch (error, stackTrace) {
+    transaction?.finish(status: const SpanStatus.internalError());
     debugPrint('WARN: Deferred local services failed: $error');
     await Sentry.captureException(error, stackTrace: stackTrace);
+  } finally {
+    dev.Timeline.finishSync();
   }
 }
 
@@ -261,11 +318,50 @@ Future<void> _openHiveBoxes() async {
     'gp',
     'notifications',
   ];
+  final futures = <Future>[];
   for (final box in boxes) {
     if (!Hive.isBoxOpen(box)) {
-      await Hive.openBox(box);
+      futures.add(Hive.openBox(box));
     }
   }
+  if (futures.isNotEmpty) {
+    await Future.wait(futures);
+  }
+}
+
+Future<void> _warmUpTimezone() async {
+  try {
+    tzdata.initializeTimeZones();
+    final timeZoneInfo = await FlutterTimezone.getLocalTimezone();
+    tz.setLocalLocation(tz.getLocation(timeZoneInfo.identifier));
+    TimezoneGate.markReady();
+  } catch (error, stackTrace) {
+    TimezoneGate.markError(error, stackTrace);
+    rethrow;
+  }
+}
+
+Future<void> _initializeNotifications() async {
+  await _openHiveBoxes();
+  if (!kIsWeb && Hive.isBoxOpen('notifications')) {
+    NotificationsService.instance.attachLaunchBox(Hive.box('notifications'));
+  }
+  await NotificationsService.instance.initialize();
+}
+
+Future<void> _preloadNotificationsLaunchData() async {
+  if (kIsWeb) return;
+  try {
+    final box = Hive.isBoxOpen('notifications')
+        ? Hive.box('notifications')
+        : await Hive.openBox('notifications');
+    NotificationsService.instance.attachLaunchBox(box);
+    final stored = box.get('launch_route');
+    if (stored is String && stored.isNotEmpty) {
+      await box.delete('launch_route');
+      NotificationsService.instance.cacheStoredLaunchRoute(stored);
+    }
+  } catch (_) {}
 }
 
 class _LinkListener extends StatefulWidget {

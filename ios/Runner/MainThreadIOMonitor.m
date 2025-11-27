@@ -1,6 +1,26 @@
 #import <Foundation/Foundation.h>
 #import <objc/runtime.h>
 
+static BOOL MTIStackHasAppFrame(NSArray<NSString *> *stack) {
+  static NSArray<NSString *> *markers;
+  static dispatch_once_t onceToken;
+  dispatch_once(&onceToken, ^{
+    markers = @[@" Runner", @"BizLevel", @"bizlevel"];
+  });
+  for (NSString *symbol in stack) {
+    for (NSString *marker in markers) {
+      if ([symbol rangeOfString:marker options:NSCaseInsensitiveSearch].location != NSNotFound) {
+        return YES;
+      }
+    }
+  }
+  return NO;
+}
+
+static NSString *MTIStackDump(NSArray<NSString *> *stack) {
+  return [stack componentsJoinedByString:@"\n"];
+}
+
 static void MTILogOnce(NSString *label, NSString *details) {
   static NSMutableSet<NSString *> *loggedLabels;
   static dispatch_once_t onceToken;
@@ -10,13 +30,77 @@ static void MTILogOnce(NSString *label, NSString *details) {
     queue = dispatch_queue_create("bizlevel.main-thread-io-monitor", DISPATCH_QUEUE_SERIAL);
   });
 
+  NSArray<NSString *> *stack = [NSThread callStackSymbols];
+  if (!MTIStackHasAppFrame(stack)) {
+    return;
+  }
+
   dispatch_sync(queue, ^{
     if ([loggedLabels containsObject:label]) {
       return;
     }
     [loggedLabels addObject:label];
-    NSLog(@"MainThreadIOMonitor: %@ (%@)\n%@", label, details ?: @"", [NSThread callStackSymbols]);
+    NSLog(@"MainThreadIOMonitor: %@ (%@)\n%@",
+          label,
+          details ?: @"",
+          MTIStackDump(stack));
   });
+}
+
+static BOOL MTIPathContainsAny(NSString *path, NSArray<NSString *> *needles) {
+  if (path.length == 0) {
+    return NO;
+  }
+  for (NSString *needle in needles) {
+    if ([path rangeOfString:needle].location != NSNotFound) {
+      return YES;
+    }
+  }
+  return NO;
+}
+
+static BOOL MTIShouldLogDataPath(NSString *path) {
+  static NSArray<NSString *> *ignoredSubstrings;
+  static dispatch_once_t onceToken;
+  dispatch_once(&onceToken, ^{
+    ignoredSubstrings = @[
+      @"/System/Library/",
+      @"UserConfigurationProfiles",
+      @"systemgroup.com.apple.configurationprofiles"
+    ];
+  });
+  return !MTIPathContainsAny(path, ignoredSubstrings);
+}
+
+static BOOL MTIShouldLogBundlePath(NSString *path) {
+  static NSArray<NSString *> *ignoredSubstrings;
+  static dispatch_once_t onceToken;
+  dispatch_once(&onceToken, ^{
+    ignoredSubstrings = @[
+      @"/System/Library/",
+      @"/Runner.app"
+    ];
+  });
+  return !MTIPathContainsAny(path, ignoredSubstrings);
+}
+
+static BOOL MTIShouldLogCreatedDirectoryPath(NSString *path) {
+  if (path.length == 0) {
+    return YES;
+  }
+  if ([path hasSuffix:@"/Library"] &&
+      [path rangeOfString:@"/Containers/Data/Application/"].location != NSNotFound) {
+    return NO;
+  }
+  static NSArray<NSString *> *ignoredSubstrings;
+  static dispatch_once_t onceToken;
+  dispatch_once(&onceToken, ^{
+    ignoredSubstrings = @[
+      @"/System/Library/",
+      @"systemgroup.com.apple.configurationprofiles"
+    ];
+  });
+  return !MTIPathContainsAny(path, ignoredSubstrings);
 }
 
 static void MTISwizzleInstanceMethod(Class cls, SEL originalSelector, SEL swizzledSelector) {
@@ -62,7 +146,9 @@ static void MTISwizzleClassMethod(Class cls, SEL originalSelector, SEL swizzledS
                                    options:(NSDataReadingOptions)mask
                                      error:(NSError *__autoreleasing *)error {
   if ([NSThread isMainThread]) {
-    MTILogOnce(@"-[NSData initWithContentsOfFile:options:error:]", path);
+    if (MTIShouldLogDataPath(path)) {
+      MTILogOnce(@"-[NSData initWithContentsOfFile:options:error:]", path);
+    }
   }
   return [self mti_initWithContentsOfFile:path options:mask error:error];
 }
@@ -71,7 +157,9 @@ static void MTISwizzleClassMethod(Class cls, SEL originalSelector, SEL swizzledS
                                options:(NSDataReadingOptions)mask
                                  error:(NSError *__autoreleasing *)error {
   if ([NSThread isMainThread]) {
-    MTILogOnce(@"+[NSData dataWithContentsOfFile:options:error:]", path);
+    if (MTIShouldLogDataPath(path)) {
+      MTILogOnce(@"+[NSData dataWithContentsOfFile:options:error:]", path);
+    }
   }
   return [self mti_dataWithContentsOfFile:path options:mask error:error];
 }
@@ -92,8 +180,10 @@ static void MTISwizzleClassMethod(Class cls, SEL originalSelector, SEL swizzledS
                         attributes:(NSDictionary<NSFileAttributeKey, id> *)attributes
                              error:(NSError *__autoreleasing *)error {
   if ([NSThread isMainThread]) {
-    MTILogOnce(@"-[NSFileManager createDirectoryAtPath:withIntermediateDirectories:attributes:error:]",
-               path);
+    if (MTIShouldLogCreatedDirectoryPath(path)) {
+      MTILogOnce(@"-[NSFileManager createDirectoryAtPath:withIntermediateDirectories:attributes:error:]",
+                 path);
+    }
   }
   return [self mti_createDirectoryAtPath:path
               withIntermediateDirectories:createIntermediates
@@ -111,7 +201,9 @@ static void MTISwizzleClassMethod(Class cls, SEL originalSelector, SEL swizzledS
 
 - (NSString *)mti_bundleIdentifier {
   if ([NSThread isMainThread]) {
-    MTILogOnce(@"-[NSBundle bundleIdentifier]", self.bundlePath);
+    if (MTIShouldLogBundlePath(self.bundlePath)) {
+      MTILogOnce(@"-[NSBundle bundleIdentifier]", self.bundlePath);
+    }
   }
   return [self mti_bundleIdentifier];
 }

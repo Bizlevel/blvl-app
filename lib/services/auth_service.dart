@@ -220,31 +220,38 @@ class AuthService {
         return AuthResponse();
       } else if (Platform.isAndroid || Platform.isIOS) {
         final googleWebClientId = envOrDefine('GOOGLE_WEB_CLIENT_ID');
+        final iosClientId = envOrDefine('IOS_GOOGLE_CLIENT_ID');
         final googleSignIn = GoogleSignIn.instance;
         if (!_googleSdkInitialized) {
           await googleSignIn.initialize(
-          serverClientId:
-              googleWebClientId.isNotEmpty ? googleWebClientId : null,
-        );
+            clientId:
+                Platform.isIOS && iosClientId.isNotEmpty ? iosClientId : null,
+            serverClientId:
+                googleWebClientId.isNotEmpty ? googleWebClientId : null,
+          );
           _googleSdkInitialized = true;
         }
-        final account = await googleSignIn.authenticate();
+
+        final account = await googleSignIn.authenticate(
+          scopeHint: const <String>['email', 'profile'],
+        );
+
         final auth = account.authentication;
-        final authClient = account.authorizationClient;
-        final authorization = await authClient.authorizeScopes(
+        final authorization = await account.authorizationClient.authorizeScopes(
           const <String>['email', 'profile'],
         );
+
         final idToken = auth.idToken;
         final accessToken = authorization.accessToken;
         if (idToken == null || accessToken.isEmpty) {
           throw AuthFailure('Не удалось получить токены Google');
         }
-        final resp = await _client.auth.signInWithIdToken(
+
+        return await _client.auth.signInWithIdToken(
           provider: OAuthProvider.google,
           idToken: idToken,
           accessToken: accessToken,
         );
-        return resp;
       }
       throw AuthFailure('Платформа не поддерживается для входа через Google');
     }, unknownErrorMessage: 'Неизвестная ошибка входа через Google');

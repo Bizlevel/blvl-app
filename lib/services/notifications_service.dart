@@ -6,6 +6,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
+import 'package:bizlevel/services/timezone_gate.dart';
 
 class NotificationsService {
   NotificationsService._();
@@ -22,6 +23,8 @@ class NotificationsService {
       FlutterLocalNotificationsPlugin();
 
   bool _initialized = false;
+  Box? _launchBox;
+  String? _cachedStoredRoute;
 
   Future<void> initialize() async {
     if (_initialized) return;
@@ -71,13 +74,20 @@ class NotificationsService {
     _initialized = true;
   }
 
+  void attachLaunchBox(Box box) {
+    _launchBox = box;
+  }
+
+  void cacheStoredLaunchRoute(String? route) {
+    if (route == null || route.isEmpty) return;
+    _cachedStoredRoute = route;
+  }
+
   // Load persisted practice reminder prefs; provide defaults when absent
   Future<(Set<int> weekdays, int hour, int minute)>
       getPracticeReminderPrefs() async {
     try {
-      final Box box = Hive.isBoxOpen(_boxName)
-          ? Hive.box(_boxName)
-          : await Hive.openBox(_boxName);
+      final box = await _ensureLaunchBox();
       final List<dynamic>? rawDays = box.get(_kWeekdays) as List<dynamic>?;
       final int hour = (box.get(_kHour) as int?) ?? 19;
       final int minute = (box.get(_kMinute) as int?) ?? 0;
@@ -100,17 +110,17 @@ class NotificationsService {
         route = pendingRoute;
         pendingRoute = null;
       }
+      if (route == null && _cachedStoredRoute != null) {
+        route = _cachedStoredRoute;
+        _cachedStoredRoute = null;
+      }
       if (route == null) {
-        try {
-          final box = Hive.isBoxOpen('notifications')
-              ? Hive.box('notifications')
-              : await Hive.openBox('notifications');
-          final stored = box.get('launch_route');
-          if (stored is String && stored.isNotEmpty) {
-            route = stored;
-            await box.delete('launch_route');
-          }
-        } catch (_) {}
+        final box = await _ensureLaunchBox();
+        final stored = box.get('launch_route');
+        if (stored is String && stored.isNotEmpty) {
+          route = stored;
+          await box.delete('launch_route');
+        }
       }
       if (route == null) {
         try {
@@ -218,6 +228,7 @@ class NotificationsService {
       {required List<int> weekdays, int hour = 19}) async {
     if (kIsWeb) return;
     if (!_initialized) await initialize();
+    await _ensureTimezoneReady();
     const channelId = 'goal_reminder';
     const AndroidNotificationDetails android = AndroidNotificationDetails(
       channelId,
@@ -242,9 +253,7 @@ class NotificationsService {
     }
     // Persist selected weekdays/hour
     try {
-      final Box box = Hive.isBoxOpen(_boxName)
-          ? Hive.box(_boxName)
-          : await Hive.openBox(_boxName);
+      final box = await _ensureLaunchBox();
       await box.put(_kWeekdays, weekdays.toSet().toList());
       await box.put(_kHour, hour);
       await box.put(_kMinute, 0);
@@ -328,6 +337,35 @@ class NotificationsService {
           await android?.requestNotificationsPermission();
         } catch (_) {}
       }
+    }
+  }
+
+  Future<Box> _ensureLaunchBox() async {
+    if (_launchBox != null && _launchBox!.isOpen) {
+      return _launchBox!;
+    }
+    if (Hive.isBoxOpen(_boxName)) {
+      _launchBox = Hive.box(_boxName);
+      return _launchBox!;
+    }
+    _launchBox = await Hive.openBox(_boxName);
+    return _launchBox!;
+  }
+
+  Future<void> persistLaunchRoute(String route) async {
+    try {
+      final box = await _ensureLaunchBox();
+      await box.put('launch_route', route);
+    } catch (_) {}
+  }
+
+  Future<void> _ensureTimezoneReady() async {
+    try {
+      await TimezoneGate.waitUntilReady();
+    } catch (error, stackTrace) {
+      try {
+        await Sentry.captureException(error, stackTrace: stackTrace);
+      } catch (_) {}
     }
   }
 }

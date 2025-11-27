@@ -53,5 +53,5 @@ String _stripPluginBlock(
       cleanedImports.replaceFirst(registrationPattern, '\n');
 
   final normalized = cleanedRegistration.replaceAll(RegExp(r'\n{3,}'), '\n\n');
-  return normalized.trimRight() + '\n';
+  return '${normalized.trimRight()}\n';
 }

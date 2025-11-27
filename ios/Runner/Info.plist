@@ -27,10 +27,13 @@
 			<string>Editor</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
+				<string>com.googleusercontent.apps.355423136369-rv6g5rhcjionialj4ho5pvbmvss6gk9h</string>
 				<string>com.googleusercontent.apps.1094397921402-o18r96t64iloastkode24ejof7j4iman</string>
 			</array>
 		</dict>
 	</array>
+	<key>GIDClientID</key>
+	<string>355423136369-rv6g5rhcjionialj4ho5pvbmvss6gk9h.apps.googleusercontent.com</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>FirebaseAppDelegateProxyEnabled</key>
@@ -40,11 +43,17 @@
 	<key>FirebaseAppCheckUseDebugProvider</key>
 	<false/>
 	<key>EnableIosFcm</key>
-	<false/>
+	<true/>
 	<key>FirebaseEnableDebugLogging</key>
 	<false/>
 	<key>FirebaseInstallationsAutoInitEnabled</key>
 	<false/>
+	<key>SentryDisableLaunchProfile</key>
+	<true/>
+	<key>SentryAsyncNativeInit</key>
+	<true/>
+	<key>SentryNativeInitDelaySeconds</key>
+	<integer>0</integer>
 	<key>GULAppDelegateSwizzlerEnabled</key>
 	<false/>
 	<key>LSRequiresIPhoneOS</key>

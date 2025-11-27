@@ -103,65 +103,98 @@ public class SentryFlutterPlugin: NSObject, FlutterPlugin {
             return
         }
 
-        SentrySDK.start { options in
-            self.sentryFlutter.update(options: options, with: arguments)
-
-            if arguments["enableAutoPerformanceTracing"] as? Bool ?? false {
-                PrivateSentrySDKOnly.appStartMeasurementHybridSDKMode = true
-                #if os(iOS) || targetEnvironment(macCatalyst)
-                PrivateSentrySDKOnly.framesTrackingMeasurementHybridSDKMode = true
-                #endif
+        let resolveSuccess: () -> Void = {
+            if Thread.isMainThread {
+                result("")
+            } else {
+                DispatchQueue.main.async {
+                    result("")
+                }
             }
+        }
 
-            let version = PrivateSentrySDKOnly.getSdkVersionString()
-            PrivateSentrySDKOnly.setSdkName(SentryFlutterPlugin.nativeClientName, andVersionString: version)
+        let startBlock = {
+            NSLog("[SentryFlutterPlugin] Async native init started")
+            SentrySDK.start { options in
+                self.sentryFlutter.update(options: options, with: arguments)
 
-            let flutterSdk = arguments["sdk"] as? [String: Any]
-
-            // note : for now, in sentry-cocoa, beforeSend is not called before captureEnvelope
-            options.beforeSend = { event in
-                self.setEventOriginTag(event: event)
-
-                if flutterSdk != nil {
-                    if var sdk = event.sdk, self.isValidSdk(sdk: sdk) {
-                        if let packages = flutterSdk!["packages"] as? [[String: String]] {
-                            if let sdkPackages = sdk["packages"] as? [[String: String]] {
-                                sdk["packages"] = sdkPackages + packages
-                            } else {
-                                sdk["packages"] = packages
-                            }
-                        }
-
-                        if let integrations = flutterSdk!["integrations"] as? [String] {
-                            if let sdkIntegrations = sdk["integrations"] as? [String] {
-                                sdk["integrations"] = sdkIntegrations + integrations
-                            } else {
-                                sdk["integrations"] = integrations
-                            }
-                        }
-                        event.sdk = sdk
-                    }
+                if arguments["enableAutoPerformanceTracing"] as? Bool ?? false {
+                    PrivateSentrySDKOnly.appStartMeasurementHybridSDKMode = true
+                    #if os(iOS) || targetEnvironment(macCatalyst)
+                    PrivateSentrySDKOnly.framesTrackingMeasurementHybridSDKMode = true
+                    #endif
                 }
 
-                return event
+                let version = PrivateSentrySDKOnly.getSdkVersionString()
+                PrivateSentrySDKOnly.setSdkName(SentryFlutterPlugin.nativeClientName, andVersionString: version)
+
+                let flutterSdk = arguments["sdk"] as? [String: Any]
+
+                // note : for now, in sentry-cocoa, beforeSend is not called before captureEnvelope
+                options.beforeSend = { event in
+                    self.setEventOriginTag(event: event)
+
+                    if flutterSdk != nil {
+                        if var sdk = event.sdk, self.isValidSdk(sdk: sdk) {
+                            if let packages = flutterSdk!["packages"] as? [[String: String]] {
+                                if let sdkPackages = sdk["packages"] as? [[String: String]] {
+                                    sdk["packages"] = sdkPackages + packages
+                                } else {
+                                    sdk["packages"] = packages
+                                }
+                            }
+
+                            if let integrations = flutterSdk!["integrations"] as? [String] {
+                                if let sdkIntegrations = sdk["integrations"] as? [String] {
+                                    sdk["integrations"] = sdkIntegrations + integrations
+                                } else {
+                                    sdk["integrations"] = integrations
+                                }
+                            }
+                            event.sdk = sdk
+                        }
+                    }
+
+                    return event
+                }
             }
+
+            #if os(iOS) || targetEnvironment(macCatalyst)
+            DispatchQueue.main.async {
+                let appIsActive = UIApplication.shared.applicationState == .active
+                if appIsActive {
+                    NotificationCenter.default.post(name: Notification.Name("SentryHybridSdkDidBecomeActive"), object: nil)
+                }
+            }
+            #else
+            DispatchQueue.main.async {
+                if NSApplication.shared.isActive {
+                    NotificationCenter.default.post(name: Notification.Name("SentryHybridSdkDidBecomeActive"), object: nil)
+                }
+            }
+            #endif
+
+            self.configureReplay(arguments)
+
+            resolveSuccess()
         }
 
-        #if os(iOS) || targetEnvironment(macCatalyst)
-        let appIsActive = UIApplication.shared.applicationState == .active
-        #else
-        let appIsActive = NSApplication.shared.isActive
-        #endif
-
-        // We send a SentryHybridSdkDidBecomeActive to the Sentry Cocoa SDK, to mimic
-        // the didBecomeActiveNotification notification. This is needed for session, OOM tracking, replays, etc.
-        if appIsActive {
-            NotificationCenter.default.post(name: Notification.Name("SentryHybridSdkDidBecomeActive"), object: nil)
+        if shouldInitializeNativeSdkAsynchronously() {
+            let delay = max(0.0, nativeInitDelaySeconds())
+            NSLog("[SentryFlutterPlugin] Async native init scheduled in %.2f s", delay)
+            if delay <= 0.0 {
+                DispatchQueue.global(qos: .utility).async {
+                    startBlock()
+                }
+            } else {
+                DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + delay) {
+                    startBlock()
+                }
+            }
+        } else {
+            NSLog("[SentryFlutterPlugin] Async native init disabled, starting immediately")
+            startBlock()
         }
-
-        configureReplay(arguments)
-
-        result("")
     }
 
   private func configureReplay(_ arguments: [String: Any]) {
@@ -191,6 +224,36 @@ public class SentryFlutterPlugin: NSObject, FlutterPlugin {
     private func closeNativeSdk(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
         SentrySDK.close()
         result("")
+    }
+
+    private func shouldInitializeNativeSdkAsynchronously() -> Bool {
+#if os(iOS)
+        if let value = Bundle.main.object(forInfoDictionaryKey: "SentryAsyncNativeInit") {
+            if let number = value as? NSNumber {
+                return number.boolValue
+            }
+            if let string = value as? NSString {
+                return string.boolValue
+            }
+        }
+        return true
+#else
+        return false
+#endif
+    }
+
+    private func nativeInitDelaySeconds() -> TimeInterval {
+#if os(iOS)
+        if let value = Bundle.main.object(forInfoDictionaryKey: "SentryNativeInitDelaySeconds") {
+            if let number = value as? NSNumber {
+                return number.doubleValue
+            }
+            if let string = value as? NSString {
+                return string.doubleValue
+            }
+        }
+#endif
+        return 0.1
     }
 
     private func setEventOriginTag(event: Event) {

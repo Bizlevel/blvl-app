@@ -1,2 +1,2 @@
-const bool kEnableIosFcm = bool.fromEnvironment('ENABLE_IOS_FCM');
-
+const bool kEnableIosFcm =
+    bool.fromEnvironment('ENABLE_IOS_FCM', defaultValue: true);

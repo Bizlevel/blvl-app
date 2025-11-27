@@ -56,7 +56,11 @@ class AppTheme {
     final ThemeData base = isDark ? ThemeData.dark() : ThemeData.light();
     return base.copyWith(
       colorScheme: cs,
-      textTheme: AppTypography.textTheme,
+      textTheme: AppTypography.textTheme.apply(
+        displayColor: isDark ? AppColor.textDark : AppColor.textColor,
+        bodyColor: isDark ? AppColor.textDark : AppColor.textColor,
+        decorationColor: isDark ? AppColor.textDark : AppColor.textColor,
+      ),
       scaffoldBackgroundColor: Colors.transparent,
       extensions: <ThemeExtension<dynamic>>[
         isDark ? ChatTheme.dark(cs) : ChatTheme.light(cs),

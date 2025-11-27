@@ -4,7 +4,6 @@ import 'dart:io';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bizlevel/services/notifications_service.dart';
@@ -177,9 +176,6 @@ class PushService {
   }
 
   Future<void> _storeLaunchRoute(String route) async {
-    try {
-      final box = await Hive.openBox('notifications');
-      await box.put('launch_route', route);
-    } catch (_) {}
+    await NotificationsService.instance.persistLaunchRoute(route);
   }
 }

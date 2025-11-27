@@ -51,6 +51,82 @@
 - В `lib/routing/app_router.dart` обёрнут `GoRouter.redirect` в `try/catch` с отправкой в Sentry — падения по `AuthFailure` теперь приводят к безопасному редиректу на `/login` вместо краша.
 - Переустановлены патчи `dart run tool/apply_plugin_patches.dart`, затем `flutter clean`, `flutter pub get`, `cd ios && LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 pod install`.
 
+## 2025-11-24 — Задача ios-update-stage5 google-signin fix
+- Обновил `google_sign_in` до 7.2.0 и переписал `AuthService.signInWithGoogle` на новый API (`GoogleSignIn.instance.initialize()` + `authenticate/authorizeScopes`); токены берём из `GoogleSignInAccount.authentication` и `authorizationClient`.
+- В `Info.plist` добавлены актуальные `CFBundleURLSchemes` и `GIDClientID` (из `GoogleService-Info.plist`), чтобы `ASWebAuthenticationSession` возвращала управление приложению.
+- Патчи `google_sign_in_ios` перекатились поверх свежей версии (ленивая загрузка plist), повторно выполнен цикл `dart run tool/apply_plugin_patches.dart`, `pod install`.
+- Следующий шаг — ручной smoke-тест входа/выхода на устройстве и обновление гайда AppAuth после подтверждения.
+
+## 2025-11-25 — Задача ios-update-stage5 smoke
+- Logout/login через Google на физическом устройстве прошли без ошибок (`docs/draft-2.md`, `docs/draft-3.md`), Supabase сессия восстанавливается.
+- Stage 5 закрыт: Google Sign-In работает на новом `ASWebAuthenticationSession`, дальше переносим внимание на AppAuth-гайд и Этап 6 (локальные сервисы/профайлинг).
+
+## 2025-11-25 — Задача ios-update-stage4 pods-clean fix
+- Полностью удалил `ios/Pods` (коррупция порождала директории `AppAuth 2`, `AppAuth 3`, … без нужных заголовков), заново выполнил `flutter clean && flutter pub get`, `cd ios && LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 pod install`.
+- Свежая установка Pods снова содержит `OIDURLSessionProvider.*`, `OIDURLQueryComponent.*` и остальные файлы AppAuthCore; пропали дубликаты `Sentry`, `GoogleSignIn`, `Firebase*`.
+- Состояние `Podfile.lock` не менялось кроме уже согласованного перехода на `Sentry/HybridSDK (= 8.56.2)`.
+
+## 2025-11-25 — Задача ios-update-stage6 local-services
+- `_initializeDeferredLocalServices` теперь запускает Hive, timezone и notifications параллельно, timezone грузится в `Isolate.run`, добавлены Sentry-транзакции и Timeline marker `startup.local_services`.
+- `NotificationsService` использует заранее открытый box `notifications`, кэширует launch route и больше не делает `Hive.openBox` в build’ах; `PushService` хранит route через сервис.
+- Перед `runApp` выполняем `_preloadNotificationsLaunchData()`, чтобы извлечь pending route без синхронного I/O в `MyApp`.
+
+## 2025-11-25 — Задача ios-update-stage6 tz-shield fix
+- `_warmUpTimezone` больше не создаёт отдельный Isolate: база `timezone` и локаль инициализируются в основном изоляте и gated через `TimezoneGate`, гонка с `tz.getLocation` исчезла.
+- Podfile патчит `SentryAsyncLog.m`, чтобы лог-файл создавался в фоновой очереди; `MainThreadIOMonitor` фильтрует стеки без `Runner/BizLevel`, поэтому остаётся только наш I/O.
+- iOS FCM снова включён (`EnableIosFcm=true`, `kEnableIosFcm` по умолчанию `true`), так что пуши возвращаются в Release после подтверждения чистых логов.
+
+## 2025-11-25 — Задача ios-update-stage6 sentry-io fix
+- `SentryFlutterPlugin` запускает `SentrySDK.start` в utility-очереди с ожиданием завершения, поэтому создание `io.sentry/*` кэшей не блокирует UI.
+- `MainThreadIOMonitor` перехватывает `NSData init/dataWithContents` и `NSFileManager create/remove` для путей `io.sentry`, перенаправляя операции в свою очередь.
+- Патчи переустановлены через `dart run tool/apply_plugin_patches.dart`, предупреждения Performance Diagnostics по Sentry I/O исчезают.
+## 2025-11-26 — Задача ios-update-stage6 sentry-post-frame fix
+- Инициализацию `SentryFlutter.init` перенесли в `_schedulePostFrameBootstraps()`, поэтому тяжёлый I/O выполняется уже после первого кадра и не попадает в окно Apple Performance Diagnostics.
+- Патч к `SentryFlutterPlugin` возвращён к синхронному запуску на главном потоке, `MainThreadIOMonitor` снова только логирует обращения без блокировок — сняты предупреждения Thread Performance Checker и Main Thread Checker.
+- Команда `dart run tool/apply_plugin_patches.dart` прогнала свежие фиксы, чтобы pods убедительно обновились.
+## 2025-11-26 — Задача ios-update-stage6 sentry-slim fix
+- Перед запуском Sentry прогреваем каталоги `io.sentry/<hash>/envelopes` в фоне (`_prewarmSentryCache`), чтобы Cocoa SDK не создавал их синхронно на UI.
+- В `_initializeSentry` отключены тяжёлые интеграции (`enableFileIOTracking`, `enableAutoPerformanceTracking`, `enableAppStartTracking`, MetricKit и т.д.) — Apple Diagnostics больше не фиксирует I/O и семафоры в окне запуска.
+- Новые импорты (`path_provider`, `path`, `crypto`) уже есть в проекте, `dart format` прогнан.
+## 2025-11-26 — Задача ios-update-stage6 sentry-deferred-native fix
+- `SentryFlutter.init` теперь запускается с `autoInitializeNativeSdk=false`: Dart‑уровень начинает логировать сразу, но нативный SDK пока не дёргается.
+- После первого кадра планируется отдельный асинхронный bootstrap (`_scheduleNativeSentryBootstrap`), который ждёт 2 секунды и только потом вызывает `SentryFlutter.native?.init` без блокировки UI.
+- Логирование добавлено для обеих стадий; при ошибке deferred init отправляется в Sentry через Dart‑hub. Apple предупреждения по `dispatch_semaphore_wait`/`createDirectoryAtPath` должны исчезнуть, поскольку Sentry не трогает файловую систему во время Application Launch.
+## 2025-11-26 — Задача ios-update-stage6 sentry-plugin-async fix
+- Для `SentryFlutterPlugin` добавлен Info.plist‑настраиваемый режим (`SentryAsyncNativeInit`, `SentryNativeInitDelaySeconds`): `initNativeSdk` теперь выполняет `SentrySDK.start` в utility‑очереди и с задержкой, поэтому тяжёлый I/O больше не происходит на главном потоке.
+- Flutter‑код возвращён к стандартной инициализации: deferred‑логика удалена из `lib/main.dart`, так что Dart‑уровень не теряет breadcrumbs до старта нативного SDK.
+- Info.plist теперь содержит `SentryAsyncNativeInit=true` и задержку 2 секунды — можно регулировать без перепаковки приложения.
+- Добавлен fallback: если ключи в Info.plist отсутствуют, iOS автоматически переключается в async‑режим (delay 2s) и логирует в консоль, можно включать sync‑инициализацию только при явном `false`.
+## 2025-11-26 — Задача ios-update-stage6 launch-profile fix
+- В `Info.plist` добавлен флаг `SentryDisableLaunchProfile`, чтобы нативный SDK не поднимал Launch Profiling без явного разрешения.
+- `patch_sentry_file_manager` теперь делает файл записываемым и добавляет guard `bizlevel_sentry_launch_profile_disabled()` ко всем функциям `launchProfileConfig*`.
+- `pod install` переустановлен (с предварительным удалением повреждённого `Pods/nanopb`), а патч записал защиту непосредственно в `SentryFileManager.m`.
+
+## 2025-11-26 — Задача ios-update-stage6 sentry-async-native fix
+- `_prewarmSentryCache` теперь выполняет файловые операции внутри `Isolate.run`, поэтому главный поток не попадает в MainThreadIOMonitor.
+- `SentryFlutter.init` больше не отключает `autoInitializeNativeSdk`: deferred старт полностью управляется патченым `SentryFlutterPlugin` и Info.plist флагами.
+- `patch_sentry_file_manager` откатывает `dispatch_semaphore`-вставку, оставляя только guard `SentryDisableLaunchProfile`; заново прогнаны `dart run tool/apply_plugin_patches.dart`, `flutter clean`, `flutter pub get`, `pod install`.
+
+## 2025-11-26 — Задача ios-update-stage6 sentry-main-thread fix
+- `SentryFlutterPlugin` теперь запускает native SDK сразу (delay=0) и переключает проверку `UIApplication.applicationState` на main queue, чтобы удалить предупреждение Main Thread Checker.
+- В `_initializeSentry` отключено `enableAutoSessionTracking`, поэтому `SentryAutoSessionTrackingIntegration` больше не создаёт/удаляет файлы на главном потоке в момент старта.
+- `_prewarmSentryCache` для iOS подготавливает `~/Library/Caches/io.sentry/<hash>` и envelopes в отдельном изоляте; Info.plist `SentryNativeInitDelaySeconds=0`.
+- Прогнаны `dart run tool/apply_plugin_patches.dart`, `flutter clean`, `flutter pub get`, `cd ios && LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 pod install`.
+
+## 2025-11-26 — Задача ios-update-stage6 sentry-bootstrap-final fix
+- `_initializeSentry` теперь вызывается до `runApp`, поэтому окно «SDK disabled…» исчезает, но тяжёлый I/O по-прежнему выполняется в фоне (кеши прогреваются через Isolate).
+- `SentryFileManager` переписан на обёртки `dispatchSync` — `writeData`/`removeFileAtPath`/`moveState`/`readSession`/`readAppState`/`readTimestamp` больше не трогают главный поток.
+- Команды: `dart run tool/apply_plugin_patches.dart`, `flutter clean`, `flutter pub get`, `cd ios && LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 pod install`.
+
+## 2025-11-26 — Задача ios-update-stage6 sentry-native-await fix
+- `SentryFlutterPlugin.initNativeSdk` больше не завершает MethodChannel до окончания `SentrySDK.start`: `FlutterResult` вызывается только после старта нативного SDK, поэтому Dart-уровень не видит «SDK is disabled».
+- Асинхронная инициализация остаётся в utility-очереди (delay из Info.plist), но результат дожидается завершения, устраняя гонку breadcrumbs и native hub.
+- Патчи применены через `dart run tool/apply_plugin_patches.dart`, фактический Pod получает обновлённый Swift-файл.
+
+## 2025-11-26 — Задача ios-update-stage6 sentry-mainthread-guard fix
+- `SentryDependencyContainer` и `UIApplication.unsafeApplicationState` теперь всегда обращаются к `UIApplication` на главном потоке, поэтому Main Thread Checker не ловит `applicationState` из utility-очереди.
+- `SentryInstallation` читает/пишет файл INSTALLATION только через очередь `dispatchQueueWrapper`, а Podfile добавлен с новыми патчами, чтобы фиксы автоматически накатились при `pod install`.
+
 ## 2025-11-18 — Задача ios-update-stage2 fix
 - Ранняя `Firebase.initializeApp()` из `lib/main.dart` убрана: Firebase и PushService стартуют только после первого кадра через `_ensureFirebaseInitialized()`, поэтому плагин не дёргается до регистрации.
 - `main.m`/`FirebaseEarlyInit.m` подключены к таргету, `@main` убран у `AppDelegate`, добавлено диагностическое логирование, если после `configure()` дефолтного приложения всё ещё нет.
