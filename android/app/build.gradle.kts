@@ -33,7 +33,7 @@ android {
 
     defaultConfig {
         applicationId = "kz.bizlevel.bizlevel"
-        minSdk = maxOf(21, flutter.minSdkVersion)
+        minSdk = maxOf(23, flutter.minSdkVersion)
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
@@ -67,5 +67,5 @@ flutter {
 
 dependencies {
     // Core desugaring
-    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }
