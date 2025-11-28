@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:bizlevel/theme/color.dart';
+import 'package:bizlevel/theme/spacing.dart';
+import 'package:bizlevel/theme/typography.dart';
 import 'package:bizlevel/widgets/custom_textfield.dart';
 
 class BizLevelTextField extends StatelessWidget {
@@ -41,7 +43,7 @@ class BizLevelTextField extends StatelessWidget {
                 ) ??
             const TextStyle(fontWeight: FontWeight.w600),
       ));
-      children.add(const SizedBox(height: 6));
+      children.add(AppSpacing.gapH(AppSpacing.s6));
     }
 
     children.add(
@@ -58,15 +60,12 @@ class BizLevelTextField extends StatelessWidget {
     );
 
     if (isInvalid || (errorText != null && errorText!.trim().isNotEmpty)) {
-      children.add(const SizedBox(height: 6));
+      children.add(AppSpacing.gapH(AppSpacing.s6));
       children.add(
         Text(
           errorText ?? 'Проверьте корректность значения',
-          style: const TextStyle(
-            color: AppColor.error,
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-          ),
+          style: AppTypography.textTheme.labelMedium
+              ?.copyWith(color: AppColor.error, fontWeight: FontWeight.w500),
         ),
       );
     }

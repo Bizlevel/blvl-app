@@ -9,6 +9,7 @@ import 'package:bizlevel/theme/spacing.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:go_router/go_router.dart';
+import 'package:bizlevel/theme/dimensions.dart';
 
 class LevelsMapScreen extends ConsumerWidget {
   const LevelsMapScreen({super.key});
@@ -107,9 +108,9 @@ class LevelsMapScreen extends ConsumerWidget {
               baseColor: AppColor.divider,
               highlightColor: AppColor.labelColor.withValues(alpha: 0.2),
               child: Card(
-                elevation: 1,
+                elevation: AppDimensions.elevationHairline,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(AppDimensions.radiusXxl),
                 ),
                 child: const SizedBox.expand(),
               ),
@@ -125,7 +126,7 @@ class LevelsMapScreen extends ConsumerWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               const Text('Ошибка загрузки уровней'),
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.sm),
               ElevatedButton(
                 onPressed: () => ref.invalidate(levelsProvider),
                 child: const Text('Повторить'),

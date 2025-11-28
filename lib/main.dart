@@ -13,9 +13,11 @@ import 'compat/url_strategy_noop.dart'
 import 'package:responsive_framework/responsive_framework.dart';
 import 'package:app_links/app_links.dart';
 import 'dart:async';
+import 'dart:developer' as dev;
 import 'utils/deep_link.dart';
 
 import 'routing/app_router.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:go_router/go_router.dart';
 import 'services/supabase_service.dart';
 import 'theme/color.dart';
@@ -23,18 +25,28 @@ import 'theme/app_theme.dart';
 import 'providers/theme_provider.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:bizlevel/services/notifications_service.dart';
-import 'package:timezone/data/latest.dart' as tz;
+import 'package:timezone/data/latest.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:flutter_timezone/flutter_timezone.dart';
+import 'package:bizlevel/services/timezone_gate.dart';
 import 'services/push_service.dart';
+import 'constants/push_flags.dart';
 
 import 'package:firebase_core/firebase_core.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
+import 'dart:convert';
+import 'dart:io';
+import 'dart:isolate';
+import 'package:crypto/crypto.dart' as crypto;
+
+bool _hiveInitialized = false;
 
 Future<void> main() async {
   // КРИТИЧНО для web: Все инициализации должны быть в одной зоне
   WidgetsFlutterBinding.ensureInitialized();
   if (!kIsWeb) {
-    await _tryInitFirebase();
+    debugPrint('INFO: Firebase bootstrap deferred to post-frame stage');
   }
 
   // Чистые URL без # — только для Web
@@ -50,81 +62,21 @@ Future<void> main() async {
   // Инициализируем Supabase
   await SupabaseService.initialize();
 
-  // Инициализируем Hive и открываем нужные боксы для кеша
-  await Hive.initFlutter();
-  await Hive.openBox('levels');
-  await Hive.openBox('lessons');
-  await Hive.openBox('goals');
-  // Кэш новой модели цели и журнала применений
-  await Hive.openBox('user_goal');
-  await Hive.openBox('practice_log');
-  // Удалено: weekly_progress бокс (legacy)
-  await Hive.openBox('quotes');
-  await Hive.openBox('gp');
+  await _ensureHiveInitialized();
+  await _preloadNotificationsLaunchData();
 
-  // Инициализация таймзон и локальных уведомлений (M0)
-  try {
-    tz.initializeTimeZones();
-    final String timeZoneName = await FlutterTimezone.getLocalTimezone();
-    tz.setLocalLocation(tz.getLocation(timeZoneName));
-    await NotificationsService.instance.initialize();
-    // Убрали недельные напоминания; остаются ежедневные напоминания практики на экране настроек
-    // Открываем лог уведомлений
-    await Hive.openBox('notifications');
-  } catch (_) {}
-
-  // Инициализация FCM (только для мобильных).
-  if (!kIsWeb) {
-    try {
-      await PushService.instance.initialize();
-    } catch (_) {}
-  }
+  const rootApp = ProviderScope(child: MyApp());
 
   final dsn = envOrDefine('SENTRY_DSN');
-
   if (dsn.isEmpty) {
-    // Без Sentry - просто запускаем приложение
     debugPrint('INFO: Sentry DSN not configured, running without Sentry');
-    runApp(const ProviderScope(child: MyApp()));
   } else {
-    // С Sentry, но в той же зоне
-    final packageInfo = await PackageInfo.fromPlatform();
-    await SentryFlutter.init(
-      (options) {
-        options
-          ..dsn = dsn
-          ..tracesSampleRate = kReleaseMode ? 0.3 : 1.0
-          ..environment = kReleaseMode ? 'prod' : 'dev'
-          ..release =
-              'bizlevel@${packageInfo.version}+${packageInfo.buildNumber}'
-          ..enableAutoSessionTracking = true
-          ..attachScreenshot = true
-          ..attachViewHierarchy = true
-          ..beforeSend = (SentryEvent event, Hint hint) {
-            event.request?.headers
-                .removeWhere((k, _) => k.toLowerCase() == 'authorization');
-            return event;
-          };
-      },
-      // НЕ используем appRunner - это создает разные зоны
-    );
-
-    // Запускаем приложение в той же зоне
-    runApp(const ProviderScope(child: MyApp()));
+    await _prewarmSentryCache(dsn);
+    await _initializeSentry(dsn);
   }
-}
 
-// Пытаемся инициализировать Firebase, но не падаем, если конфиг отсутствует
-Future<void> _tryInitFirebase() async {
-  try {
-    if (Firebase.apps.isEmpty) {
-      await Firebase.initializeApp();
-    }
-  } catch (e) {
-    // В Dev/CI окружениях файл GoogleService-Info.plist может отсутствовать
-    // Это не блокирует работу приложения (FCM будет отключён)
-    debugPrint('WARN: Firebase is not initialized: $e');
-  }
+  runApp(rootApp);
+  _schedulePostFrameBootstraps();
 }
 
 class MyApp extends ConsumerWidget {
@@ -146,16 +98,27 @@ class MyApp extends ConsumerWidget {
       router: router,
       child: MaterialApp.router(
         routerConfig: router,
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: const [
+          Locale('ru'),
+          Locale('en'),
+        ],
+        // Локализации делегируем системным настройкам; ru-параметры передаются напрямую в showDatePicker
         builder: (context, child) {
           // создаём ResponsiveWrapper как обычно
-          final wrapped = ResponsiveWrapper.builder(
-            BouncingScrollWrapper.builder(context, child!),
-            minWidth: 320,
-            defaultScale: true,
+          if (child == null) {
+            return const SizedBox.shrink();
+          }
+          final wrapped = ResponsiveBreakpoints.builder(
+            child: BouncingScrollWrapper.builder(context, child),
             breakpoints: const [
-              ResponsiveBreakpoint.resize(320, name: MOBILE),
-              ResponsiveBreakpoint.autoScale(600, name: TABLET),
-              ResponsiveBreakpoint.autoScale(1024, name: DESKTOP),
+              Breakpoint(start: 0, end: 599, name: MOBILE),
+              Breakpoint(start: 600, end: 1023, name: TABLET),
+              Breakpoint(start: 1024, end: double.infinity, name: DESKTOP),
             ],
           );
 
@@ -172,8 +135,10 @@ class MyApp extends ConsumerWidget {
               : textTheme;
 
           return Container(
-            decoration: const BoxDecoration(
-              gradient: AppColor.bgGradient,
+            decoration: BoxDecoration(
+              gradient: Theme.of(context).brightness == Brightness.dark
+                  ? AppColor.bgGradientDark
+                  : AppColor.bgGradient,
             ),
             child: Theme(
               data: Theme.of(context).copyWith(
@@ -214,6 +179,189 @@ class MyApp extends ConsumerWidget {
       ),
     );
   }
+}
+
+void _schedulePostFrameBootstraps() {
+  WidgetsBinding.instance.addPostFrameCallback((_) async {
+    if (kIsWeb) return;
+    await _ensureFirebaseInitialized('post_frame_bootstrap');
+    await _initializeDeferredLocalServices();
+    final bool runningOniOS =
+        defaultTargetPlatform == TargetPlatform.iOS && !kIsWeb;
+    if (kEnableIosFcm || !runningOniOS) {
+      try {
+        await PushService.instance.initialize();
+      } catch (error, stackTrace) {
+        debugPrint('WARN: PushService init failed: $error');
+        await Sentry.captureException(error, stackTrace: stackTrace);
+      }
+    } else {
+      debugPrint('INFO: iOS PushService skipped (kEnableIosFcm=false)');
+    }
+  });
+}
+
+Future<void> _initializeSentry(String dsn) async {
+  try {
+    final packageInfo = await PackageInfo.fromPlatform();
+    await SentryFlutter.init(
+      (options) {
+        options
+          ..dsn = dsn
+          ..tracesSampleRate = kReleaseMode ? 0.3 : 1.0
+          ..environment = kReleaseMode ? 'prod' : 'dev'
+          ..release =
+              'bizlevel@${packageInfo.version}+${packageInfo.buildNumber}'
+          ..enableAutoSessionTracking = false
+          ..attachScreenshot = true
+          ..attachViewHierarchy = true
+          ..enableAutoPerformanceTracing = false
+          ..enableTimeToFullDisplayTracing = false
+          ..enableAppHangTracking = false
+          ..enableWatchdogTerminationTracking = false
+          ..enableFramesTracking = false
+          ..enableAutoNativeBreadcrumbs = false
+          ..enableAppLifecycleBreadcrumbs = false
+          ..enableWindowMetricBreadcrumbs = false
+          ..enableUserInteractionBreadcrumbs = false
+          ..enableUserInteractionTracing = false
+          ..addInAppExclude('SentryFileIOTrackingIntegration')
+          ..beforeSend = (SentryEvent event, Hint hint) {
+            event.request?.headers
+                .removeWhere((k, _) => k.toLowerCase() == 'authorization');
+            return event;
+          };
+      },
+    );
+  } catch (error, stackTrace) {
+    debugPrint('WARN: Sentry init failed: $error');
+    await Sentry.captureException(error, stackTrace: stackTrace);
+  }
+}
+
+Future<void> _prewarmSentryCache(String dsn) async {
+  if (kIsWeb || !Platform.isIOS) return;
+  try {
+    final libraryDir = await getLibraryDirectory();
+    final cachesRoot = Directory(p.join(libraryDir.path, 'Caches'));
+    final hash = crypto.sha1.convert(utf8.encode(dsn)).toString();
+    final sentryPath = p.join(cachesRoot.path, 'io.sentry', hash);
+    final envelopesPath = p.join(sentryPath, 'envelopes');
+    // Выполняем блокирующий I/O в отдельном изоляте, чтобы не задевать UI-поток.
+    await Isolate.run(() {
+      Directory(sentryPath).createSync(recursive: true);
+      Directory(envelopesPath).createSync(recursive: true);
+    });
+  } catch (error) {
+    debugPrint('WARN: Failed to prewarm Sentry cache: $error');
+  }
+}
+
+Future<void> _ensureFirebaseInitialized(String caller) async {
+  if (kIsWeb) return;
+  try {
+    if (Firebase.apps.isEmpty) {
+      await Firebase.initializeApp();
+      debugPrint('INFO: Firebase.initializeApp() completed ($caller)');
+    }
+  } catch (e) {
+    debugPrint('WARN: Firebase initialize failed ($caller): $e');
+  }
+}
+
+Future<void> _initializeDeferredLocalServices() async {
+  if (kIsWeb) return;
+  ISentrySpan? transaction;
+  dev.Timeline.startSync('startup.local_services');
+  try {
+    transaction = Sentry.startTransaction(
+      'startup.local_services',
+      'task',
+      trimEnd: true,
+    );
+    final hiveSpan = transaction.startChild('local.hive_init');
+    final tzSpan = transaction.startChild('local.timezone_init');
+    final notifSpan = transaction.startChild('local.notifications_init');
+
+    await Future.wait([
+      _ensureHiveInitialized().whenComplete(() => hiveSpan.finish()),
+      _warmUpTimezone().whenComplete(() => tzSpan.finish()),
+      _initializeNotifications().whenComplete(() => notifSpan.finish()),
+    ]);
+    transaction.finish(status: const SpanStatus.ok());
+  } catch (error, stackTrace) {
+    transaction?.finish(status: const SpanStatus.internalError());
+    debugPrint('WARN: Deferred local services failed: $error');
+    await Sentry.captureException(error, stackTrace: stackTrace);
+  } finally {
+    dev.Timeline.finishSync();
+  }
+}
+
+Future<void> _ensureHiveInitialized() async {
+  if (_hiveInitialized || kIsWeb) {
+    return;
+  }
+  await Hive.initFlutter();
+  _hiveInitialized = true;
+}
+
+Future<void> _openHiveBoxes() async {
+  if (kIsWeb) return;
+  const boxes = [
+    'levels',
+    'lessons',
+    'goals',
+    'user_goal',
+    'practice_log',
+    'quotes',
+    'gp',
+    'notifications',
+  ];
+  final futures = <Future>[];
+  for (final box in boxes) {
+    if (!Hive.isBoxOpen(box)) {
+      futures.add(Hive.openBox(box));
+    }
+  }
+  if (futures.isNotEmpty) {
+    await Future.wait(futures);
+  }
+}
+
+Future<void> _warmUpTimezone() async {
+  try {
+    tzdata.initializeTimeZones();
+    final timeZoneInfo = await FlutterTimezone.getLocalTimezone();
+    tz.setLocalLocation(tz.getLocation(timeZoneInfo.identifier));
+    TimezoneGate.markReady();
+  } catch (error, stackTrace) {
+    TimezoneGate.markError(error, stackTrace);
+    rethrow;
+  }
+}
+
+Future<void> _initializeNotifications() async {
+  await _openHiveBoxes();
+  if (!kIsWeb && Hive.isBoxOpen('notifications')) {
+    NotificationsService.instance.attachLaunchBox(Hive.box('notifications'));
+  }
+  await NotificationsService.instance.initialize();
+}
+
+Future<void> _preloadNotificationsLaunchData() async {
+  if (kIsWeb) return;
+  try {
+    final box = Hive.isBoxOpen('notifications')
+        ? Hive.box('notifications')
+        : await Hive.openBox('notifications');
+    NotificationsService.instance.attachLaunchBox(box);
+    final stored = box.get('launch_route');
+    if (stored is String && stored.isNotEmpty) {
+      await box.delete('launch_route');
+      NotificationsService.instance.cacheStoredLaunchRoute(stored);
+    }
+  } catch (_) {}
 }
 
 class _LinkListener extends StatefulWidget {

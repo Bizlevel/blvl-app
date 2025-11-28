@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:bizlevel/theme/color.dart';
+import 'package:bizlevel/theme/spacing.dart';
 
 class BizLevelError extends StatelessWidget {
   final String title;
@@ -26,11 +27,11 @@ class BizLevelError extends StatelessWidget {
                 .titleMedium
                 ?.copyWith(fontWeight: FontWeight.w600)),
         if (message != null) ...[
-          const SizedBox(height: 6),
+          AppSpacing.gapH(AppSpacing.s6),
           Text(message!, textAlign: TextAlign.center),
         ],
         if (onRetry != null) ...[
-          const SizedBox(height: 12),
+          AppSpacing.gapH(AppSpacing.md),
           ElevatedButton(
             onPressed: onRetry,
             child: const Text('Повторить'),

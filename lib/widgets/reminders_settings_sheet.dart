@@ -43,7 +43,7 @@ class _RemindersSettingsContentState extends State<RemindersSettingsContent> {
 
   @override
   Widget build(BuildContext context) {
-    DateTime _computeNextOccurrence() {
+    DateTime computeNextOccurrence() {
       final now = DateTime.now();
       // ближайший выбранный день на/после сегодняшнего
       if (_days.isEmpty) return now;
@@ -60,7 +60,7 @@ class _RemindersSettingsContentState extends State<RemindersSettingsContent> {
       return now.add(const Duration(days: 1));
     }
 
-    final next = _computeNextOccurrence();
+    final next = computeNextOccurrence();
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,

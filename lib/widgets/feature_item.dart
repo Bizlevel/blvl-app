@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:bizlevel/theme/color.dart';
+import 'package:bizlevel/theme/spacing.dart';
+import 'package:bizlevel/theme/dimensions.dart';
+import 'package:bizlevel/theme/typography.dart';
 
 import 'custom_image.dart';
 
@@ -24,11 +27,11 @@ class FeatureItem extends StatelessWidget {
       child: Container(
         width: width,
         height: height,
-        padding: const EdgeInsets.all(10),
-        margin: const EdgeInsets.symmetric(vertical: 5),
+        padding: AppSpacing.insetsAll(AppSpacing.s10),
+        margin: AppSpacing.insetsSymmetric(v: AppSpacing.s5),
         decoration: BoxDecoration(
           color: AppColor.card,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(AppDimensions.radiusXxl),
           boxShadow: [
             BoxShadow(
               color: AppColor.shadowColor.withValues(alpha: 0.1),
@@ -44,9 +47,9 @@ class FeatureItem extends StatelessWidget {
               data["image"],
               width: double.infinity,
               height: 190,
-              radius: 15,
+              radius: 15, // оставляем кастомный радиус изображения
             ),
-            Positioned(top: 170, right: 15, child: _buildPrice()),
+            Positioned(top: 170, right: AppSpacing.s15, child: _buildPrice()),
             Positioned(top: 210, child: _buildInfo()),
           ],
         ),
@@ -56,8 +59,8 @@ class FeatureItem extends StatelessWidget {
 
   Widget _buildInfo() {
     return Container(
-      width: width - 20,
-      padding: const EdgeInsets.fromLTRB(5, 0, 5, 0),
+      width: width - AppSpacing.s20,
+      padding: AppSpacing.insetsSymmetric(h: AppSpacing.s5),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -65,13 +68,10 @@ class FeatureItem extends StatelessWidget {
             data["name"],
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 17,
-              color: AppColor.textColor,
-              fontWeight: FontWeight.w600,
-            ),
+            style: AppTypography.textTheme.titleMedium
+                ?.copyWith(color: AppColor.textColor),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: AppSpacing.s10),
           _buildAttributes(),
         ],
       ),
@@ -80,10 +80,10 @@ class FeatureItem extends StatelessWidget {
 
   Widget _buildPrice() {
     return Container(
-      padding: const EdgeInsets.all(10),
+      padding: AppSpacing.insetsAll(AppSpacing.s10),
       decoration: BoxDecoration(
         color: AppColor.primary,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppDimensions.radiusXxl),
         boxShadow: [
           BoxShadow(
             color: AppColor.shadowColor.withValues(alpha: 0.05),
@@ -94,10 +94,8 @@ class FeatureItem extends StatelessWidget {
       ),
       child: Text(
         data["price"],
-        style: const TextStyle(
-          color: AppColor.onPrimary,
-          fontWeight: FontWeight.w500,
-        ),
+        style: AppTypography.textTheme.labelLarge
+            ?.copyWith(color: AppColor.onPrimary, fontWeight: FontWeight.w600),
       ),
     );
   }
@@ -111,13 +109,13 @@ class FeatureItem extends StatelessWidget {
           AppColor.labelColor,
           data["session"],
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: AppSpacing.md),
         _getAttribute(
           Icons.schedule_rounded,
           AppColor.labelColor,
           data["duration"],
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: AppSpacing.md),
         _getAttribute(Icons.star, AppColor.yellow, data["review"]),
       ],
     );
@@ -127,12 +125,13 @@ class FeatureItem extends StatelessWidget {
     return Row(
       children: [
         Icon(icon, size: 18, color: color),
-        const SizedBox(width: 3),
+        const SizedBox(width: AppSpacing.xs3),
         Text(
           info,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(color: AppColor.labelColor, fontSize: 13),
+          style: AppTypography.textTheme.labelMedium
+              ?.copyWith(color: AppColor.labelColor),
         ),
       ],
     );

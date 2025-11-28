@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bizlevel/services/gp_service.dart';
 import 'package:bizlevel/services/supabase_service.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
+import 'package:bizlevel/models/goal_update.dart';
 
 /// Репозиторий для работы с фичей «Цель»: версии цели, спринты, напоминания, цитаты.
 ///
@@ -12,6 +13,11 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 class GoalsRepository {
   final SupabaseClient _client;
   GoalsRepository(this._client);
+  // Column sets
+  static const String _userGoalColumns =
+      'user_id, goal_text, metric_start, metric_current, metric_target, start_date, target_date, updated_at, financial_focus, action_plan_note, current_history_id';
+  static const String _practiceLogColumns =
+      'id, user_id, applied_at, applied_tools, note, created_at, updated_at, goal_history_id';
   // ---------- small helpers to reduce duplication ----------
   void _ensureAnonApikey() {
     try {
@@ -76,8 +82,7 @@ class GoalsRepository {
         _ensureAnonApikey();
         return _client
             .from('user_goal')
-            .select(
-                'user_id, goal_text, metric_type, metric_start, metric_current, metric_target, start_date, target_date, updated_at, financial_focus, action_plan_note')
+            .select(_userGoalColumns)
             .eq('user_id', userId)
             .limit(1)
             .maybeSingle();
@@ -86,31 +91,10 @@ class GoalsRepository {
     );
   }
 
-  Future<Map<String, dynamic>> upsertUserGoal({
-    required String goalText,
-    String? metricType,
-    num? metricStart,
-    num? metricCurrent,
-    num? metricTarget,
-    DateTime? startDate,
-    DateTime? targetDate,
-    String? financialFocus,
-    String? actionPlanNote,
-  }) async {
-    final String userId = _requireUserId();
+  Future<Map<String, dynamic>> upsertUserGoalRequest(
+      GoalUpsertRequest r) async {
     _ensureAnonApikey();
-    final Map<String, dynamic> payload = _buildUserGoalPayload(
-      userId: userId,
-      goalText: goalText,
-      metricType: metricType,
-      metricStart: metricStart,
-      metricCurrent: metricCurrent,
-      metricTarget: metricTarget,
-      startDate: startDate,
-      targetDate: targetDate,
-      financialFocus: financialFocus,
-      actionPlanNote: actionPlanNote,
-    );
+    final Map<String, dynamic> payload = _buildUserGoalPayloadFrom(r);
 
     Map<String, dynamic> row = await _client
         .from('user_goal')
@@ -128,9 +112,8 @@ class GoalsRepository {
           ((row['goal_text'] ?? '') as String).trim().isNotEmpty;
       if (noPointer && goalChanged) {
         final Map<String, dynamic> hist = {
-          'user_id': userId,
+          'user_id': r.userId,
           'goal_text': (row['goal_text'] ?? '').toString(),
-          if (row['metric_type'] != null) 'metric_type': row['metric_type'],
           if (row['metric_start'] != null) 'metric_start': row['metric_start'],
           if (row['metric_current'] != null)
             'metric_current': row['metric_current'],
@@ -150,7 +133,7 @@ class GoalsRepository {
         row = await _client
             .from('user_goal')
             .update({'current_history_id': newId})
-            .eq('user_id', userId)
+            .eq('user_id', r.userId)
             .select()
             .single();
       }
@@ -165,19 +148,16 @@ class GoalsRepository {
     return Map<String, dynamic>.from(row);
   }
 
-  /// Начать новую цель: закрыть текущую историю, создать новую, обнулить метрики.
-  Future<Map<String, dynamic>> startNewGoal({
-    required String goalText,
-    DateTime? targetDate,
-  }) async {
-    final String userId = _requireUserId();
+  /// Начать новую цель: закрыть текущую историю, создать новую; задать стартовые метрики при наличии.
+  Future<Map<String, dynamic>> startNewGoalRequest(
+      StartNewGoalRequest r) async {
     _ensureAnonApikey();
     // 1) закрыть текущую history (best-effort)
     try {
       final Map<String, dynamic>? ug = await _client
           .from('user_goal')
           .select('current_history_id')
-          .eq('user_id', userId)
+          .eq('user_id', r.userId)
           .maybeSingle();
       final String? hid = ug?['current_history_id'] as String?;
       if (hid != null && hid.isNotEmpty) {
@@ -188,15 +168,18 @@ class GoalsRepository {
               'closed_at': DateTime.now().toUtc().toIso8601String()
             })
             .eq('id', hid)
-            .eq('user_id', userId);
+            .eq('user_id', r.userId);
       }
     } catch (_) {}
     // 2) создать новую history (active)
     final Map<String, dynamic> histPayload = {
-      'user_id': userId,
-      'goal_text': goalText,
-      if (targetDate != null)
-        'target_date': targetDate.toUtc().toIso8601String(),
+      'user_id': r.userId,
+      'goal_text': r.goalText,
+      if (r.metricStart != null) 'metric_start': r.metricStart,
+      if (r.metricCurrent != null) 'metric_current': r.metricCurrent,
+      if (r.metricTarget != null) 'metric_target': r.metricTarget,
+      if (r.targetDate != null)
+        'target_date': r.targetDate!.toUtc().toIso8601String(),
       'status': 'active',
     };
     final Map<String, dynamic> insertedHist = await _client
@@ -205,18 +188,18 @@ class GoalsRepository {
         .select('id')
         .single();
     final String newHistoryId = insertedHist['id'] as String;
-    // 3) обновить user_goal: текст/дедлайн, очистить метрики, привязать pointer
-    Map<String, dynamic> row = await _client
+    // 3) обновить user_goal: текст/дедлайн, стартовые метрики (если переданы), привязать pointer
+    final Map<String, dynamic> row = await _client
         .from('user_goal')
         .upsert({
-          'user_id': userId,
-          'goal_text': goalText,
+          'user_id': r.userId,
+          'goal_text': r.goalText,
           'metric_type': null,
-          'metric_start': null,
-          'metric_current': null,
-          'metric_target': null,
-          if (targetDate != null)
-            'target_date': targetDate.toUtc().toIso8601String(),
+          'metric_start': r.metricStart,
+          'metric_current': r.metricCurrent,
+          'metric_target': r.metricTarget,
+          if (r.targetDate != null)
+            'target_date': r.targetDate!.toUtc().toIso8601String(),
           'current_history_id': newHistoryId,
         }, onConflict: 'user_id')
         .select()
@@ -229,37 +212,31 @@ class GoalsRepository {
     return Map<String, dynamic>.from(row);
   }
 
-  Map<String, dynamic> _buildUserGoalPayload({
-    required String userId,
-    required String goalText,
-    String? metricType,
-    num? metricStart,
-    num? metricCurrent,
-    num? metricTarget,
-    DateTime? startDate,
-    DateTime? targetDate,
-    String? financialFocus,
-    String? actionPlanNote,
-  }) {
+  Map<String, dynamic> _buildUserGoalPayloadFrom(GoalUpsertRequest r) {
     return <String, dynamic>{
-      'user_id': userId,
-      'goal_text': goalText,
-      if (metricType != null) 'metric_type': metricType,
-      if (metricStart != null) 'metric_start': metricStart,
-      if (metricCurrent != null) 'metric_current': metricCurrent,
-      if (metricTarget != null) 'metric_target': metricTarget,
-      if (startDate != null) 'start_date': startDate.toUtc().toIso8601String(),
-      if (targetDate != null)
-        'target_date': targetDate.toUtc().toIso8601String(),
-      if (financialFocus != null) 'financial_focus': financialFocus,
-      if (actionPlanNote != null) 'action_plan_note': actionPlanNote,
+      'user_id': r.userId,
+      'goal_text': r.goalText,
+      if (r.metricType != null) 'metric_type': r.metricType,
+      if (r.metricStart != null) 'metric_start': r.metricStart,
+      if (r.metricCurrent != null) 'metric_current': r.metricCurrent,
+      if (r.metricTarget != null) 'metric_target': r.metricTarget,
+      if (r.startDate != null)
+        'start_date': r.startDate!.toUtc().toIso8601String(),
+      if (r.targetDate != null)
+        'target_date': r.targetDate!.toUtc().toIso8601String(),
+      if (r.financialFocus != null) 'financial_focus': r.financialFocus,
+      if (r.actionPlanNote != null) 'action_plan_note': r.actionPlanNote,
     };
   }
+
+  // reserved for future refactor: GoalUpdate DTO usage (kept minimal to avoid API breaks)
 
   // ============================
   // Practice log (was daily_progress)
   // ============================
 
+  @Deprecated(
+      'Use fetchPracticeLogForHistory to avoid mixing old and new goals')
   Future<List<Map<String, dynamic>>> fetchPracticeLog({int limit = 20}) async {
     final String? userId = _client.auth.currentUser?.id;
     if (userId == null) return <Map<String, dynamic>>[];
@@ -288,8 +265,7 @@ class GoalsRepository {
     _ensureAnonApikey();
     final dynamic base = _client
         .from('practice_log')
-        .select(
-            'id, user_id, applied_at, applied_tools, note, created_at, updated_at')
+        .select(_practiceLogColumns)
         .eq('user_id', userId)
         .order('applied_at', ascending: false)
         .limit(limit);
@@ -300,13 +276,49 @@ class GoalsRepository {
         rows.map((e) => Map<String, dynamic>.from(e as Map)));
   }
 
+  Future<void> updateMetricCurrent(num value) async {
+    final String userId = _requireUserId();
+    _ensureAnonApikey();
+    // 1) Обновляем активную историю, если есть указатель
+    String? currentHistoryId;
+    try {
+      final ug = await _client
+          .from('user_goal')
+          .select('current_history_id')
+          .eq('user_id', userId)
+          .maybeSingle();
+      currentHistoryId = (ug?['current_history_id'] as String?);
+    } catch (_) {}
+    if (currentHistoryId != null && currentHistoryId.isNotEmpty) {
+      await _client
+          .from('user_goal_history')
+          .update({'metric_current': value}).eq('id', currentHistoryId);
+    }
+    // 2) Обновляем основную запись user_goal
+    final updated = await _client
+        .from('user_goal')
+        .update({
+          'metric_current': value,
+          'updated_at': DateTime.now().toUtc().toIso8601String()
+        })
+        .eq('user_id', userId)
+        .select()
+        .maybeSingle();
+    // 3) Обновляем кеш, если получилось получить запись
+    try {
+      if (updated != null) {
+        final Box cache = Hive.box('user_goal');
+        await cache.put('self', updated);
+      }
+    } catch (_) {}
+  }
+
   Future<List> _fetchPracticeRows(
       {required String userId, required int limit}) async {
     _ensureAnonApikey();
     return await _client
         .from('practice_log')
-        .select(
-            'id, user_id, applied_at, applied_tools, note, created_at, updated_at')
+        .select(_practiceLogColumns)
         .eq('user_id', userId)
         .order('applied_at', ascending: false)
         .limit(limit);
@@ -362,6 +374,28 @@ class GoalsRepository {
     } catch (_) {}
 
     return Map<String, dynamic>.from(inserted);
+  }
+
+  Future<void> logPracticeAndUpdateMetricTx({
+    List<String> appliedTools = const <String>[],
+    String? note,
+    DateTime? appliedAt,
+    num? metricCurrent,
+  }) async {
+    _ensureAnonApikey();
+    final params = <String, dynamic>{
+      'p_applied_tools': appliedTools,
+      if (note != null) 'p_note': note,
+      if (appliedAt != null)
+        'p_applied_at': appliedAt.toUtc().toIso8601String(),
+      if (metricCurrent != null) 'p_metric_current': metricCurrent,
+    };
+    await _client.rpc('log_practice_and_update_metric', params: params);
+    try {
+      await _claimDailyBonusAndRefresh();
+      final Box cache = Hive.box('practice_log');
+      await cache.delete('list_20');
+    } catch (_) {}
   }
 
   Future<void> _claimDailyBonusAndRefresh() async {
@@ -548,49 +582,5 @@ class GoalsRepository {
     return active[pick];
   }
 
-  /// Формирует контекст для Макса на основе данных версии цели
-  ///
-  /// Использование:
-  /// ```dart
-  /// final context = await goalsRepo.buildMaxContext(
-  ///   version: 2,
-  ///   versionData: {'concrete_result': 'Увеличить выручку...', ...}
-  /// );
-  /// ```
-  String buildMaxContext({
-    required int version,
-    required Map<String, dynamic> versionData,
-  }) {
-    final sb = StringBuffer('goal_version: $version\n');
-
-    if (version == 1) {
-      // v1: Семя цели
-      sb.writeln('concrete_result: ${versionData['concrete_result'] ?? ''}');
-      sb.writeln('main_pain: ${versionData['main_pain'] ?? ''}');
-      sb.writeln('first_action: ${versionData['first_action'] ?? ''}');
-    } else if (version == 2) {
-      // v2: Метрики
-      sb.writeln('concrete_result: ${versionData['concrete_result'] ?? ''}');
-      sb.writeln('metric_type: ${versionData['metric_type'] ?? ''}');
-      sb.writeln('metric_current: ${versionData['metric_current'] ?? ''}');
-      sb.writeln('metric_target: ${versionData['metric_target'] ?? ''}');
-      sb.writeln('financial_goal: ${versionData['financial_goal'] ?? ''}');
-    } else if (version == 3) {
-      // v3: План на 4 недели
-      sb.writeln('goal_smart: ${versionData['goal_smart'] ?? ''}');
-      sb.writeln('week1_focus: ${versionData['week1_focus'] ?? ''}');
-      sb.writeln('week2_focus: ${versionData['week2_focus'] ?? ''}');
-      sb.writeln('week3_focus: ${versionData['week3_focus'] ?? ''}');
-      sb.writeln('week4_focus: ${versionData['week4_focus'] ?? ''}');
-    } else if (version == 4) {
-      // v4: Готовность к старту
-      sb.writeln('first_three_days: ${versionData['first_three_days'] ?? ''}');
-      sb.writeln('start_date: ${versionData['start_date'] ?? ''}');
-      sb.writeln(
-          'accountability_person: ${versionData['accountability_person'] ?? ''}');
-      sb.writeln('readiness_score: ${versionData['readiness_score'] ?? 5}');
-    }
-
-    return sb.toString();
-  }
+  // buildMaxContext (v1–v4) удалён как legacy — используем buildMaxUserContext helper на клиенте
 }

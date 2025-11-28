@@ -1,4 +1,8 @@
+// ignore_for_file: unnecessary_library_name
+
 @Skip('requires real Supabase env')
+library leo_integration_test;
+
 import 'dart:math';
 
 import 'package:flutter_test/flutter_test.dart';

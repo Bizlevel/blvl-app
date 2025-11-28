@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:bizlevel/theme/color.dart';
+import 'package:bizlevel/theme/spacing.dart';
+import 'package:bizlevel/theme/dimensions.dart';
+import 'package:bizlevel/theme/typography.dart';
 import 'package:bizlevel/widgets/custom_image.dart';
 
 class RecommendItem extends StatelessWidget {
@@ -17,15 +20,15 @@ class RecommendItem extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        margin: const EdgeInsets.only(right: 10),
-        padding: const EdgeInsets.all(10),
+        margin: AppSpacing.insetsSymmetric(h: AppSpacing.s10),
+        padding: AppSpacing.insetsAll(AppSpacing.s10),
         width: 300,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          color: Colors.white,
+          borderRadius: BorderRadius.circular(AppDimensions.radiusXxl),
+          color: AppColor.surface,
           boxShadow: [
             BoxShadow(
-              color: Colors.grey.withValues(alpha: 0.1),
+              color: AppColor.shadowColor.withValues(alpha: 0.1),
               spreadRadius: 1,
               blurRadius: 1,
               offset: const Offset(1, 1), // changes position of shadow
@@ -39,9 +42,7 @@ class RecommendItem extends StatelessWidget {
               radius: 15,
               height: 80,
             ),
-            const SizedBox(
-              width: 10,
-            ),
+            const SizedBox(width: AppSpacing.s10),
             _buildInfo()
           ],
         ),
@@ -57,22 +58,16 @@ class RecommendItem extends StatelessWidget {
           data["name"],
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            color: AppColor.textColor,
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-          ),
+          style: AppTypography.textTheme.titleMedium
+              ?.copyWith(color: AppColor.textColor),
         ),
-        const SizedBox(
-          height: 5,
-        ),
+        const SizedBox(height: AppSpacing.s5),
         Text(
           data["price"],
-          style: const TextStyle(fontSize: 14, color: AppColor.textColor),
+          style: AppTypography.textTheme.bodyMedium
+              ?.copyWith(color: AppColor.textColor),
         ),
-        const SizedBox(
-          height: 15,
-        ),
+        const SizedBox(height: AppSpacing.s15),
         _buildDurationAndRate()
       ],
     );
@@ -86,33 +81,23 @@ class RecommendItem extends StatelessWidget {
           color: AppColor.labelColor,
           size: 14,
         ),
-        const SizedBox(
-          width: 2,
-        ),
+        const SizedBox(width: AppSpacing.xs),
         Text(
           data["duration"],
-          style: const TextStyle(
-            fontSize: 12,
-            color: AppColor.labelColor,
-          ),
+          style: AppTypography.textTheme.labelMedium
+              ?.copyWith(color: AppColor.labelColor),
         ),
-        const SizedBox(
-          width: 20,
-        ),
+        const SizedBox(width: AppSpacing.s20),
         const Icon(
           Icons.star,
           color: AppColor.orange,
           size: 14,
         ),
-        const SizedBox(
-          width: 2,
-        ),
+        const SizedBox(width: AppSpacing.xs),
         Text(
           data["review"],
-          style: const TextStyle(
-            fontSize: 12,
-            color: AppColor.labelColor,
-          ),
+          style: AppTypography.textTheme.labelMedium
+              ?.copyWith(color: AppColor.labelColor),
         )
       ],
     );

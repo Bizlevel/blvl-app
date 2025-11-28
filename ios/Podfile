@@ -1,9 +1,13 @@
 # Uncomment this line to define a global platform for your project
 # platform :ios, '13.0'
-platform :ios, '13.0'
+platform :ios, '15.0'
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
+ENV['LANG'] = ENV['LANG'] || 'en_US.UTF-8'
+ENV['LC_ALL'] = ENV['LC_ALL'] || 'en_US.UTF-8'
+
+require 'fileutils'
 
 project 'Runner', {
   'Debug' => :debug,
@@ -26,7 +30,392 @@ end
 
 require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), flutter_root)
 
+def apply_plugin_patches
+  script = File.expand_path(File.join('..', 'tool', 'apply_plugin_patches.dart'), __FILE__)
+  return unless File.exist?(script)
+  puts 'Applying Flutter plugin patches…'
+  success = system('cd .. && dart run tool/apply_plugin_patches.dart')
+  raise 'Failed to apply plugin patches.' unless success
+end
+
+def patch_google_sign_in_indicator
+  file = File.join(__dir__, 'Pods', 'GoogleSignIn', 'GoogleSignIn', 'Sources',
+                   'GIDAppCheck', 'UI', 'GIDActivityIndicatorViewController.m')
+  return unless File.exist?(file)
+
+  contents = File.read(file)
+  return if contents.include?('__IPHONE_OS_VERSION_MIN_REQUIRED < 130000')
+
+  legacy_block = [
+    "  UIActivityIndicatorViewStyle style;",
+    "  if (@available(iOS 13.0, *)) {",
+    "    style = UIActivityIndicatorViewStyleLarge;",
+    "  } else {",
+    "    style = UIActivityIndicatorViewStyleGray;",
+    "  }"
+  ].join("\n")
+
+  replacement = [
+    "  #if __IPHONE_OS_VERSION_MIN_REQUIRED < 130000",
+    "    UIActivityIndicatorViewStyle style;",
+    "    if (@available(iOS 13.0, *)) {",
+    "      style = UIActivityIndicatorViewStyleLarge;",
+    "    } else {",
+    "      style = UIActivityIndicatorViewStyleGray;",
+    "    }",
+    "  #else",
+    "    UIActivityIndicatorViewStyle style = UIActivityIndicatorViewStyleLarge;",
+    "  #endif"
+  ].join("\n")
+
+  if contents.include?(legacy_block)
+    File.write(file, contents.sub(legacy_block, replacement))
+    puts 'Patched GoogleSignIn activity indicator style for iOS 15+.'
+  end
+rescue => e
+  warn "Failed to patch GoogleSignIn indicator: #{e}"
+end
+
+def patch_sentry_async_log
+  file = File.join(__dir__, 'Pods', 'Sentry', 'Sources', 'Sentry', 'SentryAsyncLog.m')
+  return unless File.exist?(file)
+
+  contents = File.read(file)
+  marker = 'dispatch_get_global_queue(QOS_CLASS_UTILITY, 0)'
+  return if contents.include?(marker)
+
+  needle = "+ (void)initializeAsyncLogFile\n{\n"
+  replacement = <<~'OBJC'
++ (void)initializeAsyncLogFile
+{
+    if ([NSThread isMainThread]) {
+        dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+            [SentryAsyncLogWrapper initializeAsyncLogFile];
+        });
+        return;
+    }
+
+OBJC
+
+  if contents.include?(needle)
+    File.write(file, contents.sub(needle, replacement))
+    puts 'Patched SentryAsyncLog to avoid main-thread I/O.'
+  end
+rescue => e
+  warn "Failed to patch SentryAsyncLog: #{e}"
+end
+
+def patch_sentry_file_manager
+  file = File.join(__dir__, 'Pods', 'Sentry', 'Sources', 'Sentry', 'SentryFileManager.m')
+  return unless File.exist?(file)
+
+  FileUtils.chmod(0644, file) unless File.writable?(file)
+
+  contents = File.read(file)
+  changed = false
+
+  original = <<~'OBJC'
+BOOL
+createDirectoryIfNotExists(NSString *path, NSError **error)
+{
+    BOOL success = [[NSFileManager defaultManager] createDirectoryAtPath:path
+                                             withIntermediateDirectories:YES
+                                                              attributes:nil
+                                                                   error:error];
+    if (success) {
+        return YES;
+    }
+
+    if (isErrorPathTooLong(*error)) {
+        SENTRY_LOG_FATAL(@"Failed to create directory, path is too long: %@", path);
+    }
+    *error = NSErrorFromSentryErrorWithUnderlyingError(kSentryErrorFileIO,
+        [NSString stringWithFormat:@"Failed to create the directory at path %@.", path], *error);
+    return NO;
+}
+OBJC
+
+  patched_variant = <<~'OBJC'
+BOOL
+createDirectoryIfNotExists(NSString *path, NSError **error)
+{
+    __block NSError *innerError = nil;
+    __block BOOL success = NO;
+    void (^work)(void) = ^{
+        success = [[NSFileManager defaultManager] createDirectoryAtPath:path
+                                             withIntermediateDirectories:YES
+                                                              attributes:nil
+                                                                   error:&innerError];
+    };
+
+    if ([NSThread isMainThread]) {
+        dispatch_semaphore_t sentry_dir_sema = dispatch_semaphore_create(0);
+        dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+            work();
+            dispatch_semaphore_signal(sentry_dir_sema);
+        });
+        dispatch_semaphore_wait(sentry_dir_sema, DISPATCH_TIME_FOREVER);
+    } else {
+        work();
+    }
+
+    if (success) {
+        if (error != NULL) {
+            *error = nil;
+        }
+        return YES;
+    }
+
+    if (innerError != nil && isErrorPathTooLong(innerError)) {
+        SENTRY_LOG_FATAL(@"Failed to create directory, path is too long: %@", path);
+    }
+    innerError = NSErrorFromSentryErrorWithUnderlyingError(kSentryErrorFileIO,
+        [NSString stringWithFormat:@"Failed to create the directory at path %@.", path], innerError);
+    if (error != NULL) {
+        *error = innerError;
+    }
+    return NO;
+}
+OBJC
+
+  if contents.include?('dispatch_semaphore_t sentry_dir_sema')
+    contents = contents.sub(patched_variant, original)
+    changed = true
+  end
+
+  helper_marker = 'bizlevel_sentry_launch_profile_disabled'
+  helper_block = <<~'OBJC'
+static BOOL bizlevel_sentry_launch_profile_disabled(void)
+{
+    static NSNumber *bizlevel_sentry_launch_profile_flag = nil;
+    static dispatch_once_t bizlevel_sentry_launch_profile_once;
+    dispatch_once(&bizlevel_sentry_launch_profile_once, ^{
+        id rawValue = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"SentryDisableLaunchProfile"];
+        BOOL parsed = NO;
+        if ([rawValue respondsToSelector:@selector(boolValue)]) {
+            bizlevel_sentry_launch_profile_flag = @([rawValue boolValue]);
+            parsed = YES;
+        } else if ([rawValue isKindOfClass:[NSString class]]) {
+            NSString *lower = [(NSString *)rawValue lowercaseString];
+            if ([lower isEqualToString:@"true"] || [lower isEqualToString:@"yes"] || [lower isEqualToString:@"1"]) {
+                bizlevel_sentry_launch_profile_flag = @YES;
+                parsed = YES;
+            } else if ([lower isEqualToString:@"false"] || [lower isEqualToString:@"no"] || [lower isEqualToString:@"0"]) {
+                bizlevel_sentry_launch_profile_flag = @NO;
+                parsed = YES;
+            }
+        }
+        if (!parsed) {
+            bizlevel_sentry_launch_profile_flag = @NO;
+        }
+    });
+    return bizlevel_sentry_launch_profile_flag.boolValue;
+}
+OBJC
+
+  unless contents.include?(helper_marker)
+    contents = contents.sub("#if SENTRY_TARGET_PROFILING_SUPPORTED\n",
+                            "#if SENTRY_TARGET_PROFILING_SUPPORTED\n\n#{helper_block}\n")
+    changed = true
+  end
+
+  guard_specs = {
+    "NSURL *_Nullable launchProfileConfigFileURL(void)" => "return nil;",
+    "NSDictionary<NSString *, NSNumber *> *_Nullable sentry_persistedLaunchProfileConfigurationOptions(\n    void)" => "return nil;",
+    "BOOL\nappLaunchProfileConfigFileExists(void)" => "return NO;",
+    "void\nwriteAppLaunchProfilingConfigFile(NSMutableDictionary<NSString *, NSNumber *> *config)" => "return;",
+    "void\nremoveAppLaunchProfilingConfigFile(void)" => "return;"
+  }
+
+  guard_specs.each do |signature, return_stmt|
+    pattern = "#{signature}\n{\n"
+    guard_block = "    if (bizlevel_sentry_launch_profile_disabled()) {\n        #{return_stmt}\n    }\n"
+    existing = "#{pattern}#{guard_block}"
+    unless contents.include?(existing)
+      contents = contents.sub(pattern, existing)
+      changed = true
+    end
+  end
+
+  if changed
+    File.write(file, contents)
+    puts 'Patched SentryFileManager for main-thread I/O and launch profile guard.'
+  end
+rescue => e
+  warn "Failed to patch SentryFileManager: #{e}"
+end
+
+def patch_sentry_dependency_container
+  file = File.join(__dir__, 'Pods', 'Sentry', 'Sources', 'Sentry', 'SentryDependencyContainer.m')
+  return unless File.exist?(file)
+
+  FileUtils.chmod(0644, file) unless File.writable?(file)
+  contents = File.read(file)
+  changed = false
+
+  helper_marker = 'sentry_sharedApplicationOnMainThread'
+  typedef_line = "typedef id<SentryApplication> _Nullable (^SentryApplicationProviderBlock)(void);\n"
+
+  unless contents.include?(helper_marker)
+    helper_block = <<~'OBJC'
+#if SENTRY_HAS_UIKIT
+static UIApplication *_Nullable sentry_sharedApplicationOnMainThread(void)
+{
+    if ([NSThread isMainThread]) {
+        return UIApplication.sharedApplication;
+    }
+
+    __block UIApplication *application = nil;
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        application = UIApplication.sharedApplication;
+    });
+    return application;
+}
+#endif
+
+OBJC
+    if contents.include?(typedef_line)
+      contents.sub!(typedef_line, "#{typedef_line}\n#{helper_block}")
+      changed = true
+    end
+  end
+
+  original_return = "    return UIApplication.sharedApplication;\n"
+  replacement_return = "    return sentry_sharedApplicationOnMainThread();\n"
+  if contents.include?(original_return)
+    contents.sub!(original_return, replacement_return)
+    changed = true
+  end
+
+  if changed
+    File.write(file, contents)
+    puts 'Patched SentryDependencyContainer to fetch UIApplication on main thread.'
+  end
+rescue => e
+  warn "Failed to patch SentryDependencyContainer: #{e}"
+end
+
+def patch_sentry_application_extensions
+  file = File.join(__dir__, 'Pods', 'Sentry', 'Sources', 'Swift', 'Helper', 'SentryApplicationExtensions.swift')
+  return unless File.exist?(file)
+
+  FileUtils.chmod(0644, file) unless File.writable?(file)
+  contents = File.read(file)
+  needle = "    @objc public var unsafeApplicationState: State {\n        applicationState\n    }\n"
+  replacement = <<~'SWIFT'
+    @objc public var unsafeApplicationState: State {
+        if Thread.isMainThread {
+            return applicationState
+        }
+
+        var state = UIApplication.State.inactive
+        Dependencies.dispatchQueueWrapper.dispatchSyncOnMainQueue({
+            state = self.applicationState
+        }, timeout: 0.05)
+        return state
+    }
+SWIFT
+
+  if contents.include?(needle)
+    contents.sub!(needle, replacement)
+    File.write(file, contents)
+    puts 'Patched UIApplication unsafeApplicationState accessor.'
+  end
+rescue => e
+  warn "Failed to patch SentryApplicationExtensions: #{e}"
+end
+
+def patch_sentry_installation
+  file = File.join(__dir__, 'Pods', 'Sentry', 'Sources', 'Sentry', 'SentryInstallation.m')
+  return unless File.exist?(file)
+
+  FileUtils.chmod(0644, file) unless File.writable?(file)
+  contents = File.read(file)
+  changed = false
+
+  helper_marker = 'sentry_installation_io_queue'
+  helper_block = <<~'OBJC'
+static inline dispatch_queue_t sentry_installation_io_queue(void)
+{
+    SentryDispatchQueueWrapper *wrapper = SentryDependencyContainer.sharedInstance.dispatchQueueWrapper;
+    dispatch_queue_t queue = wrapper.queue;
+    if (queue == nil) {
+        queue = dispatch_get_global_queue(QOS_CLASS_UTILITY, 0);
+    }
+    return queue;
+}
+
+static inline NSData *_Nullable sentry_installation_read_data(NSString *path)
+{
+    if ([NSThread isMainThread]) {
+        __block NSData *result = nil;
+        dispatch_sync(sentry_installation_io_queue(), ^{
+            result = [NSData dataWithContentsOfFile:path];
+        });
+        return result;
+    }
+    return [NSData dataWithContentsOfFile:path];
+}
+
+static inline BOOL sentry_installation_write_file(NSString *path, NSData *data)
+{
+    if ([NSThread isMainThread]) {
+        __block BOOL success = NO;
+        dispatch_sync(sentry_installation_io_queue(), ^{
+            success = [[NSFileManager defaultManager] createFileAtPath:path
+                                                             contents:data
+                                                           attributes:nil];
+        });
+        return success;
+    }
+    return [[NSFileManager defaultManager] createFileAtPath:path contents:data attributes:nil];
+}
+
+OBJC
+
+  unless contents.include?(helper_marker)
+    contents.sub!("@interface SentryInstallation ()", "#{helper_block}\n@interface SentryInstallation ()")
+    changed = true
+  end
+
+  nsfile_manager_block = "            NSFileManager *fileManager = [NSFileManager defaultManager];\n\n"
+  if contents.include?(nsfile_manager_block)
+    contents.sub!(nsfile_manager_block, "\n")
+    changed = true
+  end
+
+  create_block = <<~'OBJC'
+            if (![fileManager createFileAtPath:installationFilePath
+                                      contents:installationStringData
+                                    attributes:nil]) {
+OBJC
+  create_replacement = <<~'OBJC'
+            if (!sentry_installation_write_file(installationFilePath, installationStringData)) {
+OBJC
+  if contents.include?(create_block)
+    contents.sub!(create_block, create_replacement)
+    changed = true
+  end
+
+  read_block = "    NSData *installationData = [NSData dataWithContentsOfFile:installationFilePath];"
+  read_replacement = "    NSData *installationData = sentry_installation_read_data(installationFilePath);"
+
+  if contents.include?(read_block)
+    contents.sub!(read_block, read_replacement)
+    changed = true
+  end
+
+  if changed
+    File.write(file, contents)
+    puts 'Patched SentryInstallation to offload file I/O.'
+  end
+rescue => e
+  warn "Failed to patch SentryInstallation: #{e}"
+end
+
+
 flutter_ios_podfile_setup
+apply_plugin_patches
 
 target 'Runner' do
   # Линкуем все Flutter‑плагины как статические фреймворки (совместимо с Firebase/GoogleUtilities)
@@ -35,13 +424,10 @@ target 'Runner' do
   # Подхватываем плагины, сгенерированные Flutter
   flutter_install_all_ios_pods(File.dirname(File.realpath(__FILE__)))
 
-  # Используем стабильную версию AppAuth из CocoaPods trunk
-  pod 'AppAuth', '1.7.6'
-
   # Явно указываем Sentry/HybridSDK из GitHub, чтобы podspec точно подтянулся
-  pod 'Sentry/HybridSDK',
-    :git => 'https://github.com/getsentry/sentry-cocoa.git',
-    :tag => '8.52.1'
+  pod 'Sentry/HybridSDK', '8.56.2'
+
+  pod 'FirebaseAppCheck'
 
 
 end
@@ -52,8 +438,56 @@ post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
     target.build_configurations.each do |config|
-      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
+      if target.name == 'Sentry'
+        config.build_settings['BUILD_LIBRARY_FOR_DISTRIBUTION'] = 'YES'
+      end
+      if target.name == 'objective_c'
+        config.build_settings['GCC_WARN_INHIBIT_ALL_WARNINGS'] = 'YES'
+        config.build_settings['SWIFT_SUPPRESS_WARNINGS'] = 'YES'
+      end
     end
   end
+
+  nanopb_target = installer.pods_project.targets.find { |target| target.name == 'nanopb' }
+  if nanopb_target
+    nanopb_target.build_phases.each do |phase|
+      next unless phase.respond_to?(:files)
+      phase.files.to_a.each do |build_file|
+        file_ref = build_file.file_ref
+        relative_path = file_ref&.path
+        next unless relative_path&.match?(/ \d/)
+        phase.remove_build_file(build_file)
+        file_ref.remove_from_project if file_ref
+      end
+    end
+  end
+
+  iap_target = installer.pods_project.targets.find do |target|
+    target.name == 'in_app_purchase_storekit'
+  end
+
+  if iap_target
+    if (sources = iap_target.source_build_phase)
+      sources.files.to_a.each do |build_file|
+        sources.remove_build_file(build_file)
+      end
+    end
+    if (headers = iap_target.headers_build_phase)
+      headers.files.to_a.each do |build_file|
+        headers.remove_build_file(build_file)
+      end
+    end
+    iap_target.build_configurations.each do |config|
+      config.build_settings['GCC_WARN_INHIBIT_ALL_WARNINGS'] = 'YES'
+    end
+  end
+
+  patch_google_sign_in_indicator
+  patch_sentry_async_log
+  patch_sentry_file_manager
+  patch_sentry_dependency_container
+  patch_sentry_application_extensions
+  patch_sentry_installation
 end
 

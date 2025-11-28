@@ -1,36 +1,12 @@
-// import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:sentry_flutter/sentry_flutter.dart';
-// import 'package:go_router/go_router.dart';
-// import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:bizlevel/providers/goals_providers.dart';
 import 'package:bizlevel/screens/goal/widgets/motivation_card.dart';
-// import 'package:bizlevel/providers/goals_repository_provider.dart';
-import 'package:bizlevel/utils/constant.dart';
-// import 'package:bizlevel/widgets/floating_chat_bubble.dart';
-// import 'package:bizlevel/providers/auth_provider.dart';
-import 'package:bizlevel/screens/leo_dialog_screen.dart';
-// import 'package:bizlevel/screens/goal/widgets/goal_compact_card.dart';
-// import 'package:bizlevel/screens/goal/widgets/crystallization_section.dart';
-// import 'package:bizlevel/screens/goal/widgets/progress_widget.dart'; // 🗑️ Удалён - виджет больше не используется
-// import 'package:bizlevel/screens/goal/widgets/sprint_section.dart';
-// import 'package:bizlevel/screens/goal/widgets/daily_card.dart'; // 🗑️ Перенесён в DailySprint28Widget
-// import 'package:bizlevel/screens/goal/widgets/daily_calendar.dart'; // 🗑️ Перенесён в DailySprint28Widget
-// import 'package:bizlevel/screens/goal/widgets/next_action_banner.dart';
 import 'package:bizlevel/screens/goal/widgets/practice_journal_section.dart';
-// import 'package:bizlevel/screens/goal/widgets/goal_compact_card.dart';
-// import 'package:bizlevel/screens/goal/widgets/version_navigation_chips.dart';
-// import 'package:bizlevel/screens/goal/widgets/daily_sprint_28_widget.dart';
-// import 'package:bizlevel/screens/goal/controller/goal_screen_controller.dart';
-// import 'package:bizlevel/utils/constant.dart';
-// import 'package:bizlevel/services/notifications_service.dart';
-// import 'package:bizlevel/utils/friendly_messages.dart';
-// import 'package:bizlevel/providers/gp_providers.dart'; // streak claim removed; keep provider unused
 import 'package:bizlevel/theme/color.dart';
+import 'package:bizlevel/theme/spacing.dart';
 import 'package:bizlevel/screens/goal/widgets/goal_compact_card.dart';
 
 class GoalScreen extends ConsumerStatefulWidget {
@@ -62,51 +38,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
   // Удалено поле _debounce (не используется)
   // ignore: unused_field
   final bool _saving = false;
-  // int _selectedSprint = 1;
-  // bool _sprintSaved = false;
-  // final GlobalKey _sprintSectionKey = GlobalKey();
-  // bool _goalCardExpanded = false;
-  // Check-in techniques (визуальные чекбоксы вместо текстовых полей)
-  // Техники недели (для чек-ина): используем чекбоксы ниже формы
-  // Чекбоксы техник удалены — используем текстовое поле ниже по форме чек‑ина
-  // final TextEditingController _techOtherCtrl = TextEditingController();
-
-  // Sprint check-in form
-  // final TextEditingController _achievementCtrl = TextEditingController();
-  // final TextEditingController _metricActualCtrl = TextEditingController();
-  // bool _usedArtifacts = false;
-  // bool _consultedLeo = false;
-  // bool _appliedTechniques = false;
-  // final TextEditingController _keyInsightCtrl = TextEditingController();
-  // Краткие данные по неделям удалены — аккордеон получает summary из провайдера
-  // details for weekly progress
-  // final TextEditingController _artifactsDetailsCtrl = TextEditingController();
-  // final TextEditingController _consultedBenefitCtrl = TextEditingController();
-  // final TextEditingController _techniquesDetailsCtrl = TextEditingController();
-
-  // Checkboxes for weekly checks
-  // bool _chkEisenhower = false;
-  // bool _chkAccounting = false;
-  // bool _chkUSP = false;
-  // bool _chkSMART = false;
-
-  // Авто‑реакции/бонусы: в рамках сессии защищаемся от повторных триггеров
-  // static final Set<String> _autoReactionsFired = <String>{};
-  // static final Set<int> _bonusesClaimedInSession = <int>{}; // no direct client-claim
-
-  // Упрощённый экран: initState и логика версий/спринтов удалены
-
-  // Автосохранение отключено по требованию: слушателей не добавляем
-
-  // Удалены валидации для legacy версий v1–v4
-
-  // Сохранение версий отключено на странице «Цель». Редактирование доступно только в чекпоинтах.
-
-  // Удалены контроллеры/заполнение для версий цели (v1–v4)
-
-  // _miniMetric удалён — не используется в новой версии прогресс‑виджета
-
-  // _buildCurrentWeekSummary удалён — блок «Текущая неделя» исключён
+  // Упрощённый экран
 
   @override
   Widget build(BuildContext context) {
@@ -135,96 +67,34 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
         ),
         title: const Text('Цель'),
       ),
-      bottomNavigationBar: LayoutBuilder(
-        builder: (context, cons) {
-          // Простая эвристика мобайла: ширина < 600
-          if (cons.maxWidth >= 600 || !kGoalStickyCta) {
-            return const SizedBox.shrink();
-          }
-          return SafeArea(
-            top: false,
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-              decoration: BoxDecoration(
-                color: AppColor.card,
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColor.shadowColor.withValues(alpha: 0.08),
-                    blurRadius: 6,
-                    offset: const Offset(0, -2),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton(
-                      key: const ValueKey('goal_add_entry_cta'),
-                      onPressed: _scrollToJournal,
-                      child: const Text('Добавить запись'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: OutlinedButton(
-                      key: const ValueKey('goal_chat_max_cta'),
-                      onPressed: () {
-                        try {
-                          Sentry.addBreadcrumb(Breadcrumb(
-                              category: 'goal',
-                              message: 'chat_opened_from_goal',
-                              level: SentryLevel.info));
-                        } catch (_) {}
-                        final g = ref.read(userGoalProvider).asData?.value;
-                        final userCtxLines = <String>[
-                          if ((g?['goal_text'] ?? '')
-                              .toString()
-                              .trim()
-                              .isNotEmpty)
-                            'goal_text: ${g?['goal_text']}',
-                          if ((g?['metric_type'] ?? '')
-                              .toString()
-                              .trim()
-                              .isNotEmpty)
-                            'metric_type: ${g?['metric_type']}',
-                          if ((g?['metric_current'] ?? '')
-                              .toString()
-                              .trim()
-                              .isNotEmpty)
-                            'metric_current: ${g?['metric_current']}',
-                          if ((g?['metric_target'] ?? '')
-                              .toString()
-                              .trim()
-                              .isNotEmpty)
-                            'metric_target: ${g?['metric_target']}',
-                        ];
-                        Navigator.of(context).push(MaterialPageRoute(
-                          builder: (_) => LeoDialogScreen(
-                            bot: 'max',
-                            userContext: userCtxLines.join('\n'),
-                            levelContext: '',
-                          ),
-                        ));
-                      },
-                      child: const Text('Обсудить с Максом'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
+      // Нижние CTA удалены по новой спецификации
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 840),
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
+            padding: AppSpacing.insetsAll(AppSpacing.lg),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Автопрокрутка к журналу, если указан параметр ?scroll=journal
+                Builder(builder: (context) {
+                  try {
+                    final loc = GoRouter.of(context)
+                        .routeInformationProvider
+                        .value
+                        .uri
+                        .toString();
+                    final uri = Uri.parse(loc);
+                    if (uri.queryParameters['scroll'] == 'journal') {
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        _scrollToJournal();
+                      });
+                    }
+                  } catch (_) {}
+                  return const SizedBox.shrink();
+                }),
                 const MotivationCard(),
-                const SizedBox(height: 16),
+                AppSpacing.gapH(AppSpacing.lg),
                 // Онбординг: если цель ещё не задана — предложить начать с L1
                 Consumer(builder: (context, ref, _) {
                   final g = ref.watch(userGoalProvider).asData?.value;
@@ -233,7 +103,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                   if (!empty) return const SizedBox.shrink();
                   return Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.all(12),
+                    padding: AppSpacing.insetsAll(AppSpacing.md),
                     decoration: BoxDecoration(
                       color: AppColor.backgroundInfo,
                       borderRadius: BorderRadius.circular(12),
@@ -243,14 +113,14 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                       children: [
                         const Icon(Icons.flag_outlined,
                             color: AppColor.primary),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: AppSpacing.s10),
                         Expanded(
                           child: Text(
                             'Начните с формулировки первой цели. Это займёт 1–2 минуты.',
                             style: Theme.of(context).textTheme.bodyMedium,
                           ),
                         ),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: AppSpacing.s10),
                         ElevatedButton(
                           onPressed: () => context.go('/checkpoint/l1'),
                           child: const Text('Чекпоинт L1'),
@@ -259,14 +129,14 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                     ),
                   );
                 }),
-                const SizedBox(height: 16),
+                AppSpacing.gapH(AppSpacing.lg),
                 // Что дальше? (баннер) — удалён по новой спецификации
-                const SizedBox(height: 16),
+                AppSpacing.gapH(AppSpacing.lg),
 
                 // Моя цель (редактируемая)
                 const GoalCompactCard(),
 
-                const SizedBox(height: 20),
+                const SizedBox(height: AppSpacing.s20),
 
                 // Журнал применений
                 Container(

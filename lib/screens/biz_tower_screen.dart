@@ -37,13 +37,11 @@ class BizTowerScreen extends ConsumerStatefulWidget {
 
 /// Состояние экрана башни: содержит автоскролл и ключи узлов.
 class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
-  // ignore: unused_field
   final ScrollController _scrollController = ScrollController();
   final Map<int, GlobalKey> _nodeKeys = {};
   final GlobalKey _stackKey = GlobalKey();
   // Ранее использовалось для пересчётов; оставлено для возможной телеметрии
-  // ignore: unused_field
-  List<Map<String, dynamic>> _lastNodes = const [];
+  // _lastNodes удалён
   int? _lastScrolledTo;
 
   void _scheduleAutoscrollTo(int levelNumber) {
@@ -101,7 +99,6 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
         final nodesAsync = ref.watch(towerNodesProvider);
         return nodesAsync.when(
           data: (nodes) {
-            _lastNodes = nodes;
             // Обработка запроса автоскролла через переданный параметр scrollTo
             final int? requested = widget.scrollTo;
             if (requested != null && _lastScrolledTo != requested) {

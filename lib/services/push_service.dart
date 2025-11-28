@@ -1,13 +1,13 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:flutter/foundation.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bizlevel/services/notifications_service.dart';
+import 'package:bizlevel/constants/push_flags.dart';
 
 // Топ-левел background handler обязателен для Android
 @pragma('vm:entry-point')
@@ -31,13 +31,27 @@ class PushService {
   Future<void> initialize() async {
     // В вебе этот сервис не должен работать
     if (kIsWeb) return;
+    if (Platform.isIOS && !kEnableIosFcm) {
+      Sentry.addBreadcrumb(Breadcrumb(
+        category: 'push_service',
+        level: SentryLevel.info,
+        message: 'Skip PushService on iOS (kEnableIosFcm=false)',
+      ));
+      return;
+    }
 
     try {
       // Пытаемся инициализировать Firebase безопасно
       if (Firebase.apps.isEmpty) {
         await Firebase.initializeApp();
       }
+      Sentry.addBreadcrumb(Breadcrumb(
+        category: 'push_service',
+        level: SentryLevel.info,
+        message: 'FirebaseMessaging initialization started',
+      ));
       _fm = FirebaseMessaging.instance;
+      await _fm.setAutoInitEnabled(true);
 
       // Mobile permissions
       if (Platform.isIOS || Platform.isAndroid) {
@@ -98,6 +112,11 @@ class PushService {
       // Token lifecycle
       await _syncToken();
       _fm.onTokenRefresh.listen((t) => _registerToken(t));
+      Sentry.addBreadcrumb(Breadcrumb(
+        category: 'push_service',
+        level: SentryLevel.info,
+        message: 'FirebaseMessaging initialization completed',
+      ));
     } catch (e, st) {
       await Sentry.captureException(e, stackTrace: st);
     }
@@ -105,6 +124,11 @@ class PushService {
 
   Future<void> _syncToken() async {
     try {
+      Sentry.addBreadcrumb(Breadcrumb(
+        category: 'push_service',
+        level: SentryLevel.debug,
+        message: 'Requesting FCM token via _syncToken',
+      ));
       final token = await _fm.getToken();
       if (token != null && token.isNotEmpty) {
         await _registerToken(token);
@@ -152,9 +176,6 @@ class PushService {
   }
 
   Future<void> _storeLaunchRoute(String route) async {
-    try {
-      final box = await Hive.openBox('notifications');
-      await box.put('launch_route', route);
-    } catch (_) {}
+    await NotificationsService.instance.persistLaunchRoute(route);
   }
 }

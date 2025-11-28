@@ -26,7 +26,8 @@ class BottomBarItem extends StatelessWidget {
   final GestureTapCallback? onTap;
   final Widget? iconWidget;
   final String? label;
-  final Widget Function(bool isActive, Color color, Color activeColor)? iconBuilder;
+  final Widget Function(bool isActive, Color color, Color activeColor)?
+      iconBuilder;
 
   @override
   Widget build(BuildContext context) {

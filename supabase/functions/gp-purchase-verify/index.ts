@@ -84,6 +84,55 @@ function parseBalanceAfter(data: RpcResponse): number | null {
   return null;
 }
 
+function toHex(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  const hex: string[] = [];
+  for (let i = 0; i < bytes.length; i++) {
+    const h = bytes[i].toString(16).padStart(2, "0");
+    hex.push(h);
+  }
+  return hex.join("");
+}
+
+async function insertLog(data: Record<string, unknown>, userJwt: string) {
+  try {
+    const url = `${Deno.env.get("SUPABASE_URL")}/rest/v1/iap_verify_logs`;
+    const anon = Deno.env.get("SUPABASE_ANON_KEY");
+    const service = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!url || !anon) return;
+    // attempt as user (respect RLS) if JWT provided
+    let ok = false;
+    if (userJwt && userJwt.length > 20) {
+      const r1 = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": anon,
+          "Authorization": `Bearer ${userJwt}`,
+          "Prefer": "resolution=merge-duplicates"
+        },
+        body: JSON.stringify(data),
+      }).catch(() => undefined);
+      ok = !!(r1 && r1.ok);
+    }
+    // fallback with service role (bypass RLS) to avoid losing diagnostics
+    if (!ok && service) {
+      await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": anon,
+          "Authorization": `Bearer ${service}`,
+          "Prefer": "resolution=merge-duplicates"
+        },
+        body: JSON.stringify(data),
+      }).catch(() => undefined);
+    }
+  } catch {
+    // swallow any diagnostics errors
+  }
+}
+
 // -------- iOS: verifyReceipt (production → sandbox fallback) --------
 async function verifyAppleReceipt(productId: string, base64Receipt: string) {
   const payload = {
@@ -138,11 +187,13 @@ async function verifyGooglePurchase(productId: string, purchaseToken: string, pa
   };
   const enc = (obj: unknown) => btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(obj))));
   const toUint8 = (s: string) => new TextEncoder().encode(s);
-  const pem = svc.private_key as string; // -----BEGIN PRIVATE KEY----- ...
+  const pem = String(svc.private_key || ""); // may contain \n or \\n
+  // Normalize PEM: strip headers/footers and any newline encodings (\n or \\n or \r\n)
   const pkcs8 = pem
     .replace("-----BEGIN PRIVATE KEY-----", "")
     .replace("-----END PRIVATE KEY-----", "")
-    .replace(/\n/g, "");
+    .replace(/\r?\n/g, "")
+    .replace(/\\n/g, "");
   const raw = Uint8Array.from(atob(pkcs8), c => c.charCodeAt(0));
   const key = await crypto.subtle.importKey(
     "pkcs8",
@@ -194,17 +245,44 @@ Deno.serve(async (req: Request) => {
       },
     });
   }
+  // Диагностические поля, которые не требуют повторного чтения тела запроса
+  let dbgUserJwt = "";
+  let dbgPlatform = "";
+  let dbgProductId = "";
+  let dbgPackageName = "";
+  let dbgTokenPrefix = "";
+  let dbgTokenHash = "";
   try {
     const body = (await req.json()) as VerifyRequest;
+    dbgPlatform = body?.platform || "";
+    dbgProductId = body?.product_id || "";
+    dbgPackageName = body?.package_name || "";
+    if (body?.token) {
+      dbgTokenPrefix = body.token.slice(0, 10);
+      try {
+        dbgTokenHash = toHex(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(body.token)));
+      } catch (_) {}
+    }
     // Принимаем JWT как из x-user-jwt, так и из Authorization (если это не anon/service ключ)
-    const userJwt = extractUserJwt(req) || "";
-    if (!userJwt) return jsonResponse({ error: "no_user_jwt" }, 401);
+    dbgUserJwt = extractUserJwt(req) || "";
+    if (!dbgUserJwt) return jsonResponse({ error: "no_user_jwt" }, 401);
+    // стартовый лог
+    try {
+      await insertLog({
+        platform: dbgPlatform,
+        product_id: dbgProductId,
+        package_name: dbgPackageName,
+        token_prefix: dbgTokenPrefix,
+        token_hash: dbgTokenHash,
+        step: "start"
+      }, dbgUserJwt);
+    } catch (_) {}
 
     // --- Web branch: verify by purchase_id only ---
     if (body?.purchase_id && !body.platform && !body.product_id && !body.token) {
       const rpcData = await callPostgrestRpc("gp_purchase_verify", {
         p_purchase_id: body.purchase_id,
-      }, userJwt);
+      }, dbgUserJwt);
       const balance = parseBalanceAfter(rpcData);
       if (balance == null) return jsonResponse({ error: "rpc_no_balance" }, 500);
       return new Response(JSON.stringify({ balance_after: balance }), {
@@ -240,9 +318,20 @@ Deno.serve(async (req: Request) => {
     const rpcData = await callPostgrestRpc("gp_iap_credit", {
       p_purchase_id: purchaseId,
       p_amount_gp: amount,
-    }, userJwt);
+    }, dbgUserJwt);
     const balance = parseBalanceAfter(rpcData);
     if (balance == null) return jsonResponse({ error: "rpc_no_balance" }, 500);
+    try {
+      await insertLog({
+        platform: dbgPlatform,
+        product_id: dbgProductId,
+        package_name: dbgPackageName,
+        token_prefix: dbgTokenPrefix,
+        token_hash: dbgTokenHash,
+        step: "credited",
+        http_status: 200
+      }, dbgUserJwt);
+    } catch (_) {}
 
     return new Response(JSON.stringify({ balance_after: balance }), {
       status: 200,
@@ -252,6 +341,18 @@ Deno.serve(async (req: Request) => {
       },
     });
   } catch (e) {
+    const err = String((e as any)?.message || e);
+    try {
+      await insertLog({
+        platform: dbgPlatform,
+        product_id: dbgProductId,
+        package_name: dbgPackageName,
+        token_prefix: dbgTokenPrefix,
+        token_hash: dbgTokenHash,
+        step: "error",
+        error: err
+      }, dbgUserJwt);
+    } catch (_) { /* ignore logging failure */ }
     return new Response(JSON.stringify({ error: String((e as any)?.message || e) }), {
       status: 500,
       headers: {

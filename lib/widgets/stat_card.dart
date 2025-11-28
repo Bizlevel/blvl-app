@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:bizlevel/theme/color.dart';
+import 'package:bizlevel/theme/spacing.dart';
+import 'package:bizlevel/theme/dimensions.dart';
+import 'package:bizlevel/theme/typography.dart';
 
 /// Универсальная карточка для отображения числовой статистики с иконкой.
 /// Используется в ProfileScreen и LeoChatScreen вместо дублирующегося UI.
@@ -37,10 +40,10 @@ class StatCard extends StatelessWidget {
     return SizedBox(
       height: height,
       child: Container(
-        padding: const EdgeInsets.all(12),
+        padding: AppSpacing.insetsAll(AppSpacing.md),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          color: Colors.white,
+          borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
+          color: AppColor.surface,
           boxShadow: [
             BoxShadow(
               color: AppColor.shadowColor.withValues(alpha: 0.1),
@@ -57,26 +60,23 @@ class StatCard extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(icon, size: 24, color: color),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: AppSpacing.sm),
                   Text(
                     title,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     softWrap: true,
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: color,
-                    ),
+                    style: AppTypography.textTheme.bodyMedium
+                        ?.copyWith(color: color, fontWeight: FontWeight.w600),
                   ),
                 ],
               ),
             ),
             if (showChevron)
               Positioned(
-                right: 6,
-                top: 6,
+                right: AppSpacing.s6,
+                top: AppSpacing.s6,
                 child: Icon(
                   chevronIcon,
                   size: 16,

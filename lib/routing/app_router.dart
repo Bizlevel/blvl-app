@@ -143,6 +143,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       appShell,
     ],
     redirect: (context, state) {
+      try {
       final loggingIn = state.matchedLocation == '/login' ||
           state.matchedLocation == '/register';
       // Onboarding routes deprecated; no special handling
@@ -178,8 +179,13 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         }
       }
 
-      // no redirect
-      return null;
+        // no redirect
+        return null;
+      } on Object catch (error, stackTrace) {
+        // Защищаемся от неожиданных исключений (например, во время редиректа Supabase).
+        Sentry.captureException(error, stackTrace: stackTrace);
+        return '/login';
+      }
     },
   );
 });

@@ -126,7 +126,7 @@ class _FloatingChatBubbleState extends ConsumerState<FloatingChatBubble>
             label: Text(
               widget.bot == 'max' ? 'Новый чат с Максом' : 'Новый чат с Лео',
               style: const TextStyle(
-                  color: Colors.white, fontWeight: FontWeight.w600),
+                  color: AppColor.onPrimary, fontWeight: FontWeight.w600),
             ),
           ),
           if (unread > 0)
@@ -136,10 +136,11 @@ class _FloatingChatBubbleState extends ConsumerState<FloatingChatBubble>
               child: Container(
                 padding: const EdgeInsets.all(4),
                 decoration: const BoxDecoration(
-                    color: Colors.red, shape: BoxShape.circle),
+                    color: AppColor.error, shape: BoxShape.circle),
                 child: Text(
                   '$unread',
-                  style: const TextStyle(fontSize: 10, color: Colors.white),
+                  style:
+                      const TextStyle(fontSize: 10, color: AppColor.onPrimary),
                 ),
               ),
             ),

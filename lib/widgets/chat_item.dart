@@ -60,7 +60,8 @@ class _ChatItemState extends State<ChatItem> {
               boxShadow: [
                 BoxShadow(
                   // fix: тень → AppColor.shadow
-                  color: AppColor.shadow.withValues(alpha: _isHover ? 0.2 : 0.1),
+                  color:
+                      AppColor.shadow.withValues(alpha: _isHover ? 0.2 : 0.1),
                   spreadRadius: _isHover ? 2 : 1,
                   blurRadius: _isHover ? 4 : 1,
                   offset: const Offset(1, 1),
@@ -70,13 +71,13 @@ class _ChatItemState extends State<ChatItem> {
             child: Row(
               children: [
                 if (showPhoto) _buildPhoto(imagePath, botLabel),
-                if (showPhoto) const SizedBox(width: 10),
+                if (showPhoto) const SizedBox(width: AppSpacing.s10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _buildNameAndTime(),
-                      const SizedBox(height: 5),
+                      const SizedBox(height: AppSpacing.s5),
                       _buildTextAndNotified(),
                     ],
                   ),
@@ -123,7 +124,7 @@ class _ChatItemState extends State<ChatItem> {
           width: widget.profileSize,
           height: widget.profileSize,
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: AppSpacing.xs),
         if (botLabel.isNotEmpty)
           Text(
             botLabel,
@@ -153,7 +154,7 @@ class _ChatItemState extends State<ChatItem> {
                 ?.copyWith(fontWeight: FontWeight.w700),
           ),
         ),
-        const SizedBox(width: 5),
+        const SizedBox(width: AppSpacing.s5),
         Text(
           widget.chatData['date'] ?? '',
           maxLines: 1,

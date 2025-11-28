@@ -1,6 +1,18 @@
-// @ts-nocheck
-// 1. Добавьте ссылку на типы Deno для корректной работы
+// 1) Включены типы Deno; используем явные типы для пользовательских данных
 /// <reference types="https://deno.land/x/deno@1.36.1/lib.deno.d.ts" />
+
+type UserGoal = {
+  goal_text?: string;
+  metric_current?: number | null;
+  metric_target?: number | null;
+  target_date?: string | null;
+};
+
+type PracticeItem = {
+  applied_at: string;
+  applied_tools: string[] | null;
+  note: string | null;
+};
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { serve } from "https://deno.land/std@0.192.0/http/server.ts";

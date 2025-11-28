@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:bizlevel/theme/typography.dart';
+import 'package:bizlevel/theme/spacing.dart';
+import 'package:bizlevel/theme/color.dart';
 
 class QuizWidget extends StatefulWidget {
   final Map<String, dynamic>
@@ -35,18 +38,26 @@ class _QuizWidgetState extends State<QuizWidget> {
       children: [
         Text(
           widget.questionData['question'] as String,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          style: AppTypography.textTheme.titleMedium,
         ),
-        const SizedBox(height: 8),
-        ...List.generate(options.length, (idx) {
+        AppSpacing.gapH(AppSpacing.sm),
+        RadioGroup<int>(
+          groupValue: _selected,
+          onChanged: (value) {
+            if (_checked) return;
+            setState(() => _selected = value);
+          },
+          child: Column(
+            children: List.generate(options.length, (idx) {
           return RadioListTile<int>(
             value: idx,
-            groupValue: _selected,
-            onChanged: _checked ? null : (v) => setState(() => _selected = v),
+                enabled: !_checked,
             title: Text(options[idx]),
           );
         }),
-        const SizedBox(height: 8),
+          ),
+        ),
+        AppSpacing.gapH(AppSpacing.sm),
         if (!_checked)
           ElevatedButton(
             onPressed: _selected == null
@@ -63,15 +74,15 @@ class _QuizWidgetState extends State<QuizWidget> {
           )
         else ...{
           if (_isCorrect)
-            const Text('Верно! 👍',
-                style:
-                    TextStyle(color: Colors.green, fontWeight: FontWeight.w600))
+            Text('Верно! 👍',
+                style: AppTypography.textTheme.bodyMedium?.copyWith(
+                    color: AppColor.success, fontWeight: FontWeight.w600))
           else
             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('Неправильный ответ. Попробуйте ещё раз.',
-                  style: TextStyle(
-                      color: Colors.red, fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
+              Text('Неправильный ответ. Попробуйте ещё раз.',
+                  style: AppTypography.textTheme.bodyMedium?.copyWith(
+                      color: AppColor.error, fontWeight: FontWeight.w600)),
+              AppSpacing.gapH(AppSpacing.sm),
               ElevatedButton(
                 onPressed: () {
                   setState(() {

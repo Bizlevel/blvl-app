@@ -211,6 +211,25 @@ class SupabaseService {
     });
   }
 
+  /// Fetch artifact meta for a given level.
+  static Future<Map<String, dynamic>?> fetchLevelArtifactMeta(
+      int levelId) async {
+    return _withRetry(() async {
+      try {
+        final rows = await Supabase.instance.client
+            .from('levels')
+            .select('artifact_title, artifact_description, artifact_url')
+            .eq('id', levelId)
+            .maybeSingle();
+        if (rows == null) return null;
+        return Map<String, dynamic>.from(rows as Map);
+      } on PostgrestException catch (e, st) {
+        await _handlePostgrestException(e, st);
+        rethrow;
+      }
+    }, retries: 1);
+  }
+
   /// Marks level as completed for current user and bumps current_level if needed.
   static Future<void> completeLevel(int levelId) async {
     final user = Supabase.instance.client.auth.currentUser;

@@ -8,15 +8,10 @@ import 'package:bizlevel/providers/auth_provider.dart';
 import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/theme/spacing.dart';
 import 'package:bizlevel/widgets/custom_image.dart';
-// import 'package:bizlevel/widgets/stat_card.dart';
-// import 'package:bizlevel/widgets/setting_item.dart';
 import 'package:bizlevel/providers/levels_provider.dart';
 import 'package:bizlevel/models/user_model.dart';
 import 'package:go_router/go_router.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'dart:io';
 import 'package:bizlevel/providers/gp_providers.dart';
 import 'package:bizlevel/widgets/common/bizlevel_error.dart';
 import 'package:bizlevel/widgets/common/bizlevel_loading.dart';
@@ -25,8 +20,10 @@ import 'package:bizlevel/widgets/common/gp_balance_widget.dart';
 import 'package:bizlevel/widgets/common/bizlevel_card.dart';
 import 'package:bizlevel/widgets/common/bizlevel_text_field.dart';
 import 'package:bizlevel/widgets/reminders_settings_sheet.dart';
+import 'package:bizlevel/services/media_picker_service.dart';
 import 'package:bizlevel/widgets/common/achievement_badge.dart';
 import 'package:bizlevel/providers/theme_provider.dart';
+import 'package:bizlevel/theme/dimensions.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -181,7 +178,7 @@ class ProfileScreen extends ConsumerWidget {
               actions: [
                 // Мини‑баланс GP в шапке профиля (общий виджет)
                 Padding(
-                  padding: const EdgeInsets.only(right: 8),
+                  padding: const EdgeInsets.only(right: AppSpacing.sm),
                   child: SizedBox(
                     width: 90,
                     child: Builder(
@@ -230,13 +227,13 @@ class ProfileScreen extends ConsumerWidget {
                     }
                   },
                   itemBuilder: (context) => [
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: 'theme',
                       child: Row(
                         children: [
-                          Icon(Icons.brightness_6, size: 18),
-                          SizedBox(width: 10),
-                          Text('Тема: переключить'),
+                          const Icon(Icons.brightness_6, size: 18),
+                          AppSpacing.gapW(AppSpacing.s10),
+                          const Text('Тема: переключить'),
                         ],
                       ),
                     ),
@@ -245,7 +242,7 @@ class ProfileScreen extends ConsumerWidget {
                       child: Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(6),
+                            padding: const EdgeInsets.all(AppSpacing.s6),
                             decoration: const BoxDecoration(
                               color: AppColor.blue,
                               shape: BoxShape.circle,
@@ -260,7 +257,7 @@ class ProfileScreen extends ConsumerWidget {
                               height: 18,
                             ),
                           ),
-                          const SizedBox(width: 10),
+                          AppSpacing.gapW(AppSpacing.s10),
                           const Text('Уведомления'),
                         ],
                       ),
@@ -270,7 +267,7 @@ class ProfileScreen extends ConsumerWidget {
                       child: Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(6),
+                            padding: const EdgeInsets.all(AppSpacing.s6),
                             decoration: const BoxDecoration(
                               color: AppColor.blue,
                               shape: BoxShape.circle,
@@ -285,7 +282,7 @@ class ProfileScreen extends ConsumerWidget {
                               height: 18,
                             ),
                           ),
-                          const SizedBox(width: 10),
+                          AppSpacing.gapW(AppSpacing.s10),
                           const Text('Настройки'),
                         ],
                       ),
@@ -295,7 +292,7 @@ class ProfileScreen extends ConsumerWidget {
                       child: Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(6),
+                            padding: const EdgeInsets.all(AppSpacing.s6),
                             decoration: const BoxDecoration(
                               color: AppColor.orange,
                               shape: BoxShape.circle,
@@ -310,7 +307,7 @@ class ProfileScreen extends ConsumerWidget {
                               height: 18,
                             ),
                           ),
-                          const SizedBox(width: 10),
+                          AppSpacing.gapW(AppSpacing.s10),
                           const Text('Платежи'),
                         ],
                       ),
@@ -320,7 +317,7 @@ class ProfileScreen extends ConsumerWidget {
                       child: Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(6),
+                            padding: const EdgeInsets.all(AppSpacing.s6),
                             decoration: const BoxDecoration(
                               color: AppColor.red,
                               shape: BoxShape.circle,
@@ -335,7 +332,7 @@ class ProfileScreen extends ConsumerWidget {
                               height: 18,
                             ),
                           ),
-                          const SizedBox(width: 10),
+                          AppSpacing.gapW(AppSpacing.s10),
                           const Text('Выход'),
                         ],
                       ),
@@ -397,8 +394,29 @@ class _Body extends ConsumerStatefulWidget {
 }
 
 class _BodyState extends ConsumerState<_Body> {
-  // ignore: unused_field
-  bool _isUploading = false;
+  Uint8List? _avatarPreviewBytes;
+
+  Future<void> _pickAvatarFromGallery() async {
+    final result =
+        await MediaPickerService.instance.pickImageFromGallery(context);
+    if (!mounted || result == null) return;
+    setState(() {
+      _avatarPreviewBytes = result.bytes;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Фото выбрано. Синхронизация с профилем появится позже.'),
+      ),
+    );
+  }
+
+  void _clearAvatarPreview() {
+    if (_avatarPreviewBytes == null) return;
+    setState(() {
+      _avatarPreviewBytes = null;
+    });
+  }
+  // Upload артефактов убран — состояние загрузки не требуется
 
   // Плюрализация артефактов больше не используется
 
@@ -510,64 +528,6 @@ class _BodyState extends ConsumerState<_Body> {
     }
   }
 
-  // ignore: unused_element
-  Future<void> _uploadFile() async {
-    setState(() {
-      _isUploading = true;
-    });
-
-    try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['pdf'],
-      );
-
-      if (result == null || result.files.single.path == null) {
-        debugPrint('File picking cancelled.');
-        setState(() {
-          _isUploading = false;
-        });
-        return;
-      }
-
-      final file = result.files.single;
-      final filePath = file.path!;
-      final fileName = file.name;
-
-      debugPrint('Attempting to upload: $fileName');
-
-      final response =
-          await Supabase.instance.client.storage.from('artifacts').upload(
-                fileName,
-                File(filePath),
-              );
-
-      debugPrint('Upload successful: $response');
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Upload successful!')),
-      );
-    } on StorageException catch (e) {
-      debugPrint('Detailed Storage Error: ${e.message}');
-      debugPrint('Detailed Storage Error statusCode: ${e.statusCode}');
-      debugPrint('Detailed Storage Error error: ${e.error}');
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Storage Error: ${e.message}')),
-      );
-    } catch (e) {
-      debugPrint('An unexpected error occurred: $e');
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('An unexpected error occurred: $e')),
-      );
-    } finally {
-      setState(() {
-        _isUploading = false;
-      });
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final skillsAsync = ref.watch(userSkillsProvider);
@@ -596,19 +556,19 @@ class _BodyState extends ConsumerState<_Body> {
                     .titleMedium
                     ?.copyWith(fontWeight: FontWeight.w600)),
           ),
-          const SizedBox(height: 8),
-          const SingleChildScrollView(
+          AppSpacing.gapH(AppSpacing.sm),
+          SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
-                AchievementBadge(icon: Icons.flag, label: 'Первая цель'),
-                SizedBox(width: 12),
-                AchievementBadge(
+                const AchievementBadge(icon: Icons.flag, label: 'Первая цель'),
+                AppSpacing.gapW(AppSpacing.md),
+                const AchievementBadge(
                     icon: Icons.rocket_launch,
                     rarity: AchievementRarity.rare,
                     label: '5 уровней'),
-                SizedBox(width: 12),
-                AchievementBadge(
+                AppSpacing.gapW(AppSpacing.md),
+                const AchievementBadge(
                     icon: Icons.stars,
                     rarity: AchievementRarity.epic,
                     label: 'AI‑навык +50'),
@@ -628,51 +588,37 @@ class _BodyState extends ConsumerState<_Body> {
         ? 'assets/images/avatars/avatar_${widget.avatarId}.png'
         : '';
 
+    final Widget avatarImage = _avatarPreviewBytes != null
+        ? ClipRRect(
+            borderRadius: BorderRadius.circular(40),
+            child: Image.memory(
+              _avatarPreviewBytes!,
+              width: 80,
+              height: 80,
+              fit: BoxFit.cover,
+            ),
+          )
+        : CustomImage(
+            (localAsset.isNotEmpty
+                ? localAsset
+                : "https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=800&q=60"),
+            width: 80,
+            height: 80,
+            radius: 40,
+            isNetwork: localAsset.isEmpty,
+          );
+
     return Semantics(
         label: 'Аватар пользователя',
         button: true,
         child: Row(
           children: [
-            Stack(
-              alignment: Alignment.bottomRight,
-              children: [
-                GestureDetector(
-                  onTap: _showAvatarPicker,
-                  child: CustomImage(
-                    (localAsset.isNotEmpty
-                        ? localAsset
-                        : "https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=800&q=60"),
-                    width: 80,
-                    height: 80,
-                    radius: 40,
-                    isNetwork: localAsset.isEmpty,
-                  ),
-                ),
-                Positioned(
-                  bottom: 0,
-                  right: 0,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: AppColor.surface,
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: AppColor.shadow,
-                          blurRadius: 2,
-                        ),
-                      ],
-                    ),
-                    child: const Padding(
-                      padding: EdgeInsets.all(4.0),
-                      child: Icon(
-                        Icons.camera_alt,
-                        size: 16,
-                        color: AppColor.primary,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+            _AvatarControls(
+              avatarImage: avatarImage,
+              onPickPreset: _showAvatarPicker,
+              onPickGallery: _pickAvatarFromGallery,
+              onResetPreview: _clearAvatarPreview,
+              hasPreview: _avatarPreviewBytes != null,
             ),
             const SizedBox(width: AppSpacing.medium),
             Expanded(
@@ -696,7 +642,7 @@ class _BodyState extends ConsumerState<_Body> {
                                   .headlineMedium
                                   ?.copyWith(fontWeight: FontWeight.w600),
                             ),
-                            const SizedBox(height: 6),
+                            AppSpacing.gapH(AppSpacing.s6),
                             Builder(builder: (context) {
                               final n = ref
                                       .watch(currentLevelNumberProvider)
@@ -724,8 +670,8 @@ class _BodyState extends ConsumerState<_Body> {
                             child: OutlinedButton(
                               onPressed: _openAboutMeModal,
                               style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 10, vertical: 6),
+                                padding: AppSpacing.insetsSymmetric(
+                                    h: AppSpacing.s10, v: AppSpacing.s6),
                                 minimumSize: const Size(0, 0),
                                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                 side: BorderSide(
@@ -754,6 +700,107 @@ class _BodyState extends ConsumerState<_Body> {
   // Секции настроек/платежей/выхода перенесены в меню шестерёнки AppBar
 
   // Секция артефактов удалена согласно задаче 31.16 — используется модалка
+}
+
+class _AvatarControls extends StatelessWidget {
+  const _AvatarControls({
+    required this.avatarImage,
+    required this.onPickPreset,
+    required this.onPickGallery,
+    required this.onResetPreview,
+    required this.hasPreview,
+  });
+
+  final Widget avatarImage;
+  final VoidCallback onPickPreset;
+  final VoidCallback onPickGallery;
+  final VoidCallback onResetPreview;
+  final bool hasPreview;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Stack(
+          alignment: Alignment.bottomRight,
+          children: [
+            GestureDetector(
+              onTap: onPickPreset,
+              child: avatarImage,
+            ),
+            Positioned(
+              bottom: 0,
+              right: 0,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: AppColor.surface,
+                  borderRadius: BorderRadius.circular(AppDimensions.radiusXxl),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: AppColor.shadow,
+                      blurRadius: 2,
+                    ),
+                  ],
+                ),
+                child: Padding(
+                  padding: AppSpacing.insetsAll(AppSpacing.xs),
+                  child: const Icon(
+                    Icons.camera_alt,
+                    size: 16,
+                    color: AppColor.primary,
+                  ),
+                ),
+              ),
+            ),
+            if (hasPreview)
+              Positioned(
+                top: 0,
+                left: 0,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColor.orange,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text(
+                    'BETA',
+                    style: TextStyle(
+                      color: AppColor.onPrimary,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        TextButton.icon(
+          onPressed: onPickGallery,
+          style: TextButton.styleFrom(
+            padding: EdgeInsets.zero,
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+          icon: const Icon(Icons.photo_library_outlined, size: 16),
+          label: const Text('Галерея (beta)'),
+        ),
+        if (hasPreview)
+          TextButton(
+            onPressed: onResetPreview,
+            style: TextButton.styleFrom(
+              padding: EdgeInsets.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: const Text(
+              'Сбросить фото',
+              style: TextStyle(fontSize: 12),
+            ),
+          ),
+      ],
+    );
+  }
 }
 
 class _AboutMeCard extends ConsumerStatefulWidget {
@@ -865,8 +912,10 @@ class _AboutMeCardState extends ConsumerState<_AboutMeCard> {
     if (!_editing) {
       final chips = (widget.user.keyChallenges ?? const [])
           .map((e) => Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                margin: const EdgeInsets.only(right: 6, bottom: 6),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
+                margin: const EdgeInsets.only(
+                    right: AppSpacing.s6, bottom: AppSpacing.s6),
                 decoration: BoxDecoration(
                   color: AppColor.primary.withValues(alpha: 0.06),
                   borderRadius: BorderRadius.circular(8),
@@ -899,7 +948,7 @@ class _AboutMeCardState extends ConsumerState<_AboutMeCard> {
                   ),
                 Container(
                   width: 130,
-                  margin: const EdgeInsets.only(right: 4),
+                  margin: const EdgeInsets.only(right: AppSpacing.xs),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -912,7 +961,7 @@ class _AboutMeCardState extends ConsumerState<_AboutMeCard> {
                             .labelSmall
                             ?.copyWith(color: AppColor.onSurfaceSubtle),
                       ),
-                      const SizedBox(height: 4),
+                      AppSpacing.gapH(AppSpacing.xs),
                       SizedBox(
                         height: 3,
                         child: ClipRRect(
@@ -937,7 +986,7 @@ class _AboutMeCardState extends ConsumerState<_AboutMeCard> {
                 )
               ],
             ),
-            const SizedBox(height: 8),
+            AppSpacing.gapH(AppSpacing.sm),
             _kv('Как к вам обращаться', widget.user.name),
             _kv('Цель обучения', widget.user.goal ?? '—'),
             _kv('Сфера деятельности', widget.user.businessArea ?? '—'),
@@ -950,10 +999,10 @@ class _AboutMeCardState extends ConsumerState<_AboutMeCard> {
               _kv('Регион ведения бизнеса', widget.user.businessRegion ?? '—'),
             ],
             if (chips.isNotEmpty) ...[
-              const SizedBox(height: 8),
+              AppSpacing.gapH(AppSpacing.sm),
               Wrap(children: chips),
             ],
-            const SizedBox(height: 8),
+            AppSpacing.gapH(AppSpacing.sm),
             Text(
               'Чем подробнее вы заполните профиль, тем точнее советы Лео и Макса.',
               style: Theme.of(context)
@@ -961,7 +1010,7 @@ class _AboutMeCardState extends ConsumerState<_AboutMeCard> {
                   .bodyMedium
                   ?.copyWith(color: AppColor.onSurfaceSubtle),
             ),
-            const SizedBox(height: 10),
+            AppSpacing.gapH(AppSpacing.s10),
             Align(
               alignment: Alignment.centerLeft,
               child: TextButton(
@@ -1000,24 +1049,24 @@ class _AboutMeCardState extends ConsumerState<_AboutMeCard> {
               )
             ],
           ),
-          const SizedBox(height: 8),
+          AppSpacing.gapH(AppSpacing.sm),
           BizLevelTextField(
               label: 'Как к вам обращаться', controller: _nameCtrl),
-          const SizedBox(height: 12),
+          AppSpacing.gapH(AppSpacing.md),
           BizLevelTextField(label: 'Кратко о себе', controller: _aboutCtrl),
-          const SizedBox(height: 12),
+          AppSpacing.gapH(AppSpacing.md),
           BizLevelTextField(
             label: 'Ваша цель обучения',
             controller: _goalCtrl,
             hint: 'Ключевой результат и зачем он вам',
           ),
-          const SizedBox(height: 12),
+          AppSpacing.gapH(AppSpacing.md),
           BizLevelTextField(
             label: 'Сфера деятельности',
             controller: _businessAreaCtrl,
             hint: 'Например: розница, услуги, производство',
           ),
-          const SizedBox(height: 12),
+          AppSpacing.gapH(AppSpacing.md),
           _ExperienceChips(
             label: 'Уровень опыта',
             value: _experienceLevelCtrl.text.isNotEmpty
@@ -1029,7 +1078,7 @@ class _AboutMeCardState extends ConsumerState<_AboutMeCard> {
               setState(() {});
             },
           ),
-          const SizedBox(height: 12),
+          AppSpacing.gapH(AppSpacing.md),
           _DropdownLabeled(
             label: 'Размер бизнеса',
             value: _businessSizeCtrl.text.isNotEmpty
@@ -1046,7 +1095,7 @@ class _AboutMeCardState extends ConsumerState<_AboutMeCard> {
               setState(() {});
             },
           ),
-          const SizedBox(height: 12),
+          AppSpacing.gapH(AppSpacing.md),
           _ChallengesEditor(
             initial: _keyChallenges,
             onChanged: (set) => setState(() {
@@ -1055,7 +1104,7 @@ class _AboutMeCardState extends ConsumerState<_AboutMeCard> {
                 ..addAll(set);
             }),
           ),
-          const SizedBox(height: 12),
+          AppSpacing.gapH(AppSpacing.md),
           _DropdownLabeled(
             label: 'Предпочитаемый стиль обучения',
             value: _learningStyleCtrl.text.isNotEmpty
@@ -1071,13 +1120,13 @@ class _AboutMeCardState extends ConsumerState<_AboutMeCard> {
               setState(() {});
             },
           ),
-          const SizedBox(height: 12),
+          AppSpacing.gapH(AppSpacing.md),
           BizLevelTextField(
             label: 'Регион ведения бизнеса',
             controller: _businessRegionCtrl,
             hint: 'Город/область — влияет на советы',
           ),
-          const SizedBox(height: 16),
+          AppSpacing.gapH(AppSpacing.xl),
           Row(
             children: [
               Expanded(
@@ -1114,7 +1163,7 @@ class _AboutMeCardState extends ConsumerState<_AboutMeCard> {
 
   Widget _kv(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1126,7 +1175,7 @@ class _AboutMeCardState extends ConsumerState<_AboutMeCard> {
                     .bodyMedium
                     ?.copyWith(color: AppColor.onSurfaceSubtle)),
           ),
-          const SizedBox(width: 8),
+          AppSpacing.gapW(AppSpacing.sm),
           Expanded(
             child: Text(value.isEmpty ? '—' : value,
                 style: Theme.of(context).textTheme.bodyMedium),
@@ -1143,18 +1192,18 @@ class _InfoButtonLabel extends StatelessWidget {
   const _InfoButtonLabel();
   @override
   Widget build(BuildContext context) {
-    return const Column(
+    return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        Text('Информация'),
-        SizedBox(height: 2),
+        const Text('Информация'),
+        AppSpacing.gapH(AppSpacing.xs),
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('обо мне'),
-            SizedBox(width: 6),
-            Icon(Icons.chevron_right, size: 18),
+            const Text('обо мне'),
+            AppSpacing.gapW(AppSpacing.s6),
+            const Icon(Icons.chevron_right, size: 18),
           ],
         ),
       ],
@@ -1196,7 +1245,7 @@ class _ExperienceChips extends StatelessWidget {
               .bodyMedium
               ?.copyWith(fontWeight: FontWeight.w600),
         ),
-        const SizedBox(height: 6),
+        AppSpacing.gapH(AppSpacing.s6),
         Wrap(
           spacing: 8,
           runSpacing: 8,
@@ -1209,8 +1258,8 @@ class _ExperienceChips extends StatelessWidget {
               child: GestureDetector(
                 onTap: () => onChanged(isSelected ? null : o),
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.s10, vertical: AppSpacing.s6),
                   decoration: BoxDecoration(
                     color: isSelected
                         ? AppColor.primary.withValues(alpha: 0.1)
@@ -1267,9 +1316,9 @@ class _DropdownLabeled extends StatelessWidget {
               .bodyMedium
               ?.copyWith(fontWeight: FontWeight.w600),
         ),
-        const SizedBox(height: 6),
+        AppSpacing.gapH(AppSpacing.s6),
         DropdownButtonFormField<String>(
-          value: value,
+          initialValue: value,
           items: options
               .map((e) => DropdownMenuItem<String>(
                     value: e,
@@ -1280,7 +1329,8 @@ class _DropdownLabeled extends StatelessWidget {
           decoration: const InputDecoration(
             border: OutlineInputBorder(),
             isDense: true,
-            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            contentPadding: EdgeInsets.symmetric(
+                horizontal: AppSpacing.md, vertical: AppSpacing.md),
           ),
         ),
       ],
@@ -1310,7 +1360,7 @@ class _ChallengesEditorState extends State<_ChallengesEditor> {
                 .textTheme
                 .bodyMedium
                 ?.copyWith(fontWeight: FontWeight.w600)),
-        const SizedBox(height: 8),
+        AppSpacing.gapH(AppSpacing.sm),
         Wrap(
           spacing: 8,
           runSpacing: 8,
@@ -1333,8 +1383,8 @@ class _ChallengesEditorState extends State<_ChallengesEditor> {
                     widget.onChanged(_selected);
                   },
                   child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.s10, vertical: AppSpacing.s6),
                     decoration: BoxDecoration(
                       color: isSelected
                           ? AppColor.primary.withValues(alpha: 0.1)
@@ -1378,8 +1428,8 @@ class _ChallengesEditorState extends State<_ChallengesEditor> {
                     widget.onChanged(_selected);
                   },
                   child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.s10, vertical: AppSpacing.s6),
                     decoration: BoxDecoration(
                       color: isSelected
                           ? AppColor.primary.withValues(alpha: 0.1)
@@ -1406,7 +1456,7 @@ class _ChallengesEditorState extends State<_ChallengesEditor> {
                                         : FontWeight.w400,
                                   ),
                         ),
-                        const SizedBox(width: 6),
+                        AppSpacing.gapW(AppSpacing.s6),
                         const Icon(Icons.close,
                             size: 14, color: AppColor.onSurfaceSubtle),
                       ],
@@ -1418,8 +1468,8 @@ class _ChallengesEditorState extends State<_ChallengesEditor> {
             GestureDetector(
               onTap: _onAddCustomTap,
               child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.s10, vertical: AppSpacing.s6),
                 decoration: BoxDecoration(
                   color: AppColor.surface,
                   borderRadius: BorderRadius.circular(12),
@@ -1427,12 +1477,13 @@ class _ChallengesEditorState extends State<_ChallengesEditor> {
                     color: AppColor.onSurfaceSubtle.withValues(alpha: 0.3),
                   ),
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.add, size: 16, color: AppColor.onSurfaceSubtle),
-                    SizedBox(width: 6),
-                    Text('Добавить своё'),
+                    const Icon(Icons.add,
+                        size: 16, color: AppColor.onSurfaceSubtle),
+                    AppSpacing.gapW(AppSpacing.s6),
+                    const Text('Добавить своё'),
                   ],
                 ),
               ),

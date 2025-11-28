@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:bizlevel/theme/color.dart';
+import 'package:bizlevel/theme/spacing.dart';
 
 class BreadcrumbItem {
   final String label;
@@ -15,8 +17,9 @@ class Breadcrumb extends StatelessWidget {
   const Breadcrumb(
       {super.key,
       required this.items,
-      this.padding = const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      this.separatorSpacing = 6});
+      this.padding = const EdgeInsets.symmetric(
+          horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
+      this.separatorSpacing = AppSpacing.s6});
 
   @override
   Widget build(BuildContext context) {
@@ -31,16 +34,17 @@ class Breadcrumb extends StatelessWidget {
         overflow: TextOverflow.ellipsis,
         style: isLast || item.isCurrent
             ? theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)
-            : theme.textTheme.bodyMedium?.copyWith(color: Colors.blueAccent),
+            : theme.textTheme.bodyMedium?.copyWith(color: AppColor.primary),
       );
       final widget = item.onTap != null && !isLast
           ? InkWell(onTap: item.onTap, child: text)
           : text;
       children.add(Flexible(child: widget));
       if (!isLast) {
-        children.add(SizedBox(width: separatorSpacing));
-        children.add(const Text('›', style: TextStyle(color: Colors.grey)));
-        children.add(SizedBox(width: separatorSpacing));
+        children.add(AppSpacing.gapW(separatorSpacing));
+        children.add(
+            const Text('›', style: TextStyle(color: AppColor.onSurfaceSubtle)));
+        children.add(AppSpacing.gapW(separatorSpacing));
       }
     }
 

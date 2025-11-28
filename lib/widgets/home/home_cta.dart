@@ -8,7 +8,12 @@ class HomeCta extends StatefulWidget {
   final String subtitle;
   final VoidCallback onTap;
   final double? height;
-  const HomeCta({super.key, required this.title, required this.subtitle, required this.onTap, this.height});
+  const HomeCta(
+      {super.key,
+      required this.title,
+      required this.subtitle,
+      required this.onTap,
+      this.height});
 
   @override
   State<HomeCta> createState() => _HomeCtaState();
@@ -20,7 +25,8 @@ class _HomeCtaState extends State<HomeCta> with SingleTickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
-    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 600));
+    _ctrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 600));
     _pulse();
   }
 
@@ -74,7 +80,8 @@ class _HomeCtaState extends State<HomeCta> with SingleTickerProviderStateMixin {
                   padding: const EdgeInsets.all(AppSpacing.lg),
                   child: Row(
                     children: [
-                      const Icon(Icons.play_arrow_rounded, color: AppColor.onPrimary, size: 24),
+                      const Icon(Icons.play_arrow_rounded,
+                          color: AppColor.onPrimary, size: 24),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Column(
@@ -100,7 +107,9 @@ class _HomeCtaState extends State<HomeCta> with SingleTickerProviderStateMixin {
                               style: Theme.of(context)
                                   .textTheme
                                   .bodyMedium
-                                  ?.copyWith(color: AppColor.onPrimary.withValues(alpha: 0.85)),
+                                  ?.copyWith(
+                                      color: AppColor.onPrimary
+                                          .withValues(alpha: 0.85)),
                             ),
                           ],
                         ),
@@ -116,5 +125,3 @@ class _HomeCtaState extends State<HomeCta> with SingleTickerProviderStateMixin {
     );
   }
 }
-
-

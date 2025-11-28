@@ -28,19 +28,34 @@
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>com.googleusercontent.apps.355423136369-rv6g5rhcjionialj4ho5pvbmvss6gk9h</string>
-			</array>
-		</dict>
-		<dict>
-			<key>CFBundleTypeRole</key>
-			<string>Editor</string>
-			<key>CFBundleURLSchemes</key>
-			<array>
-				<string>bizlevel.kz</string>
+				<string>com.googleusercontent.apps.1094397921402-o18r96t64iloastkode24ejof7j4iman</string>
 			</array>
 		</dict>
 	</array>
+	<key>GIDClientID</key>
+	<string>355423136369-rv6g5rhcjionialj4ho5pvbmvss6gk9h.apps.googleusercontent.com</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>FirebaseAppDelegateProxyEnabled</key>
+	<false/>
+	<key>FirebaseMessagingAutoInitEnabled</key>
+	<false/>
+	<key>FirebaseAppCheckUseDebugProvider</key>
+	<false/>
+	<key>EnableIosFcm</key>
+	<true/>
+	<key>FirebaseEnableDebugLogging</key>
+	<false/>
+	<key>FirebaseInstallationsAutoInitEnabled</key>
+	<false/>
+	<key>SentryDisableLaunchProfile</key>
+	<true/>
+	<key>SentryAsyncNativeInit</key>
+	<true/>
+	<key>SentryNativeInitDelaySeconds</key>
+	<integer>0</integer>
+	<key>GULAppDelegateSwizzlerEnabled</key>
+	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
@@ -49,6 +64,8 @@
 	<string>Сохраняем изображения в галерею только по вашему запросу (экспорт/скачивание).</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Нужен доступ к фото, чтобы выбрать аватар и прикреплять изображения.</string>
+	<key>PHPhotoLibraryPreventAutomaticLimitedAccessAlert</key>
+	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UIBackgroundModes</key>
@@ -74,5 +91,22 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<false/>
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<false/>
+		<key>UISceneConfigurations</key>
+		<dict>
+			<key>UIWindowSceneSessionRoleApplication</key>
+			<array>
+				<dict>
+					<key>UISceneConfigurationName</key>
+					<string>Default Configuration</string>
+					<key>UISceneDelegateClassName</key>
+					<string>$(PRODUCT_MODULE_NAME).SceneDelegate</string>
+				</dict>
+			</array>
+		</dict>
+	</dict>
 </dict>
 </plist>

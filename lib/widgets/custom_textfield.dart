@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:bizlevel/theme/color.dart';
+import 'package:bizlevel/theme/spacing.dart';
+import 'package:bizlevel/theme/dimensions.dart';
+import 'package:bizlevel/theme/typography.dart';
 
 class CustomTextBox extends StatelessWidget {
   const CustomTextBox({
@@ -29,17 +32,18 @@ class CustomTextBox extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       alignment: Alignment.center,
-      padding: const EdgeInsets.only(bottom: 3),
-      constraints: const BoxConstraints(minHeight: 48),
+      padding: const EdgeInsets.only(bottom: AppSpacing.xs3),
+      constraints:
+          const BoxConstraints(minHeight: AppDimensions.minButtonHeight),
       decoration: BoxDecoration(
         color: (readOnly && readOnlySoftBackground)
-            ? Colors.grey.shade100
+            ? AppColor.appBarColor
             : AppColor.textBoxColor,
         border: Border.all(
             color: (readOnly && readOnlySoftBackground)
-                ? Colors.grey.shade100
+                ? AppColor.appBarColor
                 : AppColor.textBoxColor),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(AppDimensions.radius10),
         boxShadow: [
           BoxShadow(
             color: AppColor.shadowColor.withValues(alpha: 0.05),
@@ -61,15 +65,11 @@ class CustomTextBox extends StatelessWidget {
           suffixIcon: suffix,
           border: InputBorder.none,
           hintText: hint,
-          hintStyle: const TextStyle(
-            color: Colors.grey,
-            fontSize: 15,
-          ),
+          hintStyle: AppTypography.textTheme.bodyMedium
+              ?.copyWith(color: AppColor.labelColor),
           isDense: false,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 12,
-            vertical: 10,
-          ),
+          contentPadding:
+              AppSpacing.insetsSymmetric(h: AppSpacing.md, v: AppSpacing.s10),
         ),
       ),
     );

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:bizlevel/theme/color.dart';
 import 'package:flutter/services.dart';
+import 'package:bizlevel/theme/dimensions.dart';
+import 'package:bizlevel/theme/spacing.dart';
 
 enum BizLevelButtonVariant { primary, secondary, outline, text, danger, link }
 
@@ -46,11 +48,11 @@ class BizLevelButton extends StatelessWidget {
   EdgeInsets get _padding {
     switch (size) {
       case BizLevelButtonSize.sm:
-        return const EdgeInsets.symmetric(horizontal: 12, vertical: 10);
+        return AppSpacing.insetsSymmetric(h: AppSpacing.md, v: AppSpacing.s10);
       case BizLevelButtonSize.md:
-        return const EdgeInsets.symmetric(horizontal: 16, vertical: 12);
+        return AppSpacing.insetsSymmetric(h: AppSpacing.lg, v: AppSpacing.md);
       case BizLevelButtonSize.lg:
-        return const EdgeInsets.symmetric(horizontal: 20, vertical: 14);
+        return AppSpacing.insetsSymmetric(h: AppSpacing.s20, v: AppSpacing.s14);
     }
   }
 
@@ -66,13 +68,23 @@ class BizLevelButton extends StatelessWidget {
     }
 
     final child = icon == null
-        ? Text(label)
+        ? Text(
+            label,
+            softWrap: true,
+            maxLines: 2,
+          )
         : Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               icon!,
               const SizedBox(width: 8),
-              Flexible(child: Text(label, overflow: TextOverflow.ellipsis)),
+              Flexible(
+                child: Text(
+                  label,
+                  softWrap: true,
+                  maxLines: 2,
+                ),
+              ),
             ],
           );
 
@@ -88,7 +100,7 @@ class BizLevelButton extends StatelessWidget {
             minimumSize: _minSize,
             padding: _padding,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
             ),
           ),
           child: child,
@@ -106,7 +118,7 @@ class BizLevelButton extends StatelessWidget {
             minimumSize: _minSize,
             padding: _padding,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
             ),
           ),
           child: child,
@@ -122,7 +134,7 @@ class BizLevelButton extends StatelessWidget {
             side: const BorderSide(color: AppColor.primary),
             foregroundColor: AppColor.primary,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
             ),
           ),
           child: child,
@@ -163,7 +175,7 @@ class BizLevelButton extends StatelessWidget {
             side: const BorderSide(color: AppColor.borderColor),
             foregroundColor: AppColor.primary,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
             ),
             backgroundColor: AppColor.surface,
           ),

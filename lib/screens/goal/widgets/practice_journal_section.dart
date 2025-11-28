@@ -11,6 +11,8 @@ import 'package:bizlevel/widgets/common/bizlevel_button.dart';
 import 'package:bizlevel/widgets/common/bizlevel_card.dart';
 import 'package:bizlevel/theme/spacing.dart';
 import 'package:bizlevel/theme/color.dart';
+import 'package:bizlevel/utils/max_context_helper.dart';
+import 'package:bizlevel/theme/dimensions.dart';
 
 class PracticeJournalSection extends ConsumerStatefulWidget {
   const PracticeJournalSection({super.key});
@@ -23,12 +25,15 @@ class PracticeJournalSection extends ConsumerStatefulWidget {
 class _PracticeJournalSectionState
     extends ConsumerState<PracticeJournalSection> {
   final TextEditingController _practiceNoteCtrl = TextEditingController();
+  final TextEditingController _metricUpdateCtrl = TextEditingController();
   final Set<String> _selectedTools = <String>{};
   bool _showMomentum = false;
+  bool _selectingGuard = false;
 
   @override
   void dispose() {
     _practiceNoteCtrl.dispose();
+    _metricUpdateCtrl.dispose();
     super.dispose();
   }
 
@@ -90,7 +95,7 @@ class _PracticeJournalSectionState
                 });
                 return const SizedBox.shrink();
               }),
-              const SizedBox(height: 12),
+              AppSpacing.gapH(AppSpacing.md),
               FutureBuilder(
                 future: ref.read(practiceLogAggregatesProvider.future),
                 builder: (ctx, snap) {
@@ -101,13 +106,13 @@ class _PracticeJournalSectionState
                   if (top.isEmpty) return const SizedBox.shrink();
                   final top3 = top.take(3).toList();
                   return Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.only(bottom: AppSpacing.sm),
                     child: Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
+                      spacing: AppSpacing.sm,
+                      runSpacing: AppSpacing.sm,
                       children: [
                         Padding(
-                          padding: const EdgeInsets.only(bottom: 4),
+                          padding: const EdgeInsets.only(bottom: AppSpacing.xs),
                           child: Text(
                             'Подсказка: «Топ‑3» — инструменты, которые вы отмечали чаще всего.',
                             style: Theme.of(context)
@@ -119,22 +124,32 @@ class _PracticeJournalSectionState
                         for (final t in top3)
                           FilledButton.tonalIcon(
                             onPressed: () async {
+                              if (_selectingGuard) return;
+                              _selectingGuard = true;
+                              final String label =
+                                  (t is Map && t['label'] != null)
+                                      ? t['label'].toString()
+                                      : '';
+                              if (!mounted) return;
                               setState(() {
                                 _selectedTools
                                   ..clear()
-                                  ..add(t['label']?.toString() ?? '');
+                                  ..add(label);
                               });
                               try {
                                 await Sentry.addBreadcrumb(Breadcrumb(
                                   category: 'goal',
                                   message: 'top_tool_selected',
-                                  data: {'tool': t['label']},
+                                  data: {'tool': label},
                                   level: SentryLevel.info,
                                 ));
                               } catch (_) {}
+                              _selectingGuard = false;
                             },
                             icon: const Icon(Icons.flash_on, size: 18),
-                            label: Text((t['label'] ?? '').toString()),
+                            label: Text((t is Map && t['label'] != null)
+                                ? t['label'].toString()
+                                : ''),
                           ),
                       ],
                     ),
@@ -145,16 +160,29 @@ class _PracticeJournalSectionState
                 loading: () => const SizedBox.shrink(),
                 error: (_, __) => const SizedBox.shrink(),
                 data: (opts) {
-                  final String? selected =
+                  // Де-дубликат опций и безопасное выбранное значение
+                  final List<String> uniqueOpts = () {
+                    final List<String> out = [];
+                    final Set<String> seen = <String>{};
+                    for (final e in (opts)) {
+                      if (seen.add(e)) out.add(e);
+                    }
+                    return out;
+                  }();
+                  String? selected =
                       _selectedTools.isEmpty ? null : _selectedTools.first;
+                  if (selected != null &&
+                      uniqueOpts.where((e) => e == selected).length != 1) {
+                    selected = null;
+                  }
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       DropdownButtonFormField<String>(
                         isExpanded: true,
-                        value: selected,
+                        initialValue: selected,
                         hint: const Text('Другие навыки'),
-                        items: opts
+                        items: uniqueOpts
                             .map((e) => DropdownMenuItem(
                                   value: e,
                                   child: Row(
@@ -163,7 +191,7 @@ class _PracticeJournalSectionState
                                         child: Text(e,
                                             overflow: TextOverflow.ellipsis),
                                       ),
-                                      const SizedBox(width: 6),
+                                      const SizedBox(width: AppSpacing.s6),
                                       const Tooltip(
                                         message:
                                             'Подсказка по инструменту: как и когда применять.',
@@ -175,6 +203,8 @@ class _PracticeJournalSectionState
                                 ))
                             .toList(),
                         onChanged: (v) {
+                          if (_selectingGuard) return;
+                          _selectingGuard = true;
                           setState(() {
                             _selectedTools
                               ..clear()
@@ -188,20 +218,29 @@ class _PracticeJournalSectionState
                               level: SentryLevel.info,
                             ));
                           } catch (_) {}
+                          _selectingGuard = false;
                         },
                       ),
                     ],
                   );
                 },
               ),
-              const SizedBox(height: 8),
+              AppSpacing.gapH(AppSpacing.sm),
+              TextField(
+                controller: _metricUpdateCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  hintText: 'Обновить текущее значение метрики',
+                ),
+              ),
+              AppSpacing.gapH(AppSpacing.sm),
               TextField(
                 controller: _practiceNoteCtrl,
                 maxLines: 2,
                 decoration: const InputDecoration(
                     labelText: 'Что конкретно сделал(а) сегодня'),
               ),
-              const SizedBox(height: 8),
+              AppSpacing.gapH(AppSpacing.sm),
               Align(
                 alignment: Alignment.centerLeft,
                 child: BizLevelButton(
@@ -209,16 +248,53 @@ class _PracticeJournalSectionState
                   onPressed: () async {
                     try {
                       final repo = ref.read(goalsRepositoryProvider);
-                      await repo.addPracticeEntry(
-                        appliedTools: _selectedTools.toList(),
-                        note: _practiceNoteCtrl.text.trim().isEmpty
-                            ? null
-                            : _practiceNoteCtrl.text.trim(),
-                        appliedAt: DateTime.now(),
-                      );
+                      final String metricUpdateRaw =
+                          _metricUpdateCtrl.text.trim();
+                      final num? metricUpdate = metricUpdateRaw.isEmpty
+                          ? null
+                          : num.tryParse(metricUpdateRaw);
+                      // Пытаемся выполнить транзакционный RPC; при ошибке — фоллбек
+                      try {
+                        await repo.logPracticeAndUpdateMetricTx(
+                          appliedTools: _selectedTools.toList(),
+                          note: _practiceNoteCtrl.text.trim().isEmpty
+                              ? null
+                              : _practiceNoteCtrl.text.trim(),
+                          appliedAt: DateTime.now(),
+                          metricCurrent: metricUpdate,
+                        );
+                      } catch (_) {
+                        await repo.addPracticeEntry(
+                          appliedTools: _selectedTools.toList(),
+                          note: _practiceNoteCtrl.text.trim().isEmpty
+                              ? null
+                              : _practiceNoteCtrl.text.trim(),
+                          appliedAt: DateTime.now(),
+                        );
+                        if (metricUpdate != null) {
+                          await repo.updateMetricCurrent(metricUpdate);
+                        }
+                      }
+                      ref.invalidate(userGoalProvider);
+                      if (metricUpdate != null) {
+                        try {
+                          await Sentry.addBreadcrumb(Breadcrumb(
+                            category: 'goal',
+                            message: 'metric_current_updated',
+                            data: {'value': metricUpdate},
+                            level: SentryLevel.info,
+                          ));
+                        } catch (_) {}
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                              content:
+                                  Text('Метрика обновлена до $metricUpdate')),
+                        );
+                      }
                       final String note = _practiceNoteCtrl.text.trim();
-                      final String tools = _selectedTools.join(', ');
                       _practiceNoteCtrl.clear();
+                      _metricUpdateCtrl.clear();
                       _selectedTools.clear();
                       ref.invalidate(practiceLogProvider);
                       ref.invalidate(practiceLogAggregatesProvider);
@@ -251,10 +327,12 @@ class _PracticeJournalSectionState
                       Navigator.of(context).push(MaterialPageRoute(
                         builder: (_) => LeoDialogScreen(
                           bot: 'max',
-                          userContext: [
-                            if (note.isNotEmpty) 'practice_note: $note',
-                            if (tools.isNotEmpty) 'applied_tools: $tools',
-                          ].join('\n'),
+                          userContext: buildMaxUserContext(
+                            goal: ref.read(userGoalProvider).asData?.value,
+                            practiceNote: note.isEmpty ? null : note,
+                            appliedTools: const [],
+                            metricCurrentUpdated: metricUpdate,
+                          ),
                           levelContext: '',
                           autoUserMessage: note.isNotEmpty
                               ? 'Сегодня сделал(а): $note'
@@ -269,7 +347,7 @@ class _PracticeJournalSectionState
                   },
                 ),
               ),
-              const SizedBox(height: 8),
+              AppSpacing.gapH(AppSpacing.sm),
               FutureBuilder(
                 future: ref.read(practiceLogAggregatesProvider.future),
                 builder: (ctx, snap) {
@@ -280,14 +358,14 @@ class _PracticeJournalSectionState
                   final List top =
                       (data['topTools'] as List?) ?? const <dynamic>[];
                   return Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.only(bottom: AppSpacing.sm),
                     child: LayoutBuilder(
                       builder: (ctx, cons) {
                         final stats = <Widget>[
                           Text('Всего: $total'),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: AppSpacing.md),
                           Text('Дней: $days'),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: AppSpacing.md),
                           if (top.isNotEmpty)
                             ConstrainedBox(
                               constraints: const BoxConstraints(maxWidth: 200),
@@ -298,8 +376,8 @@ class _PracticeJournalSectionState
                             ),
                         ];
                         return Wrap(
-                          spacing: 12,
-                          runSpacing: 8,
+                          spacing: AppSpacing.md,
+                          runSpacing: AppSpacing.sm,
                           crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
                             ...stats,
@@ -326,16 +404,17 @@ class _PracticeJournalSectionState
                   if (items.isEmpty) {
                     return Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.all(AppSpacing.md),
                       decoration: BoxDecoration(
                         color: AppColor.backgroundInfo,
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius:
+                            BorderRadius.circular(AppDimensions.radiusMd),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text('Пока записей нет'),
-                          const SizedBox(height: 6),
+                          AppSpacing.gapH(AppSpacing.s6),
                           Text(
                             'Выберите инструмент и кратко опишите, что сделали сегодня. Например: «Матрица приоритетов — разобрал входящие заявки, распределил по важности».',
                             style: Theme.of(context).textTheme.bodySmall,
@@ -382,7 +461,7 @@ class _PracticeJournalSectionState
                           trailing:
                               Text(fmt((m['applied_at'] ?? '').toString())),
                         ),
-                      const SizedBox(height: 8),
+                      AppSpacing.gapH(AppSpacing.sm),
                       BizLevelButton(
                         variant: BizLevelButtonVariant.text,
                         label: 'Вся история →',
@@ -406,11 +485,12 @@ class _PracticeJournalSectionState
                 duration: const Duration(milliseconds: 250),
                 opacity: _showMomentum ? 1 : 0,
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md, vertical: AppSpacing.sm),
                   decoration: BoxDecoration(
                     color: AppColor.backgroundSuccess,
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius:
+                        BorderRadius.circular(AppDimensions.radiusXxl),
                     border: Border.all(
                         color: AppColor.success.withValues(alpha: 0.3)),
                   ),
@@ -419,7 +499,7 @@ class _PracticeJournalSectionState
                     children: [
                       Icon(Icons.trending_up,
                           color: AppColor.success, size: 18),
-                      SizedBox(width: 6),
+                      SizedBox(width: AppSpacing.s6),
                       Text('+1 день движения к цели',
                           style: TextStyle(color: AppColor.success)),
                     ],

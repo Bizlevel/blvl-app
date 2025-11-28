@@ -1,4 +1,5 @@
 import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -6,7 +7,8 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:bizlevel/providers/gp_providers.dart';
 import 'package:bizlevel/services/gp_service.dart';
 import 'package:bizlevel/services/iap_service.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:bizlevel/services/storekit2_service.dart';
+import 'package:bizlevel/utils/hive_box_helper.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:bizlevel/widgets/common/bizlevel_card.dart';
@@ -15,6 +17,8 @@ import 'package:bizlevel/widgets/common/gp_balance_widget.dart';
 import 'package:bizlevel/theme/color.dart' show AppColor;
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:bizlevel/theme/spacing.dart';
+import 'package:bizlevel/theme/dimensions.dart';
 
 class GpStoreScreen extends ConsumerStatefulWidget {
   const GpStoreScreen({super.key});
@@ -25,30 +29,78 @@ class GpStoreScreen extends ConsumerStatefulWidget {
 
 class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
   String? _selectedPackageId;
-  int? _selectedAmount;
   String? _selectedLabel;
   bool _faqExpanded = false;
   bool _bonusExpanded = false;
+  bool _iapLoadRequested = false;
   final Map<String, ProductDetails> _productMap = {};
+  final Map<String, StoreKitProduct> _storeKitProducts = {};
+  String? _storeKitStatusMessage;
   final Map<String, Map<String, dynamic>> _serverPricing = {};
 
   @override
   void initState() {
     super.initState();
-    _loadIapProducts();
     _loadServerPricing();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _waitForVisibilityAndLoadIap();
+    });
+  }
+
+  void _waitForVisibilityAndLoadIap() {
+    if (_iapLoadRequested) return;
+    final route = ModalRoute.of(context);
+    final isVisible = route == null || route.isCurrent;
+    if (!isVisible) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _waitForVisibilityAndLoadIap();
+      });
+      return;
+    }
+    _iapLoadRequested = true;
+    _loadIapProducts();
   }
 
   Future<void> _loadIapProducts() async {
     try {
       final platform = IapService.currentPlatform();
-      if (platform == 'ios' || platform == 'android') {
+      if (platform == 'ios') {
+        final productIds = {'gp_300', 'gp_1000', 'gp_2000'}.toList();
+        final response =
+            await StoreKit2Service.instance.fetchProducts(productIds);
+        final products = response.products;
+        try {
+          await Sentry.addBreadcrumb(Breadcrumb(
+            message: 'gp_storekit2_products_loaded',
+            data: {
+              'found': products.map((e) => e.id).toList(),
+              'requested': productIds,
+              'invalid': response.invalidProductIds,
+              'requestId': response.requestId,
+              'error': response.errorMessage,
+            },
+          ));
+        } catch (_) {}
+        if (mounted) {
+          setState(() {
+            _storeKitStatusMessage = _buildStoreKitStatus(
+              requested: productIds,
+              response: response,
+            );
+            for (final p in products) {
+              _storeKitProducts[p.id] = p;
+            }
+          });
+        }
+      } else if (platform == 'android') {
         final iap = IapService.instance;
         if (await iap.isAvailable()) {
           final resp = await iap.queryProducts({
-            'bizlevelgp_300',
-            'bizlevelgp_1000',
-            'bizlevelgp_2000',
+            'gp_300',
+            'gp_1000',
+            'gp_2000',
           });
           try {
             await Sentry.addBreadcrumb(Breadcrumb(
@@ -73,7 +125,6 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
 
   Future<void> _loadServerPricing() async {
     try {
-      // Web или универсальный fallback — читаем витрину KZT
       final rows = await Supabase.instance.client
           .from('store_pricing')
           .select('product_id, amount_kzt, amount_gp, bonus_gp, title')
@@ -91,7 +142,12 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
 
   String _priceLabelFor(String productId, String fallback) {
     final platform = IapService.currentPlatform();
-    if (platform == 'ios' || platform == 'android') {
+    if (platform == 'ios') {
+      final product = _storeKitProducts[productId];
+      if (product != null && product.displayPrice.isNotEmpty) {
+        return product.displayPrice;
+      }
+    } else if (platform == 'android') {
       final p = _productMap[productId];
       if (p != null && p.price.isNotEmpty) return p.price;
     }
@@ -104,7 +160,6 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
   }
 
   String _fmtKzt(int amount) {
-    // Простое форматирование: 19960 -> 19 960
     final s = amount.toString();
     final buf = StringBuffer();
     for (int i = 0; i < s.length; i++) {
@@ -115,6 +170,33 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
     return buf.toString();
   }
 
+  String? _buildStoreKitStatus({
+    required List<String> requested,
+    required StoreKitFetchResponse response,
+  }) {
+    final suffix =
+        response.requestId == null ? '' : ' (запрос ${response.requestId})';
+    if (response.errorMessage != null && response.errorMessage!.isNotEmpty) {
+      return 'StoreKit вернул ошибку: ${response.errorMessage}$suffix';
+    }
+    if (response.invalidProductIds.isNotEmpty) {
+      final missing = response.invalidProductIds.join(', ');
+      return 'App Store пока не возвращает товары ($missing). После загрузки метаданных в App Store Connect они появятся автоматически$suffix';
+    }
+    if (response.products.isEmpty && requested.isNotEmpty) {
+      return 'StoreKit ответил пустым списком. Это ожидаемо, пока в App Store Connect не загружены скриншоты и метаданные$suffix';
+    }
+    return null;
+  }
+
+  bool _canPurchaseSelectedPackage() {
+    final packageId = _selectedPackageId;
+    if (packageId == null) return false;
+    final platform = IapService.currentPlatform();
+    if (platform != 'ios') return true;
+    return _storeKitProducts.containsKey(packageId);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -122,22 +204,20 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
       body: LayoutBuilder(builder: (context, constraints) {
         final bool isXs = constraints.maxWidth < 360;
         // Устанавливаем дефолтный выбранный план (середина) если не выбрано
-        _selectedPackageId ??= 'bizlevelgp_1000';
-        _selectedAmount ??=
-            (_serverPricing['bizlevelgp_1000']?['amount_kzt'] as int?) ?? 9960;
+        _selectedPackageId ??= 'gp_1000';
         _selectedLabel ??= 'РАЗГОН: 1400 GP';
 
         return ListView(
-          padding: const EdgeInsets.all(16),
+          padding: AppSpacing.insetsAll(AppSpacing.lg),
           children: [
             // Вводный блок
             BizLevelCard(
-              padding: const EdgeInsets.all(12),
+              padding: AppSpacing.insetsAll(AppSpacing.md),
               outlined: true,
               child: Row(
                 children: [
                   const GpBalanceWidget(),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: AppSpacing.md),
                   Expanded(
                     child: Text(
                       'GP — внутренняя валюта BizLevel: 1 GP = 1 сообщение в чате тренеров, также GP открывают новые этажи.',
@@ -149,10 +229,10 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.md),
             // Подсказка: как получить GP (бонусы) — свёрнутый раздел
             BizLevelCard(
-              padding: const EdgeInsets.all(4),
+              padding: AppSpacing.insetsAll(AppSpacing.xs),
               child: ExpansionTile(
                 initiallyExpanded: _bonusExpanded,
                 onExpansionChanged: (v) => setState(() => _bonusExpanded = v),
@@ -183,7 +263,7 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.md),
             // Переключатель планов
             Semantics(
               label: 'Выбор плана',
@@ -192,33 +272,30 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
                 children: [
                   ChoiceChip(
                     label: const Text('СТАРТ'),
-                    selected: _selectedPackageId == 'bizlevelgp_300',
+                    selected: _selectedPackageId == 'gp_300',
                     onSelected: (_) {
                       setState(() {
-                        _selectedPackageId = 'bizlevelgp_300';
-                        _selectedAmount = 3000;
+                        _selectedPackageId = 'gp_300';
                         _selectedLabel = 'СТАРТ: 300 GP';
                       });
                     },
                   ),
                   ChoiceChip(
                     label: const Text('РАЗГОН'),
-                    selected: _selectedPackageId == 'bizlevelgp_1000',
+                    selected: _selectedPackageId == 'gp_1000',
                     onSelected: (_) {
                       setState(() {
-                        _selectedPackageId = 'bizlevelgp_1000';
-                        _selectedAmount = 9960;
+                        _selectedPackageId = 'gp_1000';
                         _selectedLabel = 'РАЗГОН: 1400 GP';
                       });
                     },
                   ),
                   ChoiceChip(
                     label: const Text('ТРАНСФОРМ'),
-                    selected: _selectedPackageId == 'bizlevelgp_2000',
+                    selected: _selectedPackageId == 'gp_2000',
                     onSelected: (_) {
                       setState(() {
-                        _selectedPackageId = 'bizlevelgp_2000';
-                        _selectedAmount = 19960;
+                        _selectedPackageId = 'gp_2000';
                         _selectedLabel = 'ТРАНСФОРМАЦИЯ: 3000 GP';
                       });
                     },
@@ -226,9 +303,9 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.md),
             // Одна карточка выбранного плана
-            if (_selectedPackageId == 'bizlevelgp_300')
+            if (_selectedPackageId == 'gp_300')
               Semantics(
                 label: 'План СТАРТ, 300 GP',
                 child: _GpPlanCard(
@@ -241,12 +318,12 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
                     'Получить второе мнение',
                   ],
                   italicNote: 'Каждый успешный бизнес начинался с первого шага',
-                  priceLabel: _priceLabelFor('bizlevelgp_300', '₸3 000'),
+                  priceLabel: _priceLabelFor('gp_300', '₸3 000'),
                   selected: true,
                   onSelect: () {},
                 ),
               ),
-            if (_selectedPackageId == 'bizlevelgp_1000')
+            if (_selectedPackageId == 'gp_1000')
               Semantics(
                 label: 'План РАЗГОН, 1400 GP',
                 child: _GpPlanCard(
@@ -259,14 +336,14 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
                     'Открыть новые горизонты',
                   ],
                   italicNote: 'Выбор 80% предпринимателей',
-                  priceLabel: _priceLabelFor('bizlevelgp_1000', '₸9 960'),
+                  priceLabel: _priceLabelFor('gp_1000', '₸9 960'),
                   highlight: true,
                   ribbon: isXs ? null : 'Хит',
                   selected: true,
                   onSelect: () {},
                 ),
               ),
-            if (_selectedPackageId == 'bizlevelgp_2000')
+            if (_selectedPackageId == 'gp_2000')
               Semantics(
                 label: 'План ТРАНСФОРМАЦИЯ, 3000 GP',
                 child: _GpPlanCard(
@@ -279,16 +356,22 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
                     'От мечты к результату',
                   ],
                   italicNote: 'Для тех, кто настроен серьезно',
-                  priceLabel: _priceLabelFor('bizlevelgp_2000', '₸19 960'),
+                  priceLabel: _priceLabelFor('gp_2000', '₸19 960'),
                   ribbon: isXs ? null : 'Выгоднее всего',
                   selected: true,
                   onSelect: () {},
                 ),
               ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.md),
+            if (IapService.currentPlatform() == 'ios' &&
+                _storeKitStatusMessage != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                child: _StoreKitNotice(message: _storeKitStatusMessage!),
+              ),
             // FAQ свернут по умолчанию
             BizLevelCard(
-              padding: const EdgeInsets.all(4),
+              padding: AppSpacing.insetsAll(AppSpacing.xs),
               child: ExpansionTile(
                 initiallyExpanded: _faqExpanded,
                 onExpansionChanged: (v) => setState(() => _faqExpanded = v),
@@ -316,43 +399,373 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
       bottomNavigationBar: SafeArea(
         top: false,
         child: Container(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+          padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg, AppSpacing.sm, AppSpacing.lg, AppSpacing.md),
           decoration: const BoxDecoration(
             color: AppColor.surface,
             border: Border(top: BorderSide(color: AppColor.borderStrong)),
           ),
-          child: Row(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Expanded(
-                child: BizLevelButton(
-                  label: _selectedLabel == null ? 'Выберите пакет' : 'Оплатить',
-                  onPressed: _selectedPackageId == null
-                      ? null
-                      : () => _startPurchaseIapOrWeb(
-                            context,
-                            ref,
-                            _selectedPackageId!,
-                            _selectedAmount!,
-                          ),
+              Row(
+                children: [
+                  Expanded(
+                    child: BizLevelButton(
+                      label: _selectedPackageId == null
+                          ? 'Выберите пакет'
+                          : _canPurchaseSelectedPackage()
+                              ? 'Оплатить'
+                              : 'Недоступно',
+                      onPressed: _selectedPackageId == null ||
+                              !_canPurchaseSelectedPackage()
+                          ? null
+                          : () => _startPurchaseIapOrWeb(
+                                context,
+                                ref,
+                                _selectedPackageId!,
+                              ),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  BizLevelButton(
+                    variant: BizLevelButtonVariant.secondary,
+                    label: 'Проверить',
+                    onPressed: () => _verifyLastPurchase(context),
+                  ),
+                ],
+              ),
+              if (IapService.currentPlatform() == 'ios' &&
+                  !_canPurchaseSelectedPackage() &&
+                  _storeKitStatusMessage != null) ...[
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  _storeKitStatusMessage!,
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodySmall
+                      ?.copyWith(color: AppColor.labelColor),
                 ),
-              ),
-              const SizedBox(width: 12),
-              BizLevelButton(
-                variant: BizLevelButtonVariant.secondary,
-                label: 'Проверить',
-                onPressed: () => _verifyLastPurchase(context),
-              ),
+              ]
             ],
           ),
         ),
       ),
     );
   }
+
+  Future<void> _startPurchaseIapOrWeb(
+    BuildContext context,
+    WidgetRef ref,
+    String packageId,
+  ) async {
+    try {
+      final platform = IapService.currentPlatform();
+      if (platform == 'ios') {
+        final handled = await _handleIosPurchase(context, ref, packageId);
+        if (handled) return;
+      } else if (platform == 'android') {
+        final handled = await _handleAndroidPurchase(context, ref, packageId);
+        if (handled) return;
+      } else if (platform != 'web') {
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text(
+                'В мобильных приложениях веб‑оплата отключена. Используйте Google/Apple Pay в сторе.')));
+        return;
+      }
+      await _startWebPurchase(context, packageId);
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Не удалось создать оплату')),
+      );
+    }
+  }
+
+  Future<bool> _handleIosPurchase(
+      BuildContext context, WidgetRef ref, String packageId) async {
+    final iap = IapService.instance;
+    var product = _storeKitProducts[packageId];
+    if (product == null) {
+      await _loadIapProducts();
+      product = _storeKitProducts[packageId];
+    }
+    if (product == null) {
+      if (!context.mounted) return true;
+      final message = _storeKitStatusMessage ??
+          'Не удалось запросить цену в App Store. Повторите позже.';
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
+      return true;
+    }
+
+    try {
+      await Sentry.addBreadcrumb(Breadcrumb(
+        message: 'gp_storekit_purchase_started',
+        data: {'productId': product.id},
+      ));
+    } catch (_) {}
+
+    final result = await iap.buyStoreKitProduct(product.id);
+    if (!result.isSuccess || result.transaction == null) {
+      try {
+        await Sentry.addBreadcrumb(Breadcrumb(
+          message: 'gp_storekit_purchase_not_completed',
+          data: {
+            'productId': product.id,
+            'status': result.status,
+          },
+        ));
+      } catch (_) {}
+      if (!context.mounted) return true;
+      final message = result.isCancelled
+          ? 'Покупка отменена.'
+          : 'Не удалось завершить покупку. Попробуйте снова.';
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
+      return true;
+    }
+
+    final transaction = result.transaction!;
+    final receipt =
+        transaction.appStoreReceipt ?? transaction.jwsRepresentation;
+    final gp = GpService(Supabase.instance.client);
+
+    try {
+      await Sentry.addBreadcrumb(Breadcrumb(
+        message: 'gp_storekit_verify_started',
+        data: {'productId': product.id},
+      ));
+    } catch (_) {}
+
+    final balance = await gp.verifyIapPurchase(
+      platform: 'ios',
+      productId:
+          transaction.productId.isNotEmpty ? transaction.productId : product.id,
+      token: receipt,
+    );
+
+    try {
+      await Sentry.addBreadcrumb(Breadcrumb(
+        message: 'gp_storekit_verify_success',
+        data: {
+          'productId': product.id,
+          'transactionId': transaction.transactionId,
+          'balance_after': balance,
+        },
+      ));
+    } catch (_) {}
+
+    if (!context.mounted) return true;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Покупка подтверждена, баланс: $balance')),
+    );
+    final container = ProviderScope.containerOf(context);
+    container.invalidate(gpBalanceProvider);
+    return true;
+  }
+
+  Future<bool> _handleAndroidPurchase(
+      BuildContext context, WidgetRef ref, String packageId) async {
+    final iap = IapService.instance;
+    final available = await iap.isAvailable();
+    if (!available) {
+      if (!context.mounted) return true;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text(
+              'Оплата в Google Play временно недоступна. Попробуйте позже.')));
+      return true;
+    }
+
+    final resp = await iap.queryProducts({packageId});
+    if (resp.notFoundIDs.isNotEmpty || resp.productDetails.isEmpty) {
+      if (!context.mounted) return true;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text(
+              'Оплата в приложении доступна только через Google/Apple. Попробуйте позже.')));
+      return true;
+    }
+
+    final product = resp.productDetails.first;
+    try {
+      await Sentry.addBreadcrumb(Breadcrumb(
+        message: 'gp_iap_purchase_started',
+        data: {
+          'productId': product.id,
+          'platform': IapService.currentPlatform(),
+        },
+      ));
+    } catch (_) {}
+
+    final purchase = await iap.buyConsumableOnce(product);
+    if (purchase != null && purchase.status == PurchaseStatus.purchased) {
+      try {
+        await Sentry.addBreadcrumb(Breadcrumb(
+          message: 'gp_iap_purchase_purchased',
+          data: {'productId': product.id},
+        ));
+      } catch (_) {}
+      final gp = GpService(Supabase.instance.client);
+      final token = purchase.verificationData.serverVerificationData;
+      final platform = IapService.currentPlatform();
+      String? packageName;
+      if (platform == 'android') {
+        try {
+          final pi = await PackageInfo.fromPlatform();
+          packageName = pi.packageName;
+        } catch (_) {}
+      }
+      try {
+        await Sentry.addBreadcrumb(Breadcrumb(
+          message: 'gp_verify_started',
+          data: {'productId': product.id, 'platform': platform},
+        ));
+      } catch (_) {}
+      int balance;
+      try {
+        balance = await gp.verifyIapPurchase(
+          platform: platform,
+          productId: product.id,
+          token: token,
+          packageName: packageName,
+        );
+      } catch (e) {
+        if (platform == 'android') {
+          final fallbackToken = _extractAndroidPurchaseToken(purchase);
+          try {
+            await Sentry.addBreadcrumb(Breadcrumb(
+              message: 'gp_verify_retry_android_token_fallback',
+              data: {
+                'hasFallback': fallbackToken != null,
+                'origLen': token.length,
+                'fbLen': fallbackToken?.length ?? 0,
+              },
+            ));
+          } catch (_) {}
+          if (fallbackToken != null &&
+              fallbackToken.isNotEmpty &&
+              fallbackToken != token) {
+            balance = await gp.verifyIapPurchase(
+              platform: platform,
+              productId: product.id,
+              token: fallbackToken,
+              packageName: packageName,
+            );
+          } else {
+            rethrow;
+          }
+        } else {
+          rethrow;
+        }
+      }
+      try {
+        await Sentry.addBreadcrumb(Breadcrumb(
+          message: 'gp_verify_success',
+          data: {'productId': product.id, 'balance_after': balance},
+        ));
+      } catch (_) {}
+      if (!context.mounted) return true;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Покупка подтверждена, баланс: $balance')),
+      );
+      final container = ProviderScope.containerOf(context);
+      container.invalidate(gpBalanceProvider);
+      return true;
+    }
+    try {
+      await Sentry.addBreadcrumb(Breadcrumb(
+        message: 'gp_iap_purchase_not_purchased',
+        data: {
+          'productId': product.id,
+          'status': purchase?.status.toString(),
+        },
+      ));
+    } catch (_) {}
+    if (!context.mounted) return true;
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Не удалось завершить покупку. Попробуйте снова.')));
+    return true;
+  }
+
+  Future<void> _startWebPurchase(
+    BuildContext context,
+    String packageId,
+  ) async {
+    final gp = GpService(Supabase.instance.client);
+    try {
+      await Sentry.addBreadcrumb(Breadcrumb(
+        message: 'gp_web_purchase_init',
+        data: {'productId': packageId},
+      ));
+    } catch (_) {}
+    final init = await gp.initPurchase(packageId: packageId);
+    final urlStr = init['payment_url'] ?? '';
+    final purchaseId = init['purchase_id'] ?? '';
+    final url = Uri.tryParse(urlStr);
+
+    final isMock = url != null && url.host.contains('payments.example.com');
+    if (isMock && purchaseId.isNotEmpty) {
+      try {
+        final balance = await gp.verifyPurchase(purchaseId: purchaseId);
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('Покупка подтверждена (тест), баланс: $balance')),
+        );
+        final container = ProviderScope.containerOf(context);
+        container.invalidate(gpBalanceProvider);
+        return;
+      } catch (_) {}
+    }
+
+    if (url != null && await canLaunchUrl(url)) {
+      await launchUrl(url, mode: LaunchMode.externalApplication);
+    }
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('После оплаты нажмите «Проверить покупку»')),
+    );
+  }
+
+  String? _extractAndroidPurchaseToken(PurchaseDetails p) {
+    final raw = p.verificationData.localVerificationData;
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map) {
+        final token = decoded['purchaseToken'];
+        if (token is String && token.isNotEmpty) return token;
+        final inner = decoded['json'];
+        if (inner is String && inner.isNotEmpty) {
+          final decoded2 = jsonDecode(inner);
+          if (decoded2 is Map) {
+            final token2 = decoded2['purchaseToken'];
+            if (token2 is String && token2.isNotEmpty) return token2;
+          }
+        }
+      }
+    } catch (_) {
+      final re = RegExp(r'"purchaseToken"\s*:\s*"([^"]+)"');
+      final m = re.firstMatch(raw);
+      if (m != null) return m.group(1);
+    }
+    return null;
+  }
 }
 
 Future<void> _verifyLastPurchase(BuildContext context) async {
   try {
-    final box = Hive.box('gp');
+    // Блокируем web-verify по purchase_id в мобильных приложениях
+    final platform = IapService.currentPlatform();
+    if (platform == 'android' || platform == 'ios') {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text(
+              'В мобильных приложениях подтверждение доступно только через Google/Apple. Запустите проверку из флоу покупки в сторе.')));
+      return;
+    }
+    final box = await HiveBoxHelper.openBox('gp');
     final lastId = (box.get('last_purchase_id') as String?) ?? '';
     if (lastId.isEmpty) {
       if (!context.mounted) return;
@@ -381,192 +794,6 @@ Future<void> _verifyLastPurchase(BuildContext context) async {
         : 'Не удалось подтвердить. Проверьте интернет или попробуйте позже.';
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
-}
-
-Future<void> _startPurchaseIapOrWeb(
-  BuildContext context,
-  WidgetRef ref,
-  String packageId,
-  int amountKzt,
-) async {
-  try {
-    // Попытка IAP на iOS/Android
-    if (IapService.currentPlatform() == 'ios' ||
-        IapService.currentPlatform() == 'android') {
-      final iap = IapService.instance;
-      final available = await iap.isAvailable();
-      if (available) {
-        final resp = await iap.queryProducts({packageId});
-        if (resp.notFoundIDs.isEmpty && resp.productDetails.isNotEmpty) {
-          final product = resp.productDetails.first;
-          try {
-            await Sentry.addBreadcrumb(Breadcrumb(
-              message: 'gp_iap_purchase_started',
-              data: {
-                'productId': product.id,
-                'platform': IapService.currentPlatform()
-              },
-            ));
-          } catch (_) {}
-          final purchase = await iap.buyConsumableOnce(product);
-          if (purchase != null && purchase.status == PurchaseStatus.purchased) {
-            try {
-              await Sentry.addBreadcrumb(Breadcrumb(
-                message: 'gp_iap_purchase_purchased',
-                data: {'productId': product.id},
-              ));
-            } catch (_) {}
-            final gp = GpService(Supabase.instance.client);
-            final token = purchase.verificationData.serverVerificationData;
-            final platform = IapService.currentPlatform();
-            // Имя пакета нужно передать на сервер для Android (устранение рассинхрона с env)
-            String? packageName;
-            if (platform == 'android') {
-              try {
-                final pi = await PackageInfo.fromPlatform();
-                packageName = pi.packageName;
-              } catch (_) {}
-            }
-            try {
-              await Sentry.addBreadcrumb(Breadcrumb(
-                message: 'gp_verify_started',
-                data: {'productId': product.id, 'platform': platform},
-              ));
-            } catch (_) {}
-            int balance;
-            try {
-              balance = await gp.verifyIapPurchase(
-                platform: platform,
-                productId: product.id,
-                token: token,
-                packageName: packageName,
-              );
-            } catch (e) {
-              // Android fallback: извлечь чистый purchaseToken из localVerificationData
-              if (platform == 'android') {
-                final fallbackToken = _extractAndroidPurchaseToken(purchase);
-                try {
-                  await Sentry.addBreadcrumb(Breadcrumb(
-                    message: 'gp_verify_retry_android_token_fallback',
-                    data: {
-                      'hasFallback': fallbackToken != null,
-                      'origLen': token.length,
-                      'fbLen': fallbackToken?.length ?? 0,
-                    },
-                  ));
-                } catch (_) {}
-                if (fallbackToken != null &&
-                    fallbackToken.isNotEmpty &&
-                    fallbackToken != token) {
-                  balance = await gp.verifyIapPurchase(
-                    platform: platform,
-                    productId: product.id,
-                    token: fallbackToken,
-                    packageName: packageName,
-                  );
-                } else {
-                  rethrow;
-                }
-              } else {
-                rethrow;
-              }
-            }
-            try {
-              await Sentry.addBreadcrumb(Breadcrumb(
-                message: 'gp_verify_success',
-                data: {'productId': product.id, 'balance_after': balance},
-              ));
-            } catch (_) {}
-            if (!context.mounted) return;
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Покупка подтверждена, баланс: $balance')),
-            );
-            final container = ProviderScope.containerOf(context);
-            container.invalidate(gpBalanceProvider);
-            return;
-          }
-          try {
-            await Sentry.addBreadcrumb(Breadcrumb(
-              message: 'gp_iap_purchase_not_purchased',
-              data: {
-                'productId': product.id,
-                'status': purchase?.status.toString()
-              },
-            ));
-          } catch (_) {}
-        }
-      }
-    }
-    // Фолбэк: текущий web/mock флоу
-    final gp = GpService(Supabase.instance.client);
-    try {
-      await Sentry.addBreadcrumb(Breadcrumb(
-        message: 'gp_web_purchase_init',
-        data: {'productId': packageId},
-      ));
-    } catch (_) {}
-    final init = await gp.initPurchase(packageId: packageId);
-    final urlStr = init['payment_url'] ?? '';
-    final purchaseId = init['purchase_id'] ?? '';
-    final url = Uri.tryParse(urlStr);
-
-    final isMock = url != null && url.host.contains('payments.example.com');
-    if (isMock && purchaseId.isNotEmpty) {
-      try {
-        final balance = await gp.verifyPurchase(purchaseId: purchaseId);
-        if (!context.mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text('Покупка подтверждена (тест), баланс: $balance')),
-        );
-        final container = ProviderScope.containerOf(context);
-        container.invalidate(gpBalanceProvider);
-        return;
-      } catch (_) {
-        // Переходим в обычный путь
-      }
-    }
-
-    if (url != null && await canLaunchUrl(url)) {
-      await launchUrl(url, mode: LaunchMode.externalApplication);
-    }
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('После оплаты нажмите «Проверить покупку»')),
-    );
-  } catch (e) {
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Не удалось создать оплату')),
-    );
-  }
-}
-
-// Извлекает purchaseToken из localVerificationData на Android
-String? _extractAndroidPurchaseToken(PurchaseDetails p) {
-  final raw = p.verificationData.localVerificationData;
-  try {
-    final decoded = jsonDecode(raw);
-    if (decoded is Map) {
-      final token = decoded['purchaseToken'];
-      if (token is String && token.isNotEmpty) return token;
-      // Некоторые реализации несут JSON во вложенном поле 'json'
-      final inner = decoded['json'];
-      if (inner is String && inner.isNotEmpty) {
-        final decoded2 = jsonDecode(inner);
-        if (decoded2 is Map) {
-          final token2 = decoded2['purchaseToken'];
-          if (token2 is String && token2.isNotEmpty) return token2;
-        }
-      }
-    }
-  } catch (_) {
-    // Fallback: простая регэксп-выборка
-    final re = RegExp(r'"purchaseToken"\s*:\s*"([^"]+)"');
-    final m = re.firstMatch(raw);
-    if (m != null) return m.group(1);
-  }
-  return null;
 }
 
 class _GpPlanCard extends StatelessWidget {
@@ -598,10 +825,11 @@ class _GpPlanCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      elevation: highlight ? 3 : 1,
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppDimensions.radiusLg)),
+      elevation: highlight ? 3 : AppDimensions.elevationHairline,
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: AppSpacing.insetsAll(AppSpacing.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -629,18 +857,18 @@ class _GpPlanCard extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: AppSpacing.s6),
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         SvgPicture.asset('assets/images/gp_coin.svg',
                             width: 18, height: 18),
-                        const SizedBox(width: 6),
+                        const SizedBox(width: AppSpacing.s6),
                         _GpLabelText(label: gpLabel, compact: true),
                       ],
                     ),
                     if (ribbon != null || selected) ...[
-                      const SizedBox(height: 8),
+                      const SizedBox(height: AppSpacing.sm),
                       _Ribbon(ribbon: ribbon, selected: selected),
                     ],
                   ],
@@ -658,15 +886,15 @@ class _GpPlanCard extends StatelessWidget {
                           fontWeight: FontWeight.w700,
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: AppSpacing.sm),
                       SvgPicture.asset('assets/images/gp_coin.svg',
                           width: 20, height: 20),
-                      const SizedBox(width: 6),
+                      const SizedBox(width: AppSpacing.s6),
                       Flexible(
                         child: _GpLabelText(label: gpLabel, compact: true),
                       ),
                       if (ribbon != null || selected) ...[
-                        const SizedBox(width: 8),
+                        const SizedBox(width: AppSpacing.sm),
                         _Ribbon(ribbon: ribbon, selected: selected),
                       ],
                     ],
@@ -681,7 +909,7 @@ class _GpPlanCard extends StatelessWidget {
                 ],
               );
             }),
-            const SizedBox(height: 10),
+            const SizedBox(height: AppSpacing.s10),
             Text(
               descriptionTitle,
               textAlign: TextAlign.left,
@@ -689,15 +917,15 @@ class _GpPlanCard extends StatelessWidget {
                 fontWeight: FontWeight.w700,
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: AppSpacing.s6),
             ...bullets.map((b) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Icon(Icons.check,
                           size: 16, color: AppColor.success),
-                      const SizedBox(width: 6),
+                      const SizedBox(width: AppSpacing.s6),
                       Expanded(
                         child: Text(
                           b,
@@ -707,7 +935,7 @@ class _GpPlanCard extends StatelessWidget {
                     ],
                   ),
                 )),
-            const SizedBox(height: 6),
+            const SizedBox(height: AppSpacing.s6),
             Text(
               italicNote,
               textAlign: TextAlign.left,
@@ -715,7 +943,7 @@ class _GpPlanCard extends StatelessWidget {
                 fontStyle: FontStyle.italic,
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: AppSpacing.s6),
           ],
         ),
       ),
@@ -776,10 +1004,10 @@ class _Ribbon extends StatelessWidget {
     final text = selected ? 'Выбрано' : (ribbon ?? '');
     if (text.isEmpty) return const SizedBox.shrink();
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: AppSpacing.insetsSymmetric(h: AppSpacing.s10, v: AppSpacing.xs),
       decoration: BoxDecoration(
         color: bg.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(AppDimensions.radiusRound),
         border: Border.all(color: bg.withValues(alpha: 0.35)),
       ),
       child: Text(
@@ -808,6 +1036,36 @@ class _FaqRow extends StatelessWidget {
           Icon(icon, size: 18, color: AppColor.labelColor),
           const SizedBox(width: 8),
           Expanded(child: Text(text)),
+        ],
+      ),
+    );
+  }
+}
+
+class _StoreKitNotice extends StatelessWidget {
+  const _StoreKitNotice({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return BizLevelCard(
+      padding: AppSpacing.insetsAll(AppSpacing.md),
+      outlined: true,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.info_outline, color: AppColor.labelColor),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Text(
+              message,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.copyWith(color: AppColor.labelColor),
+            ),
+          ),
         ],
       ),
     );

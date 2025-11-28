@@ -17,7 +17,6 @@ import 'package:bizlevel/widgets/home/top_gp_badge.dart';
 import 'package:bizlevel/widgets/home/home_goal_card.dart';
 import 'package:bizlevel/widgets/home/home_continue_card.dart';
 import 'package:bizlevel/widgets/home/home_quote_card.dart';
-import 'package:bizlevel/widgets/common/list_row_tile.dart';
 import 'package:bizlevel/widgets/common/notification_center.dart';
 
 class MainStreetScreen extends ConsumerStatefulWidget {
@@ -62,7 +61,9 @@ class _MainStreetScreenState extends ConsumerState<MainStreetScreen> {
                 SizedBox(
                   height: AppDimensions.homeGreetingHeight,
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.lg,
+                    ),
                     child: _GreetingHeader(),
                   ),
                 ),
@@ -81,9 +82,11 @@ class _MainStreetScreenState extends ConsumerState<MainStreetScreen> {
                               ref.refresh(userGoalProvider.future),
                               ref.refresh(levelsProvider.future),
                             ]);
-                            if (mounted) {
+                            if (context.mounted) {
                               NotificationCenter.showSuccess(
-                                  context, 'Обновлено');
+                                context,
+                                'Обновлено',
+                              );
                             }
                           } catch (_) {
                             // Без падения, индикатор скрываем
@@ -91,16 +94,18 @@ class _MainStreetScreenState extends ConsumerState<MainStreetScreen> {
                         },
                         child: SingleChildScrollView(
                           physics: const AlwaysScrollableScrollPhysics(),
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.s20,
+                          ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
                               // Цитата дня
                               const HomeQuoteCard(),
-                              const SizedBox(height: 12),
+                              const SizedBox(height: AppSpacing.md),
                               // Карточка «Моя цель»
                               const HomeGoalCard(),
-                              const SizedBox(height: 20),
+                              const SizedBox(height: AppSpacing.s20),
                               // Карточка «Продолжить обучение»
                               Consumer(
                                 builder: (context, ref, _) {
@@ -120,21 +125,23 @@ class _MainStreetScreenState extends ConsumerState<MainStreetScreen> {
                                       final levelTitle =
                                           (next['levelTitle'] as String?)
                                               ?.trim();
-                                      // Подзаголовок «Уровень N: Название»
+                                      // Подзаголовок: только название уровня без префикса «Уровень N»
                                       String subtitle;
                                       if (levelTitle != null &&
                                           levelTitle.isNotEmpty) {
-                                        final hasPrefix = levelTitle
-                                            .trimLeft()
-                                            .toLowerCase()
-                                            .startsWith('уровень');
-                                        subtitle = (!hasPrefix && levelNum > 0)
-                                            ? 'Уровень $levelNum: $levelTitle'
+                                        // Удаляем возможный префикс «Уровень X: »
+                                        final cleaned = levelTitle.replaceFirst(
+                                          RegExp(
+                                            r'^\s*Уровень\s*\d*\s*:?\s*',
+                                            caseSensitive: false,
+                                          ),
+                                          '',
+                                        );
+                                        subtitle = cleaned.isNotEmpty
+                                            ? cleaned
                                             : levelTitle;
                                       } else {
-                                        subtitle = levelNum > 0
-                                            ? 'Уровень $levelNum: $label'
-                                            : label;
+                                        subtitle = label;
                                       }
                                       return HomeContinueCard(
                                         subtitle: subtitle,
@@ -163,7 +170,7 @@ class _MainStreetScreenState extends ConsumerState<MainStreetScreen> {
                                             }
                                             final levelNumber =
                                                 next['levelNumber'] as int? ??
-                                                    0;
+                                                0;
                                             final levelId =
                                                 next['levelId'] as int? ?? 0;
                                             context.go(
@@ -204,7 +211,7 @@ class _MainStreetScreenState extends ConsumerState<MainStreetScreen> {
                                   );
                                 },
                               ),
-                              const SizedBox(height: 24),
+                              const SizedBox(height: AppSpacing.xl),
                               const _QuickAccessSection(),
                               AppSpacing.gapH(12),
                             ],
@@ -250,7 +257,7 @@ class _GreetingHeader extends ConsumerWidget {
         if (user == null) return const SizedBox.shrink();
         return Row(
           children: [
-            // Large avatar on the left
+            // Compact avatar on the left (56px)
             _GreetingAvatar(user.avatarId, user.avatarUrl),
             const SizedBox(width: 12),
             Expanded(
@@ -261,36 +268,22 @@ class _GreetingHeader extends ConsumerWidget {
                   Text(
                     user.name,
                     overflow: TextOverflow.ellipsis,
-                    // fix: inline типографика → Theme.textTheme
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurface,
-                          height: 1.15,
-                        ),
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      height: 1.1,
+                    ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 4),
                   FutureBuilder<int>(
                     future: SupabaseService.resolveCurrentLevelNumber(
                       user.currentLevel,
                     ),
                     builder: (context, snap) {
                       final level = snap.data ?? 0;
-                      // Капсула‑чип «Уровень N»
-                      return Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: AppColor.backgroundInfo,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColor.border),
-                        ),
-                        child: Text(
-                          'Уровень $level',
-                          overflow: TextOverflow.ellipsis,
-                          style:
-                              Theme.of(context).textTheme.labelLarge?.copyWith(
-                                    color: AppColor.primary,
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                      return Text(
+                        'Уровень $level',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColor.onSurfaceSubtle,
                         ),
                       );
                     },
@@ -327,7 +320,10 @@ class _GreetingAvatar extends StatelessWidget {
       avatarPath = 'assets/images/avatars/avatar_1.png';
       isNetwork = false;
     }
+    // Compact size: 56px total
     return Container(
+      width: 56,
+      height: 56,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         boxShadow: [
@@ -346,9 +342,9 @@ class _GreetingAvatar extends StatelessWidget {
         ),
         child: CustomImage(
           avatarPath,
-          width: 80,
-          height: 80,
-          radius: 40,
+          width: 52,
+          height: 52,
+          radius: 26,
           isNetwork: isNetwork,
           isShadow: false,
         ),
@@ -364,17 +360,18 @@ class _QuickAccessSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final levels = ref.watch(levelsProvider).value ?? const [];
-    final collected =
-        levels.where((l) => (l['isCompleted'] as bool? ?? false)).length;
+    final collected = levels
+        .where((l) => (l['isCompleted'] as bool? ?? false))
+        .length;
     final totalAsync = ref.watch(libraryTotalCountProvider);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Title removed per requirement
-        GridView.count(
+          GridView.count(
           crossAxisCount: 2,
           // Flatter cards so section fits on one screen
-          childAspectRatio: 2.3,
+          childAspectRatio: 2.5,
           mainAxisSpacing: 8,
           crossAxisSpacing: 12,
           shrinkWrap: true,
@@ -401,7 +398,7 @@ class _QuickAccessSection extends ConsumerWidget {
             ),
             _QuickTile(
               icon: Icons.inventory_2_outlined,
-              title: 'Мои артефакты',
+              title: 'Артефакты',
               subtitle: '$collected инструментов',
               onTap: () {
                 Sentry.addBreadcrumb(
@@ -453,25 +450,57 @@ class _QuickTile extends StatelessWidget {
                   scale: scale,
                   duration: const Duration(milliseconds: 120),
                   child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: AppColor.border),
                       boxShadow: const [
                         BoxShadow(
-                          color: AppColor.shadow,
-                          blurRadius: 8,
-                          offset: Offset(0, 2),
-                        )
+                          color: AppColor.shadowSoft,
+                          blurRadius: 12,
+                          offset: Offset(0, 4),
+                        ),
                       ],
                     ),
-                    child: ListRowTile(
-                      leadingIcon: icon,
-                      title: title,
-                      subtitle: subtitle,
-                      onTap: onTap,
-                      semanticsLabel: '$title, $subtitle',
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: AppColor.primary.withValues(alpha: 0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            icon,
+                            size: 20,
+                            color: AppColor.primary,
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: AppColor.onSurfaceSubtle,
+                                fontSize: 11,
+                              ),
+                        ),
+                      ],
                     ),
                   ),
                 ),

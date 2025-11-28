@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:bizlevel/theme/color.dart';
+import 'package:bizlevel/theme/spacing.dart';
+import 'package:bizlevel/theme/typography.dart';
 
 class SettingItem extends StatelessWidget {
   const SettingItem({
@@ -23,7 +25,7 @@ class SettingItem extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10),
+        padding: AppSpacing.insetsSymmetric(v: AppSpacing.s10),
         child: leadingIcon != null ? _buildItemWithPrefixIcon() : _buildItem(),
       ),
     );
@@ -47,18 +49,16 @@ class SettingItem extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         _buildPrefixIcon(),
-        const SizedBox(
-          width: 10,
-        ),
+        const SizedBox(width: AppSpacing.s10),
         Expanded(
           child: Text(
             title,
-            style: const TextStyle(fontSize: 16),
+            style: AppTypography.textTheme.titleMedium,
           ),
         ),
         const Icon(
           Icons.arrow_forward_ios,
-          color: Colors.grey,
+          color: AppColor.onSurfaceSubtle,
           size: 17,
         )
       ],
@@ -72,12 +72,12 @@ class SettingItem extends StatelessWidget {
         Expanded(
           child: Text(
             title,
-            style: const TextStyle(fontSize: 16),
+            style: AppTypography.textTheme.titleMedium,
           ),
         ),
         const Icon(
           Icons.arrow_forward_ios,
-          color: AppColor.darker,
+          color: AppColor.onSurfaceSubtle,
           size: 17,
         )
       ],

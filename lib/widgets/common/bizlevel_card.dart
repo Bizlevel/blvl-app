@@ -34,7 +34,8 @@ class BizLevelCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final content = Padding(padding: padding, child: child);
 
-    final cardColor = tonal ? AppColor.appBarColor : (color ?? AppColor.surface);
+    final cardColor =
+        tonal ? AppColor.appBarColor : (color ?? AppColor.surface);
     final card = Card(
       color: cardColor,
       elevation: elevation,
@@ -42,7 +43,9 @@ class BizLevelCard extends StatelessWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(radius),
         side: BorderSide(
-          color: outlined ? (borderColor ?? AppColor.border) : (borderColor ?? Colors.transparent),
+          color: outlined
+              ? (borderColor ?? AppColor.border)
+              : (borderColor ?? Colors.transparent),
         ),
       ),
       child: onTap == null

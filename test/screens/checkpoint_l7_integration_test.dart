@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:bizlevel/models/goal_update.dart';
 import 'package:bizlevel/providers/goals_providers.dart';
 import 'package:bizlevel/providers/goals_repository_provider.dart';
 import 'package:bizlevel/repositories/goals_repository.dart';
@@ -15,27 +16,18 @@ class _FakeRepo extends GoalsRepository {
   Future<Map<String, dynamic>?> fetchUserGoal() async => storedGoal;
 
   @override
-  Future<Map<String, dynamic>> upsertUserGoal({
-    required String goalText,
-    String? metricType,
-    num? metricStart,
-    num? metricCurrent,
-    num? metricTarget,
-    DateTime? startDate,
-    DateTime? targetDate,
-    String? financialFocus,
-    String? actionPlanNote,
-  }) async {
+  Future<Map<String, dynamic>> upsertUserGoalRequest(
+      GoalUpsertRequest r) async {
     storedGoal = {
-      'goal_text': goalText,
-      'metric_type': metricType,
-      'metric_start': metricStart,
-      'metric_current': metricCurrent,
-      'metric_target': metricTarget,
-      'start_date': startDate?.toIso8601String(),
-      'target_date': targetDate?.toIso8601String(),
-      'financial_focus': financialFocus,
-      'action_plan_note': actionPlanNote,
+      'goal_text': r.goalText,
+      'metric_type': r.metricType,
+      'metric_start': r.metricStart,
+      'metric_current': r.metricCurrent,
+      'metric_target': r.metricTarget,
+      'start_date': r.startDate?.toIso8601String(),
+      'target_date': r.targetDate?.toIso8601String(),
+      'financial_focus': r.financialFocus,
+      'action_plan_note': r.actionPlanNote,
     }..removeWhere((k, v) => v == null);
     return Map<String, dynamic>.from(storedGoal!);
   }
@@ -74,8 +66,11 @@ void main() {
       };
 
     // Эмулируем завершение L7: вызовем upsertUserGoal с action_plan_note и добавим запись
-    await fake.upsertUserGoal(
-        goalText: 'Цель', actionPlanNote: 'Усилить применение');
+    await fake.upsertUserGoalRequest(const GoalUpsertRequest(
+      userId: 'test',
+      goalText: 'Цель',
+      actionPlanNote: 'Усилить применение',
+    ));
     await fake.addPracticeEntry(note: '[SYS] L7 decision: Усилить применение');
 
     // Проверяем провайдеры

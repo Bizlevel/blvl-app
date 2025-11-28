@@ -24,8 +24,6 @@ class _TopGpBadgeState extends ConsumerState<TopGpBadge>
     _ctrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 220),
-      lowerBound: 0.0,
-      upperBound: 1.0,
     );
   }
 
@@ -94,10 +92,11 @@ class _TopGpBadgeState extends ConsumerState<TopGpBadge>
                       const SizedBox(width: 6),
                       Text(
                         '$balance',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              color: AppColor.primary,
-                              fontWeight: FontWeight.w700,
-                            ),
+                        style:
+                            Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  color: AppColor.primary,
+                                  fontWeight: FontWeight.w700,
+                                ),
                       ),
                       if (_delta != 0) ...[
                         const SizedBox(width: 6),
@@ -110,8 +109,9 @@ class _TopGpBadgeState extends ConsumerState<TopGpBadge>
                                 .textTheme
                                 .labelLarge
                                 ?.copyWith(
-                                  color:
-                                      _delta > 0 ? AppColor.success : AppColor.error,
+                                  color: _delta > 0
+                                      ? AppColor.success
+                                      : AppColor.error,
                                   fontWeight: FontWeight.w700,
                                 ),
                           ),
