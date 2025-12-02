@@ -283,7 +283,7 @@ class _ArtifactTileState extends State<_ArtifactTile> {
             child: Container(
               decoration: BoxDecoration(
                 color: AppColor.card,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
                 boxShadow: [
                   BoxShadow(
                     color: AppColor.shadowColor.withValues(alpha: 0.08),
@@ -615,7 +615,7 @@ class _ArtifactFullscreenState extends State<_ArtifactFullscreen>
                         decoration: BoxDecoration(
                           // fix: dark mode friendly overlay
                           color: AppColor.surfaceDark.withValues(alpha: 0.45),
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,

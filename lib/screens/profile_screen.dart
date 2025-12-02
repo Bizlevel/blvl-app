@@ -176,21 +176,14 @@ class ProfileScreen extends ConsumerWidget {
                     ?.copyWith(color: AppColor.textColor),
               ),
               actions: [
-                // Мини‑баланс GP в шапке профиля (общий виджет)
-                Padding(
-                  padding: const EdgeInsets.only(right: AppSpacing.sm),
+                const Padding(
+                  padding: EdgeInsets.only(right: AppSpacing.sm),
                   child: SizedBox(
-                    width: 90,
-                    child: Builder(
-                      builder: (context) {
-                        // Лёгкая замена: используем общий виджет
-                        return const SizedBox(
-                          child: Align(
-                            alignment: Alignment.centerRight,
-                            child: _ProfileGpBalanceSlot(),
-                          ),
-                        );
-                      },
+                    width: 76,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerRight,
+                      child: _ProfileGpBalanceSlot(),
                     ),
                   ),
                 ),
@@ -366,7 +359,7 @@ class _ProfileGpBalanceSlot extends StatelessWidget {
   const _ProfileGpBalanceSlot();
   @override
   Widget build(BuildContext context) {
-    return const GpBalanceWidget();
+    return const GpBalanceWidget(compact: true);
   }
 }
 
@@ -440,8 +433,8 @@ class _BodyState extends ConsumerState<_Body> {
               children: [
                 Padding(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.medium,
-                    vertical: AppSpacing.small,
+                    horizontal: AppSpacing.lg,
+                    vertical: AppSpacing.sm,
                   ),
                   child: Row(
                     children: [
@@ -466,7 +459,7 @@ class _BodyState extends ConsumerState<_Body> {
                 Expanded(
                   child: SingleChildScrollView(
                     controller: scrollController,
-                    padding: const EdgeInsets.all(AppSpacing.medium),
+                    padding: const EdgeInsets.all(AppSpacing.lg),
                     child: _AboutMeCard(user: widget.user),
                   ),
                 ),
@@ -484,11 +477,11 @@ class _BodyState extends ConsumerState<_Body> {
       backgroundColor: AppColor.surface,
       builder: (ctx) {
         return GridView.builder(
-          padding: const EdgeInsets.all(AppSpacing.medium),
+          padding: const EdgeInsets.all(AppSpacing.lg),
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 3,
-            mainAxisSpacing: AppSpacing.medium,
-            crossAxisSpacing: AppSpacing.medium,
+            mainAxisSpacing: AppSpacing.lg,
+            crossAxisSpacing: AppSpacing.lg,
           ),
           itemCount: 12,
           itemBuilder: (_, index) {
@@ -500,7 +493,7 @@ class _BodyState extends ConsumerState<_Body> {
               child: Stack(
                 children: [
                   ClipRRect(
-                    borderRadius: BorderRadius.circular(40),
+                    borderRadius: BorderRadius.circular(AppDimensions.radiusAvatar),
                     child: Image.asset(asset, fit: BoxFit.cover),
                   ),
                   if (isSelected)
@@ -508,7 +501,7 @@ class _BodyState extends ConsumerState<_Body> {
                       child: Container(
                         decoration: BoxDecoration(
                           border: Border.all(color: AppColor.primary, width: 3),
-                          borderRadius: BorderRadius.circular(40),
+                          borderRadius: BorderRadius.circular(AppDimensions.radiusAvatar),
                         ),
                       ),
                     ),
@@ -533,11 +526,11 @@ class _BodyState extends ConsumerState<_Body> {
     final skillsAsync = ref.watch(userSkillsProvider);
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.medium),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
       child: Column(
         children: [
           _buildProfile(),
-          const SizedBox(height: AppSpacing.medium),
+          const SizedBox(height: AppSpacing.lg),
 
           // Блок статистики (уровень/артефакты) убран по новой спецификации
           skillsAsync.when(
@@ -547,7 +540,7 @@ class _BodyState extends ConsumerState<_Body> {
             error: (e, st) =>
                 const Center(child: Text('Ошибка загрузки навыков')),
           ),
-          const SizedBox(height: AppSpacing.medium),
+          const SizedBox(height: AppSpacing.lg),
           Align(
             alignment: Alignment.centerLeft,
             child: Text('Достижения',
@@ -575,7 +568,7 @@ class _BodyState extends ConsumerState<_Body> {
               ],
             ),
           ),
-          const SizedBox(height: AppSpacing.medium),
+          const SizedBox(height: AppSpacing.lg),
           // Premium отключён — кнопка скрыта
           // Секция артефактов скрыта — используйте карточку статистики выше
         ],
@@ -590,7 +583,7 @@ class _BodyState extends ConsumerState<_Body> {
 
     final Widget avatarImage = _avatarPreviewBytes != null
         ? ClipRRect(
-            borderRadius: BorderRadius.circular(40),
+            borderRadius: BorderRadius.circular(AppDimensions.radiusAvatar),
             child: Image.memory(
               _avatarPreviewBytes!,
               width: 80,
@@ -620,7 +613,7 @@ class _BodyState extends ConsumerState<_Body> {
               onResetPreview: _clearAvatarPreview,
               hasPreview: _avatarPreviewBytes != null,
             ),
-            const SizedBox(width: AppSpacing.medium),
+            const SizedBox(width: AppSpacing.lg),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -762,7 +755,7 @@ class _AvatarControls extends StatelessWidget {
                       const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
                     color: AppColor.orange,
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
                   ),
                   child: const Text(
                     'BETA',
@@ -918,7 +911,7 @@ class _AboutMeCardState extends ConsumerState<_AboutMeCard> {
                     right: AppSpacing.s6, bottom: AppSpacing.s6),
                 decoration: BoxDecoration(
                   color: AppColor.primary.withValues(alpha: 0.06),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
                   border: Border.all(
                       color: AppColor.primary.withValues(alpha: 0.2)),
                 ),
@@ -965,7 +958,7 @@ class _AboutMeCardState extends ConsumerState<_AboutMeCard> {
                       SizedBox(
                         height: 3,
                         child: ClipRRect(
-                          borderRadius: BorderRadius.circular(3),
+                          borderRadius: BorderRadius.circular(AppDimensions.radiusXs),
                           child: LinearProgressIndicator(
                             value: completion.$1,
                             backgroundColor:
@@ -1264,7 +1257,7 @@ class _ExperienceChips extends StatelessWidget {
                     color: isSelected
                         ? AppColor.primary.withValues(alpha: 0.1)
                         : AppColor.surface,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
                     border: Border.all(
                       color: isSelected
                           ? AppColor.primary
@@ -1318,7 +1311,7 @@ class _DropdownLabeled extends StatelessWidget {
         ),
         AppSpacing.gapH(AppSpacing.s6),
         DropdownButtonFormField<String>(
-          value: value,
+          initialValue: value,
           items: options
               .map((e) => DropdownMenuItem<String>(
                     value: e,
@@ -1389,7 +1382,7 @@ class _ChallengesEditorState extends State<_ChallengesEditor> {
                       color: isSelected
                           ? AppColor.primary.withValues(alpha: 0.1)
                           : AppColor.surface,
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
                       border: Border.all(
                         color: isSelected
                             ? AppColor.primary
@@ -1434,7 +1427,7 @@ class _ChallengesEditorState extends State<_ChallengesEditor> {
                       color: isSelected
                           ? AppColor.primary.withValues(alpha: 0.1)
                           : AppColor.surface,
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
                       border: Border.all(
                         color: isSelected
                             ? AppColor.primary
@@ -1472,7 +1465,7 @@ class _ChallengesEditorState extends State<_ChallengesEditor> {
                     horizontal: AppSpacing.s10, vertical: AppSpacing.s6),
                 decoration: BoxDecoration(
                   color: AppColor.surface,
-                  borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
                   border: Border.all(
                     color: AppColor.onSurfaceSubtle.withValues(alpha: 0.3),
                   ),

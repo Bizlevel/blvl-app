@@ -243,7 +243,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           padding: AppSpacing.insetsAll(AppSpacing.lg),
           decoration: BoxDecoration(
             color: AppColor.success.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
             border: Border.all(color: AppColor.success.withValues(alpha: 0.3)),
           ),
           child: Row(
@@ -283,7 +283,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             width: double.infinity,
             decoration: BoxDecoration(
               gradient: AppColor.businessGradient,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
             ),
             alignment: Alignment.center,
             child: Text(

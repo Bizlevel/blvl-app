@@ -23,10 +23,13 @@ class AppSpacing {
   static const double xxs = 2;
   static const double xs3 = 3;
 
-  // Backward-compatibility aliases (medium/small/large)
-  static const double small = sm; // 8
-  static const double medium = lg; // 16
-  static const double large = xl; // 24
+  // @Deprecated aliases — use sm/lg/xl instead
+  @Deprecated('Use AppSpacing.sm instead')
+  static const double small = sm;
+  @Deprecated('Use AppSpacing.lg instead')
+  static const double medium = lg;
+  @Deprecated('Use AppSpacing.xl instead')
+  static const double large = xl;
 
   // Шорткаты отступов
   static EdgeInsets insetsAll(double value) => EdgeInsets.all(value);

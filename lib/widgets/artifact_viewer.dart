@@ -185,7 +185,7 @@ class _ChipToggle extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
           color: active ? Colors.white : Colors.white.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(AppDimensions.radiusXxl),
           border: Border.all(
               color: Colors.white.withValues(alpha: active ? 0.0 : 0.5)),
         ),

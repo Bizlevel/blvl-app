@@ -10,6 +10,7 @@ import 'package:bizlevel/widgets/common/bizlevel_button.dart';
 import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/services/auth_service.dart';
 import 'package:bizlevel/theme/spacing.dart';
+import 'package:bizlevel/theme/dimensions.dart';
 import 'package:bizlevel/services/supabase_service.dart';
 
 import 'package:bizlevel/widgets/level/blocks/level_page_block.dart';
@@ -43,11 +44,11 @@ class ProfileFormBlock extends LevelPageBlock {
       backgroundColor: Colors.white,
       builder: (ctx) {
         return GridView.builder(
-          padding: const EdgeInsets.all(AppSpacing.medium),
+          padding: const EdgeInsets.all(AppSpacing.lg),
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 3,
-            mainAxisSpacing: AppSpacing.medium,
-            crossAxisSpacing: AppSpacing.medium,
+            mainAxisSpacing: AppSpacing.lg,
+            crossAxisSpacing: AppSpacing.lg,
           ),
           itemCount: 12,
           itemBuilder: (_, index) {
@@ -59,7 +60,7 @@ class ProfileFormBlock extends LevelPageBlock {
               child: Stack(
                 children: [
                   ClipRRect(
-                    borderRadius: BorderRadius.circular(15),
+                    borderRadius: BorderRadius.circular(AppDimensions.radiusXl),
                     child: Image.asset(asset, fit: BoxFit.cover),
                   ),
                   if (isSelected)
@@ -67,7 +68,7 @@ class ProfileFormBlock extends LevelPageBlock {
                       child: Container(
                         decoration: BoxDecoration(
                           border: Border.all(color: AppColor.primary, width: 3),
-                          borderRadius: BorderRadius.circular(15),
+                          borderRadius: BorderRadius.circular(AppDimensions.radiusXl),
                         ),
                       ),
                     ),
@@ -154,7 +155,7 @@ class ProfileFormBlock extends LevelPageBlock {
                 child: Stack(
                   children: [
                     ClipRRect(
-                      borderRadius: BorderRadius.circular(15),
+                      borderRadius: BorderRadius.circular(AppDimensions.radiusXl),
                       child: Image.asset(
                         'assets/images/avatars/avatar_$selectedAvatarId.png',
                         width: 90,
@@ -170,7 +171,7 @@ class ProfileFormBlock extends LevelPageBlock {
                         height: 28,
                         decoration: BoxDecoration(
                           color: AppColor.surface,
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(AppDimensions.radius14),
                           boxShadow: const [
                             BoxShadow(
                               color: AppColor.shadow,

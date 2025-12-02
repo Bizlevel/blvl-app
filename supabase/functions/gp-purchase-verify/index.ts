@@ -22,7 +22,9 @@ type RpcResponse = { balance_after?: number } | number[] | number | Record<strin
 const PRODUCT_TO_GP: Record<string, number> = {
   // Старые ID (dev)
   gp_300: 300,
-  gp_1400: 1400, // 1000 + 400 бонус
+  gp_1000: 1400,
+  gp_2000: 3000,
+  gp_1400: 1400, // legacy alias
   gp_3000: 3000,
   // Новые ID (App Store / Google Play)
   bizlevelgp_300: 300,
@@ -253,6 +255,18 @@ Deno.serve(async (req: Request) => {
   let dbgTokenPrefix = "";
   let dbgTokenHash = "";
   try {
+    const logStep = async (step: string, error?: string | null) => {
+      if (!dbgUserJwt) return;
+      await insertLog({
+        platform: dbgPlatform,
+        product_id: dbgProductId,
+        package_name: dbgPackageName,
+        token_prefix: dbgTokenPrefix,
+        token_hash: dbgTokenHash,
+        step,
+        error: error || undefined,
+      }, dbgUserJwt);
+    };
     const body = (await req.json()) as VerifyRequest;
     dbgPlatform = body?.platform || "";
     dbgProductId = body?.product_id || "";
@@ -265,7 +279,10 @@ Deno.serve(async (req: Request) => {
     }
     // Принимаем JWT как из x-user-jwt, так и из Authorization (если это не anon/service ключ)
     dbgUserJwt = extractUserJwt(req) || "";
-    if (!dbgUserJwt) return jsonResponse({ error: "no_user_jwt" }, 401);
+    if (!dbgUserJwt) {
+      await logStep("error", "no_user_jwt");
+      return jsonResponse({ error: "no_user_jwt" }, 401);
+    }
     // стартовый лог
     try {
       await insertLog({
@@ -284,7 +301,11 @@ Deno.serve(async (req: Request) => {
         p_purchase_id: body.purchase_id,
       }, dbgUserJwt);
       const balance = parseBalanceAfter(rpcData);
-      if (balance == null) return jsonResponse({ error: "rpc_no_balance" }, 500);
+      if (balance == null) {
+        await logStep("error", "rpc_no_balance");
+        return jsonResponse({ error: "rpc_no_balance" }, 500);
+      }
+      await logStep("web_credited");
       return new Response(JSON.stringify({ balance_after: balance }), {
         status: 200,
         headers: {
@@ -296,10 +317,14 @@ Deno.serve(async (req: Request) => {
 
     // --- IAP branch (mobile) ---
     if (!body?.platform || !body?.product_id || !body?.token) {
+      await logStep("error", "invalid_request");
       return jsonResponse({ error: "invalid_request" }, 400);
     }
     const amount = PRODUCT_TO_GP[body.product_id];
-    if (!amount) return jsonResponse({ error: "unknown_product" }, 400);
+    if (!amount) {
+      await logStep("error", `unknown_product:${body.product_id}`);
+      return jsonResponse({ error: "unknown_product" }, 400);
+    }
 
     let transactionId = "";
     if (body.platform === "ios") {
@@ -309,6 +334,7 @@ Deno.serve(async (req: Request) => {
       const r = await verifyGooglePurchase(body.product_id, body.token, body.package_name);
       transactionId = r.transactionId;
     } else {
+      await logStep("error", `unsupported_platform:${body.platform}`);
       return jsonResponse({ error: "unsupported_platform" }, 400);
     }
 
@@ -320,7 +346,10 @@ Deno.serve(async (req: Request) => {
       p_amount_gp: amount,
     }, dbgUserJwt);
     const balance = parseBalanceAfter(rpcData);
-    if (balance == null) return jsonResponse({ error: "rpc_no_balance" }, 500);
+    if (balance == null) {
+      await logStep("error", "rpc_no_balance");
+      return jsonResponse({ error: "rpc_no_balance" }, 500);
+    }
     try {
       await insertLog({
         platform: dbgPlatform,

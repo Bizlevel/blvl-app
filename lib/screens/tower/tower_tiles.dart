@@ -239,7 +239,7 @@ class _CheckpointNodeTile extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
         onTap: () => _handleCheckpointTap(context, node),
         child: Semantics(
           label: type == 'mini_case'
@@ -312,7 +312,7 @@ class _LevelNodeTile extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         key: tileKey,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
         onTap: () => _handleLevelTap(
           context,
           levelNumber: levelNumber,
@@ -345,7 +345,7 @@ class _LevelNodeTile extends StatelessWidget {
                       side:
                           const BorderSide(color: AppColor.primary, width: 1.5),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
                       ),
                       padding: const EdgeInsets.symmetric(
                           horizontal: 12, vertical: 8),

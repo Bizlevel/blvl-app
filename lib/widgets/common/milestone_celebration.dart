@@ -1,6 +1,9 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:bizlevel/theme/color.dart';
+import 'package:bizlevel/theme/dimensions.dart';
+import 'package:bizlevel/theme/animations.dart';
+import 'package:bizlevel/theme/spacing.dart';
 import 'package:bizlevel/services/notification_log_service.dart';
 
 class MilestoneCelebration extends StatefulWidget {
@@ -21,7 +24,7 @@ class _MilestoneCelebrationState extends State<MilestoneCelebration>
   void initState() {
     super.initState();
     _controller = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 1600))
+        vsync: this, duration: AppAnimations.celebration)
       ..forward();
     // Лог события открытия
     try {
@@ -67,7 +70,7 @@ class _MilestoneCelebrationState extends State<MilestoneCelebration>
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               color: AppColor.card,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(AppDimensions.radiusXl),
               boxShadow: const [
                 BoxShadow(
                     color: AppColor.shadow,
@@ -81,7 +84,7 @@ class _MilestoneCelebrationState extends State<MilestoneCelebration>
                 const Text('Поздравляем!',
                     style:
                         TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
-                const SizedBox(height: 8),
+                AppSpacing.gapH(AppSpacing.sm),
                 if (widget.gpGain != null)
                   const Text('Вы получили бонус!',
                       textAlign: TextAlign.center,
@@ -89,11 +92,11 @@ class _MilestoneCelebrationState extends State<MilestoneCelebration>
                 else
                   const Text('Вы достигли вехи. Продолжайте в том же духе!',
                       textAlign: TextAlign.center),
-                const SizedBox(height: 12),
+                AppSpacing.gapH(AppSpacing.md),
                 if (widget.gpGain != null)
                   TweenAnimationBuilder<double>(
                     tween: Tween(begin: 0, end: widget.gpGain!.toDouble()),
-                    duration: const Duration(milliseconds: 900),
+                    duration: AppAnimations.pulse,
                     curve: Curves.easeOut,
                     builder: (context, value, _) => Row(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -107,7 +110,7 @@ class _MilestoneCelebrationState extends State<MilestoneCelebration>
                       ],
                     ),
                   ),
-                const SizedBox(height: 16),
+                AppSpacing.gapH(AppSpacing.lg),
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(

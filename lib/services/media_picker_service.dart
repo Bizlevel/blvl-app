@@ -2,6 +2,7 @@ import 'dart:io' show Platform;
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:bizlevel/theme/dimensions.dart';
 import 'package:photo_manager/photo_manager.dart';
 
 /// Unified media picker that replaces legacy DKImagePickerController / file_picker.
@@ -149,7 +150,7 @@ class _PhotoGridSheetState extends State<_PhotoGridSheet> {
                 return GestureDetector(
                   onTap: () => _handleSelect(asset),
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
                     child: FutureBuilder<Uint8List?>(
                       future: asset
                           .thumbnailDataWithSize(const ThumbnailSize.square(300)),

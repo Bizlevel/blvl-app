@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:bizlevel/providers/gp_providers.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:bizlevel/theme/color.dart';
+import 'package:bizlevel/theme/dimensions.dart';
+import 'package:bizlevel/theme/animations.dart';
 
 class TopGpBadge extends ConsumerStatefulWidget {
   const TopGpBadge({super.key});
@@ -23,7 +25,7 @@ class _TopGpBadgeState extends ConsumerState<TopGpBadge>
     super.initState();
     _ctrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 220),
+      duration: AppAnimations.quick,
     );
   }
 
@@ -61,7 +63,7 @@ class _TopGpBadgeState extends ConsumerState<TopGpBadge>
         color: Colors.transparent,
         child: InkWell(
           onTap: () => context.go('/gp-store'),
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(AppDimensions.radiusXxl),
           child: AnimatedBuilder(
             animation: _ctrl,
             builder: (context, child) {
@@ -74,7 +76,7 @@ class _TopGpBadgeState extends ConsumerState<TopGpBadge>
                   decoration: BoxDecoration(
                     // outlined‑капсула: светлый фон + бордер
                     color: AppColor.surface,
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(AppDimensions.radiusXxl),
                     border: Border.all(color: AppColor.border),
                     boxShadow: const [
                       BoxShadow(
@@ -102,7 +104,7 @@ class _TopGpBadgeState extends ConsumerState<TopGpBadge>
                         const SizedBox(width: 6),
                         AnimatedOpacity(
                           opacity: _delta == 0 ? 0 : 1,
-                          duration: const Duration(milliseconds: 200),
+                          duration: AppAnimations.quick,
                           child: Text(
                             _delta > 0 ? '+$_delta' : '$_delta',
                             style: Theme.of(context)

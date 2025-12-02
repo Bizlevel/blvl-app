@@ -8,6 +8,7 @@ import 'package:bizlevel/widgets/common/bizlevel_card.dart';
 import 'package:bizlevel/widgets/common/bizlevel_button.dart';
 import 'package:bizlevel/theme/spacing.dart';
 import 'package:bizlevel/theme/color.dart';
+import 'package:bizlevel/theme/dimensions.dart';
 
 class CheckpointL4Screen extends ConsumerStatefulWidget {
   const CheckpointL4Screen({super.key});
@@ -190,7 +191,7 @@ class _CheckpointHeader extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: AppColor.primary,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
       ),
       child: Row(
         children: [
@@ -210,7 +211,7 @@ class _CheckpointHeader extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
               color: AppColor.surface,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(AppDimensions.radiusXl),
             ),
             child: Text(
               title,

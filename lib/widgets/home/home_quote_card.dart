@@ -21,7 +21,7 @@ class HomeQuoteCard extends ConsumerWidget {
         return Semantics(
           label: 'Цитата дня',
           child: InkWell(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
             onTap: () {
               try {
                 Sentry.addBreadcrumb(Breadcrumb(

@@ -10,11 +10,15 @@ class AppDimensions {
   // Радиусы
   static const double radiusXs = 3.0;
   static const double radiusSm = 4.0;
+  static const double radius6 = 6.0;
   static const double radiusMd = 8.0;
   static const double radius10 = 10.0;
   static const double radiusLg = 12.0;
+  static const double radius14 = 14.0;
   static const double radiusXl = 16.0;
   static const double radiusXxl = 20.0;
+  static const double radius24 = 24.0;
+  static const double radiusAvatar = 40.0;
   static const double radiusRound = 999.0;
 
   // Элевации

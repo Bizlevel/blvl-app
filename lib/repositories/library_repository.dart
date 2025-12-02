@@ -1,32 +1,38 @@
-import 'dart:io';
-
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Репозиторий Библиотеки (курсы/гранты/акселераторы/избранное) с SWR‑кешем на Hive.
+/// Для Web: без Hive кеша (только сеть).
 class LibraryRepository {
   final SupabaseClient _client;
   LibraryRepository(this._client);
 
-  Future<Box> _openBox() => Hive.openBox('library');
+  /// Открывает box только для non-Web платформ
+  Future<Box?> _openBox() async {
+    if (kIsWeb) return null;
+    return Hive.openBox('library');
+  }
 
   // === Общие хелперы кеша/логирования ===
   Future<void> _capture(Object error, StackTrace st) async {
     await Sentry.captureException(error, stackTrace: st);
   }
 
-  List<Map<String, dynamic>>? _readCached(Box box, String cacheKey) {
+  List<Map<String, dynamic>>? _readCached(Box? box, String cacheKey) {
+    if (box == null) return null;
     final cached = box.get(cacheKey);
     if (cached == null) return null;
     return List<Map<String, dynamic>>.from(cached as List);
   }
 
   Future<void> _saveCached(
-    Box box,
+    Box? box,
     String cacheKey,
     List<Map<String, dynamic>> data,
   ) async {
+    if (box == null) return;
     await box.put(cacheKey, data);
   }
 
@@ -34,13 +40,13 @@ class LibraryRepository {
     required String cacheKey,
     required Future<List<dynamic>> Function() fetch,
   }) async {
-    final box = await _openBox();
+    final box = await _openBox(); // null для Web
     int? prevCount;
     DateTime? lastDigest;
     try {
       final cached = _readCached(box, cacheKey);
       prevCount = cached?.length;
-      final ts = box.get('digest_ts') as String?;
+      final ts = box?.get('digest_ts') as String?;
       if (ts != null) lastDigest = DateTime.tryParse(ts);
     } catch (_) {}
     try {
@@ -53,7 +59,7 @@ class LibraryRepository {
         final now = DateTime.now().toUtc();
         final bool cooldownPassed =
             lastDigest == null || now.difference(lastDigest).inHours >= 24;
-        if ((prevCount ?? 0) < data.length && cooldownPassed) {
+        if ((prevCount ?? 0) < data.length && cooldownPassed && box != null) {
           // Отправим локальный пуш (образовательный канал)
           // Игнорируем ошибки — нет жёсткой зависимости в репозитории
           // Пользователь увидит один пуш не чаще 1 раза в 24ч
@@ -165,7 +171,7 @@ class LibraryRepository {
     if (userId == null) {
       throw Exception('Пользователь не авторизован');
     }
-    final box = await _openBox();
+    final box = await _openBox(); // null для Web
     final cacheKey = 'favorites:user_$userId';
     try {
       final rows = await _client
@@ -174,24 +180,18 @@ class LibraryRepository {
           .order('created_at', ascending: false) as List<dynamic>;
       final data =
           rows.map((e) => Map<String, dynamic>.from(e as Map)).toList();
-      await box.put(cacheKey, data);
+      if (box != null) await box.put(cacheKey, data);
       return data;
     } on PostgrestException catch (e, st) {
       await Sentry.captureException(e, stackTrace: st);
-      final cached = box.get(cacheKey);
-      if (cached != null) {
-        return List<Map<String, dynamic>>.from(cached as List);
-      }
-      rethrow;
-    } on SocketException {
-      final cached = box.get(cacheKey);
+      final cached = box?.get(cacheKey);
       if (cached != null) {
         return List<Map<String, dynamic>>.from(cached as List);
       }
       rethrow;
     } catch (e, st) {
       await Sentry.captureException(e, stackTrace: st);
-      final cached = box.get(cacheKey);
+      final cached = box?.get(cacheKey);
       if (cached != null) {
         return List<Map<String, dynamic>>.from(cached as List);
       }
@@ -231,9 +231,6 @@ class LibraryRepository {
       }
     } on PostgrestException catch (e, st) {
       await Sentry.captureException(e, stackTrace: st);
-      rethrow;
-    } on SocketException {
-      // Оффлайн — считаем ошибкой (сервер обязателен для мутации)
       rethrow;
     }
   }
@@ -305,8 +302,6 @@ class LibraryRepository {
       };
     } on PostgrestException catch (e, st) {
       await _capture(e, st);
-      rethrow;
-    } on SocketException {
       rethrow;
     } catch (e, st) {
       await _capture(e, st);

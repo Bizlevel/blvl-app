@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/theme/spacing.dart';
+import 'package:bizlevel/theme/dimensions.dart';
+import 'package:bizlevel/theme/animations.dart';
 import 'package:bizlevel/widgets/common/bizlevel_button.dart';
 
 /// Карточка «Продолжить обучение» с текстом слева и иллюстрацией уровня справа.
@@ -28,91 +30,102 @@ class _HomeContinueCardState extends State<HomeContinueCard> {
     return Semantics(
       label: 'Продолжить обучение. ${widget.subtitle}',
       button: true,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppColor.card,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColor.border),
-          boxShadow: const [
-            BoxShadow(
-              color: AppColor.shadow,
-              blurRadius: 16,
-              offset: Offset(0, 4),
-            )
-          ],
-        ),
-        child: Row(
-          children: [
-            // Текстовая часть
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: AppColor.backgroundInfo,
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: AppColor.border),
-                    ),
-                    child: Text(
-                      widget.levelNumber > 0
-                          ? 'Уровень ${widget.levelNumber}'
-                          : 'Уровень',
-                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                          color: AppColor.primary, fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    widget.subtitle,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodyLarge
-                        ?.copyWith(fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 12),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: BizLevelButton(
-                      label: 'Продолжить обучение',
-                      onPressed: widget.onTap,
-                      size: BizLevelButtonSize.sm,
-                    ),
-                  ),
-                ],
-              ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: widget.onTap,
+          borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColor.card,
+              borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
+              border: Border.all(color: AppColor.border),
+              boxShadow: const [
+                BoxShadow(
+                  color: AppColor.shadow,
+                  blurRadius: 16,
+                  offset: Offset(0, 4),
+                )
+              ],
             ),
-            AppSpacing.gapW(16),
-            // Изображение уровня справа
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: _FadeOnce(
-                enabled: !_animated,
-                onShown: () => setState(() => _animated = true),
-                child: Container(
-                  width: 112,
-                  height: 88,
-                  color: AppColor.primary.withValues(alpha: 0.05),
-                  child: Image.asset(
-                    'assets/images/lvls/level_${widget.levelNumber}.png',
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Icon(
-                        Icons.school,
-                        color: AppColor.primary.withValues(alpha: 0.3),
-                        size: 40,
-                      );
-                    },
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppColor.backgroundInfo,
+                          borderRadius:
+                              BorderRadius.circular(AppDimensions.radius6),
+                          border: Border.all(color: AppColor.border),
+                        ),
+                        child: Text(
+                          widget.levelNumber > 0
+                              ? 'Уровень ${widget.levelNumber}'
+                              : 'Уровень',
+                          style: Theme.of(context)
+                              .textTheme
+                              .labelLarge
+                              ?.copyWith(
+                                  color: AppColor.primary,
+                                  fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                      AppSpacing.gapH(AppSpacing.sm),
+                      Text(
+                        widget.subtitle,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodyLarge
+                            ?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                      AppSpacing.gapH(AppSpacing.md),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: BizLevelButton(
+                          icon: const Icon(Icons.play_arrow),
+                          label: 'Продолжить обучение',
+                          onPressed: widget.onTap,
+                          size: BizLevelButtonSize.lg,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ),
+                AppSpacing.gapW(16),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
+                  child: _FadeOnce(
+                    enabled: !_animated,
+                    onShown: () => setState(() => _animated = true),
+                    child: Container(
+                      width: 112,
+                      height: 88,
+                      color: AppColor.primary.withValues(alpha: 0.05),
+                      child: Image.asset(
+                        'assets/images/lvls/level_${widget.levelNumber}.png',
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Icon(
+                            Icons.school,
+                            color: AppColor.primary.withValues(alpha: 0.3),
+                            size: 40,
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -133,7 +146,7 @@ class _FadeOnce extends StatefulWidget {
 class _FadeOnceState extends State<_FadeOnce>
     with SingleTickerProviderStateMixin {
   late final AnimationController _ctrl = AnimationController(
-      vsync: this, duration: const Duration(milliseconds: 300))
+      vsync: this, duration: AppAnimations.normal)
     ..forward().whenComplete(() {
       widget.onShown();
     });

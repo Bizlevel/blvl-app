@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:bizlevel/providers/goals_providers.dart';
 import 'package:bizlevel/theme/color.dart' show AppColor;
 import 'package:bizlevel/theme/spacing.dart';
+import 'package:bizlevel/theme/dimensions.dart';
+import 'package:bizlevel/theme/animations.dart';
 
 /// Карточка «Мотивация от Макса» с автосворачиванием и кликом для разворота
 class MotivationCard extends ConsumerStatefulWidget {
@@ -18,11 +20,11 @@ class _MotivationCardState extends ConsumerState<MotivationCard> {
   Widget build(BuildContext context) {
     final quoteAsync = ref.watch(dailyQuoteProvider);
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 250),
+      duration: MotionSystem.modalTransition,
       curve: Curves.easeInOut,
       constraints: const BoxConstraints(minHeight: 120),
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
         child: Container(
           width: double.infinity,
           padding: AppSpacing.insetsAll(20),
@@ -32,7 +34,7 @@ class _MotivationCardState extends ConsumerState<MotivationCard> {
               end: Alignment.bottomRight,
               colors: [AppColor.appBgColor, AppColor.appBarColor],
             ),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
             boxShadow: [
               BoxShadow(
                 color: AppColor.shadowColor.withValues(alpha: 0.1),
@@ -97,7 +99,7 @@ class _MotivationCardState extends ConsumerState<MotivationCard> {
                           height: 20,
                           decoration: BoxDecoration(
                             color: AppColor.dividerColor,
-                            borderRadius: BorderRadius.circular(4),
+                            borderRadius: BorderRadius.circular(AppDimensions.radiusSm),
                           ),
                         ),
                         AppSpacing.gapH(12),
@@ -106,7 +108,7 @@ class _MotivationCardState extends ConsumerState<MotivationCard> {
                           height: 16,
                           decoration: BoxDecoration(
                             color: AppColor.dividerColor,
-                            borderRadius: BorderRadius.circular(4),
+                            borderRadius: BorderRadius.circular(AppDimensions.radiusSm),
                           ),
                         ),
                         AppSpacing.gapH(8),
@@ -115,7 +117,7 @@ class _MotivationCardState extends ConsumerState<MotivationCard> {
                           height: 16,
                           decoration: BoxDecoration(
                             color: AppColor.dividerColor,
-                            borderRadius: BorderRadius.circular(4),
+                            borderRadius: BorderRadius.circular(AppDimensions.radiusSm),
                           ),
                         ),
                         AppSpacing.gapH(8),
@@ -124,7 +126,7 @@ class _MotivationCardState extends ConsumerState<MotivationCard> {
                           height: 14,
                           decoration: BoxDecoration(
                             color: AppColor.dividerColor,
-                            borderRadius: BorderRadius.circular(4),
+                            borderRadius: BorderRadius.circular(AppDimensions.radiusSm),
                           ),
                         ),
                       ],
