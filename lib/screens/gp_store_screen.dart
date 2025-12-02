@@ -207,15 +207,15 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
               padding: AppSpacing.insetsAll(AppSpacing.md),
               outlined: true,
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const GpBalanceWidget(compact: true),
+                  const GpBalanceWidget(),
                   const SizedBox(width: AppSpacing.md),
                   Expanded(
                     child: Text(
                       'GP — внутренняя валюта BizLevel: 1 GP = 1 сообщение в чате тренеров, также GP открывают новые этажи.',
                       style: Theme.of(context).textTheme.bodyMedium,
-                      softWrap: true,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
@@ -448,10 +448,9 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
       }
       await _startWebPurchase(context, packageId);
     } catch (e) {
-      final message = _describePurchaseError(e);
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
+        const SnackBar(content: Text('Не удалось создать оплату')),
       );
     }
   }
@@ -766,20 +765,6 @@ Future<void> _verifyLastPurchase(BuildContext context) async {
         : 'Не удалось подтвердить. Проверьте интернет или попробуйте позже.';
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
-}
-
-String _describePurchaseError(Object error) {
-  if (error is GpFailure && error.message.isNotEmpty) {
-    return error.message;
-  }
-  final raw = error.toString();
-  if (raw.contains('unknown_product')) {
-    return 'Store пока не вернул данные о товаре. Проверьте статусы SKU в консоли и повторите попытку.';
-  }
-  if (raw.contains('web_verify_not_allowed_on_mobile')) {
-    return 'Подтверждать покупку нужно в том же флоу Google/Apple Pay внутри приложения.';
-  }
-  return 'Не удалось создать оплату';
 }
 
 class _GpPlanCard extends StatelessWidget {

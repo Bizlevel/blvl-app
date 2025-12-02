@@ -4,12 +4,6 @@
 - 52.fix-3: Метки времени у сообщений (hh:mm), `SelectableText` для баблов ассистента. Пагинация/автоскролл и контракты LeoService без изменений. Линты чистые.
 
 
-## Задача iap-android-2025-12-02 fix
-- Edge `gp-purchase-verify`: добавлены SKU `gp_1000/gp_2000`, детальное логирование `invalid_request/unknown_product/rpc_no_balance`.
-- Деплой функции через supabase-mcp (версия v69); проверены `gp_ledger`/`gp_wallets` — кредиты начисляются.
-- `GpStoreScreen` показывает текст `GpFailure` (в т.ч. `unknown_product`) вместо универсального «Не удалось создать оплату».
-
-
 # Этап 53: IAP покупки GP (StoreKit/Google Billing)
 - Клиент:
   - Добавлен `in_app_purchase`, сервис `IapService` (запрос продуктов, покупка consumable), метод `GpService.verifyIapPurchase`.
@@ -624,8 +618,3 @@
 - **AppEffects токены**: Создан новый файл `lib/theme/effects.dart` с токенами теней (`shadowXs..shadowXl`, `glowSuccess/Primary/Premium`), добавлен экспорт в `design_tokens.dart`.
 - **RadioGroup API**: `QuizWidget` обновлён на новый Flutter 3.32+ `RadioGroup` API с `IgnorePointer` для блокировки после проверки.
 - **lint_tokens.sh**: Расширен скрипт проверки токенов — добавлены паттерны для `BorderRadius.circular`, `Duration(milliseconds:)`, deprecated aliases, режим `--warn`.
-
-## 2025-12-02 — Задача ui-home-overflow fix
-- Главная: `HomeGoalCard` получила адаптивные кнопки («+ Действие к цели», «Обсудить с Максом») и переразметку текста, `DonutProgress` подстраивается по ширине; `HomeContinueCard` кликабельна целиком, CTA переведён на размер `lg`.
-- Быстрые действия: сетка quick actions переведена на соотношение сторон 3.2, плитки используют токены отступов и больше не вызывают overflow.
-- Башня/Профиль/Магазин GP: `GpBalanceWidget` получил компактный режим для AppBar и карточек, вводный блок магазина GP теперь заворачивает текст вместе с бейджем без предупреждений.

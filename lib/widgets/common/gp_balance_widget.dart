@@ -11,16 +11,15 @@ import 'package:bizlevel/providers/gp_providers.dart';
 /// Компактный общий виджет баланса GP (иконка + число)
 /// Использование: GP выводится из `gpBalanceProvider`; по тапу → /gp-store
 class GpBalanceWidget extends ConsumerWidget {
-  final bool compact;
-  const GpBalanceWidget({super.key, this.compact = false});
+  const GpBalanceWidget({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final gpAsync = ref.watch(gpBalanceProvider);
     final balance = gpAsync.value?['balance'] ?? 0;
 
-    final double height = compact ? 28.0 : 32.0;
-    final double minWidth = compact ? 60.0 : 80.0;
+    const width = 80.0;
+    const height = 32.0;
 
     return InkWell(
       onTap: () {
@@ -30,15 +29,9 @@ class GpBalanceWidget extends ConsumerWidget {
       },
       borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
       child: Container(
-        constraints: BoxConstraints(
-          minHeight: height,
-          minWidth: minWidth,
-          maxWidth: compact ? 100 : double.infinity,
-        ),
-        padding: AppSpacing.insetsSymmetric(
-          h: compact ? AppSpacing.s6 : AppSpacing.sm,
-          v: AppSpacing.xs,
-        ),
+        width: width,
+        height: height,
+        padding: AppSpacing.insetsSymmetric(h: AppSpacing.sm),
         decoration: BoxDecoration(
           color: AppColor.surface,
           borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
@@ -46,7 +39,6 @@ class GpBalanceWidget extends ConsumerWidget {
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
           children: [
             SvgPicture.asset('assets/images/gp_coin.svg',
                 width: 20, height: 20),

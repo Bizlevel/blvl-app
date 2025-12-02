@@ -176,14 +176,21 @@ class ProfileScreen extends ConsumerWidget {
                     ?.copyWith(color: AppColor.textColor),
               ),
               actions: [
-                const Padding(
-                  padding: EdgeInsets.only(right: AppSpacing.sm),
+                // Мини‑баланс GP в шапке профиля (общий виджет)
+                Padding(
+                  padding: const EdgeInsets.only(right: AppSpacing.sm),
                   child: SizedBox(
-                    width: 76,
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: Alignment.centerRight,
-                      child: _ProfileGpBalanceSlot(),
+                    width: 90,
+                    child: Builder(
+                      builder: (context) {
+                        // Лёгкая замена: используем общий виджет
+                        return const SizedBox(
+                          child: Align(
+                            alignment: Alignment.centerRight,
+                            child: _ProfileGpBalanceSlot(),
+                          ),
+                        );
+                      },
                     ),
                   ),
                 ),
@@ -359,7 +366,7 @@ class _ProfileGpBalanceSlot extends StatelessWidget {
   const _ProfileGpBalanceSlot();
   @override
   Widget build(BuildContext context) {
-    return const GpBalanceWidget(compact: true);
+    return const GpBalanceWidget();
   }
 }
 

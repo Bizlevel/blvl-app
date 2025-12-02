@@ -371,8 +371,8 @@ class _QuickAccessSection extends ConsumerWidget {
         // Title removed per requirement
           GridView.count(
           crossAxisCount: 2,
-          // Flatter cards so section fits on один экран
-          childAspectRatio: 3.2,
+          // Flatter cards so section fits on one screen
+          childAspectRatio: 2.5,
           mainAxisSpacing: 8,
           crossAxisSpacing: 12,
           shrinkWrap: true,
@@ -450,10 +450,10 @@ class _QuickTile extends StatelessWidget {
                 child: AnimatedScale(
                   scale: scale,
                   duration: AppAnimations.micro,
-                    child: Container(
+                  child: Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.lg,
-                      vertical: AppSpacing.md,
+                      horizontal: 16,
+                      vertical: 12,
                     ),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
@@ -482,7 +482,7 @@ class _QuickTile extends StatelessWidget {
                             color: AppColor.primary,
                           ),
                         ),
-                        AppSpacing.gapH(AppSpacing.sm),
+                        const Spacer(),
                         Text(
                           title,
                           maxLines: 1,
