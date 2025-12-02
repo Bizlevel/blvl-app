@@ -54,7 +54,7 @@ class _HomeCtaState extends State<HomeCta> with SingleTickerProviderStateMixin {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(AppDimensions.radius14),
           onTap: widget.onTap,
           child: AnimatedBuilder(
             animation: _ctrl,
@@ -67,7 +67,7 @@ class _HomeCtaState extends State<HomeCta> with SingleTickerProviderStateMixin {
                   decoration: BoxDecoration(
                     // fix: заменить градиент/тени на токены
                     gradient: AppColor.businessGradient,
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(AppDimensions.radius14),
                     boxShadow: const [
                       BoxShadow(
                         color: AppColor.shadow,

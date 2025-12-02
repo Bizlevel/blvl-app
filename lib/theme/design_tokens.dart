@@ -3,6 +3,7 @@ export 'spacing.dart';
 export 'dimensions.dart';
 export 'typography.dart';
 export 'animations.dart';
+export 'effects.dart';
 export 'input_decoration_theme.dart';
 export 'app_theme.dart';
 export 'chat_theme.dart';

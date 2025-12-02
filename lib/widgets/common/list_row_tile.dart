@@ -81,7 +81,7 @@ class ListRowTile extends StatelessWidget {
     final tappable = Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
         onTap: onTap,
         child: body,
       ),

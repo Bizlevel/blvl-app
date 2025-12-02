@@ -1,11 +1,15 @@
 import 'package:flutter/animation.dart';
 
 class AppAnimations {
-  // Длительности
+  // Длительности — базовые
+  static const Duration micro = Duration(milliseconds: 150);
   static const Duration quick = Duration(milliseconds: 200);
   static const Duration normal = Duration(milliseconds: 300);
+  static const Duration medium = Duration(milliseconds: 500);
   static const Duration slow = Duration(milliseconds: 600);
   static const Duration verySlow = Duration(milliseconds: 800);
+  static const Duration pulse = Duration(milliseconds: 900);
+  static const Duration celebration = Duration(milliseconds: 1600);
 
   // Кривые
   static const Curve defaultCurve = Curves.easeOutCubic;

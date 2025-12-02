@@ -1,6 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 import '../services/supabase_service.dart';
 
@@ -10,45 +10,62 @@ class LevelsRepository {
   LevelsRepository(this._client);
 
   /// Загружает уровни. Если [userId] передан, включает прогресс.
+  /// Для Web: без Hive кеша (только сеть).
+  /// Для Mobile: с Hive кешем и offline fallback.
   Future<List<Map<String, dynamic>>> fetchLevels({String? userId}) async {
+    // Web: работаем только через сеть, без кеша
+    if (kIsWeb) {
+      return _fetchFromNetwork(userId);
+    }
+
+    // Mobile: используем Hive кеш
+    return _fetchWithCache(userId);
+  }
+
+  /// Загрузка с сервера без кеширования (для Web)
+  Future<List<Map<String, dynamic>>> _fetchFromNetwork(String? userId) async {
+    final data = userId == null
+        ? await SupabaseService.fetchLevelsRaw()
+        : await SupabaseService.fetchLevelsWithProgress(userId);
+
+    return _resolveImages(data);
+  }
+
+  /// Загрузка с Hive кешем и offline fallback (для Mobile)
+  Future<List<Map<String, dynamic>>> _fetchWithCache(String? userId) async {
     final Box cache = Hive.box('levels');
     final String cacheKey = userId == null ? 'public' : 'user_$userId';
 
-    // Сначала пытаемся запросить сервер.
     try {
       final data = userId == null
           ? await SupabaseService.fetchLevelsRaw()
           : await SupabaseService.fetchLevelsWithProgress(userId);
 
-      // Сохраняем в кеш (Hive поддерживает Map/List примитивов)
-      final resolved = await Future.wait(data.map((level) async {
-        final String? coverPath = level['cover_path'] as String?;
-        String? imageUrl;
-        if (coverPath != null && coverPath.isNotEmpty) {
-          imageUrl = await SupabaseService.getCoverSignedUrl(coverPath);
-        }
-
-        level['image'] = imageUrl ?? level['image_url'] ?? level['image'];
-        return level;
-      }));
-
+      final resolved = await _resolveImages(data);
       await cache.put(cacheKey, resolved);
       return resolved;
-    } on SocketException {
-      // Нет интернета → читаем из кеша
-      final cached = cache.get(cacheKey);
-      if (cached != null) {
-        return List<Map<String, dynamic>>.from(cached);
-      }
-      rethrow;
     } catch (_) {
-      // При любой другой ошибке пробуем вернуть кеш
+      // При ошибке пробуем вернуть кеш
       final cached = cache.get(cacheKey);
       if (cached != null) {
         return List<Map<String, dynamic>>.from(cached);
       }
       rethrow;
     }
+  }
+
+  /// Резолвит URL изображений для уровней
+  Future<List<Map<String, dynamic>>> _resolveImages(
+      List<Map<String, dynamic>> data) async {
+    return Future.wait(data.map((level) async {
+      final String? coverPath = level['cover_path'] as String?;
+      String? imageUrl;
+      if (coverPath != null && coverPath.isNotEmpty) {
+        imageUrl = await SupabaseService.getCoverSignedUrl(coverPath);
+      }
+      level['image'] = imageUrl ?? level['image_url'] ?? level['image'];
+      return level;
+    }));
   }
 
   /// Возвращает подписанный URL артефакта.

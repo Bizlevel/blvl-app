@@ -18,6 +18,7 @@ import 'package:bizlevel/widgets/home/home_goal_card.dart';
 import 'package:bizlevel/widgets/home/home_continue_card.dart';
 import 'package:bizlevel/widgets/home/home_quote_card.dart';
 import 'package:bizlevel/widgets/common/notification_center.dart';
+import 'package:bizlevel/theme/animations.dart';
 
 class MainStreetScreen extends ConsumerStatefulWidget {
   const MainStreetScreen({super.key});
@@ -56,7 +57,7 @@ class _MainStreetScreenState extends ConsumerState<MainStreetScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const SizedBox(height: 8),
+                AppSpacing.gapH(AppSpacing.sm),
                 // Greeting block with avatar, name/level, GP badge
                 SizedBox(
                   height: AppDimensions.homeGreetingHeight,
@@ -204,7 +205,7 @@ class _MainStreetScreenState extends ConsumerState<MainStreetScreen> {
                                       );
                                       return HomeContinueCard(
                                         subtitle: 'Башня',
-                                        levelNumber: 0,
+                                        levelNumber: 1,
                                         onTap: () => context.go('/tower'),
                                       );
                                     },
@@ -273,7 +274,7 @@ class _GreetingHeader extends ConsumerWidget {
                       height: 1.1,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  AppSpacing.gapH(AppSpacing.xs),
                   FutureBuilder<int>(
                     future: SupabaseService.resolveCurrentLevelNumber(
                       user.currentLevel,
@@ -438,24 +439,24 @@ class _QuickTile extends StatelessWidget {
         cursor: SystemMouseCursors.click,
         child: TweenAnimationBuilder<double>(
           tween: Tween(begin: 1, end: 1),
-          duration: const Duration(milliseconds: 150),
+          duration: AppAnimations.micro,
           builder: (context, scale, child) {
             return Material(
               color: AppColor.card,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
               child: InkWell(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
                 onTap: onTap,
                 child: AnimatedScale(
                   scale: scale,
-                  duration: const Duration(milliseconds: 120),
+                  duration: AppAnimations.micro,
                   child: Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 16,
                       vertical: 12,
                     ),
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
                       border: Border.all(color: AppColor.border),
                       boxShadow: const [
                         BoxShadow(
@@ -490,7 +491,7 @@ class _QuickTile extends StatelessWidget {
                                 fontWeight: FontWeight.w600,
                               ),
                         ),
-                        const SizedBox(height: 2),
+                        AppSpacing.gapH(AppSpacing.xxs),
                         Text(
                           subtitle,
                           maxLines: 1,

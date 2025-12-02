@@ -51,8 +51,8 @@ class LevelsMapScreen extends ConsumerWidget {
     return levelsAsync.when(
       data: (levels) {
         return SliverPadding(
-          padding: const EdgeInsets.fromLTRB(AppSpacing.medium,
-              AppSpacing.small, AppSpacing.medium, AppSpacing.large),
+          padding: const EdgeInsets.fromLTRB(AppSpacing.lg,
+              AppSpacing.sm, AppSpacing.lg, AppSpacing.xl),
           sliver: SliverGrid(
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount:
@@ -92,8 +92,8 @@ class LevelsMapScreen extends ConsumerWidget {
         );
       },
       loading: () => SliverPadding(
-        padding: const EdgeInsets.fromLTRB(AppSpacing.medium, AppSpacing.small,
-            AppSpacing.medium, AppSpacing.large),
+        padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.sm,
+            AppSpacing.lg, AppSpacing.xl),
         sliver: SliverGrid(
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount:

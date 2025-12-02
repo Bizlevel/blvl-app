@@ -6,6 +6,7 @@ import 'package:bizlevel/providers/leo_service_provider.dart';
 import 'package:bizlevel/widgets/leo_message_bubble.dart';
 import 'package:bizlevel/widgets/typing_indicator.dart';
 import 'package:bizlevel/theme/color.dart';
+import 'package:bizlevel/theme/animations.dart';
 
 class LeoQuizWidget extends ConsumerStatefulWidget {
   final Map<String, dynamic>
@@ -110,7 +111,7 @@ class _LeoQuizWidgetState extends ConsumerState<LeoQuizWidget> {
       try {
         _scrollController.animateTo(
           _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
+          duration: AppAnimations.normal,
           curve: Curves.easeOut,
         );
       } catch (_) {}
@@ -206,13 +207,13 @@ class _LeoQuizWidgetState extends ConsumerState<LeoQuizWidget> {
                                 });
                                 _checkAnswer();
                               },
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
                         child: Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 12),
                           decoration: BoxDecoration(
                             color: bgColor,
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
                             border: Border.all(color: borderColor),
                           ),
                           child: Row(
@@ -281,13 +282,13 @@ class _LeoQuizWidgetState extends ConsumerState<LeoQuizWidget> {
                         _isSending = false;
                       });
                     },
-                    borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 12, vertical: 10),
                       decoration: BoxDecoration(
                         color: AppColor.primary,
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
                       ),
                       child: Text(
                         'Попробовать снова',

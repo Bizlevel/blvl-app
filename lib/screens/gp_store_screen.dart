@@ -189,14 +189,6 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
     return null;
   }
 
-  bool _canPurchaseSelectedPackage() {
-    final packageId = _selectedPackageId;
-    if (packageId == null) return false;
-    final platform = IapService.currentPlatform();
-    if (platform != 'ios') return true;
-    return _storeKitProducts.containsKey(packageId);
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -336,7 +328,7 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
                     'Открыть новые горизонты',
                   ],
                   italicNote: 'Выбор 80% предпринимателей',
-                  priceLabel: _priceLabelFor('gp_1000', '₸9 960'),
+                  priceLabel: _priceLabelFor('gp_1000', '₸9 990'),
                   highlight: true,
                   ribbon: isXs ? null : 'Хит',
                   selected: true,
@@ -356,19 +348,13 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
                     'От мечты к результату',
                   ],
                   italicNote: 'Для тех, кто настроен серьезно',
-                  priceLabel: _priceLabelFor('gp_2000', '₸19 960'),
+                  priceLabel: _priceLabelFor('gp_2000', '₸19 990'),
                   ribbon: isXs ? null : 'Выгоднее всего',
                   selected: true,
                   onSelect: () {},
                 ),
               ),
             const SizedBox(height: AppSpacing.md),
-            if (IapService.currentPlatform() == 'ios' &&
-                _storeKitStatusMessage != null)
-              Padding(
-                padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                child: _StoreKitNotice(message: _storeKitStatusMessage!),
-              ),
             // FAQ свернут по умолчанию
             BizLevelCard(
               padding: AppSpacing.insetsAll(AppSpacing.xs),
@@ -415,11 +401,8 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
                     child: BizLevelButton(
                       label: _selectedPackageId == null
                           ? 'Выберите пакет'
-                          : _canPurchaseSelectedPackage()
-                              ? 'Оплатить'
-                              : 'Недоступно',
-                      onPressed: _selectedPackageId == null ||
-                              !_canPurchaseSelectedPackage()
+                          : 'Оплатить',
+                      onPressed: _selectedPackageId == null
                           ? null
                           : () => _startPurchaseIapOrWeb(
                                 context,
@@ -436,18 +419,6 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
                   ),
                 ],
               ),
-              if (IapService.currentPlatform() == 'ios' &&
-                  !_canPurchaseSelectedPackage() &&
-                  _storeKitStatusMessage != null) ...[
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  _storeKitStatusMessage!,
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodySmall
-                      ?.copyWith(color: AppColor.labelColor),
-                ),
-              ]
             ],
           ),
         ),
@@ -1036,36 +1007,6 @@ class _FaqRow extends StatelessWidget {
           Icon(icon, size: 18, color: AppColor.labelColor),
           const SizedBox(width: 8),
           Expanded(child: Text(text)),
-        ],
-      ),
-    );
-  }
-}
-
-class _StoreKitNotice extends StatelessWidget {
-  const _StoreKitNotice({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return BizLevelCard(
-      padding: AppSpacing.insetsAll(AppSpacing.md),
-      outlined: true,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Icon(Icons.info_outline, color: AppColor.labelColor),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: Text(
-              message,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyMedium
-                  ?.copyWith(color: AppColor.labelColor),
-            ),
-          ),
         ],
       ),
     );

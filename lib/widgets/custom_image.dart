@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:bizlevel/theme/color.dart';
+import 'package:bizlevel/theme/dimensions.dart';
 
 class CustomImage extends StatelessWidget {
   const CustomImage(
@@ -86,7 +87,7 @@ class BlankImageWidget extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: Colors.grey.shade200,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
       ),
       alignment: Alignment.center,
       child:

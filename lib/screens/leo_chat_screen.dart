@@ -10,6 +10,7 @@ import 'package:bizlevel/theme/color.dart' show AppColor;
 import 'package:bizlevel/providers/auth_provider.dart';
 import 'package:bizlevel/services/context_service.dart';
 import 'package:bizlevel/theme/spacing.dart';
+import 'package:bizlevel/theme/dimensions.dart';
 
 class LeoChatScreen extends ConsumerStatefulWidget {
   const LeoChatScreen({super.key});
@@ -178,7 +179,7 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
             constraints: const BoxConstraints(minHeight: 128),
             decoration: BoxDecoration(
               color: AppColor.surface,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
               border: Border.all(color: AppColor.borderSubtle),
               boxShadow: const [
                 BoxShadow(

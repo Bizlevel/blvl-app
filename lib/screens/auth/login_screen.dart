@@ -10,6 +10,7 @@ import '../../theme/color.dart' show AppColor;
 import '../../widgets/custom_textfield.dart';
 import '../../widgets/common/bizlevel_button.dart';
 import '../../theme/spacing.dart';
+import '../../theme/dimensions.dart';
 import '../../utils/constant.dart';
 
 class LoginScreen extends HookConsumerWidget {
@@ -127,7 +128,8 @@ class LoginScreen extends HookConsumerWidget {
                         h: AppSpacing.lg, v: AppSpacing.xl),
                     decoration: BoxDecoration(
                       color: AppColor.surface,
-                      borderRadius: BorderRadius.circular(AppSpacing.xl), // 24
+                      borderRadius:
+                          BorderRadius.circular(AppDimensions.radius24),
                       boxShadow: [
                         BoxShadow(
                           color: AppColor.textColor.withValues(alpha: 0.05),
@@ -203,8 +205,8 @@ class LoginScreen extends HookConsumerWidget {
                                 padding: AppSpacing.insetsSymmetric(
                                     v: AppSpacing.md),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(AppSpacing.lg),
+                                  borderRadius: BorderRadius.circular(
+                                      AppDimensions.radiusXl),
                                 ),
                                 side: BorderSide(
                                   color:

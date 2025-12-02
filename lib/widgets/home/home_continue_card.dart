@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/theme/spacing.dart';
+import 'package:bizlevel/theme/dimensions.dart';
+import 'package:bizlevel/theme/animations.dart';
 import 'package:bizlevel/widgets/common/bizlevel_button.dart';
 
 /// Карточка «Продолжить обучение» с текстом слева и иллюстрацией уровня справа.
@@ -32,7 +34,7 @@ class _HomeContinueCardState extends State<HomeContinueCard> {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: AppColor.card,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
           border: Border.all(color: AppColor.border),
           boxShadow: const [
             BoxShadow(
@@ -54,7 +56,7 @@ class _HomeContinueCardState extends State<HomeContinueCard> {
                         const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       color: AppColor.backgroundInfo,
-                      borderRadius: BorderRadius.circular(6),
+                      borderRadius: BorderRadius.circular(AppDimensions.radius6),
                       border: Border.all(color: AppColor.border),
                     ),
                     child: Text(
@@ -65,7 +67,7 @@ class _HomeContinueCardState extends State<HomeContinueCard> {
                           color: AppColor.primary, fontWeight: FontWeight.w600),
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  AppSpacing.gapH(AppSpacing.sm),
                   Text(
                     widget.subtitle,
                     maxLines: 2,
@@ -75,7 +77,7 @@ class _HomeContinueCardState extends State<HomeContinueCard> {
                         .bodyLarge
                         ?.copyWith(fontWeight: FontWeight.w600),
                   ),
-                  const SizedBox(height: 12),
+                  AppSpacing.gapH(AppSpacing.md),
                   Align(
                     alignment: Alignment.centerLeft,
                     child: BizLevelButton(
@@ -90,7 +92,7 @@ class _HomeContinueCardState extends State<HomeContinueCard> {
             AppSpacing.gapW(16),
             // Изображение уровня справа
             ClipRRect(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
               child: _FadeOnce(
                 enabled: !_animated,
                 onShown: () => setState(() => _animated = true),
@@ -133,7 +135,7 @@ class _FadeOnce extends StatefulWidget {
 class _FadeOnceState extends State<_FadeOnce>
     with SingleTickerProviderStateMixin {
   late final AnimationController _ctrl = AnimationController(
-      vsync: this, duration: const Duration(milliseconds: 300))
+      vsync: this, duration: AppAnimations.normal)
     ..forward().whenComplete(() {
       widget.onShown();
     });

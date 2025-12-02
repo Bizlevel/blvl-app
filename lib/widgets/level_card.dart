@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:bizlevel/theme/spacing.dart';
 import 'package:bizlevel/theme/dimensions.dart';
 import 'package:bizlevel/theme/typography.dart';
+import 'package:bizlevel/theme/animations.dart';
 
 import 'custom_image.dart';
 import 'package:bizlevel/utils/formatters.dart';
@@ -61,8 +62,8 @@ class _LevelCardState extends State<LevelCard> {
           child: Container(
             key: const Key('level_card'),
             width: widget.width,
-            padding: const EdgeInsets.all(AppSpacing.medium),
-            margin: const EdgeInsets.symmetric(vertical: AppSpacing.small),
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            margin: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
             decoration: BoxDecoration(
               color: Colors.transparent,
               border: Border.all(
@@ -126,7 +127,7 @@ class _LevelCardState extends State<LevelCard> {
         onExit: (_) => setState(() => _hover = false),
         child: AnimatedScale(
           scale: _hover ? 1.03 : 1.0,
-          duration: const Duration(milliseconds: 150),
+          duration: AppAnimations.micro,
           child: card,
         ),
       );
@@ -158,7 +159,7 @@ class _LevelCardState extends State<LevelCard> {
       left: 10,
       child: TweenAnimationBuilder<double>(
         tween: Tween(begin: 1.0, end: 1.2),
-        duration: const Duration(milliseconds: 800),
+        duration: AppAnimations.verySlow,
         curve: Curves.easeInOut,
         builder: (context, scale, child) {
           return Transform.scale(scale: scale, child: child);
@@ -181,7 +182,7 @@ class _LevelCardState extends State<LevelCard> {
       child: Container(
         decoration: BoxDecoration(
           color: AppColor.labelColor.withValues(alpha: 0.6),
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(AppDimensions.radiusXxl),
         ),
         child: const Center(
           child: Icon(Icons.lock, color: AppColor.onPrimary, size: 48),
@@ -194,7 +195,7 @@ class _LevelCardState extends State<LevelCard> {
     return Container(
       width: widget.width == double.infinity
           ? double.infinity
-          : widget.width - AppSpacing.medium,
+          : widget.width - AppSpacing.lg,
       padding: AppSpacing.insetsSymmetric(h: AppSpacing.s5),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

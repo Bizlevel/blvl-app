@@ -7,6 +7,8 @@ import 'package:bizlevel/screens/goal/widgets/motivation_card.dart';
 import 'package:bizlevel/screens/goal/widgets/practice_journal_section.dart';
 import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/theme/spacing.dart';
+import 'package:bizlevel/theme/dimensions.dart';
+import 'package:bizlevel/theme/animations.dart';
 import 'package:bizlevel/screens/goal/widgets/goal_compact_card.dart';
 
 class GoalScreen extends ConsumerStatefulWidget {
@@ -24,7 +26,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
     final ctx = _journalSectionKey.currentContext;
     if (ctx != null) {
       Scrollable.ensureVisible(ctx,
-          duration: const Duration(milliseconds: 300));
+          duration: AppAnimations.normal);
     }
   }
 
@@ -106,7 +108,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                     padding: AppSpacing.insetsAll(AppSpacing.md),
                     decoration: BoxDecoration(
                       color: AppColor.backgroundInfo,
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
                       border: Border.all(color: AppColor.border),
                     ),
                     child: Row(
@@ -258,7 +260,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
     final ctx = _sprintSectionKey.currentContext;
     if (ctx != null) {
       Scrollable.ensureVisible(ctx,
-          duration: const Duration(milliseconds: 300));
+          duration: AppAnimations.normal);
     }
   } */
 

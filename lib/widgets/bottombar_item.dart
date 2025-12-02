@@ -45,7 +45,7 @@ class BottomBarItem extends StatelessWidget {
       curve: AppAnimations.smoothCurve,
       padding: const EdgeInsets.all(5),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(50),
+        borderRadius: BorderRadius.circular(AppDimensions.radiusRound),
         color: AppColor.bottomBarColor,
         boxShadow: [
           if (isActive)
@@ -83,7 +83,7 @@ class BottomBarItem extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(50),
+        borderRadius: BorderRadius.circular(AppDimensions.radiusRound),
         onTap: onTap,
         child: ConstrainedBox(
           constraints:

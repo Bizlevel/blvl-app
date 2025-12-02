@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:bizlevel/theme/color.dart';
+import 'package:bizlevel/theme/dimensions.dart';
+import 'package:bizlevel/theme/animations.dart';
 import 'package:bizlevel/providers/levels_provider.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:go_router/go_router.dart';
@@ -58,7 +60,7 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
       if (key?.currentContext != null) {
         if (!mounted) return;
         await Scrollable.ensureVisible(key!.currentContext!,
-            duration: const Duration(milliseconds: 500),
+            duration: AppAnimations.medium,
             curve: Curves.easeInOutCubic,
             alignment: 0.3);
         _logBreadcrumb('tower_autoscroll_done level=$levelNumber');

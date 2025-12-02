@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:bizlevel/theme/dimensions.dart';
 
 class ParallaxImage extends StatelessWidget {
   final String assetPath;
@@ -19,7 +20,7 @@ class ParallaxImage extends StatelessWidget {
   Widget build(BuildContext context) {
     final lowEnd = _isLowEnd(context);
     return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(AppDimensions.radiusXl),
       child: SizedBox(
         width: double.infinity,
         height: height,
