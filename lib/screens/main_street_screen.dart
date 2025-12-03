@@ -371,8 +371,8 @@ class _QuickAccessSection extends ConsumerWidget {
         // Title removed per requirement
           GridView.count(
           crossAxisCount: 2,
-          // Flatter cards so section fits on one screen
-          childAspectRatio: 2.5,
+          // Уменьшен ratio для достаточной высоты текста
+          childAspectRatio: 1.8,
           mainAxisSpacing: 8,
           crossAxisSpacing: 12,
           shrinkWrap: true,
@@ -466,9 +466,7 @@ class _QuickTile extends StatelessWidget {
                         ),
                       ],
                     ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Row(
                       children: [
                         Container(
                           padding: const EdgeInsets.all(8),
@@ -482,24 +480,31 @@ class _QuickTile extends StatelessWidget {
                             color: AppColor.primary,
                           ),
                         ),
-                        const Spacer(),
-                        Text(
-                          title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.w600,
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                    ),
                               ),
-                        ),
-                        AppSpacing.gapH(AppSpacing.xxs),
-                        Text(
-                          subtitle,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: AppColor.onSurfaceSubtle,
-                                fontSize: 11,
+                              const SizedBox(height: 2),
+                              Text(
+                                subtitle,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: AppColor.onSurfaceSubtle,
+                                    ),
                               ),
+                            ],
+                          ),
                         ),
                       ],
                     ),

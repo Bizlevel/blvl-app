@@ -56,7 +56,11 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
-async function callPostgrestRpc(functionName: string, args: Record<string, unknown>, userJwt: string) {
+async function callPostgrestRpc(
+  functionName: string,
+  args: Record<string, unknown>,
+  userJwt: string,
+) {
   const url = `${Deno.env.get("SUPABASE_URL")}/rest/v1/rpc/${functionName}`;
   const anon = Deno.env.get("SUPABASE_ANON_KEY");
   if (!url || !anon || !userJwt) throw new Error("server_misconfigured");
@@ -66,12 +70,14 @@ async function callPostgrestRpc(functionName: string, args: Record<string, unkno
       "Content-Type": "application/json",
       "apikey": anon,
       "Authorization": `Bearer ${userJwt}`,
+      "Prefer": "return=representation",
     },
     body: JSON.stringify(args),
   });
-  const data = await resp.json().catch(() => undefined);
+  const rawText = await resp.text();
+  const data = rawText ? JSON.parse(rawText) : undefined;
   if (!resp.ok) {
-    throw new Error(`rpc_failed:${functionName}:${resp.status}:${JSON.stringify(data)}`);
+    throw new Error(`rpc_failed:${functionName}:${resp.status}:${rawText}`);
   }
   return data as RpcResponse;
 }
@@ -345,7 +351,15 @@ Deno.serve(async (req: Request) => {
       p_purchase_id: purchaseId,
       p_amount_gp: amount,
     }, dbgUserJwt);
-    const balance = parseBalanceAfter(rpcData);
+    let balance = parseBalanceAfter(rpcData);
+    if (balance == null) {
+      // fallback: запрос баланса напрямую
+      try {
+        const balData = await callPostgrestRpc("gp_balance", {}, dbgUserJwt);
+        const row = parseBalanceAfter(balData);
+        if (row != null) balance = row;
+      } catch (_) { /* ignore */ }
+    }
     if (balance == null) {
       await logStep("error", "rpc_no_balance");
       return jsonResponse({ error: "rpc_no_balance" }, 500);

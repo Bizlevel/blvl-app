@@ -18,7 +18,6 @@ class GpBalanceWidget extends ConsumerWidget {
     final gpAsync = ref.watch(gpBalanceProvider);
     final balance = gpAsync.value?['balance'] ?? 0;
 
-    const width = 80.0;
     const height = 32.0;
 
     return InkWell(
@@ -29,7 +28,7 @@ class GpBalanceWidget extends ConsumerWidget {
       },
       borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
       child: Container(
-        width: width,
+        constraints: const BoxConstraints(minWidth: 70, maxWidth: 110),
         height: height,
         padding: AppSpacing.insetsSymmetric(h: AppSpacing.sm),
         decoration: BoxDecoration(
@@ -38,18 +37,22 @@ class GpBalanceWidget extends ConsumerWidget {
           border: Border.all(color: AppColor.borderSubtle),
         ),
         child: Row(
+          mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             SvgPicture.asset('assets/images/gp_coin.svg',
-                width: 20, height: 20),
-            const SizedBox(width: AppSpacing.s6),
-            TweenAnimationBuilder<double>(
-              tween: Tween(begin: 0, end: balance.toDouble()),
-              duration: const Duration(milliseconds: 600),
-              curve: Curves.easeOut,
-              builder: (context, value, _) => Text(
-                value.toInt().toString(),
-                style: AppTypography.textTheme.titleMedium,
+                width: 18, height: 18),
+            const SizedBox(width: AppSpacing.xs),
+            Flexible(
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0, end: balance.toDouble()),
+                duration: const Duration(milliseconds: 600),
+                curve: Curves.easeOut,
+                builder: (context, value, _) => Text(
+                  value.toInt().toString(),
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.textTheme.titleMedium,
+                ),
               ),
             ),
           ],

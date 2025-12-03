@@ -618,3 +618,29 @@
 - **AppEffects токены**: Создан новый файл `lib/theme/effects.dart` с токенами теней (`shadowXs..shadowXl`, `glowSuccess/Primary/Premium`), добавлен экспорт в `design_tokens.dart`.
 - **RadioGroup API**: `QuizWidget` обновлён на новый Flutter 3.32+ `RadioGroup` API с `IgnorePointer` для блокировки после проверки.
 - **lint_tokens.sh**: Расширен скрипт проверки токенов — добавлены паттерны для `BorderRadius.circular`, `Duration(milliseconds:)`, deprecated aliases, режим `--warn`.
+
+## Задача iap-android-2025-12-02b fix
+- Edge `gp-purchase-verify`: PostgREST вызывается с `Prefer: return=representation`, добавлен fallback `gp_balance` при пустом ответе, чтобы не падать с `rpc_no_balance` после успешного начисления. Деплой supabase-mcp → версия v70.
+- Клиент (`GpStoreScreen`): при `rpc_no_balance` запускаем принудительный refresh `gp_balance`; если GP уже пришли — отображаем «Покупка подтверждена…», иначе даём хинт «Покупка завершена, идёт обновление баланса».
+- В результате пользователи больше не видят ложных ошибок, а задержка зачисления прозрачна.
+
+
+## 2025-12-02 — Задача ui-overflow-fix: Исправление overflow на Главной/Профиле/Магазине
+- **GpBalanceWidget**: Убрана фиксированная ширина 80px, добавлен `constraints: BoxConstraints(minWidth: 70, maxWidth: 110)`, иконка уменьшена до 18px, текст обёрнут в `Flexible` с `overflow: ellipsis`.
+- **HomeGoalCard**: Полностью перестроена раскладка — DonutProgress (80px) вынесен в верхнюю часть рядом с текстом, кнопки «Действие»/«Обсудить» в отдельном ряду на всю ширину карточки, текст кнопок полный без переносов.
+- **_QuickTile (Библиотека/Артефакты)**: `childAspectRatio` с 2.5 до 1.8, переделана раскладка на горизонтальную (иконка слева, текст справа в `Row`), текст полностью виден без обрезки.
+- **AppBarTheme**: Добавлены `foregroundColor`, `iconTheme.color` и `titleTextStyle.color = AppColor.textColor` — заголовки страниц больше не сливаются с белым фоном.
+- **PracticeJournalSection**: Сдвинут overlay `+1 день` на `top: 40`, обёрнут в `IgnorePointer` и добавлен guard от повторных открытий bottom sheet (кнопка колокольчика дизейблится, пока открыт sheet).
+- **ReminderPrefsProvider**: Новый `AsyncNotifier` + модель `ReminderPrefs` централизуют загрузку настроек напоминаний (предварительный fetch через сервис, дальнейшее обновление через `refreshPrefs()`).
+- **RemindersSettingsSheet**: Полностью переписан на `ConsumerStatefulWidget` — подключён `reminderPrefsProvider`, добавлены skeleton/error‑состояния, Spinner при сохранении, единая обработка ошибок и обновление провайдера после `schedulePracticeReminders`.
+- **Practice reminders sync**: Создана таблица `practice_reminders`, RPC `upsert_practice_reminders`, `due_practice_reminders`, `mark_practice_reminders_notified`, добавлен Supabase sync в `NotificationsService` (шаринг расписания между устройствами + оффлайн кеш в Hive).
+- **Push tokens**: `push_tokens` расширена полями `timezone/locale/enabled`, `PushService` теперь отправляет метаданные при регистрации.
+- **Edge Function reminder-cron**: Новый крон-функшн агрегирует due reminders, вызывает `push-dispatch`, и после отправки помечает `last_notified_at`. Деплой выполнен (версия 2), для вызова используется service-role key; cron настроить через Scheduled Triggers.
+- **UI статус**: В листе настроек добавлен блок об актуальном состоянии синхронизации (cloud + локальные напоминания), чтобы пользователю было видно, что пуши работают из облака.
+- **ReminderPrefs performance**: Добавлен `ReminderPrefsCache` с прогревом при старте (`NotificationsService.prefetchReminderPrefs()`), все чтения/записи Hive выполняются через `Isolate.run`, `ReminderPrefsNotifier` теперь мгновенно отдаёт данные из памяти и обновляет их асинхронно, что убрало зависания Goal/Настроек.
+
+## 2025-12-02 — Задача notif-io fix:
+- ReminderPrefs кеш переведён на `SharedPreferences` (`ReminderPrefsStorage`), полностью убран Hive из горячего пути Goal/Настроек.
+- `NotificationsService.getPracticeReminderPrefs/prefetch` теперь работают только с in-memory кешом + SharedPreferences, запись в Supabase остаётся асинхронной.
+- Таймзона для RPC читается из нового стораджа, так что никаких `NSFileManager`/`NSData` операций на UI-потоке не осталось.
+- Добавлены Sentry breadcrumbs и мгновенный показ локальных данных: `reminderPrefsProvider` больше не блокирует UI, `RemindersSettingsContent` показывает последнюю конфигурацию с индикатором синхронизации и сообщением об ошибке при оффлайне.

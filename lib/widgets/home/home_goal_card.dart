@@ -59,135 +59,137 @@ class HomeGoalCard extends ConsumerWidget {
                       : DateTime.tryParse(td)?.toLocal();
                 } catch (_) {}
 
-                return Row(
+                return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Левая колонка: текст и дата/прогресс
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Моя цель',
-                            style: Theme.of(context).textTheme.titleMedium
-                                ?.copyWith(fontWeight: FontWeight.w600),
-                          ),
-                          AppSpacing.gapH(AppSpacing.md),
-                          Text(
-                            goalText.isEmpty ? 'Цель не задана' : goalText,
-                            maxLines: 3,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.bodyMedium,
-                          ),
-                          AppSpacing.gapH(AppSpacing.s10),
-                          if (targetDate != null)
-                            Row(
-                              children: [
-                                Text(
-                                  '⏱ ',
-                                  style: Theme.of(
-                                    context,
-                                  ).textTheme.titleMedium,
-                                ),
-                                Text(
-                                  targetDate.isBefore(DateTime.now())
-                                      ? 'Поставить новый дедлайн'
-                                      : 'до ${DateFormat('dd.MM.yyyy').format(targetDate)}',
-                                  style: Theme.of(context).textTheme.bodyMedium
-                                      ?.copyWith(
-                                        color:
-                                            targetDate.isBefore(DateTime.now())
-                                            ? AppColor.error
-                                            : AppColor.onSurfaceSubtle,
-                                      ),
-                                ),
-                              ],
-                            ),
-                          if (progress == null) ...[
-                            AppSpacing.gapH(AppSpacing.sm),
-                            Text(
-                              'Добавьте метрику (тип, текущее и целевое значение), чтобы видеть прогресс.',
-                              style: Theme.of(context).textTheme.labelMedium
-                                  ?.copyWith(color: AppColor.onSurfaceSubtle),
-                            ),
-                          ],
-                          AppSpacing.gapH(AppSpacing.md),
-                          // Кнопки в один ряд, каждая занимает половину ширины; текст заворачивается до 2 строк
-                          Row(
+                    // Верхняя часть: текст цели + прогресс справа
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Expanded(
-                                child: BizLevelButton(
-                                  icon: const Icon(
-                                    Icons.track_changes,
-                                    size: 18,
-                                  ),
-                                  label: 'Действие',
-                                  onPressed: () {
-                                    try {
-                                      Sentry.addBreadcrumb(
-                                        Breadcrumb(
-                                          category: 'ui.tap',
-                                          message: 'home_goal_action_tap',
-                                          level: SentryLevel.info,
-                                        ),
-                                      );
-                                    } catch (_) {}
-                                    context.go('/goal?scroll=journal');
-                                  },
-                                  variant: BizLevelButtonVariant.secondary,
-                                  size: BizLevelButtonSize.sm,
-                                ),
+                              Text(
+                                'Моя цель',
+                                style: Theme.of(context).textTheme.titleMedium
+                                    ?.copyWith(fontWeight: FontWeight.w600),
                               ),
-                              const SizedBox(width: AppSpacing.md),
-                              Expanded(
-                                child: BizLevelButton(
-                                  icon: Container(
-                                    width: 24,
-                                    height: 24,
-                                    decoration: const BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      image: DecorationImage(
-                                        image: AssetImage(
-                                            'assets/images/avatars/avatar_max.png'),
-                                        fit: BoxFit.cover,
+                              AppSpacing.gapH(AppSpacing.sm),
+                              Text(
+                                goalText.isEmpty ? 'Цель не задана' : goalText,
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.bodyMedium,
+                              ),
+                              AppSpacing.gapH(AppSpacing.sm),
+                              if (targetDate != null)
+                                Row(
+                                  children: [
+                                    const Text('⏱ '),
+                                    Flexible(
+                                      child: Text(
+                                        targetDate.isBefore(DateTime.now())
+                                            ? 'Поставить новый дедлайн'
+                                            : 'до ${DateFormat('dd.MM.yyyy').format(targetDate)}',
+                                        style: Theme.of(context).textTheme.bodySmall
+                                            ?.copyWith(
+                                              color: targetDate.isBefore(DateTime.now())
+                                                  ? AppColor.error
+                                                  : AppColor.onSurfaceSubtle,
+                                            ),
                                       ),
                                     ),
-                                  ),
-                                  label: 'Обсудить',
-                                  onPressed: () {
-                                    try {
-                                      Sentry.addBreadcrumb(
-                                        Breadcrumb(
-                                          category: 'ui.tap',
-                                          message: 'home_goal_max_tap',
-                                          level: SentryLevel.info,
-                                        ),
-                                      );
-                                    } catch (_) {}
-                                    Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (_) => LeoDialogScreen(
-                                          bot: 'max',
-                                          userContext: buildMaxUserContext(
-                                            goal: goal,
-                                          ),
-                                          levelContext: '',
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                  size: BizLevelButtonSize.sm,
+                                  ],
                                 ),
-                              ),
                             ],
                           ),
+                        ),
+                        if (progress != null) ...[
+                          const SizedBox(width: AppSpacing.md),
+                          DonutProgress(
+                            value: progress.clamp(0.0, 1.0),
+                            size: 80,
+                            strokeWidth: 6,
+                          ),
                         ],
-                      ),
+                      ],
                     ),
-                    const SizedBox(width: AppSpacing.lg),
-                    // Правая колонка: донат‑прогресс
-                    if (progress != null)
-                      DonutProgress(value: progress.clamp(0.0, 1.0)),
+                    if (progress == null) ...[
+                      AppSpacing.gapH(AppSpacing.sm),
+                      Text(
+                        'Добавьте метрику, чтобы видеть прогресс.',
+                        style: Theme.of(context).textTheme.labelSmall
+                            ?.copyWith(color: AppColor.onSurfaceSubtle),
+                      ),
+                    ],
+                    AppSpacing.gapH(AppSpacing.md),
+                    // Кнопки в отдельном ряду на всю ширину
+                    Row(
+                      children: [
+                        Expanded(
+                          child: BizLevelButton(
+                            icon: const Icon(Icons.track_changes, size: 16),
+                            label: 'Действие',
+                            onPressed: () {
+                              try {
+                                Sentry.addBreadcrumb(
+                                  Breadcrumb(
+                                    category: 'ui.tap',
+                                    message: 'home_goal_action_tap',
+                                    level: SentryLevel.info,
+                                  ),
+                                );
+                              } catch (_) {}
+                              context.go('/goal?scroll=journal');
+                            },
+                            variant: BizLevelButtonVariant.secondary,
+                            size: BizLevelButtonSize.sm,
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: BizLevelButton(
+                            icon: Container(
+                              width: 18,
+                              height: 18,
+                              decoration: const BoxDecoration(
+                                shape: BoxShape.circle,
+                                image: DecorationImage(
+                                  image: AssetImage(
+                                      'assets/images/avatars/avatar_max.png'),
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                            ),
+                            label: 'Обсудить',
+                            onPressed: () {
+                              try {
+                                Sentry.addBreadcrumb(
+                                  Breadcrumb(
+                                    category: 'ui.tap',
+                                    message: 'home_goal_max_tap',
+                                    level: SentryLevel.info,
+                                  ),
+                                );
+                              } catch (_) {}
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => LeoDialogScreen(
+                                    bot: 'max',
+                                    userContext: buildMaxUserContext(
+                                      goal: goal,
+                                    ),
+                                    levelContext: '',
+                                  ),
+                                ),
+                              );
+                            },
+                            size: BizLevelButtonSize.sm,
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
                 );
               },
