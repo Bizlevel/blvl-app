@@ -1,5 +1,7 @@
 import 'dart:developer';
+import 'dart:io' show Platform;
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -200,8 +202,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           ),
         ),
         AppSpacing.gapH(AppSpacing.lg),
-        if (kEnableGoogleAuth) const _OrDivider(),
-        if (kEnableGoogleAuth) AppSpacing.gapH(AppSpacing.lg),
+        if (kEnableGoogleAuth || kEnableAppleAuth) const _OrDivider(),
+        if (kEnableGoogleAuth || kEnableAppleAuth) AppSpacing.gapH(AppSpacing.lg),
         if (kEnableGoogleAuth)
           SizedBox(
             width: double.infinity,
@@ -221,7 +223,27 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               ),
             ),
           ),
-        if (kEnableGoogleAuth) AppSpacing.gapH(AppSpacing.lg),
+        if (kEnableGoogleAuth) AppSpacing.gapH(AppSpacing.md),
+        if (kEnableAppleAuth && (kIsWeb || (!kIsWeb && Platform.isIOS)))
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              icon: const Icon(Icons.apple),
+              label: const Text('Регистрация через Apple'),
+              onPressed: () {
+                ref.read(loginControllerProvider.notifier).signInWithApple();
+              },
+              style: OutlinedButton.styleFrom(
+                padding: AppSpacing.insetsSymmetric(v: AppSpacing.md),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
+                ),
+                side: BorderSide(
+                    color: AppColor.textColor.withValues(alpha: 0.2)),
+              ),
+            ),
+          ),
+        if (kEnableGoogleAuth || kEnableAppleAuth) AppSpacing.gapH(AppSpacing.lg),
         TextButton(
           onPressed: () => context.go('/login'),
           child: const Text('Уже есть аккаунт? Войти'),

@@ -2,6 +2,7 @@ import 'dart:developer';
 import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -255,6 +256,94 @@ class AuthService {
       }
       throw AuthFailure('Платформа не поддерживается для входа через Google');
     }, unknownErrorMessage: 'Неизвестная ошибка входа через Google');
+  }
+
+  /// Sign in with Apple for iOS and Web.
+  /// Note: Apple Sign In is only available on iOS 13+ and Web.
+  Future<AuthResponse> signInWithApple() async {
+    return _handleAuthCall(() async {
+      if (kIsWeb) {
+        // Для web используем OAuth редирект
+        final redirectTo = envOrDefine('WEB_REDIRECT_ORIGIN');
+        await _client.auth.signInWithOAuth(
+          OAuthProvider.apple,
+          redirectTo: redirectTo.isNotEmpty ? redirectTo : null,
+        );
+        // На web произойдёт редирект, сессия подхватится onAuthStateChange
+        return AuthResponse();
+      } else if (Platform.isIOS) {
+        // Проверка доступности (iOS 13+)
+        if (!await SignInWithApple.isAvailable()) {
+          throw AuthFailure('Sign in with Apple недоступен на этом устройстве');
+        }
+
+        // Запрос авторизации
+        final credential = await SignInWithApple.getAppleIDCredential(
+          scopes: [
+            AppleIDAuthorizationScopes.email,
+            AppleIDAuthorizationScopes.fullName,
+          ],
+        );
+
+        // Получение identity token
+        final identityToken = credential.identityToken;
+        if (identityToken == null) {
+          throw AuthFailure('Не удалось получить токен от Apple');
+        }
+
+        // Вход через Supabase
+        final response = await _client.auth.signInWithIdToken(
+          provider: OAuthProvider.apple,
+          idToken: identityToken,
+        );
+
+        // Обработка данных пользователя
+        final user = response.user;
+        if (user != null) {
+          // Set Sentry user context
+          Sentry.configureScope((scope) {
+            scope.setUser(SentryUser(id: user.id, email: user.email));
+          });
+
+          // Apple предоставляет имя только при первом входе — сохраняем в профиль
+          if (credential.givenName != null || credential.familyName != null) {
+            try {
+              final fullName =
+                  '${credential.givenName ?? ''} ${credential.familyName ?? ''}'
+                      .trim();
+              if (fullName.isNotEmpty) {
+                await updateProfile(name: fullName);
+              }
+            } catch (_) {
+              // Игнорируем ошибки обновления профиля
+            }
+          }
+
+          // Бонус за первый вход (идемпотентно)
+          try {
+            final gp = GpService(_client);
+            await gp.claimBonus(ruleKey: 'signup_bonus');
+            try {
+              final fresh = await gp.getBalance();
+              await GpService.saveBalanceCache(fresh);
+            } catch (_) {}
+          } catch (_) {}
+
+          // Пересоздаём локальные уведомления под текущего пользователя
+          try {
+            final notif = NotificationsService.instance;
+            await notif.initialize();
+            await notif.cancelWeeklyPlan();
+            await notif.cancelDailySprint();
+            await notif.cancelDailyPracticeReminder();
+            await notif.scheduleDailyPracticeReminder();
+          } catch (_) {}
+        }
+
+        return response;
+      }
+      throw AuthFailure('Sign in with Apple доступен только на iOS и Web');
+    }, unknownErrorMessage: 'Неизвестная ошибка входа через Apple');
   }
 }
 

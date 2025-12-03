@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -188,8 +190,8 @@ class LoginScreen extends HookConsumerWidget {
                           onPressed: isLoading ? null : submit,
                         ),
                         AppSpacing.gapH(AppSpacing.xl),
-                        if (kEnableGoogleAuth) const _OrDivider(),
-                        if (kEnableGoogleAuth) AppSpacing.gapH(AppSpacing.xl),
+                        if (kEnableGoogleAuth || kEnableAppleAuth) const _OrDivider(),
+                        if (kEnableGoogleAuth || kEnableAppleAuth) AppSpacing.gapH(AppSpacing.xl),
                         if (kEnableGoogleAuth)
                           SizedBox(
                             width: double.infinity,
@@ -215,7 +217,33 @@ class LoginScreen extends HookConsumerWidget {
                               ),
                             ),
                           ),
-                        if (kEnableGoogleAuth) AppSpacing.gapH(AppSpacing.lg),
+                        if (kEnableGoogleAuth) AppSpacing.gapH(AppSpacing.md),
+                        if (kEnableAppleAuth && (kIsWeb || (!kIsWeb && Platform.isIOS)))
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              icon: const Icon(Icons.apple),
+                              label: const Text('Войти через Apple'),
+                              onPressed: () {
+                                ref
+                                    .read(loginControllerProvider.notifier)
+                                    .signInWithApple();
+                              },
+                              style: OutlinedButton.styleFrom(
+                                padding: AppSpacing.insetsSymmetric(
+                                    v: AppSpacing.md),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(
+                                      AppDimensions.radiusXl),
+                                ),
+                                side: BorderSide(
+                                  color:
+                                      AppColor.textColor.withValues(alpha: 0.2),
+                                ),
+                              ),
+                            ),
+                          ),
+                        if (kEnableGoogleAuth || kEnableAppleAuth) AppSpacing.gapH(AppSpacing.lg),
                         // Social proof (лёгкий блок
                         const _SocialProofBlock(),
                         AppSpacing.gapH(AppSpacing.sm),

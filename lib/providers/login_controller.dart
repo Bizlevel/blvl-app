@@ -30,6 +30,16 @@ class LoginController extends StateNotifier<AsyncValue<void>> {
       state = AsyncError(e, st);
     }
   }
+
+  Future<void> signInWithApple() async {
+    state = const AsyncLoading();
+    try {
+      await ref.read(authServiceProvider).signInWithApple();
+      state = const AsyncData(null);
+    } catch (e, st) {
+      state = AsyncError(e, st);
+    }
+  }
 }
 
 /// Провайдер для [LoginController].

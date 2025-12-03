@@ -47,6 +47,7 @@ dependencies:
   firebase_messaging: ^16.0.4
   flutter_timezone: ^5.0.1
   google_sign_in: ^7.2.0
+  sign_in_with_apple: ^6.1.0
   in_app_purchase:
   intl: ^0.20.2
   dynamic_color: ^1.6.9
