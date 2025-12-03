@@ -65,6 +65,18 @@ async function fetchTokens(userIds: string[]): Promise<string[]> {
   return rows.map((r: { token: string }) => r.token);
 }
 
+async function sendMessage(accessToken: string, projectId: string, message: Record<string, unknown>) {
+  const resp = await fetch(`https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
+    body: JSON.stringify({ message }),
+  });
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Response(`FCM send failed: ${text}`, { status: 500 });
+  }
+}
+
 serve(async (req: Request) => {
   if (req.method !== "POST") return new Response("Method Not Allowed", { status: 405 });
 
@@ -87,19 +99,18 @@ serve(async (req: Request) => {
   const sa = await getServiceAccount();
   const projectId = sa.project_id;
 
-  const messages = tokens.map((token) => ({
-    token,
-    notification: payload.notification,
-    data: (payload.data ?? {}) as Record<string, string>,
-    android: payload.android?.channel_id ? { notification: { channel_id: payload.android.channel_id } } : undefined,
-  }));
+  for (const token of tokens) {
+    const message = {
+      token,
+      notification: payload.notification,
+      data: (payload.data ?? {}) as Record<string, string>,
+      android: payload.android?.channel_id
+        ? { notification: { channel_id: payload.android.channel_id } }
+        : undefined,
+    };
+    await sendMessage(accessToken, projectId, message);
+  }
 
-  const resp = await fetch(`https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
-    body: JSON.stringify({ validate_only: false, message: messages[0] }),
-  });
-  if (!resp.ok) return new Response("FCM send failed", { status: 500 });
   return new Response(JSON.stringify({ sent: tokens.length }), { status: 200 });
 });
 

@@ -1,24 +1,26 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
-
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:timezone/timezone.dart' as tz;
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:timezone/timezone.dart' as tz;
+
 import 'package:bizlevel/services/timezone_gate.dart';
+import 'package:bizlevel/services/reminder_prefs_cache.dart';
+import 'package:bizlevel/services/reminder_prefs_storage.dart';
+import 'package:bizlevel/models/reminder_prefs.dart';
 
 class NotificationsService {
   NotificationsService._();
   static final NotificationsService instance = NotificationsService._();
   static String? pendingRoute;
+  bool _cloudRefreshInFlight = false;
 
   // Keys for local persistence
   static const String _boxName = 'notifications';
-  static const String _kWeekdays = 'practice_reminder_weekdays';
-  static const String _kHour = 'practice_reminder_hour';
-  static const String _kMinute = 'practice_reminder_minute';
-
   final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
 
@@ -83,25 +85,143 @@ class NotificationsService {
     _cachedStoredRoute = route;
   }
 
-  // Load persisted practice reminder prefs; provide defaults when absent
+  // Load persisted practice reminder prefs; prioritize Supabase, fallback to Hive
   Future<(Set<int> weekdays, int hour, int minute)>
       getPracticeReminderPrefs() async {
+    final cached = ReminderPrefsCache.instance.current;
+    if (cached != null) {
+      _logReminderStage('cache_hit', {
+        'weekdays': cached.weekdays.length.toString(),
+        'hour': '${cached.hour}',
+      });
+      unawaited(_refreshCloudPrefs(source: 'cache_hit'));
+      return (cached.weekdays, cached.hour, cached.minute);
+    }
+    final local = await _loadReminderPrefsFromCache();
+    final prefs = ReminderPrefs(
+      weekdays: local.$1,
+      hour: local.$2,
+      minute: local.$3,
+    );
+    ReminderPrefsCache.instance.set(prefs);
+    _logReminderStage('local_loaded', {
+      'weekdays': prefs.weekdays.length.toString(),
+      'hour': '${prefs.hour}',
+    });
+    unawaited(_refreshCloudPrefs(source: 'local_fallback'));
+    return local;
+  }
+
+  Future<void> prefetchReminderPrefs() async {
     try {
-      final box = await _ensureLaunchBox();
-      final List<dynamic>? rawDays = box.get(_kWeekdays) as List<dynamic>?;
-      final int hour = (box.get(_kHour) as int?) ?? 19;
-      final int minute = (box.get(_kMinute) as int?) ?? 0;
+      final cached = await _loadReminderPrefsFromCache();
+      ReminderPrefsCache.instance.set(
+        ReminderPrefs(
+          weekdays: cached.$1,
+          hour: cached.$2,
+          minute: cached.$3,
+        ),
+      );
+      unawaited(_refreshCloudPrefs(source: 'prefetch'));
+    } catch (_) {}
+  }
+
+  Future<void> _refreshCloudPrefs({String source = 'auto'}) async {
+    if (_cloudRefreshInFlight) return;
+    final supabaseClient = Supabase.instance.client;
+    final String? userId = supabaseClient.auth.currentUser?.id;
+    if (userId == null) return;
+    _cloudRefreshInFlight = true;
+    try {
+      _logReminderStage('cloud_fetch_start', {'source': source});
+      final data = await supabaseClient
+          .from('practice_reminders')
+          .select('weekdays,hour,minute,timezone')
+          .eq('user_id', userId)
+          .maybeSingle()
+          .timeout(const Duration(seconds: 2));
+      if (data == null) {
+        _logReminderStage('cloud_fetch_empty', {'source': source});
+        return;
+      }
+      final List<dynamic>? rawDays = data['weekdays'] as List<dynamic>?;
+      final int hour = (data['hour'] as num?)?.toInt() ?? 19;
+      final int minute = (data['minute'] as num?)?.toInt() ?? 0;
       final Set<int> days = rawDays == null
           ? {DateTime.monday, DateTime.wednesday, DateTime.friday}
           : rawDays
-              .map((e) => int.tryParse(e.toString()) ?? 0)
+              .map((e) => (e as num).toInt())
               .where((v) => v >= 1 && v <= 7)
               .toSet();
-      return (days, hour, minute);
+      final prefs = ReminderPrefs(weekdays: days, hour: hour, minute: minute);
+      ReminderPrefsCache.instance.set(prefs);
+      await _cacheReminderPrefs(
+        days,
+        hour,
+        minute,
+        timezone: data['timezone'] as String? ?? tz.local.name,
+      );
+      _logReminderStage('cloud_fetch_success', {
+        'source': source,
+        'weekdays': days.length.toString(),
+        'hour': '$hour',
+      });
+    } catch (error, stackTrace) {
+      _logReminderStage('cloud_fetch_error', {
+        'source': source,
+        'message': error.toString(),
+      });
+      await Sentry.captureException(error, stackTrace: stackTrace);
+    } finally {
+      _cloudRefreshInFlight = false;
+    }
+  }
+
+  Future<(Set<int> weekdays, int hour, int minute)>
+      _loadReminderPrefsFromCache() async {
+    try {
+      return await ReminderPrefsStorage.instance.load();
     } catch (_) {
       return ({DateTime.monday, DateTime.wednesday, DateTime.friday}, 19, 0);
     }
   }
+
+  Future<void> _cacheReminderPrefs(
+    Set<int> days,
+    int hour,
+    int minute, {
+    String? timezone,
+  }) async {
+    try {
+      await ReminderPrefsStorage.instance.save(
+        days,
+        hour,
+        minute,
+        timezone: timezone ?? tz.local.name,
+      );
+    } catch (_) {}
+  }
+
+  Future<void> _syncReminderPrefsToCloud(
+      Set<int> days, int hour, int minute) async {
+    final client = Supabase.instance.client;
+    final userId = client.auth.currentUser?.id;
+    if (userId == null) return;
+    try {
+      await client.rpc('upsert_practice_reminders', params: {
+        'p_weekdays': days.toList(),
+        'p_hour': hour,
+        'p_minute': minute,
+        'p_timezone': (await _getCachedTimezone()) ?? tz.local.name,
+        'p_source': 'mobile',
+      });
+    } catch (error, stackTrace) {
+      await Sentry.captureException(error, stackTrace: stackTrace);
+    }
+  }
+
+  Future<String?> _getCachedTimezone() async =>
+      ReminderPrefsStorage.instance.loadTimezone();
 
   Future<String?> consumeAnyLaunchRoute() async {
     try {
@@ -223,9 +343,12 @@ class NotificationsService {
     } catch (_) {}
   }
 
-  /// Schedule reminders at selected weekdays (IDs: Monday..Sunday) and hour
-  Future<void> schedulePracticeReminders(
-      {required List<int> weekdays, int hour = 19}) async {
+  /// Schedule reminders at selected weekdays (IDs: Monday..Sunday) and hour/minute
+  Future<void> schedulePracticeReminders({
+    required List<int> weekdays,
+    int hour = 19,
+    int minute = 0,
+  }) async {
     if (kIsWeb) return;
     if (!_initialized) await initialize();
     await _ensureTimezoneReady();
@@ -238,26 +361,27 @@ class NotificationsService {
       priority: Priority.high,
     );
     const details = NotificationDetails(android: android);
-    for (final wd in weekdays.toSet()) {
+    final Set<int> uniqueWeekdays = weekdays.toSet();
+    for (final wd in uniqueWeekdays) {
       const idBase = 9000;
       await _plugin.zonedSchedule(
         idBase + wd,
         'Время практики',
         'Загляни в «Цель» и отметь действие сегодня',
-        _nextInstanceOf(weekday: wd, hour: hour, minute: 0),
+        _nextInstanceOf(weekday: wd, hour: hour, minute: minute),
         details,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
         matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
         payload: '{"route":"/goal"}',
       );
     }
-    // Persist selected weekdays/hour
-    try {
-      final box = await _ensureLaunchBox();
-      await box.put(_kWeekdays, weekdays.toSet().toList());
-      await box.put(_kHour, hour);
-      await box.put(_kMinute, 0);
-    } catch (_) {}
+    await _cacheReminderPrefs(
+      uniqueWeekdays,
+      hour,
+      minute,
+      timezone: tz.local.name,
+    );
+    await _syncReminderPrefsToCloud(uniqueWeekdays, hour, minute);
   }
 
   /// Convenience: default Mon/Wed/Fri
@@ -367,5 +491,20 @@ class NotificationsService {
         await Sentry.captureException(error, stackTrace: stackTrace);
       } catch (_) {}
     }
+  }
+
+  void _logReminderStage(String stage, [Map<String, String>? data]) {
+    final payload = data ?? const <String, String>{};
+    debugPrint('REMINDER_PREFS[$stage] $payload');
+    try {
+      Sentry.addBreadcrumb(
+        Breadcrumb(
+          category: 'notif.reminder_prefs',
+          message: stage,
+          level: SentryLevel.info,
+          data: payload,
+        ),
+      );
+    } catch (_) {}
   }
 }

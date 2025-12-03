@@ -98,7 +98,11 @@ class AppTheme {
         centerTitle: true,
         backgroundColor: Colors.transparent,
         elevation: 0,
-        titleTextStyle: AppTypography.textTheme.headlineSmall,
+        foregroundColor: AppColor.textColor,
+        titleTextStyle: AppTypography.textTheme.headlineSmall?.copyWith(
+          color: AppColor.textColor,
+        ),
+        iconTheme: const IconThemeData(color: AppColor.textColor),
       );
 
   static InputDecorationTheme _inputDecorationDark() =>

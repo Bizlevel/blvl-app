@@ -347,6 +347,7 @@ Future<void> _initializeNotifications() async {
     NotificationsService.instance.attachLaunchBox(Hive.box('notifications'));
   }
   await NotificationsService.instance.initialize();
+  await NotificationsService.instance.prefetchReminderPrefs();
 }
 
 Future<void> _preloadNotificationsLaunchData() async {

@@ -1,13 +1,15 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:bizlevel/services/notifications_service.dart';
 import 'package:bizlevel/constants/push_flags.dart';
+import 'package:bizlevel/services/notifications_service.dart';
+import 'package:timezone/timezone.dart' as tz;
 
 // Топ-левел background handler обязателен для Android
 @pragma('vm:entry-point')
@@ -148,11 +150,16 @@ class PushService {
           : Platform.isIOS
               ? 'ios'
               : 'web';
+      final localeTag = ui.PlatformDispatcher.instance.locale.toLanguageTag();
+      final timezone = tz.local.name.isNotEmpty ? tz.local.name : 'UTC';
 
       await Supabase.instance.client.from('push_tokens').upsert({
         'user_id': user.id,
         'token': token,
         'platform': platform,
+        'timezone': timezone,
+        'locale': localeTag,
+        'enabled': true,
         'updated_at': DateTime.now().toIso8601String(),
       });
     } catch (e, st) {

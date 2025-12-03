@@ -29,6 +29,7 @@ class _PracticeJournalSectionState
   final Set<String> _selectedTools = <String>{};
   bool _showMomentum = false;
   bool _selectingGuard = false;
+  bool _reminderSheetOpen = false;
 
   @override
   void dispose() {
@@ -61,7 +62,15 @@ class _PracticeJournalSectionState
                   IconButton(
                     tooltip: 'Настроить напоминания',
                     icon: const Icon(Icons.notifications_active_outlined),
-                    onPressed: () => showRemindersSettingsSheet(context),
+                    onPressed: _reminderSheetOpen
+                        ? null
+                        : () async {
+                            setState(() => _reminderSheetOpen = true);
+                            await showRemindersSettingsSheet(context);
+                            if (mounted) {
+                              setState(() => _reminderSheetOpen = false);
+                            }
+                          },
                   ),
                 ],
               ),
@@ -477,10 +486,11 @@ class _PracticeJournalSectionState
               ),
             ],
           ),
-          if (_showMomentum)
-            Positioned(
-              right: 0,
-              top: 0,
+        if (_showMomentum)
+          Positioned(
+            right: 0,
+            top: 40, // Сдвинуто вниз, чтобы не перекрывать кнопку колокольчика
+            child: IgnorePointer(
               child: AnimatedOpacity(
                 duration: const Duration(milliseconds: 250),
                 opacity: _showMomentum ? 1 : 0,
@@ -507,6 +517,7 @@ class _PracticeJournalSectionState
                 ),
               ),
             ),
+          ),
         ],
       ),
     );

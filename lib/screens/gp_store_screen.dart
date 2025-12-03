@@ -448,9 +448,16 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
       }
       await _startWebPurchase(context, packageId);
     } catch (e) {
+      var message = _describePurchaseError(e);
+      if (message == _rpcNoBalanceMessage) {
+        final fallbackBalance = await _refreshBalanceAfterDelay(context);
+        if (fallbackBalance != null) {
+          message = 'Покупка подтверждена, баланс: $fallbackBalance';
+        }
+      }
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Не удалось создать оплату')),
+        SnackBar(content: Text(message)),
       );
     }
   }
@@ -624,9 +631,20 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
               token: fallbackToken,
               packageName: packageName,
             );
+          } else if (_looksLikeRpcNoBalance(e)) {
+            final fallbackBalance = await _refreshBalanceAfterDelay(context);
+            if (fallbackBalance != null) {
+              balance = fallbackBalance;
+            } else {
+              rethrow;
+            }
           } else {
             rethrow;
           }
+        } else if (_looksLikeRpcNoBalance(e)) {
+          final fallbackBalance = await _refreshBalanceAfterDelay(context);
+          if (fallbackBalance == null) rethrow;
+          balance = fallbackBalance;
         } else {
           rethrow;
         }
@@ -1011,4 +1029,41 @@ class _FaqRow extends StatelessWidget {
       ),
     );
   }
+}
+
+bool _looksLikeRpcNoBalance(Object error) {
+  final raw = error.toString();
+  return raw.contains('rpc_no_balance');
+}
+
+const _rpcNoBalanceMessage =
+    'Покупка завершена, идёт обновление баланса. Через пару секунд обновите экран.';
+
+Future<int?> _refreshBalanceAfterDelay(BuildContext context) async {
+  try {
+    await Future.delayed(const Duration(seconds: 2));
+    final container = ProviderScope.containerOf(context);
+    container.invalidate(gpBalanceProvider);
+    final map = await container.read(gpBalanceProvider.future);
+    return map['balance'];
+  } catch (_) {
+    return null;
+  }
+}
+
+String _describePurchaseError(Object error) {
+  if (error is GpFailure && error.message.isNotEmpty) {
+    return error.message;
+  }
+  final raw = error.toString();
+  if (raw.contains('unknown_product')) {
+    return 'Store пока не вернул данные о товаре. Проверьте статусы SKU в консоли и повторите попытку.';
+  }
+  if (raw.contains('web_verify_not_allowed_on_mobile')) {
+    return 'Подтверждать покупку нужно в том же флоу Google/Apple Pay внутри приложения.';
+  }
+  if (_looksLikeRpcNoBalance(error)) {
+    return _rpcNoBalanceMessage;
+  }
+  return 'Не удалось создать оплату';
 }
