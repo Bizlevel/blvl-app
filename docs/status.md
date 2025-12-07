@@ -1,3 +1,4 @@
+
 # Этап 52-fix: Чаты — UX быстрых ответов и чтения
 - 52.fix-1: `LeoDialogScreen` — скрытие клавиатуры по жесту скролла (`keyboardDismissBehavior:onDrag`), по тапу вне поля (`onTapOutside`) и иконка «Скрыть клавиатуру». Добавлен FAB «Вниз» при отскролле.
 - 52.fix-2: Подсказки переведены в компактную горизонтальную ленту (1 строка, прокрутка) с кнопкой «Ещё…» (bottom‑sheet) и «Показать подсказки» при сворачивании.
@@ -644,3 +645,33 @@
 - `NotificationsService.getPracticeReminderPrefs/prefetch` теперь работают только с in-memory кешом + SharedPreferences, запись в Supabase остаётся асинхронной.
 - Таймзона для RPC читается из нового стораджа, так что никаких `NSFileManager`/`NSData` операций на UI-потоке не осталось.
 - Добавлены Sentry breadcrumbs и мгновенный показ локальных данных: `reminderPrefsProvider` больше не блокирует UI, `RemindersSettingsContent` показывает последнюю конфигурацию с индикатором синхронизации и сообщением об ошибке при оффлайне.
+
+## 2025-12-07 — Задача startup-blocking fix:
+- Исправлены 4 блокирующих паттерна в провайдерах:
+  - `currentUserProvider`: убрано `await authStateProvider.future` и `ref.watch(authStateProvider)` — теперь синхронное чтение `currentSession`
+  - `gpBalanceProvider`: убрано `await authStateProvider.future` и `ref.watch(authStateProvider)` — синхронная проверка сессии
+- Sentry init перенесён в `_schedulePostFrameBootstraps()` — не блокирует `runApp()`
+- Созданы тесты производительности (`test/providers/startup_performance_test.dart`) — 13 тестов, все проходят
+- **Важно:** Медленный запуск в Debug сборке (13+ сек до Dart VM, 2+ мин до Flutter main) — нормально для JIT, Release должен запускаться за <3 сек
+
+## 2025-12-07 — ✅ Задача startup-blocking fix ЗАВЕРШЕНА!
+
+**Приложение запускается! Экран уведомлений работает!**
+
+### Исправленные критические проблемы:
+
+1. **Podfile** — сломанный патч `patch_sentry_installation` вызывал ошибки компиляции
+2. **FirebaseEarlyInit.m** — init в `+load` и `constructor` блокировал main thread
+3. **AppDelegate.swift** — Firebase init перенесён в `willFinishLaunchingWithOptions` (до SceneDelegate)
+4. **auth_provider.dart** — `await authStateProvider.future` блокировал 73+ сек
+5. **gp_providers.dart** — `ref.watch(authStateProvider)` блокировал UI
+6. **app_router.dart** — `ref.watch(authStateProvider)` блокировал GoRouter
+7. **main.dart** — Sentry init блокировал `runApp()`, перенесён в post-frame
+8. **main.dart** — HiveError из-за FutureBuilder в MyApp.build(), убран
+9. **notifications_service.dart** — `_ensureLaunchBox()` теперь возвращает null при ошибке
+10. **login_controller.dart** — добавлена инвалидация провайдеров после логина
+
+### Тесты:
+- GoRouter тесты: 3/3 ✅
+- Provider тесты: 13/13 ✅
+- Всего тестов: 16/16 ✅

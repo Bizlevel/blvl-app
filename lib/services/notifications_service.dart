@@ -236,10 +236,12 @@ class NotificationsService {
       }
       if (route == null) {
         final box = await _ensureLaunchBox();
-        final stored = box.get('launch_route');
-        if (stored is String && stored.isNotEmpty) {
-          route = stored;
-          await box.delete('launch_route');
+        if (box != null) {
+          final stored = box.get('launch_route');
+          if (stored is String && stored.isNotEmpty) {
+            route = stored;
+            await box.delete('launch_route');
+          }
         }
       }
       if (route == null) {
@@ -464,22 +466,33 @@ class NotificationsService {
     }
   }
 
-  Future<Box> _ensureLaunchBox() async {
-    if (_launchBox != null && _launchBox!.isOpen) {
+  /// Возвращает Hive box для launch route, или null если Hive не инициализирован.
+  /// ВАЖНО: Hive.initFlutter() должен быть вызван в main() ДО runApp()!
+  Future<Box?> _ensureLaunchBox() async {
+    try {
+      if (_launchBox != null && _launchBox!.isOpen) {
+        return _launchBox!;
+      }
+      if (Hive.isBoxOpen(_boxName)) {
+        _launchBox = Hive.box(_boxName);
+        return _launchBox!;
+      }
+      _launchBox = await Hive.openBox(_boxName);
       return _launchBox!;
+    } catch (e) {
+      // HiveError: Hive не инициализирован — это может произойти,
+      // если consumeAnyLaunchRoute() вызывается до Hive.initFlutter()
+      debugPrint('WARN: NotificationsService._ensureLaunchBox failed: $e');
+      return null;
     }
-    if (Hive.isBoxOpen(_boxName)) {
-      _launchBox = Hive.box(_boxName);
-      return _launchBox!;
-    }
-    _launchBox = await Hive.openBox(_boxName);
-    return _launchBox!;
   }
 
   Future<void> persistLaunchRoute(String route) async {
     try {
       final box = await _ensureLaunchBox();
-      await box.put('launch_route', route);
+      if (box != null) {
+        await box.put('launch_route', route);
+      }
     } catch (_) {}
   }
 

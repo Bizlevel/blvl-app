@@ -29,30 +29,27 @@ import Darwin
 
   @objc static func configureFirebaseBeforeMain() {
     guard !didConfigureFirebase else { return }
+    didConfigureFirebase = true  // Устанавливаем сразу, чтобы избежать повторного входа
 
-    let didEnableDebugLogging = enableFirebaseDebugLoggingIfNeeded()
+    // Минимизируем логирование для ускорения
+    FirebaseConfiguration.shared.setLoggerLevel(.min)
 
+    // Конфигурируем Firebase только если ещё не сконфигурирован
     if FirebaseApp.app() == nil {
       FirebaseApp.configure()
-    } else {
-      NSLog("AppDelegate: FIRApp was already configured before configureFirebaseBeforeMain()")
     }
 
-    configureAppCheck()
-    if FirebaseApp.app() == nil {
-      NSLog("AppDelegate: Firebase default app is still nil after configure()")
+    // App Check конфигурируем отложенно — это не критично для запуска
+    DispatchQueue.main.async {
+      configureAppCheck()
     }
-    if !didEnableDebugLogging {
-      FirebaseConfiguration.shared.setLoggerLevel(.min)
-    }
+
     if !didLogBootstrap {
-      NSLog("AppDelegate: Firebase configured before UIApplicationMain (debugProvider=%@)",
-            isAppCheckDebugEnabled ? "ON" : "OFF")
-      NSLog("AppDelegate: iOS FCM enabled=%@", isIosFcmEnabled ? "YES" : "NO")
+      NSLog("AppDelegate: Firebase configured (debugProvider=%@, fcm=%@)",
+            isAppCheckDebugEnabled ? "ON" : "OFF",
+            isIosFcmEnabled ? "YES" : "NO")
       didLogBootstrap = true
     }
-
-    didConfigureFirebase = true
   }
 
   private static func configureAppCheck() {
@@ -111,6 +108,13 @@ import Darwin
     _ application: UIApplication,
     willFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
   ) -> Bool {
+    // 2025-12-07: Firebase ДОЛЖЕН быть здесь — это единственное место ДО SceneDelegate!
+    // В iOS 13+ порядок: willFinishLaunching → SceneDelegate → didFinishLaunching
+    // SceneDelegate создаёт FlutterController и регистрирует плагины.
+    // Плагины требуют Firebase, поэтому он должен быть инициализирован ДО SceneDelegate.
+    // Оптимизации в configureFirebaseBeforeMain() делают это быстрым:
+    // - Минимальное логирование
+    // - App Check в async
     Self.configureFirebaseBeforeMain()
     return super.application(application, willFinishLaunchingWithOptions: launchOptions)
   }
@@ -119,6 +123,7 @@ import Darwin
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
+    // Fallback для iOS < 13 (без SceneDelegate) — вызов безопасен, т.к. guard защищает от повторной инициализации
     Self.configureFirebaseBeforeMain()
     UNUserNotificationCenter.current().delegate = self
     if #available(iOS 13.0, *) {

@@ -268,7 +268,7 @@ SPEC CHECKSUMS:
   objective_c: 89e720c30d716b036faf9c9684022048eee1eee2
   package_info_plus: af8e2ca6888548050f16fa2f1938db7b5a5df499
   path_provider_foundation: bb55f6dbba17d0dccd6737fe6f7f34fbd0376880
-  photo_manager: 343d78032bf7ebe944d2ab9702204dc2eda07338
+  photo_manager: a28a34edbfad3569010477f4f4fe75247c1b08df
   PromisesObjC: f5707f49cb48b9636751c5b2e7d227e43fba9f47
   Sentry: b53951377b78e21a734f5dc8318e333dbfc682d7
   sentry_flutter: 4c33648b7e83310aa1fdb1b10c5491027d9643f0
@@ -280,6 +280,6 @@ SPEC CHECKSUMS:
   wakelock_plus: e29112ab3ef0b318e58cfa5c32326458be66b556
   webview_flutter_wkwebview: 8ebf4fded22593026f7dbff1fbff31ea98573c8d
 
-PODFILE CHECKSUM: 3894d0259239fa57f0f9090fd7a0a391af002a64
+PODFILE CHECKSUM: 99b3f4ae5e9791a866fe68f297929ecedd86781a
 
 COCOAPODS: 1.16.2

@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
@@ -14,9 +15,7 @@ import '../screens/biz_tower_screen.dart';
 import '../screens/leo_chat_screen.dart';
 import '../screens/goal_screen.dart';
 import '../screens/goal_history_screen.dart';
-// material import не требуется
 import '../screens/mini_case_screen.dart';
-// import '../screens/goal_checkpoint_screen.dart';
 import '../screens/gp_store_screen.dart';
 import '../screens/library/library_screen.dart';
 import '../screens/library/library_section_screen.dart';
@@ -26,16 +25,24 @@ import '../screens/checkpoints/checkpoint_l1_screen.dart';
 import '../screens/checkpoints/checkpoint_l4_screen.dart';
 import '../screens/checkpoints/checkpoint_l7_screen.dart';
 
+/// Глобальный ключ для доступа к NavigatorState из GoRouter.
+/// Используется для навигации из _schedulePostFrameBootstraps().
+final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
+
 /// Riverpod provider that exposes the [GoRouter] instance used across the app.
 ///
-/// На данном этапе логика редиректов будет добавлена позже (задача 15.2).
+/// ВАЖНО: НЕ используем ref.watch(authStateProvider) здесь!
+/// StreamProvider.watch() внутри Provider может заблокировать UI навсегда,
+/// если поток не выдаёт события сразу (проблема холодного старта).
+/// Вместо этого читаем сессию синхронно из Supabase SDK.
 final goRouterProvider = Provider<GoRouter>((ref) {
-  // Слушаем изменения аутентификации, чтобы GoRouter автоматически
-  // пересоздавался при логине/логауте.
-  final authAsync = ref.watch(authStateProvider);
+  // Подписываемся на currentUserProvider для пересоздания роутера при изменении.
+  // НЕ используем authStateProvider напрямую — это StreamProvider!
   final currentUserAsync = ref.watch(currentUserProvider);
-  final session = authAsync.asData?.value.session ??
-      Supabase.instance.client.auth.currentSession;
+  
+  // Читаем сессию СИНХРОННО из кэша Supabase SDK.
+  // Это не блокирует — сессия уже загружена при Supabase.initialize().
+  final session = Supabase.instance.client.auth.currentSession;
 
   final initialLocation = session == null ? '/login' : '/home';
 
@@ -126,6 +133,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
   );
 
   return GoRouter(
+    navigatorKey: rootNavigatorKey,
     initialLocation: initialLocation,
     observers: [SentryNavigatorObserver()],
     routes: [

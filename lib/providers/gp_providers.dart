@@ -9,17 +9,13 @@ final gpServiceProvider = Provider<GpService>((ref) {
 
 /// SWR-провайдер баланса GP. Использует локальный кеш Hive.
 final gpBalanceProvider = FutureProvider<Map<String, int>>((ref) async {
-  // Подписываемся на состояние аутентификации: при смене сессии провайдер
-  // будет инвалидирован и перезапрошен, чтобы не залипать на 0 до логина.
-  ref.watch(authStateProvider);
-
+  // ВАЖНО: НЕ используем ref.watch(authStateProvider) — это StreamProvider,
+  // который может блокировать FutureProvider, пока поток не выдаст первое событие!
+  // Вместо этого проверяем currentSession синхронно.
+  
   // Гейт: не делаем сетевые вызовы, пока нет user JWT.
-  // Это устраняет ранние 401 от gp-balance до появления сессии.
   if (Supabase.instance.client.auth.currentSession == null) {
-    final auth = await ref.watch(authStateProvider.future);
-    if (auth.session == null) {
-      return const {'balance': 0, 'total_earned': 0, 'total_spent': 0};
-    }
+    return const {'balance': 0, 'total_earned': 0, 'total_spent': 0};
   }
   // мгновенно отдаём кеш, если есть
   final cached = GpService.readBalanceCache();

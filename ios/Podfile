@@ -488,6 +488,7 @@ post_install do |installer|
   patch_sentry_file_manager
   patch_sentry_dependency_container
   patch_sentry_application_extensions
-  patch_sentry_installation
+  # ВРЕМЕННО ОТКЛЮЧЕНО: патч ломает билд (fileManager не объявлен после частичного применения)
+  # patch_sentry_installation
 end
 

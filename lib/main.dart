@@ -54,28 +54,29 @@ Future<void> main() async {
     setUrlStrategy(PathUrlStrategy());
   }
 
-  // Загружаем переменные окружения (если файл есть)
+  // Загружаем переменные окружения СИНХРОННО (из памяти, не disk I/O)
   try {
     await dotenv.load();
   } catch (_) {}
 
-  // Инициализируем Supabase
+  // Supabase init — ЖДЁМ, т.к. GoRouter читает currentSession сразу.
+  // Supabase.initialize() быстрый: создаёт клиент + читает сессию из кэша.
+  // Медленные операции (сетевые) выполняются Supabase SDK в фоне.
   await SupabaseService.initialize();
+  debugPrint('INFO: Supabase init completed');
 
+  // Hive.initFlutter() — КРИТИЧНО! MyApp.build() вызывает NotificationsService,
+  // который требует инициализированный Hive. Это быстрая операция (только путь).
+  // Открытие боксов (медленное I/O) — в post-frame.
   await _ensureHiveInitialized();
-  await _preloadNotificationsLaunchData();
 
   const rootApp = ProviderScope(child: MyApp());
 
-  final dsn = envOrDefine('SENTRY_DSN');
-  if (dsn.isEmpty) {
-    debugPrint('INFO: Sentry DSN not configured, running without Sentry');
-  } else {
-    await _prewarmSentryCache(dsn);
-    await _initializeSentry(dsn);
-  }
-
+  // КРИТИЧНО: runApp() вызывается СРАЗУ, без ожидания сети/диска!
+  // Первый кадр отрисовывается мгновенно.
   runApp(rootApp);
+  
+  // Все тяжёлые операции — после первого кадра
   _schedulePostFrameBootstraps();
 }
 
@@ -152,21 +153,9 @@ class MyApp extends ConsumerWidget {
                         : const FadeUpwardsPageTransitionsBuilder(),
                 }),
               ),
-              child: FutureBuilder<String?>(
-                future: NotificationsService.instance.consumeAnyLaunchRoute(),
-                builder: (context, snap) {
-                  if (snap.connectionState == ConnectionState.done &&
-                      snap.data != null &&
-                      snap.data!.isNotEmpty) {
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      try {
-                        router.go(snap.data!);
-                      } catch (_) {}
-                    });
-                  }
-                  return wrapped;
-                },
-              ),
+              // Launch route от уведомлений обрабатывается в _schedulePostFrameBootstraps()
+              // после полной инициализации Hive. FutureBuilder здесь вызывал HiveError.
+              child: wrapped,
             ),
           );
         },
@@ -184,8 +173,25 @@ class MyApp extends ConsumerWidget {
 void _schedulePostFrameBootstraps() {
   WidgetsBinding.instance.addPostFrameCallback((_) async {
     if (kIsWeb) return;
+    
+    // Sentry — сначала, чтобы ловить ошибки в остальных инициализациях
+    final dsn = envOrDefine('SENTRY_DSN');
+    if (dsn.isNotEmpty) {
+      try {
+        await _prewarmSentryCache(dsn);
+        await _initializeSentry(dsn);
+      } catch (e) {
+        debugPrint('WARN: Sentry deferred init failed: $e');
+      }
+    }
+    
     await _ensureFirebaseInitialized('post_frame_bootstrap');
     await _initializeDeferredLocalServices();
+    
+    // Обработка launch route от уведомлений — ПОСЛЕ инициализации Hive!
+    // Раньше это было в FutureBuilder в MyApp.build(), но вызывало HiveError.
+    await _handleNotificationLaunchRoute();
+    
     final bool runningOniOS =
         defaultTargetPlatform == TargetPlatform.iOS && !kIsWeb;
     if (kEnableIosFcm || !runningOniOS) {
@@ -199,6 +205,24 @@ void _schedulePostFrameBootstraps() {
       debugPrint('INFO: iOS PushService skipped (kEnableIosFcm=false)');
     }
   });
+}
+
+/// Обрабатывает launch route от уведомлений после полной инициализации.
+Future<void> _handleNotificationLaunchRoute() async {
+  try {
+    final route = await NotificationsService.instance.consumeAnyLaunchRoute();
+    if (route != null && route.isNotEmpty) {
+      debugPrint('INFO: Navigating to launch route: $route');
+      // Используем глобальный navigatorKey из GoRouter
+      final navigator = rootNavigatorKey.currentState;
+      if (navigator != null && navigator.mounted) {
+        // GoRouter.of требует context, используем navigator.context
+        GoRouter.of(navigator.context).go(route);
+      }
+    }
+  } catch (e) {
+    debugPrint('WARN: Failed to handle notification launch route: $e');
+  }
 }
 
 Future<void> _initializeSentry(String dsn) async {
@@ -287,6 +311,7 @@ Future<void> _initializeDeferredLocalServices() async {
       _ensureHiveInitialized().whenComplete(() => hiveSpan.finish()),
       _warmUpTimezone().whenComplete(() => tzSpan.finish()),
       _initializeNotifications().whenComplete(() => notifSpan.finish()),
+      _preloadNotificationsLaunchData(), // Перенесено из main()
     ]);
     transaction.finish(status: const SpanStatus.ok());
   } catch (error, stackTrace) {
@@ -299,11 +324,33 @@ Future<void> _initializeDeferredLocalServices() async {
 }
 
 Future<void> _ensureHiveInitialized() async {
-  if (_hiveInitialized || kIsWeb) {
+  if (_hiveInitialized) {
+    debugPrint('INFO: Hive already initialized, skipping');
     return;
   }
-  await Hive.initFlutter();
-  _hiveInitialized = true;
+  if (kIsWeb) {
+    debugPrint('INFO: Hive skipped on web');
+    return;
+  }
+  try {
+    debugPrint('INFO: Hive.initFlutter() starting...');
+    await Hive.initFlutter();
+    _hiveInitialized = true;
+    debugPrint('INFO: Hive.initFlutter() completed successfully');
+  } catch (e, st) {
+    debugPrint('ERROR: Hive.initFlutter() failed: $e');
+    debugPrint('Stack trace: $st');
+    // Пробуем инициализировать с явным путём
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      final hivePath = p.join(dir.path, 'hive');
+      Hive.init(hivePath);
+      _hiveInitialized = true;
+      debugPrint('INFO: Hive.init() with explicit path succeeded');
+    } catch (e2) {
+      debugPrint('ERROR: Hive.init() with explicit path also failed: $e2');
+    }
+  }
 }
 
 Future<void> _openHiveBoxes() async {
