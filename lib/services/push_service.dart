@@ -2,78 +2,65 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:ui' as ui;
 
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:onesignal_flutter/onesignal_flutter.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bizlevel/constants/push_flags.dart';
 import 'package:bizlevel/services/notifications_service.dart';
+import 'package:bizlevel/utils/env_helper.dart';
 import 'package:timezone/timezone.dart' as tz;
 
 // Топ-левел background handler обязателен для Android
-@pragma('vm:entry-point')
-Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  try {
-    await Firebase.initializeApp();
-    Sentry.addBreadcrumb(Breadcrumb(
-      category: 'notif_push_received',
-      data: {'from': 'background', 'hasData': message.data.isNotEmpty},
-      level: SentryLevel.info,
-    ));
-  } catch (_) {}
-}
-
 class PushService {
   PushService._();
   static final PushService instance = PushService._();
 
-  late final FirebaseMessaging _fm;
-
   Future<void> initialize() async {
     // В вебе этот сервис не должен работать
     if (kIsWeb) return;
-    if (Platform.isIOS && !kEnableIosFcm) {
+
+    // OneSignal для обеих платформ
+    if (!kEnableIosPush && Platform.isIOS) {
       Sentry.addBreadcrumb(Breadcrumb(
         category: 'push_service',
         level: SentryLevel.info,
-        message: 'Skip PushService on iOS (kEnableIosFcm=false)',
+        message: 'Skip PushService on iOS (kEnableIosPush=false)',
+      ));
+      return;
+    }
+
+    // Не блокируем первый кадр: OneSignal в фоне
+    unawaited(_initializeOneSignal());
+  }
+
+  Future<void> _initializeOneSignal() async {
+    final appId = envOrDefine('ONESIGNAL_APP_ID');
+    if (appId.isEmpty) {
+      Sentry.addBreadcrumb(Breadcrumb(
+        category: 'push_service',
+        level: SentryLevel.warning,
+        message: 'ONESIGNAL_APP_ID is empty, skip OneSignal init',
       ));
       return;
     }
 
     try {
-      // Пытаемся инициализировать Firebase безопасно
-      if (Firebase.apps.isEmpty) {
-        await Firebase.initializeApp();
-      }
-      Sentry.addBreadcrumb(Breadcrumb(
-        category: 'push_service',
-        level: SentryLevel.info,
-        message: 'FirebaseMessaging initialization started',
-      ));
-      _fm = FirebaseMessaging.instance;
-      await _fm.setAutoInitEnabled(true);
+      OneSignal.initialize(appId);
+      await OneSignal.Notifications.requestPermission(true);
 
-      // Mobile permissions
-      if (Platform.isIOS || Platform.isAndroid) {
-        await _fm.requestPermission();
-      }
-
-      FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-
-      // Foreground messages
-      FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      OneSignal.Notifications.addForegroundWillDisplayListener((event) {
+        final payload = event.notification;
+        event.preventDefault(); // покажем сами
         Sentry.addBreadcrumb(Breadcrumb(
           category: 'notif_push_received',
-          data: {'from': 'foreground', 'hasData': message.data.isNotEmpty},
+          data: {'from': 'foreground', 'hasData': payload.additionalData != null},
           level: SentryLevel.info,
         ));
-        // Показываем системное уведомление в фореграунде (минимальный контент)
-        final title = message.notification?.title ?? 'Сообщение BizLevel';
-        final body = message.notification?.body ?? 'Откройте приложение';
-        final route = message.data['route']?.toString();
-        final type = message.data['type']?.toString();
+        final title = payload.title ?? 'Сообщение BizLevel';
+        final body = payload.body ?? 'Откройте приложение';
+        final route = payload.additionalData?['route']?.toString();
+        final type = payload.additionalData?['type']?.toString();
         final channel = switch (type) {
           'goal_reminder' => 'goal_reminder',
           'gp_economy' => 'gp_economy',
@@ -88,9 +75,8 @@ class PushService {
         );
       });
 
-      // Taps from background/killed
-      FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-        final route = message.data['route']?.toString();
+      OneSignal.Notifications.addClickListener((event) {
+        final route = event.notification.additionalData?['route']?.toString();
         if (route != null && route.isNotEmpty) {
           Sentry.addBreadcrumb(Breadcrumb(
             category: 'notif_push_tap',
@@ -101,49 +87,54 @@ class PushService {
         }
       });
 
-      // Cold start
-      final initial =
-          (Firebase.apps.isNotEmpty) ? await _fm.getInitialMessage() : null;
-      if (initial != null) {
-        final route = initial.data['route']?.toString();
-        if (route != null && route.isNotEmpty) {
-          _storeLaunchRoute(route);
-        }
+      final sub = OneSignal.User.pushSubscription;
+      final playerId = sub.id;
+      final token = sub.token;
+
+      final primaryToken = playerId ?? token;
+      if (primaryToken != null && primaryToken.isNotEmpty) {
+        await _registerToken(primaryToken, provider: 'onesignal');
       }
 
-      // Token lifecycle
-      await _syncToken();
-      _fm.onTokenRefresh.listen((t) => _registerToken(t));
+      OneSignal.User.pushSubscription.addObserver((state) async {
+        final newId = state.current.id;
+        final newToken = state.current.token;
+        final refreshed = newId ?? newToken;
+        if (refreshed != null && refreshed.isNotEmpty) {
+          await _registerToken(refreshed, provider: 'onesignal');
+        }
+      });
+
       Sentry.addBreadcrumb(Breadcrumb(
         category: 'push_service',
         level: SentryLevel.info,
-        message: 'FirebaseMessaging initialization completed',
+        message: 'OneSignal initialization completed',
       ));
     } catch (e, st) {
       await Sentry.captureException(e, stackTrace: st);
     }
   }
 
-  Future<void> _syncToken() async {
-    try {
-      Sentry.addBreadcrumb(Breadcrumb(
-        category: 'push_service',
-        level: SentryLevel.debug,
-        message: 'Requesting FCM token via _syncToken',
-      ));
-      final token = await _fm.getToken();
-      if (token != null && token.isNotEmpty) {
-        await _registerToken(token);
-      }
-    } catch (e, st) {
-      await Sentry.captureException(e, stackTrace: st);
-    }
-  }
-
-  Future<void> _registerToken(String token) async {
+  Future<void> _registerToken(String token, {required String provider}) async {
     try {
       final user = Supabase.instance.client.auth.currentUser;
       if (user == null) return; // не логиним — не регистрируем
+
+      if (!_isValidToken(token)) {
+        await Sentry.captureMessage(
+          'push_service: invalid token, skip',
+          level: SentryLevel.warning,
+          withScope: (scope) {
+            scope.setContexts('push_token', {
+              'provider': provider,
+              'length': token.length,
+              'sample': token.substring(0, token.length > 64 ? 64 : token.length),
+            });
+            scope.setUser(SentryUser(id: user.id));
+          },
+        );
+        return;
+      }
 
       final platform = Platform.isAndroid
           ? 'android'
@@ -157,6 +148,7 @@ class PushService {
         'user_id': user.id,
         'token': token,
         'platform': platform,
+        'provider': provider,
         'timezone': timezone,
         'locale': localeTag,
         'enabled': true,
@@ -171,7 +163,8 @@ class PushService {
     try {
       final user = Supabase.instance.client.auth.currentUser;
       if (user == null) return;
-      final token = await _fm.getToken();
+      final sub = OneSignal.User.pushSubscription;
+      final token = sub.id ?? sub.token;
       if (token == null) return;
       await Supabase.instance.client
           .from('push_tokens')
@@ -184,5 +177,15 @@ class PushService {
 
   Future<void> _storeLaunchRoute(String route) async {
     await NotificationsService.instance.persistLaunchRoute(route);
+  }
+
+  bool _isValidToken(String token) {
+    if (token.isEmpty) return false;
+    // Отсекаем явные мусорные значения, которые ломают uuid/text поля
+    const disallowed = ['{', '}', ',', ' '];
+    if (disallowed.any(token.contains)) return false;
+    // UUID / OneSignal player id и FCM токены длиннее 20 символов
+    if (token.length < 20) return false;
+    return true;
   }
 }

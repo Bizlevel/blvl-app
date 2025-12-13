@@ -10,6 +10,7 @@ class NativeBootstrap {
   static const MethodChannel _channel =
       MethodChannel('bizlevel/native_bootstrap');
   static bool _iapRegistered = false;
+  static bool _mediaRegistered = false;
 
   static Future<void> ensureIapRegistered({String caller = 'unknown'}) async {
     if (_iapRegistered || kIsWeb || !Platform.isIOS) {
@@ -39,9 +40,33 @@ class NativeBootstrap {
       await Sentry.captureException(error, stackTrace: stackTrace);
     }
   }
+
+  static Future<void> ensureMediaPlugins({String caller = 'unknown'}) async {
+    if (_mediaRegistered || kIsWeb || !Platform.isIOS) {
+      return;
+    }
+    final stackPreview = StackTrace.current
+        .toString()
+        .split('\n')
+        .where((line) => line.trim().isNotEmpty)
+        .take(8)
+        .join('\n');
+    final message =
+        '[NativeBootstrap] ensureMediaPlugins caller=$caller\n$stackPreview';
+    debugPrint(message);
+    try {
+      await _channel.invokeMethod<void>('registerMediaPlugins');
+      _mediaRegistered = true;
+      await Sentry.captureMessage(
+        'native_bootstrap.ensure_media_registered',
+        params: [message],
+        withScope: (scope) {
+          scope.setExtra('caller', caller);
+          scope.setExtra('stack', stackPreview);
+        },
+      );
+    } catch (error, stackTrace) {
+      await Sentry.captureException(error, stackTrace: stackTrace);
+    }
+  }
 }
-
-
-
-
-

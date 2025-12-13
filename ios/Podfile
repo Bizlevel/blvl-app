@@ -7,7 +7,95 @@ ENV['COCOAPODS_DISABLE_STATS'] = 'true'
 ENV['LANG'] = ENV['LANG'] || 'en_US.UTF-8'
 ENV['LC_ALL'] = ENV['LC_ALL'] || 'en_US.UTF-8'
 
+# По умолчанию отключаем Firebase на iOS (можно включить через DISABLE_IOS_FIREBASE=false)
+disable_ios_firebase = ENV.fetch('DISABLE_IOS_FIREBASE', 'true') == 'true'
+puts "Podfile: disable_ios_firebase=#{disable_ios_firebase} (ENV DISABLE_IOS_FIREBASE=#{ENV['DISABLE_IOS_FIREBASE']})"
+
 require 'fileutils'
+require 'json'
+
+# Удаляем firebase-плагины из .flutter-plugins-dependencies, чтобы при disable_ios_firebase
+# Pods не подтягивали Firebase* вообще.
+def prune_firebase_plugins(disable_ios_firebase)
+  unless disable_ios_firebase
+    puts 'Prune firebase plugins: skipped (disable_ios_firebase=false)'
+    return
+  end
+  plugins_file = File.expand_path(File.join('..', '.flutter-plugins-dependencies'), __dir__)
+  unless File.exist?(plugins_file)
+    puts "Prune firebase plugins: file not found #{plugins_file}"
+    return
+  end
+
+  begin
+    puts "Prune firebase plugins: reading #{plugins_file}"
+    json = JSON.parse(File.read(plugins_file))
+    plugins = json.dig('plugins', 'ios')
+    return unless plugins.is_a?(Array)
+
+    filtered = plugins.reject do |p|
+      name = p['name']
+      name == 'firebase_core' || name == 'firebase_messaging' || name == 'firebase_app_check'
+    end
+
+    if filtered.length != plugins.length
+      json['plugins']['ios'] = filtered
+      File.write(plugins_file, JSON.pretty_generate(json))
+      puts 'Pruned firebase_* plugins from .flutter-plugins-dependencies (disable_ios_firebase=true)'
+    else
+      puts 'Prune firebase plugins: nothing to remove (plugins unchanged)'
+    end
+  rescue => e
+    warn "Failed to prune firebase plugins: #{e}"
+  end
+end
+
+# Удаляем in_app_purchase_storekit, чтобы SKPaymentQueue не поднимался на старте
+def prune_storekit1_plugin
+  plugins_file = File.expand_path(File.join('..', '.flutter-plugins-dependencies'), __dir__)
+  unless File.exist?(plugins_file)
+    puts "Prune storekit1 plugin: file not found #{plugins_file}"
+    return
+  end
+
+  begin
+    puts "Prune storekit1 plugin: reading #{plugins_file}"
+    json = JSON.parse(File.read(plugins_file))
+    plugins = json.dig('plugins', 'ios')
+    return unless plugins.is_a?(Array)
+
+    filtered = plugins.reject do |p|
+      p['name'] == 'in_app_purchase_storekit'
+    end
+
+    if filtered.length != plugins.length
+      json['plugins']['ios'] = filtered
+      File.write(plugins_file, JSON.pretty_generate(json))
+      puts 'Pruned in_app_purchase_storekit from .flutter-plugins-dependencies'
+    else
+      puts 'Prune storekit1 plugin: nothing to remove'
+    end
+  rescue => e
+    warn "Failed to prune storekit1 plugin: #{e}"
+  end
+end
+
+def assert_no_firebase_plugins(disable_ios_firebase)
+  return unless disable_ios_firebase
+  plugins_file = File.expand_path(File.join('..', '.flutter-plugins-dependencies'), __dir__)
+  return unless File.exist?(plugins_file)
+  json = JSON.parse(File.read(plugins_file)) rescue nil
+  return unless json
+  plugins = json.dig('plugins', 'ios')
+  return unless plugins.is_a?(Array)
+  has_firebase = plugins.any? do |p|
+    name = p['name']
+    name&.start_with?('firebase_')
+  end
+  if has_firebase
+    raise 'Detected firebase_* plugins in .flutter-plugins-dependencies while DISABLE_IOS_FIREBASE=true. Run `flutter pub get` and ensure pruning happens before pod install.'
+  end
+end
 
 project 'Runner', {
   'Debug' => :debug,
@@ -256,8 +344,8 @@ def patch_sentry_dependency_container
   helper_marker = 'sentry_sharedApplicationOnMainThread'
   typedef_line = "typedef id<SentryApplication> _Nullable (^SentryApplicationProviderBlock)(void);\n"
 
-  unless contents.include?(helper_marker)
-    helper_block = <<~'OBJC'
+  # Исправляем рекурсию: на главном потоке возвращаем UIApplication.sharedApplication напрямую.
+  helper_block = <<~'OBJC'
 #if SENTRY_HAS_UIKIT
 static UIApplication *_Nullable sentry_sharedApplicationOnMainThread(void)
 {
@@ -274,18 +362,30 @@ static UIApplication *_Nullable sentry_sharedApplicationOnMainThread(void)
 #endif
 
 OBJC
+
+  unless contents.include?(helper_marker)
     if contents.include?(typedef_line)
       contents.sub!(typedef_line, "#{typedef_line}\n#{helper_block}")
       changed = true
     end
+  else
+    # Если функция уже есть, перезаписываем на корректное тело (без рекурсии).
+    regex = /
+#if SENTRY_HAS_UIKIT
+static UIApplication \\*_Nullable sentry_sharedApplicationOnMainThread\\(void\\)
+\\{
+.*?
+\\}
+#endif
+/mx
+    contents = contents.sub(regex, helper_block)
+    changed = true
   end
 
   original_return = "    return UIApplication.sharedApplication;\n"
   replacement_return = "    return sentry_sharedApplicationOnMainThread();\n"
-  if contents.include?(original_return)
-    contents.sub!(original_return, replacement_return)
-    changed = true
-  end
+  contents.gsub!(original_return, replacement_return)
+  changed = true if contents.include?(replacement_return)
 
   if changed
     File.write(file, contents)
@@ -415,6 +515,9 @@ end
 
 
 flutter_ios_podfile_setup
+prune_firebase_plugins(disable_ios_firebase)
+assert_no_firebase_plugins(disable_ios_firebase)
+prune_storekit1_plugin
 apply_plugin_patches
 
 target 'Runner' do
@@ -424,12 +527,18 @@ target 'Runner' do
   # Подхватываем плагины, сгенерированные Flutter
   flutter_install_all_ios_pods(File.dirname(File.realpath(__FILE__)))
 
+  # GoogleUtilities требуется GoogleSignIn; оставляем, даже при отключённом Firebase
+  pod 'GoogleUtilities', '8.1.0'
+
   # Явно указываем Sentry/HybridSDK из GitHub, чтобы podspec точно подтянулся
   pod 'Sentry/HybridSDK', '8.56.2'
-
-  pod 'FirebaseAppCheck'
-
-
+  # OneSignal — версия, совместимая с onesignal_flutter (из Podspec)
+  pod 'OneSignalXCFramework', '5.2.14'
+  unless disable_ios_firebase
+    pod 'FirebaseCore'
+    pod 'FirebaseMessaging'
+    pod 'FirebaseAppCheck'
+  end
 end
 
 
@@ -484,11 +593,9 @@ post_install do |installer|
   end
 
   patch_google_sign_in_indicator
-  patch_sentry_async_log
-  patch_sentry_file_manager
-  patch_sentry_dependency_container
-  patch_sentry_application_extensions
-  # ВРЕМЕННО ОТКЛЮЧЕНО: патч ломает билд (fileManager не объявлен после частичного применения)
-  # patch_sentry_installation
+  # Стратегия A (декабрь 2025): НЕ патчим Sentry внутри Pods.
+  # Причина: Pods перегенерируются при pod install, а строковые патчи могут давать
+  # самоповреждение (пример: рекурсивный helper sentry_sharedApplicationOnMainThread).
+  # Стабильность достигаем через конфигурацию и порядок инициализации, а не через правки Pods.
 end
 

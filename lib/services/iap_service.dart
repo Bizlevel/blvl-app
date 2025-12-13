@@ -14,7 +14,9 @@ class IapService {
   static IapService? _singleton;
   static IapService get instance => _singleton ??= IapService._();
 
-  final InAppPurchase _iap = InAppPurchase.instance;
+  // На iOS не трогаем InAppPurchase (SK1), чтобы не поднимать SKPaymentQueue.
+  final InAppPurchase? _iap =
+      (!kIsWeb && Platform.isAndroid) ? InAppPurchase.instance : null;
   StreamSubscription<List<PurchaseDetails>>? _sub;
 
   bool get _isIos => !kIsWeb && Platform.isIOS;
@@ -26,7 +28,7 @@ class IapService {
     }
     try {
       await _ensurePluginRegistered('isAvailable');
-      return await _iap.isAvailable();
+      return await _iap!.isAvailable();
     } catch (_) {
       return false;
     }
@@ -34,8 +36,11 @@ class IapService {
 
   /// Загружает детали продуктов для Android (StoreKit 1 не используется).
   Future<ProductDetailsResponse> queryProducts(Set<String> ids) async {
+    if (_iap == null) {
+      throw UnsupportedError('InAppPurchase недоступен на этой платформе');
+    }
     await _ensurePluginRegistered('queryProducts');
-    return _iap.queryProductDetails(ids);
+    return _iap!.queryProductDetails(ids);
   }
 
   /// Загружает продукты из StoreKit 2 (iOS).
@@ -57,19 +62,22 @@ class IapService {
     if (_isIos) {
       throw UnsupportedError('Use buyStoreKitProduct on iOS');
     }
+    if (_iap == null) {
+      throw UnsupportedError('InAppPurchase недоступен на этой платформе');
+    }
     final available = await isAvailable();
     if (!available) return null;
 
     final completer = Completer<PurchaseDetails?>();
 
     _sub?.cancel();
-    _sub = _iap.purchaseStream.listen((purchases) async {
+    _sub = _iap!.purchaseStream.listen((purchases) async {
       for (final p in purchases) {
         if (p.productID == product.id) {
           if (!completer.isCompleted) completer.complete(p);
           if (p.pendingCompletePurchase) {
             try {
-              await _iap.completePurchase(p);
+              await _iap!.completePurchase(p);
             } catch (_) {}
           }
         }
@@ -79,7 +87,7 @@ class IapService {
     });
 
     final param = PurchaseParam(productDetails: product);
-    await _iap.buyConsumable(purchaseParam: param);
+    await _iap!.buyConsumable(purchaseParam: param);
 
     final result = await completer.future
         .timeout(const Duration(seconds: 90), onTimeout: () => null);

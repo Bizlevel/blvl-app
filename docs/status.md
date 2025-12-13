@@ -1,3 +1,15 @@
+Задача ios-onesignal-clean fix: полностью отключён Firebase на iOS/Android, пропатчен onesignal_flutter (init через OneSignalAppID, типы removeTags/aliases, sharedInstance), обновлён Podfile (OneSignalXCFramework 5.2.14), pod install выполнен с DISABLE_IOS_FIREBASE=true.
+Задача onesignal-ios fix: подготовка миграции iOS пушей на OneSignal, убрана инициализация Firebase на iOS, добавлен onesignal_flutter и защита Podfile от возврата Firebase.
+
+- Задача ios-firebase-gating fix: Вернул FLUTTER_TARGET=lib/main.dart, загейтил Firebase (AppDelegate, GeneratedPluginRegistrant, Podfile, DisableIosFirebase=true), отключил рискованные Sentry патчи по умолчанию, пересобрал pods с DISABLE_IOS_FIREBASE=true.
+# Задача iOS-perf fix: Устранение блокировок запуска (2025-12-08)
+- Исправлен `user_skills_provider.dart`: `ref.watch(authStateProvider)` → синхронное чтение
+- Удалён дубль `currentUserProvider.future` в `levels_provider.dart`  
+- Упрощён `FirebaseEarlyInit.m` (placeholder вместо dead code)
+- Обновлён `sign_in_with_apple` 6.1.0 → 7.0.1 (iOS 18 switch fix)
+- Упрощён `profile_screen.dart`: убран внешний `.when(authStateProvider)`
+- Все 17 тестов пройдены (providers + routing). Требуется тест в Xcode.
+
 
 # Этап 52-fix: Чаты — UX быстрых ответов и чтения
 - 52.fix-1: `LeoDialogScreen` — скрытие клавиатуры по жесту скролла (`keyboardDismissBehavior:onDrag`), по тапу вне поля (`onTapOutside`) и иконка «Скрыть клавиатуру». Добавлен FAB «Вниз» при отскролле.
@@ -673,5 +685,37 @@
 
 ### Тесты:
 - GoRouter тесты: 3/3 ✅
-- Provider тесты: 13/13 ✅
-- Всего тестов: 16/16 ✅
+- Provider тесты: 14/14 ✅
+- Всего тестов: 17/17 ✅
+
+---
+
+## 🔴 Fix (2025-12-08): Устранение корневой причины зависания iOS
+
+### Проблема:
+После предыдущих исправлений логи устройства показали:
+- `Hang detected: 56.83s`
+- `Waited 15.417541 seconds for a drawable, giving up`
+- `System gesture gate timed out`
+
+### Корневая причина:
+`FirebaseApp.configure()` в `willFinishLaunchingWithOptions` блокировал main thread на 15-60 сек из-за синхронного disk I/O.
+
+### Исправления:
+1. **AppDelegate.swift** — удалены вызовы `configureFirebaseBeforeMain()`:
+   - `willFinishLaunchingWithOptions` — закомментировано
+   - `didFinishLaunchingWithOptions` — закомментировано
+   - Firebase теперь инициализируется на Flutter стороне в post-frame
+
+2. **ios/Podfile** — добавлен патч `patch_sign_in_with_apple_switch`:
+   - Исправляет switch exhaustive warning для iOS 18
+
+### Тесты:
+- Provider тесты: 14/14 ✅
+- Routing тесты: 3/3 ✅  
+- Всего: 17/17 ✅
+
+### Требуется:
+1. `cd ios && pod install`
+2. Пересборка в Xcode
+3. Тестирование на устройстве — ожидается устранение зависания

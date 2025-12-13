@@ -397,15 +397,10 @@ class _BodyState extends ConsumerState<_Body> {
   Uint8List? _avatarPreviewBytes;
 
   Future<void> _pickAvatarFromGallery() async {
-    final result =
-        await MediaPickerService.instance.pickImageFromGallery(context);
-    if (!mounted || result == null) return;
-    setState(() {
-      _avatarPreviewBytes = result.bytes;
-    });
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Фото выбрано. Синхронизация с профилем появится позже.'),
+        content: Text('Загрузка фото из галереи отключена в текущей версии.'),
       ),
     );
   }
@@ -500,7 +495,8 @@ class _BodyState extends ConsumerState<_Body> {
               child: Stack(
                 children: [
                   ClipRRect(
-                    borderRadius: BorderRadius.circular(AppDimensions.radiusAvatar),
+                    borderRadius:
+                        BorderRadius.circular(AppDimensions.radiusAvatar),
                     child: Image.asset(asset, fit: BoxFit.cover),
                   ),
                   if (isSelected)
@@ -508,7 +504,8 @@ class _BodyState extends ConsumerState<_Body> {
                       child: Container(
                         decoration: BoxDecoration(
                           border: Border.all(color: AppColor.primary, width: 3),
-                          borderRadius: BorderRadius.circular(AppDimensions.radiusAvatar),
+                          borderRadius:
+                              BorderRadius.circular(AppDimensions.radiusAvatar),
                         ),
                       ),
                     ),
@@ -965,7 +962,8 @@ class _AboutMeCardState extends ConsumerState<_AboutMeCard> {
                       SizedBox(
                         height: 3,
                         child: ClipRRect(
-                          borderRadius: BorderRadius.circular(AppDimensions.radiusXs),
+                          borderRadius:
+                              BorderRadius.circular(AppDimensions.radiusXs),
                           child: LinearProgressIndicator(
                             value: completion.$1,
                             backgroundColor:
@@ -1389,7 +1387,8 @@ class _ChallengesEditorState extends State<_ChallengesEditor> {
                       color: isSelected
                           ? AppColor.primary.withValues(alpha: 0.1)
                           : AppColor.surface,
-                      borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
+                      borderRadius:
+                          BorderRadius.circular(AppDimensions.radiusLg),
                       border: Border.all(
                         color: isSelected
                             ? AppColor.primary
@@ -1434,7 +1433,8 @@ class _ChallengesEditorState extends State<_ChallengesEditor> {
                       color: isSelected
                           ? AppColor.primary.withValues(alpha: 0.1)
                           : AppColor.surface,
-                      borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
+                      borderRadius:
+                          BorderRadius.circular(AppDimensions.radiusLg),
                       border: Border.all(
                         color: isSelected
                             ? AppColor.primary
@@ -1472,7 +1472,7 @@ class _ChallengesEditorState extends State<_ChallengesEditor> {
                     horizontal: AppSpacing.s10, vertical: AppSpacing.s6),
                 decoration: BoxDecoration(
                   color: AppColor.surface,
-                      borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
+                  borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
                   border: Border.all(
                     color: AppColor.onSurfaceSubtle.withValues(alpha: 0.3),
                   ),

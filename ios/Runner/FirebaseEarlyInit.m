@@ -17,11 +17,13 @@
 
 #import <Foundation/Foundation.h>
 #import "Runner-Swift.h"
-@import FirebaseCore;
 
+#if __has_include(<FirebaseCore/FirebaseCore.h>)
+@import FirebaseCore;
 @interface FIRApp (FirebaseEarlyInitPrivate)
 + (BOOL)isDefaultAppConfigured;
 @end
+#endif
 
 static NSString *FirebaseEarlyInitCallerString(const char *caller) {
   if (caller == NULL) {
@@ -41,9 +43,11 @@ __attribute__((constructor(0))) static void FirebaseUltraEarlyInitConstructor(vo
 __attribute__((constructor)) static void FirebaseEarlyInitConstructor(void) {
   // ОТКЛЮЧЕНО: Не инициализируем Firebase в constructor
   // Только вызываем AppDelegate для подготовки (без [FIRApp configure])
+#if __has_include(<FirebaseCore/FirebaseCore.h>)
   @autoreleasepool {
     // [AppDelegate configureFirebaseBeforeMain] теперь вызывается в didFinishLaunching
   }
+#endif
 }
 
 @interface FirebaseEarlyInitSentinel : NSObject

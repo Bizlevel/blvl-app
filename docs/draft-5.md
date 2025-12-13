@@ -1,60 +1,46 @@
-## Хронология попыток починить Goal/Notifications (2025‑11 → 2025‑12)
+# План работ (декабрь 2025) — устранение зависаний старта и финализация пушей/IAP
 
-### 1. Исходное состояние (до 2025‑11-18)
-- **Симптомы:** при каждом холодном запуске на iOS появлялся чёрный экран. В логах — `MainThreadIOMonitor` с `NSFileManager`, `NSData`, `SKPaymentQueue`, `FirebaseCore I-COR000003`.
-- **Причина:** Firebase и тяжёлые плагины (StoreKit 1, DKImagePicker, Google Sign-In) поднимались в ObjC `+load`, до Flutter. NotificationsService, Hive и SharedPreferences тоже инициализировались синхронно.
+## Цель
+1. Сдвинуть инициализацию OneSignal после прохождения экрана логина/регистрации.
+2. Полностью исключить StoreKit 1: оставить только StoreKit 2 мост и регистрацию.
+3. Перевести тяжёлые плагины на ленивую регистрацию (photo_manager, file_selector_ios, webview_flutter_wkwebview).
+4. Проверить/подтвердить корректность Sentry (с патчами I/O и валидным DSN).
+5. Зафиксировать состояние: запуск без фризов, пуши/StoreKit2 работают, лишние плагины не блокируют старт.
 
-### 2. План обновления iOS (18–24 ноября)
-1. **Stage 1** — синхронизация Flutter/Pods.
-2. **Stage 2** — ранний bootstrap Firebase:
-   - Добавлены `FirebaseEarlyInit.m`, `AppDelegate.configureFirebaseBeforeMain()`, флаги `FirebaseEnableDebugLogging`, `EnableIosFcm`.
-   - Несколько итераций (`docs/draft-2/3/4.md`) показывали, что `I-COR000003` всё ещё появляется. Варианты с `constructor(0)`/`+load` и отключением `GULAppDelegateSwizzler` тестировались до тех пор, пока предупреждение не исчезло (20.11).
-   - Для диагностики временно включали `FIRDebugEnabled` и breakpoint на `FIRLogBasic`.
-3. **Stage 3** — StoreKit 2 и deferred IAP:
-   - В `NativeBootstrapCoordinator` появился MethodChannel `bizlevel/native_bootstrap`.
-   - `BizPluginRegistrant` перестал регистрировать `InAppPurchasePlugin` в `GeneratedPluginRegistrant`.
-   - Новый Swift‑мост `StoreKit2Bridge` + Dart-сервис.
-   - Скрипт `tool/strip_iap_from_registrant.dart` чистит `GeneratedPluginRegistrant.m` при каждой сборке.
-4. **Stage 4** — Галерея/файловые плагины:
-   - Убраны `dk_image_picker`, `file_picker`; добавлены SceneDelegate, отложенные инициализации.
-5. **Stage 6 (часть)** — Notifications/Hive/timezone перенесены в post-frame, но ранний ObjC bootstrap Firebase по-прежнему существовал.
+## Пошаговый план
+1) OneSignal после логина
+   - Найти точку вызова `PushService.initialize()` / `_initPushes()` в `main.dart`.
+   - Переместить запуск на событие успешного логина/восстановления сессии (например, listener authState или после завершения экрана логина).
+   - Убедиться, что web не трогаем, флаги `kEnableIosPush` сохраняем.
+   - Проверить: запуск без пушей до логина; после логина токен регистрируется в Supabase; уведомление при тапе открывает маршрут.
 
-### 3. Декабрьские попытки (2025‑12-01 → 2025‑12-06)
+2) StoreKit 1 → удалить
+   - Убрать `in_app_purchase_storekit` из `GeneratedPluginRegistrant` (патч/скрипт).
+   - В `BizPluginRegistrant` удалить `registerDeferredIap` для StoreKit1; оставить только StoreKit2Bridge.
+   - Проверить, что iOS UI магазина вызывает только StoreKit2Service; Android/Web остаются без изменений.
+   - Сборка iOS (Debug/Release) без warnings/undefined symbols.
 
-#### 3.1. Исправления в Flutter‑коде
-- **GoalScreen / NotificationsOverlay**: убрали бесконечные `BoxConstraints`, добавили LayoutBuilder/CustomScrollView, устраняли RenderBox asserts.
-- **NotificationsService**: внедрены `_guardedCloudRefresh`, `ReminderPrefsCache`, `_workSerial`, `bindAuthLifecycle`, очередь SharedPreferences, позднее — `ensureReady()` для ленивой инициализации.
-- **Providers**: `notification_settings_provider`, `levelsProvider`, `libraryProvider`, goal/practice log провайдеры возвращают заглушки, пока нет сессии, чтобы Supabase/Hive не грузились на экране логина.
-- **Tests**: обновлялись `street_screen_test.dart`, `checkpoint_l7_cta_navigation_test.dart`, `login_screen_test.dart` под новые сценарии.
-- **Docs**: `docs/status.md` пополнялся задачами `notif-freeze`, `notif-goal-final`, `notif-lazy-bootstrap`.
+3) Ленивые тяжёлые плагины
+   - photo_manager/file_selector_ios/webview_flutter_wkwebview: не регистрировать до первого использования; инициализировать в момент открытия соответствующего экрана/сервиса.
+   - Проверить, что MediaPickerService не вызывается на старте (Profile только по действию).
+   - Повторный прогон: старт без их регистрации, затем открыть экран/фичу и убедиться, что плагины работают.
 
-#### 3.2. Декабрьские проблемы
-- Логи (`docs/draft-2.md`, `docs/draft-4.md`) продолжали показывать `FirebaseEarlyInit: +load ... FIRApp configure()` до Flutter, затем `MainThreadIOMonitor` с `NSFileManager`/`NSData`/`dlopen`.
-- NotificationsService, Supabase провайдеры и SharedPreferences уже ленивые, но пользы нет, пока ObjC слой блокирует главный поток.
-- Пользователь наблюдал: экран Goal не открывается, настройки уведомлений дают затемнение, приложение «замирает» даже перед авторизацией.
+4) Sentry проверка
+   - Убедиться `DISABLE_SENTRY=false`, DSN задан.
+   - Проверить, что патчи Sentry (I/O) применяются (`SENTRY_PATCH_IO=true` в ENV при pod install).
+   - Сравнить: события/ошибки доходят до Sentry после включения; при отсутствии DSN — корректно пропускается.
 
-### 4. Последняя попытка (2025‑12-07)
-1. **Идея:** полностью отложить нативный bootstrap — ObjC не конфигурирует Firebase, пока Flutter сам не попросит по MethodChannel.
-2. **Реализация:**
-   - Добавлен флаг `FirebaseDeferredBootstrap` в `Info.plist`.
-   - `FirebaseEarlyInit.m` проверяет флаг: если true — `+load`/конструкторы логируют defer и не вызывают `FIRApp configure`.
-   - `AppDelegate` получил метод `configureFirebaseDeferred(reason:)`; старый `configureFirebaseBeforeMain()` теперь просто логирует, если bootstrap отложен.
-   - `NativeBootstrapCoordinator` обрабатывает метод `configureFirebase`.
-   - В Dart (`NativeBootstrap.ensureFirebaseConfigured`) вызов добавлен в `_schedulePostFrameBootstraps()` до `_ensureFirebaseInitialized`.
-   - Репозитории (`levels`, `lessons`, `goals`, `gp_service`) переведены на `HiveBoxHelper.openBox`.
-3. **Проверки:** `dart analyze` → только старые warning’и. Но устройственный лог всё ещё показывает `FirebaseEarlyInit: +load ... configure()` — значит, проект не пересобран (Info.plist/Pods не обновлены), и флаг не попал на устройство.
+5) Контрольный прогон
+   - `flutter clean && flutter pub get`
+   - `cd ios && pod install`
+   - iOS Debug: холодный старт, убедиться в отсутствии ранних I/O и фризов.
+   - iOS Release: Smoke — логин, пуш-токен, получение пуша, открытие магазина (StoreKit2), покупка в тестовом окружении/симуляция.
+   - Зафиксировать логи MainThreadIOMonitor/Timeline и собрать отчёт.
 
-### 5. Текущее состояние (по последним логам)
-- ObjC конструкторы продолжают конфигурировать Firebase до запуска Flutter, из-за чего `MainThreadIOMonitor` ловит `NSFileManager`, `NSData`, `bundlePath`, `createFileAtPath`.
-- NotificationsService и другие ленивые слои не успевают помочь — приложение зависает на чёрном экране ещё до первого UI кадра.
+## Формат отчётов по шагам
+- Для каждого шага: кратко «что сделал», «результат/замеры», «остаточные проблемы/следующие действия».
+- Если шаг не дал эффекта — указать причину и следующий вариант.
 
-### 6. Рекомендации для повторного внедрения
-1. **Полная пересборка iOS**: `flutter clean`, удаление `ios/Pods` и `Podfile.lock`, `pod install`, затем Xcode Release на устройстве. Убедиться, что Info.plist с `FirebaseDeferredBootstrap=true` присутствует в собранном `.ipa`.
-2. **Диагностика логов**: временно поставить `FirebaseEnableDebugLogging=true`, собрать Release, убедиться, что лог содержит «Firebase bootstrap deferred until Flutter», а `MainThreadIOMonitor` молчит до первого кадра.
-3. **После подтверждения**: вернуть `FirebaseEnableDebugLogging=false`, включить `EnableIosFcm` по необходимости, повторно проверить App Check/PushService.
-4. **Мониторинг**: при обновлении Pods/Flutter повторно запускать `tool/strip_iap_from_registrant.dart` и проверять `FirebaseEarlyInit.m`, чтобы флаг не потерялся.
 
-### 7. Выводы
-- Одних Flutter‑поправок недостаточно — ключевая проблема в ObjC bootstrap’е.
-- После каждого изменения iOS‑слоя нужно проверять логи `docs/draft-*.md` и убеждаться, что `FirebaseEarlyInit` ведёт себя согласно плану.
-- Без чистой пересборки (pod install, clean build) даже правильные изменения не попадут на устройство, и вся оптимизация сверху будет бесполезна.
+
+
