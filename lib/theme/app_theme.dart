@@ -212,16 +212,18 @@ class AppTheme {
       );
 
   static DialogThemeData _dialogTheme(ColorScheme cs) => DialogThemeData(
-        backgroundColor: MaterialElevation.surfaceAt(cs, 2),
+        // Liquid glass: более плотная поверхность для модалов
+        backgroundColor: AppColor.glassSurfaceStrong,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppDimensions.radiusXl),
         ),
       );
 
   static BottomSheetThemeData _bottomSheetTheme(ColorScheme cs) =>
-      BottomSheetThemeData(
-        backgroundColor: MaterialElevation.surfaceAt(cs, 1),
-        shape: const RoundedRectangleBorder(
+      const BottomSheetThemeData(
+        // Liquid glass: bottom-sheet как "стеклянная" панель
+        backgroundColor: AppColor.glassSurfaceStrong,
+        shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(
             top: Radius.circular(AppDimensions.radiusXl),
           ),

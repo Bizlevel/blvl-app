@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:timezone/timezone.dart' as tz;
@@ -21,17 +22,21 @@ class NotificationsService {
 
   // Keys for local persistence
   static const String _boxName = 'notifications';
+  static const String _prefsLaunchRouteKey = 'notif_launch_route';
   final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
 
   bool _initialized = false;
+  bool _permissionsRequested = false;
   Box? _launchBox;
   String? _cachedStoredRoute;
 
   Future<void> initialize() async {
     if (_initialized) return;
+    _startupLog('notif.initialize.start');
     if (kIsWeb) {
       _initialized = true;
+      _startupLog('notif.initialize.skip_web');
       try {
         Sentry.addBreadcrumb(Breadcrumb(
           level: SentryLevel.info,
@@ -43,7 +48,14 @@ class NotificationsService {
     }
     const AndroidInitializationSettings androidInit =
         AndroidInitializationSettings('ic_launcher');
-    const DarwinInitializationSettings iosInit = DarwinInitializationSettings();
+    // ВАЖНО (iOS): не запрашиваем permission на cold start.
+    // Иначе в логах появляется "Requesting authorization..." + возможные фризы/деактивации сцены.
+    // Разрешение просим только по явному действию пользователя (см. ensurePermissionsRequested()).
+    const DarwinInitializationSettings iosInit = DarwinInitializationSettings(
+      requestAlertPermission: false,
+      requestBadgePermission: false,
+      requestSoundPermission: false,
+    );
     const InitializationSettings initSettings = InitializationSettings(
       android: androidInit,
       iOS: iosInit,
@@ -69,11 +81,35 @@ class NotificationsService {
         } catch (_) {}
       },
     );
+    _startupLog('notif.plugin_initialized');
 
     await _ensureAndroidChannels();
-    await _requestPermissionsIfNeeded();
+    _startupLog('notif.android_channels_ready');
 
     _initialized = true;
+    _startupLog('notif.initialize.done');
+  }
+
+  /// Запрос разрешений на уведомления — **только по явному действию** (например, при сохранении напоминаний).
+  ///
+  /// Не вызываем на cold start, чтобы не ловить фризы/задержки и неожиданные системные диалоги.
+  Future<void> ensurePermissionsRequested() async {
+    if (kIsWeb) return;
+    if (!_initialized) await initialize();
+    if (_permissionsRequested) return;
+    _startupLog('notif.permissions.request.start');
+    await _requestPermissionsIfNeeded();
+    _permissionsRequested = true;
+    _startupLog('notif.permissions.request.done');
+  }
+
+  void _startupLog(String name, [Map<String, Object?> data = const {}]) {
+    // Лёгкий лог, чтобы не ухудшать старты; привязан к общему стилю STARTUP[*].
+    // Здесь не используем shared Stopwatch, чтобы не тянуть зависимости;
+    // важнее иметь порядок/факт вызовов.
+    if (kDebugMode) {
+      debugPrint('STARTUP[$name] $data');
+    }
   }
 
   void attachLaunchBox(Box box) {
@@ -83,6 +119,18 @@ class NotificationsService {
   void cacheStoredLaunchRoute(String? route) {
     if (route == null || route.isEmpty) return;
     _cachedStoredRoute = route;
+  }
+
+  Future<String?> _consumeLaunchRouteFromPrefs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final route = prefs.getString(_prefsLaunchRouteKey);
+      if (route == null || route.isEmpty) return null;
+      await prefs.remove(_prefsLaunchRouteKey);
+      return route;
+    } catch (_) {
+      return null;
+    }
   }
 
   // Load persisted practice reminder prefs; prioritize Supabase, fallback to Hive
@@ -234,6 +282,8 @@ class NotificationsService {
         route = _cachedStoredRoute;
         _cachedStoredRoute = null;
       }
+      // ВАЖНО: быстрый путь без Hive (чтобы не делать Hive.openBox на cold start).
+      route ??= await _consumeLaunchRouteFromPrefs();
       if (route == null) {
         final box = await _ensureLaunchBox();
         if (box != null) {
@@ -353,6 +403,7 @@ class NotificationsService {
   }) async {
     if (kIsWeb) return;
     if (!_initialized) await initialize();
+    await ensurePermissionsRequested();
     await _ensureTimezoneReady();
     const channelId = 'goal_reminder';
     const AndroidNotificationDetails android = AndroidNotificationDetails(
@@ -477,8 +528,9 @@ class NotificationsService {
         _launchBox = Hive.box(_boxName);
         return _launchBox!;
       }
-      _launchBox = await Hive.openBox(_boxName);
-      return _launchBox!;
+      // ВАЖНО: не открываем box на холодном старте.
+      // Hive.openBox может быть дорогим (блокирующий I/O) и провоцировать Hang detected.
+      return null;
     } catch (e) {
       // HiveError: Hive не инициализирован — это может произойти,
       // если consumeAnyLaunchRoute() вызывается до Hive.initFlutter()
@@ -489,20 +541,21 @@ class NotificationsService {
 
   Future<void> persistLaunchRoute(String route) async {
     try {
-      final box = await _ensureLaunchBox();
-      if (box != null) {
-        await box.put('launch_route', route);
-      }
+      // Быстрый и безопасный storage: SharedPreferences (NSUserDefaults).
+      // Hive для этой задачи избыточен и может давать долгие openBox на старте.
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_prefsLaunchRouteKey, route);
     } catch (_) {}
   }
 
   Future<void> _ensureTimezoneReady() async {
     try {
-      await TimezoneGate.waitUntilReady();
+      await TimezoneGate.ensureInitialized();
     } catch (error, stackTrace) {
       try {
         await Sentry.captureException(error, stackTrace: stackTrace);
       } catch (_) {}
+      rethrow;
     }
   }
 

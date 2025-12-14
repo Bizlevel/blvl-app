@@ -20,9 +20,7 @@ import 'package:bizlevel/widgets/common/gp_balance_widget.dart';
 import 'package:bizlevel/widgets/common/bizlevel_card.dart';
 import 'package:bizlevel/widgets/common/bizlevel_text_field.dart';
 import 'package:bizlevel/widgets/reminders_settings_sheet.dart';
-import 'package:bizlevel/services/media_picker_service.dart';
 import 'package:bizlevel/widgets/common/achievement_badge.dart';
-import 'package:bizlevel/providers/theme_provider.dart';
 import 'package:bizlevel/theme/dimensions.dart';
 
 class ProfileScreen extends ConsumerWidget {
@@ -164,7 +162,9 @@ class ProfileScreen extends ConsumerWidget {
         return CustomScrollView(
           slivers: [
             SliverAppBar(
-              backgroundColor: AppColor.appBgColor,
+              // Единый фон приложения задаётся в main.dart (градиент). AppBar делаем прозрачным,
+              // чтобы работал общий "glass/surface system".
+              backgroundColor: Colors.transparent,
               pinned: true,
               snap: true,
               floating: true,
@@ -199,13 +199,6 @@ class ProfileScreen extends ConsumerWidget {
                       color: AppColor.onSurfaceSubtle),
                   onSelected: (value) async {
                     switch (value) {
-                      case 'theme':
-                        final mode = ref.read(themeModeProvider);
-                        final next = mode == ThemeMode.light
-                            ? ThemeMode.dark
-                            : ThemeMode.light;
-                        ref.read(themeModeProvider.notifier).state = next;
-                        break;
                       case 'notifications':
                         await showRemindersSettingsSheet(context);
                         break;
@@ -227,16 +220,6 @@ class ProfileScreen extends ConsumerWidget {
                     }
                   },
                   itemBuilder: (context) => [
-                    PopupMenuItem(
-                      value: 'theme',
-                      child: Row(
-                        children: [
-                          const Icon(Icons.brightness_6, size: 18),
-                          AppSpacing.gapW(AppSpacing.s10),
-                          const Text('Тема: переключить'),
-                        ],
-                      ),
-                    ),
                     PopupMenuItem(
                       value: 'notifications',
                       child: Row(

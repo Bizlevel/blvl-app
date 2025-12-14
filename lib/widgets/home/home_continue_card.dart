@@ -4,6 +4,7 @@ import 'package:bizlevel/theme/spacing.dart';
 import 'package:bizlevel/theme/dimensions.dart';
 import 'package:bizlevel/theme/animations.dart';
 import 'package:bizlevel/widgets/common/bizlevel_button.dart';
+import 'package:bizlevel/widgets/common/bizlevel_card.dart';
 
 /// Карточка «Продолжить обучение» с текстом слева и иллюстрацией уровня справа.
 class HomeContinueCard extends StatefulWidget {
@@ -27,25 +28,12 @@ class _HomeContinueCardState extends State<HomeContinueCard> {
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      label: 'Продолжить обучение. ${widget.subtitle}',
-      button: true,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppColor.card,
-          borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
-          border: Border.all(color: AppColor.border),
-          boxShadow: const [
-            BoxShadow(
-              color: AppColor.shadow,
-              blurRadius: 16,
-              offset: Offset(0, 4),
-            )
-          ],
-        ),
-        child: Row(
-          children: [
+    return BizLevelCard(
+      semanticsLabel: 'Продолжить обучение. ${widget.subtitle}',
+      onTap: widget.onTap,
+      outlined: true,
+      child: Row(
+        children: [
             // Текстовая часть
             Expanded(
               child: Column(
@@ -114,8 +102,7 @@ class _HomeContinueCardState extends State<HomeContinueCard> {
                 ),
               ),
             ),
-          ],
-        ),
+        ],
       ),
     );
   }

@@ -70,15 +70,11 @@ class AuthService {
           } catch (_) {}
         } catch (_) {}
 
-        // Пересоздаём локальные уведомления под текущего пользователя
+        // Локальные уведомления: инициализируем ядро (без запроса permissions).
+        // Разрешения и расписание напоминаний — только по явному действию пользователя
+        // (экран "Напоминания"), чтобы избежать фризов/неожиданных системных диалогов.
         try {
-          final notif = NotificationsService.instance;
-          await notif.initialize();
-          // Чистим старые типы расписаний и ставим единое напоминание практики (Пн/Ср/Пт)
-          await notif.cancelWeeklyPlan();
-          await notif.cancelDailySprint();
-          await notif.cancelDailyPracticeReminder();
-          await notif.scheduleDailyPracticeReminder();
+          await NotificationsService.instance.initialize();
         } catch (_) {}
       }
       return response;
@@ -329,14 +325,10 @@ class AuthService {
             } catch (_) {}
           } catch (_) {}
 
-          // Пересоздаём локальные уведомления под текущего пользователя
+          // Локальные уведомления: инициализируем ядро (без запроса permissions).
+          // Разрешения и расписание — только по явному действию пользователя.
           try {
-            final notif = NotificationsService.instance;
-            await notif.initialize();
-            await notif.cancelWeeklyPlan();
-            await notif.cancelDailySprint();
-            await notif.cancelDailyPracticeReminder();
-            await notif.scheduleDailyPracticeReminder();
+            await NotificationsService.instance.initialize();
           } catch (_) {}
         }
 

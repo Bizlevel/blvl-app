@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/theme/spacing.dart';
 
 class BizLevelError extends StatelessWidget {
@@ -42,7 +41,6 @@ class BizLevelError extends StatelessWidget {
 
     if (fullscreen) {
       return Scaffold(
-        backgroundColor: AppColor.appBgColor,
         body: Center(child: content),
       );
     }

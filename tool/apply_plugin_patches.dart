@@ -72,8 +72,8 @@ Future<void> main() async {
       continue;
     }
 
-    _copyDirectory(entity, pluginDir);
-    patchedSomething = true;
+    final didChange = _copyDirectory(entity, pluginDir);
+    patchedSomething = didChange || patchedSomething;
   }
 
   await _patchHostFiles(projectRoot);
@@ -85,17 +85,44 @@ Future<void> main() async {
   }
 }
 
-void _copyDirectory(Directory source, Directory destinationRoot) {
+bool _copyDirectory(Directory source, Directory destinationRoot) {
+  var changed = false;
   for (final entity in source.listSync(recursive: true)) {
     if (entity is! File) continue;
     final relativePath = p.relative(entity.path, from: source.path);
     final destinationPath = p.join(destinationRoot.path, relativePath);
     final destinationFile = File(destinationPath);
     destinationFile.parent.createSync(recursive: true);
-    destinationFile.writeAsBytesSync(entity.readAsBytesSync());
+    final nextBytes = entity.readAsBytesSync();
+
+    // Важно для скорости билда: не перезаписываем файлы плагинов, если контент
+    // не изменился. Иначе Xcode считает их "изменёнными" и пересобирает Pods.
+    if (destinationFile.existsSync()) {
+      try {
+        final currentBytes = destinationFile.readAsBytesSync();
+        if (_bytesEqual(currentBytes, nextBytes)) {
+          continue;
+        }
+      } catch (_) {
+        // Если чтение текущего файла по какой-то причине упало — перепишем.
+      }
+    }
+
+    destinationFile.writeAsBytesSync(nextBytes);
     stdout.writeln(
         '[plugin_patches] -> ${p.basename(source.path)} / $relativePath');
+    changed = true;
   }
+  return changed;
+}
+
+bool _bytesEqual(List<int> a, List<int> b) {
+  if (identical(a, b)) return true;
+  if (a.length != b.length) return false;
+  for (var i = 0; i < a.length; i++) {
+    if (a[i] != b[i]) return false;
+  }
+  return true;
 }
 
 /// Applies in-place patches to the iOS host project that are not tied to a
@@ -205,8 +232,7 @@ bool _patchOneSignalPlugin(Map<String, String> flutterPlugins) {
         changed = true;
       }
       if (contents.contains('return [NSNull null];')) {
-        contents =
-            contents.replaceAll('return [NSNull null];', 'return @\"\";');
+        contents = contents.replaceAll('return [NSNull null];', 'return @"";');
         changed = true;
       }
       if (changed) {
@@ -326,7 +352,7 @@ void _patchGeneratedPluginRegistrant(Directory projectRoot) {
 
   // Wrap registration with DisableIosFirebase flag from Info.plist.
   if (!contents.contains('DisableIosFirebase')) {
-    final insertNeedle =
+    const insertNeedle =
         '[FileSelectorPlugin registerWithRegistrar:[registry registrarForPlugin:@"FileSelectorPlugin"]];';
     if (contents.contains(insertNeedle)) {
       contents = contents.replaceFirst(

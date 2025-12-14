@@ -1,616 +1,239 @@
-# Отчёт: Улучшения и предостережения после startup-blocking fix
+# BizLevel — iOS: регрессия зависаний/долгого старта (декабрь 2025)
 
-**Дата:** 2025-12-08  
-**Контекст:** Приложение работает стабильно. Этот документ содержит рекомендации по улучшению и критические предостережения.
+Дата: 2025‑12‑14  
+Статус: ✅ завершено
 
----
+## 0) Контекст (что случилось)
+После последних правок снова появились **сильные подвисания** и долгий запуск на iOS.  
+По логам (`docs/draft-2.md`, `docs/draft-4.md`) фиксируются:
 
-# 🔧 УЛУЧШЕНИЯ (не ломая работу)
+- **Hang detected: 14.14s** (около `12:18:18`) + затем `flutter: INFO: Supabase bootstrap completed` / `Hive bootstrap completed`
+- **Hang detected: 8.91s** (около `12:18:27`) рядом со стартом Sentry (`SentryFlutterPlugin ... started`) и `MainThreadIOMonitor` стеком Sentry
+- **Hang detected: 29.16s** + `Gesture: System gesture gate timed out` (около `12:18:59`) — UI реально «не отвечает»
+- В `docs/draft-2.md` есть **`Message from debugger: killed`** после `gesture gate timed out` → процесс убивается из‑за неотзывчивости (watchdog).
 
-## 1. ВЫСОКИЙ ПРИОРИТЕТ: MainThreadIOMonitor предупреждения от Firebase
+`docs/draft-6.md` уже описывает похожий класс проблем и принципы фикса:  
+**не блокировать первый кадр**, **не запускать тяжёлое в одной await‑цепочке**, **permissions не на cold start**, **timezone/Hive — лениво**, **Sentry — не в критическом пути UI**.
 
-### Что не работает оптимально
+## 1) Гипотезы причин (почему это происходит)
+На текущий момент наиболее вероятные источники зависаний:
 
-Логи показывают множественные предупреждения:
-```
-fault: Performing I/O on the main thread can cause slow launches.
-       antipattern trigger: -[NSData initWithContentsOfFile:options:error:]
-fault: Performing I/O on the main thread can cause hangs.
-       antipattern trigger: -[NSBundle bundlePath]
-fault: antipattern trigger: dlopen
-```
+1) **Запрос notification permissions на cold start**  
+`NotificationsService.initialize()` вызывает `_requestPermissionsIfNeeded()` сразу — на iOS это ведёт к системным операциям/деактивациям и может “подвешивать” интерактивность.
 
-**Причина:** Firebase SDK читает `GoogleService-Info.plist` и загружает динамические библиотеки синхронно на main thread во время `[FIRApp configure]`.
+2) **Тяжёлый timezone init на старте**  
+`tzdata.initializeTimeZones()` — синхронная тяжёлая операция; если выполняется во время пользовательской интеракции, легко получить `gesture gate timed out`.
 
-**Файл:** `ios/Runner/AppDelegate.swift` (функция `configureFirebaseBeforeMain()`)
+3) **Массовое открытие Hive box’ов на старте**  
+Открытие пачки коробок даёт пики дискового I/O и может “замораживать” главный изолят.
 
-### Текущая реализация
+4) **Sentry init / native I/O близко к моментам интерактивности**  
+Логи содержат `MainThreadIOMonitor` стек внутри Sentry (`SentryAsyncLogWrapper initializeAsyncLogFile`), что совпадает с hang‑событиями.
 
-```swift
-// ios/Runner/AppDelegate.swift:80-130
-static func configureFirebaseBeforeMain() {
-    guard !didConfigureFirebase else { return }
-    didConfigureFirebase = true
-    FirebaseConfiguration.shared.setLoggerLevel(.min)
-    FirebaseApp.configure()  // ← I/O на main thread!
-    // ...
-}
-```
+## 2) Что из правок в этом чате могло вернуть проблему (список)
+Потенциальные триггеры регрессии (по коду и логам):
 
-### Предлагаемое решение
+- Добавление/усиление post‑frame цепочки “Sentry → deferred local services → notifications → timezone → push”.
+- Инициализация уведомлений с запросом разрешений на старте (`NotificationsService.initialize()`).
+- Инициализация timezone (`tzdata.initializeTimeZones()`) в рамках deferred‑старта, а не по требованию.
+- Массовое `Hive.openBox` для множества боксов на старте.
 
-**ВНИМАНИЕ:** Это решение РИСКОВАННОЕ. Flutter плагины требуют Firebase ДО регистрации. Тестируйте тщательно!
-
-```swift
-static func configureFirebaseBeforeMain() {
-    guard !didConfigureFirebase else { return }
-    didConfigureFirebase = true
-    
-    // Вариант 1: Минимизация логов (уже сделано)
-    FirebaseConfiguration.shared.setLoggerLevel(.min)
-    
-    // Вариант 2: Асинхронная инициализация тяжёлых частей
-    // ТОЛЬКО для App Check и Analytics, НЕ для core!
-    FirebaseApp.configure()  // Core должен быть синхронным
-    
-    DispatchQueue.global(qos: .userInitiated).async {
-        // Тяжёлые операции в фоне
-        Analytics.setAnalyticsCollectionEnabled(true)
-    }
-    
-    // App Check уже в async (сделано в текущей версии)
-    DispatchQueue.main.async {
-        self.configureAppCheck()
-    }
-}
-```
-
-### Альтернативное решение (безопаснее)
-
-Оставить как есть, но добавить в `Info.plist`:
-```xml
-<key>FirebaseDataCollectionDefaultEnabled</key>
-<false/>
-```
-
-Это отключит автоматический сбор данных при старте, уменьшив I/O.
-
-### Риски
-
-- Если сделать `FirebaseApp.configure()` асинхронным, плагины могут упасть с `[I-COR000005] No app has been configured`
-- iOS 13+ Scene Lifecycle требует Firebase ДО SceneDelegate
-
-### Рекомендация
-
-**НЕ МЕНЯТЬ** без крайней необходимости. Предупреждения не блокируют запуск, приложение работает.
+## 3) Цели фикса (KPI)
+- **KPI‑1 (интерактивность)**: нет `Gesture: System gesture gate timed out` и нет `killed` при обычной интеракции (чат/клавиатура).
+- **KPI‑2 (cold start)**: первый UI появляется быстро, а тяжёлые задачи не “замораживают” UI.
+- **KPI‑3 (анти‑регресс)**: правила зафиксированы (permissions/TZ/Hive/Sentry) + есть простая диагностика таймингов.
 
 ---
 
-## 2. СРЕДНИЙ ПРИОРИТЕТ: sign_in_with_apple switch warning
+## 4) План работ (TODO, выполняем по шагам)
 
-### Что не работает
+> ВАЖНО: после каждого шага ниже я дописываю **результат** в раздел “Журнал выполнения”.
 
-Компилятор выдаёт предупреждение:
-```
-sign_in_with_apple: Switch covers known cases, but 'ASAuthorizationError.Code' may have additional unknown values
-```
+### T0 — Базовая фиксация проблемы (без функциональных изменений)
+- [x] **T0.1** Добавить лёгкую инструментализацию таймингов старта (Stopwatch/Timeline) в:
+  - `lib/main.dart` (bootstrap + post-frame этапы)
+  - `lib/services/notifications_service.dart` (init + permissions)
+  - `lib/services/timezone_gate.dart` (timezone init)
+- **Критерий готовности**: в логах есть понятные метки `STARTUP[...]` с длительностями.
 
-**Причина:** iOS 18 добавил новые case в `ASAuthorizationError.Code`:
-- `.credentialImport`
-- `.credentialExport`  
-- `.preferSignInWithApple`
-- `.deviceNotConfiguredForPasskeyCreation`
+### T1 — Убрать notification permissions с cold start (P1)
+- [x] **T1.1** Разделить notifications init на:
+  - `initialize()` (ядро без запроса permissions)
+  - `ensurePermissionsRequested()` (только по запросу из UI/перед scheduling)
+- [x] **T1.2** Проверить вызовы: где нужно — добавить явный запрос permissions (экран настроек/включение напоминаний).
+- **Критерий готовности**: при cold start нет системного запроса разрешений; разрешение спрашивается только при явном действии пользователя.
 
-**Файл:** Плагин `sign_in_with_apple` (внешняя зависимость)
+### T2 — Убрать timezone init с cold start (P3)
+- [x] **T2.1** Убрать `_warmUpTimezone()` из дефолтного startup пути.
+- [x] **T2.2** Ввести “ensure timezone” по требованию (перед schedule reminders) и корректно закрыть `TimezoneGate`.
+- **Критерий готовности**: `tzdata.initializeTimeZones()` не запускается на старте, но напоминания продолжают работать.
 
-### Предлагаемое решение
+### T3 — Уменьшить Hive I/O на старте (P2)
+- [x] **T3.1** На старте открывать только то, что необходимо для launch-route (обычно `notifications` box).
+- [x] **T3.2** Остальные box’ы открывать лениво, либо при входе на конкретные экраны/фичи.
+- **Критерий готовности**: нет массового открытия боксов на старте; нет HiveError; функциональность не сломана.
 
-Создать патч в `ios/Podfile`:
+### T4 — Sentry: убрать из критического пути интерактивности (P4)
+- [x] **T4.1** Перенести/разнести Sentry init так, чтобы он не блокировал UI (не одной await‑цепочкой).
+- [x] **T4.2** При необходимости — сделать “delay/idle init” (инициализация после показа первого реального экрана).
+- **Критерий готовности**: исчезают hang‑кластеры, совпадающие по времени со стартом Sentry.
 
-```ruby
-def patch_sign_in_with_apple(installer)
-  installer.pods_project.targets.each do |target|
-    next unless target.name == 'sign_in_with_apple'
-    target.source_build_phase.files.each do |file|
-      next unless file.file_ref.path.end_with?('.swift')
-      # Добавить @unknown default в switch
-    end
-  end
-end
-```
-
-**ИЛИ** обновить плагин до версии с исправлением (если доступна).
-
-### Риски
-
-- Патчи плагинов хрупкие — обновление плагина может сломать патч
-- Warning не критичен, приложение работает
-
-### Рекомендация
-
-Проверить наличие обновления `sign_in_with_apple` в pub.dev. Если нет — игнорировать warning.
+### T5 — Финальная проверка и меры против регрессии
+- [x] **T5.1** Прогнать `flutter analyze` + `test/ui_text_scaling_test.dart` + `test/providers/startup_performance_test.dart`.
+- [x] **T5.2** Зафиксировать правила “чтобы не возвращалось” (permissions/TZ/Hive/Sentry) в конце этого файла.
 
 ---
 
-## 3. СРЕДНИЙ ПРИОРИТЕТ: Отменённые запросы (Error -999 cancelled)
+## 5) Журнал выполнения (обновляется после каждого шага)
 
-### Что происходит
+### 2025‑12‑14
+- ✅ **T0.1 Инструментация таймингов (STARTUP[*]) добавлена**
+  - Файлы: `lib/main.dart`, `lib/services/notifications_service.dart`, `lib/services/timezone_gate.dart`
+  - Добавлены метки:
+    - `STARTUP[bootstrap.*]` (dotenv/supabase/hive)
+    - `STARTUP[postframe.*]` (Sentry prewarm/init, local services, launch route)
+    - `STARTUP[ui.*.first_frame]` (первый кадр bootstrap и router UI)
+    - `STARTUP[notif.*]` (init/permissions)
+    - `STARTUP[timezone.init.*]` (ленивая инициализация timezone)
+  - Проверки:
+    - `flutter analyze` ✅
+    - `flutter test test/ui_text_scaling_test.dart` ✅
+    - `flutter test test/providers/startup_performance_test.dart` ✅
 
-Логи показывают:
-```
-Task finished with error [-999] Error Domain=NSURLErrorDomain Code=-999 "cancelled"
-```
+- ✅ **T1 Убрали permissions‑prompt с cold start**
+  - `NotificationsService.initialize()` больше **не вызывает** `_requestPermissionsIfNeeded()`.
+  - Добавлен `NotificationsService.ensurePermissionsRequested()` и он вызывается:
+    - при `schedulePracticeReminders()` (то есть при сохранении настроек напоминаний пользователем)
+  - Убрано авто‑расписание напоминаний на login (email+password и Apple), чтобы не провоцировать внезапный системный диалог.
+  - Проверки:
+    - `flutter analyze` ✅
+    - `flutter test test/ui_text_scaling_test.dart` ✅
+    - `flutter test test/providers/startup_performance_test.dart` ✅
 
-**Причина:** При навигации между экранами активные HTTP запросы отменяются, но не graceful.
+- ✅ **T2 Timezone стал ленивым (по требованию)**
+  - Убрали `tzdata.initializeTimeZones()` из `_initializeDeferredLocalServices()` (не запускается на старте).
+  - Реализовали `TimezoneGate.ensureInitialized()` (внутри tzdata + FlutterTimezone + tz.setLocalLocation).
+  - `NotificationsService` теперь вызывает timezone init только при scheduling (и пробрасывает ошибку наверх, чтобы UI мог показать фидбек).
+  - Проверки:
+    - `flutter analyze` ✅
+    - `flutter test test/ui_text_scaling_test.dart` ✅
+    - `flutter test test/providers/startup_performance_test.dart` ✅
 
-**Файлы:** Все провайдеры и сервисы, делающие сетевые запросы.
+- ✅ **T3 Уменьшили Hive I/O на старте**
+  - В `lib/main.dart` сокращён список “pre-open” box’ов до: `gp`, `notifications`
+    - больше не открываем на старте: `levels`, `lessons`, `user_goal`, `practice_log`, `quotes` и т.п.
+  - `LevelsRepository` и `LessonsRepository` переведены на ленивое открытие через `HiveBoxHelper.openBox(...)`.
+  - Проверки:
+    - `flutter analyze` ✅
+    - `flutter test test/ui_text_scaling_test.dart` ✅
+    - `flutter test test/providers/startup_performance_test.dart` ✅
 
-### Текущая реализация
+- ✅ **T4 Sentry вынесен из критического окна интерактивности**
+  - `SentryFlutter.init` больше **не выполняется** синхронно в post‑frame цепочке до local services.
+  - Добавлен `_scheduleDeferredSentryInit()`:
+    - стартует через ~1500мс
+    - выполняется в `SchedulerBinding.scheduleTask(..., Priority.idle)` (когда UI простаивает)
+  - Проверки:
+    - `flutter analyze` ✅
+    - `flutter test test/providers/startup_performance_test.dart` ✅
+    - `flutter test test/ui_text_scaling_test.dart` ✅
 
-```dart
-// Типичный провайдер
-final someDataProvider = FutureProvider<Data>((ref) async {
-  final response = await supabase.from('table').select();
-  return Data.fromJson(response);
-});
-```
-
-### Предлагаемое решение
-
-Использовать `CancelToken` и обрабатывать отмену:
-
-```dart
-final someDataProvider = FutureProvider<Data>((ref) async {
-  final cancelToken = CancelToken();
-  
-  // Отменить запрос при dispose провайдера
-  ref.onDispose(() => cancelToken.cancel());
-  
-  try {
-    final response = await supabase
-        .from('table')
-        .select()
-        .withConverter((data) => Data.fromJson(data));
-    return response;
-  } on PostgrestException catch (e) {
-    if (e.code == 'PGRST116') {
-      // Request was cancelled - это OK
-      throw StateError('Request cancelled');
-    }
-    rethrow;
-  }
-});
-```
-
-### Риски
-
-- Supabase SDK не поддерживает `CancelToken` напрямую
-- Требует рефакторинга всех провайдеров
-
-### Рекомендация
-
-Низкий приоритет. Error -999 — нормальное поведение iOS при навигации.
-
----
-
-## 4. СРЕДНИЙ ПРИОРИТЕТ: Optimistic UI для логина
-
-### Что не оптимально
-
-Текущий flow:
-1. Пользователь нажимает "Войти"
-2. Ждём ответ от Supabase (1-3 сек)
-3. Инвалидируем провайдеры
-4. GoRouter редиректит на `/home`
-
-**Пользователь видит loading 1-3 секунды.**
-
-**Файл:** `lib/providers/login_controller.dart`
-
-### Текущая реализация
-
-```dart
-Future<void> signIn({required String email, required String password}) async {
-  state = const AsyncLoading();
-  try {
-    await ref.read(authServiceProvider).signIn(email: email, password: password);
-    state = const AsyncData(null);
-    _invalidateAuthDependentProviders();  // ← Только после успеха
-  } catch (e, st) {
-    state = AsyncError(e, st);
-  }
-}
-```
-
-### Предлагаемое решение
-
-```dart
-Future<void> signIn({required String email, required String password}) async {
-  state = const AsyncLoading();
-  
-  // Optimistic: показываем home сразу
-  // GoRouter.of(context).go('/home');  // Требует BuildContext
-  
-  try {
-    await ref.read(authServiceProvider).signIn(email: email, password: password);
-    state = const AsyncData(null);
-    _invalidateAuthDependentProviders();
-  } catch (e, st) {
-    state = AsyncError(e, st);
-    // Rollback: вернуть на login
-    // GoRouter.of(context).go('/login');
-  }
-}
-```
-
-**Проблема:** `LoginController` не имеет доступа к `BuildContext` для навигации.
-
-### Альтернативное решение
-
-Использовать `rootNavigatorKey` (уже добавлен):
-
-```dart
-import '../routing/app_router.dart';
-
-Future<void> signIn({...}) async {
-  state = const AsyncLoading();
-  
-  // Optimistic navigation
-  final navigator = rootNavigatorKey.currentState;
-  if (navigator != null) {
-    // Показываем home с loading overlay
-  }
-  
-  try {
-    await ref.read(authServiceProvider).signIn(...);
-    _invalidateAuthDependentProviders();
-  } catch (e, st) {
-    // Rollback
-  }
-}
-```
-
-### Риски
-
-- При ошибке сети пользователь увидит home, потом вернётся на login — плохой UX
-- Нужно добавить loading overlay на home
-
-### Рекомендация
-
-Средний приоритет. Улучшит UX, но требует дополнительной работы.
+- ✅ **T5 Финальная валидация + анти‑регресс правила**
+  - Повторно прогнаны проверки после всех шагов:
+    - `flutter analyze` ✅
+    - `flutter test test/ui_text_scaling_test.dart` ✅
+    - `flutter test test/providers/startup_performance_test.dart` ✅
+  - Добавлены правила ниже (см. разделы 6–7).
 
 ---
 
-## 5. НИЗКИЙ ПРИОРИТЕТ: Кэширование профиля пользователя
+## 6) Как проверить фикс на iOS (ручной чеклист)
 
-### Что не оптимально
+### 6.1 Cold start (важно)
+1) Удалить приложение с устройства (чтобы был “чистый” cold start).
+2) Поставить заново и запустить.
+3) В Xcode/Console убедиться:
+   - **нет** системного prompt “разрешить уведомления” на старте
+   - в логах есть `STARTUP[bootstrap.*]`, `STARTUP[postframe.*]`
+   - `STARTUP[postframe.sentry.deferred.start]` появляется **после** `postframe.done` и с задержкой.
 
-`currentUserProvider` каждый раз делает запрос к Supabase:
+### 6.2 Интерактивность (чат/клавиатура)
+1) Сразу после появления UI:
+   - открыть чат → вызвать клавиатуру → быстро печатать/скроллить.
+2) В логах должно быть:
+   - **нет** `Hang detected: ...`
+   - **нет** `Gesture: System gesture gate timed out`
+   - **нет** `Message from debugger: killed`
 
-```dart
-final currentUserProvider = FutureProvider<UserModel?>((ref) async {
-  // ...
-  final profile = await repository.fetchProfile(supabaseUser.id);  // ← Сеть!
-  return profile;
-});
-```
-
-**Файл:** `lib/providers/auth_provider.dart`
-
-### Предлагаемое решение
-
-Добавить локальный кэш с TTL:
-
-```dart
-class UserProfileCache {
-  UserModel? _cached;
-  DateTime? _cachedAt;
-  static const _ttl = Duration(minutes: 5);
-  
-  bool get isValid => 
-    _cached != null && 
-    _cachedAt != null && 
-    DateTime.now().difference(_cachedAt!) < _ttl;
-  
-  UserModel? get() => isValid ? _cached : null;
-  
-  void set(UserModel profile) {
-    _cached = profile;
-    _cachedAt = DateTime.now();
-  }
-  
-  void invalidate() {
-    _cached = null;
-    _cachedAt = null;
-  }
-}
-
-final _profileCache = UserProfileCache();
-
-final currentUserProvider = FutureProvider<UserModel?>((ref) async {
-  final session = Supabase.instance.client.auth.currentSession;
-  if (session == null) return null;
-  
-  // Проверяем кэш
-  final cached = _profileCache.get();
-  if (cached != null && cached.id == session.user.id) {
-    return cached;
-  }
-  
-  // Загружаем из сети
-  final profile = await repository.fetchProfile(session.user.id);
-  if (profile != null) {
-    _profileCache.set(profile);
-  }
-  return profile;
-});
-```
-
-### Риски
-
-- Кэш может устареть (профиль изменён на другом устройстве)
-- Нужно инвалидировать кэш при обновлении профиля
-
-### Рекомендация
-
-Низкий приоритет. Текущая реализация работает, сетевые запросы не критичны.
+### 6.3 Напоминания (timezone+permissions теперь по запросу)
+1) Открыть экран **Напоминания** → нажать **Сохранить**.
+2) Ожидаем:
+   - системный prompt на разрешение уведомлений появляется **тут** (если не давали раньше)
+   - после этого scheduling проходит (нет ошибок), напоминания приходят в выбранное время.
 
 ---
 
-## 6. НИЗКИЙ ПРИОРИТЕТ: Предзагрузка данных в splash
-
-### Что можно улучшить
-
-Пока показывается splash screen, можно параллельно загружать данные:
-- Профиль пользователя
-- GP баланс
-- Список уровней
-- Последний прогресс
-
-**Файл:** `lib/main.dart` (функция `_schedulePostFrameBootstraps()`)
-
-### Предлагаемое решение
-
-```dart
-void _schedulePostFrameBootstraps() {
-  WidgetsBinding.instance.addPostFrameCallback((_) async {
-    // Существующая инициализация...
-    await _ensureFirebaseInitialized('post_frame_bootstrap');
-    await _initializeDeferredLocalServices();
-    
-    // Предзагрузка данных (параллельно!)
-    await Future.wait([
-      _preloadUserProfile(),
-      _preloadGpBalance(),
-      _preloadLevels(),
-    ]);
-  });
-}
-
-Future<void> _preloadUserProfile() async {
-  try {
-    final container = ProviderContainer();
-    await container.read(currentUserProvider.future);
-  } catch (_) {}
-}
-```
-
-### Риски
-
-- Если пользователь не залогинен, загрузка бессмысленна
-- Дополнительный расход трафика при старте
-
-### Рекомендация
-
-Низкий приоритет. Реализовать только если splash показывается долго.
+## 7) Правила, чтобы проблема не возвращалась (anti‑regress)
+- **Permissions**: не запрашивать notification permissions на cold start / на логине. Только по явному действию (настройка напоминаний).
+- **Timezone**: `tzdata.initializeTimeZones()` — только по требованию перед scheduling (лениво через `TimezoneGate.ensureInitialized()`).
+- **Hive**:
+  - на старте не открывать “пачку” box’ов;
+  - если репозиторий использует Hive — открывать box лениво (`HiveBoxHelper.openBox`), либо через `Hive.openBox` внутри метода.
+- **Sentry**:
+  - не запускать Sentry init в критическом окне интерактивности;
+  - Sentry init — позже, через idle/задержку (как в `_scheduleDeferredSentryInit`).
+- **Правка Pods**: не лечить поведение правками в `ios/Pods/**` (всё устойчивое — в исходниках/скриптах проекта).
 
 ---
 
-# ⛔ КРИТИЧЕСКИЕ ПРЕДОСТЕРЕЖЕНИЯ
+## 8) Follow‑up (2025‑12‑14): лаг первой клавиши на логине
+После первого круга фиксов приложение стало собираться, а `pod install` проходит чисто, но на iOS осталось **небольшое подтормаживание** при первом вводе в поле логина.
 
-## Что НЕЛЬЗЯ делать (чтобы не сломать приложение)
+По свежим логам (`docs/draft-2.md`, `docs/draft-4.md`) видно:
+- `STARTUP[postframe.local_services]` занимал около **~4.8s** и совпадал по времени с `Hang detected: 4.81s`.
+- В момент первого ввода/показа клавиатуры появляются системные события `TUIKeyboard*` и `MainThreadIOMonitor ... InternalConfig.plist`, после чего фиксируются `Hang detected: 6.26s / 10.52s` (в логах отмечено `debugger attached`).
 
-### 1. НЕ использовать `await ref.watch(authStateProvider.future)`
+### Применённые добивки (минимальные, направленные на интерактивность)
+- `lib/main.dart`: **убрана** инициализация `NotificationsService` из `postframe.local_services` (оставили только быстрый preload `launch_route` через Hive). Уведомления теперь инициализируются **лениво** при реальном использовании.
+- `lib/widgets/custom_textfield.dart`, `lib/screens/auth/login_screen.dart`: для `email/password` отключены `autocorrect`, `enableSuggestions`, `enableIMEPersonalizedLearning`, выставлены `keyboardType`, `autofillHints`, отключены smart quotes/dashes — чтобы снизить нагрузку клавиатуры на первом вводе.
 
-**Почему запрещено:**
-```dart
-// ❌ ОПАСНО! Блокирует навсегда!
-final currentUserProvider = FutureProvider<UserModel?>((ref) async {
-  final auth = await ref.watch(authStateProvider.future);  // ← БЛОКИРОВКА!
-});
-```
-
-`authStateProvider` — это `StreamProvider`. Вызов `.future` ждёт **первого события** от `onAuthStateChange`. Если:
-- Сеть недоступна
-- Supabase не отвечает
-- Нет кэшированной сессии
-
-...то `.future` будет ждать **бесконечно**, блокируя весь UI.
-
-**Правильный способ:**
-```dart
-// ✅ ПРАВИЛЬНО! Синхронное чтение из кэша
-final currentUserProvider = FutureProvider<UserModel?>((ref) async {
-  final session = Supabase.instance.client.auth.currentSession;
-  // ...
-});
-```
+Проверки после добивок:
+- `flutter analyze` ✅
+- `flutter test test/providers/startup_performance_test.dart` ✅
+- `flutter test test/ui_text_scaling_test.dart` ✅
 
 ---
 
-### 2. НЕ использовать `ref.watch(authStateProvider)` в Provider/FutureProvider
+## 9) Регрессия (2025‑12‑14): стало ещё хуже по cold start — что было не так и как исправили
 
-**Почему запрещено:**
-```dart
-// ❌ ОПАСНО! Может блокировать!
-final goRouterProvider = Provider<GoRouter>((ref) {
-  ref.watch(authStateProvider);  // ← Блокирует если Stream не эмитит
-});
-```
+### 9.1 Что показывают свежие логи (draft‑2 / draft‑4)
+- `STARTUP[ui.bootstrap.first_frame]` появляется только на **~6.0s**, и почти сразу после этого завершается `bootstrap.dotenv`:
+  - `bootstrap.dotenv.start` → `bootstrap.dotenv.ok` ≈ **6s**
+  - рядом фиксируется `Hang detected: ~6.01s`
+- `STARTUP[postframe.local_services]` занимает **~8.06s** (`local_services.start` → `local_services.ok`), и это совпадает с:
+  - `Hang detected: 8.06s`
+  - затем возможны `Gesture: System gesture gate timed out`
+- Дополнительно есть “длинные” хэнги в районе клавиатуры (`Hang detected: 18.35s`, `7.35s`) — они проявляются, когда в момент системной инициализации клавиатуры наш главный поток занят долгими задачами.
 
-`ref.watch()` на `StreamProvider` внутри `Provider` или `FutureProvider` создаёт зависимость, которая может блокировать пока Stream не выдаст значение.
+### 9.2 Что я сделал не так (корень регрессии)
+1) **Запуск bootstrap слишком рано**  
+   Мы запускали `appBootstrapProvider` прямо в `MyApp.build()` через `ref.watch(...)`.  
+   Если внутри bootstrap есть тяжёлые операции/платформенные вызовы, это способно задержать первый кадр и дать “Hang detected” ещё до того, как UI станет интерактивным.
 
-**Правильный способ:**
-```dart
-// ✅ ПРАВИЛЬНО! Синхронное чтение
-final goRouterProvider = Provider<GoRouter>((ref) {
-  final session = Supabase.instance.client.auth.currentSession;
-  // ...
-});
-```
+2) **Оставили блокирующий I/O в `postframe.local_services`**  
+   В `main.dart` оставался preload launch‑route через `Hive.openBox('notifications')`.  
+   На iOS это может занимать секунды и блокировать главный поток → ровно то, что видно как `local_services ~8s` + `Hang detected`.
 
----
+### 9.3 Что изменили, чтобы исправить
+- **Первый кадр**: `MyApp` переведён на `ConsumerStatefulWidget` и bootstrap запускается **после первого кадра** Bootscreen (через `addPostFrameCallback`).
+- **Launch route без Hive**:
+  - `NotificationsService.persistLaunchRoute/consumeAnyLaunchRoute` теперь используют `SharedPreferences` (`NSUserDefaults`) как быстрый storage.
+  - `NotificationsService._ensureLaunchBox()` больше **не делает** `Hive.openBox(...)` на cold start.
+  - preload launch‑route через Hive удалён из `main.dart`, чтобы `postframe.local_services` был практически мгновенным.
 
-### 3. НЕ инициализировать Sentry ДО `runApp()`
+Проверки после этих правок:
+- `flutter analyze` ✅
+- `flutter test test/providers/startup_performance_test.dart` ✅
+- `flutter test test/ui_text_scaling_test.dart` ✅
 
-**Почему запрещено:**
-```dart
-// ❌ ОПАСНО! Блокирует UI на 60+ секунд!
-Future<void> main() async {
-  await _initializeSentry(dsn);  // ← Сетевые запросы с таймаутом!
-  runApp(rootApp);
-}
-```
-
-Sentry SDK при инициализации:
-1. Делает сетевые запросы
-2. Имеет таймаут 60 секунд
-3. Блокирует main thread
-
-**Правильный способ:**
-```dart
-// ✅ ПРАВИЛЬНО! Sentry после первого кадра
-Future<void> main() async {
-  runApp(rootApp);  // ← UI сразу!
-  _schedulePostFrameBootstraps();  // ← Sentry здесь
-}
-
-void _schedulePostFrameBootstraps() {
-  WidgetsBinding.instance.addPostFrameCallback((_) async {
-    await _initializeSentry(dsn);  // ← После UI
-  });
-}
-```
-
----
-
-### 4. НЕ инициализировать Firebase в `+load` или `constructor`
-
-**Почему запрещено:**
-```objc
-// ❌ ОПАСНО! Блокирует ДО UIApplicationMain!
-// ios/Runner/FirebaseEarlyInit.m
-+ (void)load {
-    [FIRApp configure];  // ← Блокирует main thread!
-}
-```
-
-Методы `+load` и `__attribute__((constructor))` выполняются **до** `UIApplicationMain`. Любой I/O здесь блокирует запуск приложения.
-
-**Правильный способ:**
-Firebase инициализируется в `willFinishLaunchingWithOptions`:
-```swift
-// ✅ ПРАВИЛЬНО!
-// ios/Runner/AppDelegate.swift
-override func application(
-    _ application: UIApplication,
-    willFinishLaunchingWithOptions: ...
-) -> Bool {
-    Self.configureFirebaseBeforeMain()  // ← Здесь безопасно
-    return super.application(...)
-}
-```
-
----
-
-### 5. НЕ использовать `FutureBuilder` в `build()` для критичных операций
-
-**Почему запрещено:**
-```dart
-// ❌ ОПАСНО! Race condition с инициализацией!
-class MyApp extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<String?>(
-      future: NotificationsService.instance.consumeAnyLaunchRoute(),
-      builder: (context, snap) => ...,  // ← Hive может быть не готов!
-    );
-  }
-}
-```
-
-`FutureBuilder` в `build()` может вызывать операции **до** завершения инициализации в `main()`.
-
-**Правильный способ:**
-```dart
-// ✅ ПРАВИЛЬНО! Обработка в post-frame
-void _schedulePostFrameBootstraps() {
-  WidgetsBinding.instance.addPostFrameCallback((_) async {
-    await _handleNotificationLaunchRoute();  // ← После инициализации
-  });
-}
-```
-
----
-
-### 6. НЕ забывать инвалидировать провайдеры после логина
-
-**Почему важно:**
-После исправления блокировок, провайдеры больше не подписаны на `authStateProvider`. Это значит, что они **не узнают** об изменении auth state автоматически.
-
-```dart
-// ✅ ОБЯЗАТЕЛЬНО после успешного логина!
-void _invalidateAuthDependentProviders() {
-  ref.invalidate(currentUserProvider);
-  ref.invalidate(goRouterProvider);
-  debugPrint('LoginController: invalidated auth-dependent providers');
-}
-```
-
----
-
-# 📂 ФАЙЛЫ, КОТОРЫЕ БЫЛИ ИЗМЕНЕНЫ
-
-| Файл | Что изменено | Зачем |
-|------|--------------|-------|
-| `ios/Podfile` | Закомментирован `patch_sentry_installation` | Патч генерировал некорректный код |
-| `ios/Runner/FirebaseEarlyInit.m` | Закомментированы вызовы в `+load` и `constructor` | Блокировали main thread |
-| `ios/Runner/main.m` | Закомментирован вызов `configureFirebaseBeforeMain` | Дублировал инициализацию |
-| `ios/Runner/AppDelegate.swift` | Firebase в `willFinishLaunching` + оптимизации | Правильный порядок для iOS 13+ |
-| `lib/providers/auth_provider.dart` | Убран `await authStateProvider.future` | Блокировал навсегда |
-| `lib/providers/gp_providers.dart` | Убран `ref.watch(authStateProvider)` | Блокировал UI |
-| `lib/routing/app_router.dart` | Убран `ref.watch(authStateProvider)`, добавлен `rootNavigatorKey` | Блокировал GoRouter |
-| `lib/main.dart` | Sentry в post-frame, убран FutureBuilder | Блокировал `runApp()` |
-| `lib/services/notifications_service.dart` | `_ensureLaunchBox()` возвращает null при ошибке | Защита от HiveError |
-| `lib/providers/login_controller.dart` | Добавлена инвалидация провайдеров | Провайдеры не подписаны на auth changes |
-
----
-
-# 🧪 ТЕСТЫ
-
-Созданы тесты для предотвращения регрессий:
-
-1. **`test/providers/provider_smoke_test.dart`** — smoke-тесты провайдеров
-2. **`test/providers/startup_performance_test.dart`** — тесты производительности
-3. **`test/routing/app_router_test.dart`** — тесты GoRouter
-
-**Все 16 тестов должны проходить!**
-
-```bash
-flutter test test/providers/ test/routing/
-```
-
----
-
-# 📋 ЧЕКЛИСТ ПЕРЕД ИЗМЕНЕНИЯМИ
-
-Перед любыми изменениями в auth/startup коде:
-
-- [ ] Провайдер НЕ использует `await ref.watch(streamProvider.future)`
-- [ ] Провайдер НЕ использует `ref.watch(streamProvider)` без необходимости
-- [ ] Sentry init НЕ блокирует `runApp()`
-- [ ] Firebase init в `willFinishLaunchingWithOptions` (не раньше!)
-- [ ] Нет `FutureBuilder` в `build()` для критичных операций
-- [ ] После логина вызывается `_invalidateAuthDependentProviders()`
-- [ ] Все 16 тестов проходят
 

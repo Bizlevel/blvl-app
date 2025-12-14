@@ -32,8 +32,10 @@ class NativeBootstrap {
         'native_bootstrap.ensure_iap_registered',
         params: [message],
         withScope: (scope) {
-          scope.setExtra('caller', caller);
-          scope.setExtra('stack', stackPreview);
+          scope.setContexts('native_bootstrap', {
+            'caller': caller,
+            'stack': stackPreview,
+          });
         },
       );
     } catch (error, stackTrace) {
@@ -61,8 +63,10 @@ class NativeBootstrap {
         'native_bootstrap.ensure_media_registered',
         params: [message],
         withScope: (scope) {
-          scope.setExtra('caller', caller);
-          scope.setExtra('stack', stackPreview);
+          scope.setContexts('native_bootstrap', {
+            'caller': caller,
+            'stack': stackPreview,
+          });
         },
       );
     } catch (error, stackTrace) {

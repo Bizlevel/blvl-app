@@ -163,6 +163,16 @@ class LoginScreen extends HookConsumerWidget {
                           hint: 'Email',
                           prefix: const Icon(Icons.email_outlined),
                           controller: emailController,
+                          keyboardType: TextInputType.emailAddress,
+                          textInputAction: TextInputAction.next,
+                          // На iOS первая инициализация клавиатуры + генерация подсказок может давать фризы.
+                          // Для email подсказки/автокоррекция не нужны — отключаем.
+                          autocorrect: false,
+                          enableSuggestions: false,
+                          enableIMEPersonalizedLearning: false,
+                          autofillHints: const [AutofillHints.email],
+                          smartDashesType: SmartDashesType.disabled,
+                          smartQuotesType: SmartQuotesType.disabled,
                         ),
                         AppSpacing.gapH(AppSpacing.lg),
                         // поле пароля с глазом
@@ -172,6 +182,14 @@ class LoginScreen extends HookConsumerWidget {
                           prefix: const Icon(Icons.lock_outline),
                           controller: passwordController,
                           obscureText: obscurePassword.value,
+                          keyboardType: TextInputType.visiblePassword,
+                          textInputAction: TextInputAction.done,
+                          autocorrect: false,
+                          enableSuggestions: false,
+                          enableIMEPersonalizedLearning: false,
+                          autofillHints: const [AutofillHints.password],
+                          smartDashesType: SmartDashesType.disabled,
+                          smartQuotesType: SmartQuotesType.disabled,
                           suffix: IconButton(
                             tooltip: obscurePassword.value
                                 ? 'Показать пароль'

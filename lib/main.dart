@@ -14,8 +14,10 @@ import 'package:responsive_framework/responsive_framework.dart';
 import 'package:app_links/app_links.dart';
 import 'dart:async';
 import 'dart:developer' as dev;
+import 'dart:math' as math;
 import 'utils/deep_link.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter/scheduler.dart';
 
 import 'routing/app_router.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -23,13 +25,8 @@ import 'package:go_router/go_router.dart';
 import 'services/supabase_service.dart';
 import 'theme/color.dart';
 import 'theme/app_theme.dart';
-import 'providers/theme_provider.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:bizlevel/services/notifications_service.dart';
-import 'package:timezone/data/latest.dart' as tzdata;
-import 'package:timezone/timezone.dart' as tz;
-import 'package:flutter_timezone/flutter_timezone.dart';
-import 'package:bizlevel/services/timezone_gate.dart';
 import 'services/push_service.dart';
 import 'constants/push_flags.dart';
 
@@ -44,8 +41,21 @@ bool _hiveInitialized = false;
 bool _pushInitStarted = false;
 StreamSubscription<AuthState>? _authStateSub;
 bool _postFrameBootstrapsScheduled = false;
-const bool _kDisableSentryDefine =
-    bool.fromEnvironment('DISABLE_SENTRY', defaultValue: false);
+bool _sentryDeferredInitScheduled = false;
+bool _bootstrapFirstFrameLogged = false;
+bool _routerFirstFrameLogged = false;
+const bool _kDisableSentryDefine = bool.fromEnvironment('DISABLE_SENTRY');
+
+final Stopwatch _startupSw = Stopwatch()..start();
+void _startupLog(String name, [Map<String, Object?> data = const {}]) {
+  // Важно: лог лёгкий, чтобы не усугублять зависания.
+  final elapsedMs = _startupSw.elapsedMilliseconds;
+  final payload = <String, Object?>{
+    't_ms': elapsedMs,
+    ...data,
+  };
+  debugPrint('STARTUP[$name] $payload');
+}
 
 bool _isSentryDisabled() {
   final envValue = dotenv.isInitialized
@@ -61,22 +71,31 @@ bool _isSentryDisabled() {
 /// Стратегия A: показываем Flutter UI сразу, а dotenv/Supabase/Hive инициализируем
 /// уже на Flutter-экране (Bootscreen). Так LaunchScreen исчезает быстро.
 final appBootstrapProvider = FutureProvider<void>((ref) async {
+  _startupLog('bootstrap.start');
   // Загружаем env (может быть нужно для Supabase/Sentry/OneSignal ключей).
   try {
+    _startupLog('bootstrap.dotenv.start');
     await dotenv.load();
+    _startupLog('bootstrap.dotenv.ok');
   } catch (_) {}
 
   // Supabase init — нужен до построения GoRouter (router читает currentSession).
+  _startupLog('bootstrap.supabase.start');
   await SupabaseService.initialize();
+  _startupLog('bootstrap.supabase.ok');
   debugPrint('INFO: Supabase bootstrap completed');
 
   // Hive нужен NotificationsService (и части репозиториев/кэша).
+  _startupLog('bootstrap.hive.start');
   await _ensureHiveInitialized();
+  _startupLog('bootstrap.hive.ok');
   debugPrint('INFO: Hive bootstrap completed');
+  _startupLog('bootstrap.done');
 });
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  _startupLog('main.ensure_initialized');
 
   // Чистые URL без # — только для Web
   if (kIsWeb) {
@@ -84,19 +103,46 @@ Future<void> main() async {
   }
 
   // runApp() — сразу. Всё тяжёлое переносим в appBootstrapProvider.
+  _startupLog('main.run_app');
   runApp(const ProviderScope(child: MyApp()));
 }
 
-class MyApp extends ConsumerWidget {
+class MyApp extends ConsumerStatefulWidget {
   const MyApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends ConsumerState<MyApp> {
+  bool _bootstrapStarted = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // ВАЖНО: запускаем bootstrap ПОСЛЕ первого кадра, иначе тяжёлые FutureProvider
+    // могут задерживать первый render и провоцировать "Hang detected" на старте.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      setState(() => _bootstrapStarted = true);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Dark-mode откладываем: фиксируем light-mode на уровне приложения.
+    const ThemeMode themeMode = ThemeMode.light;
+
+    // Пока не отрисовали первый кадр bootstrap UI — не стартуем тяжёлую инициализацию.
+    if (!_bootstrapStarted) {
+      return const _BootstrapApp(themeMode: themeMode);
+    }
+
     final bootstrap = ref.watch(appBootstrapProvider);
     return bootstrap.when(
-      loading: () => _BootstrapApp(themeMode: ref.watch(themeModeProvider)),
+      loading: () => const _BootstrapApp(themeMode: themeMode),
       error: (error, _) => _BootstrapErrorApp(
-        themeMode: ref.watch(themeModeProvider),
+        themeMode: themeMode,
         error: error,
         onRetry: () => ref.invalidate(appBootstrapProvider),
       ),
@@ -107,7 +153,7 @@ class MyApp extends ConsumerWidget {
             router: router,
             child: _RouterApp(
               router: router,
-              themeMode: ref.watch(themeModeProvider),
+              themeMode: themeMode,
             ),
           ),
         );
@@ -120,31 +166,61 @@ void _schedulePostFrameBootstraps() {
   if (_postFrameBootstrapsScheduled) return;
   _postFrameBootstrapsScheduled = true;
   WidgetsBinding.instance.addPostFrameCallback((_) async {
+    _startupLog('postframe.start');
     if (kIsWeb) return;
 
     // Sentry — можно отключить через DISABLE_SENTRY (env/fromEnvironment)
-    if (!_isSentryDisabled()) {
-      final dsn = envOrDefine('SENTRY_DSN');
-      if (dsn.isNotEmpty) {
-        try {
-          await _prewarmSentryCache(dsn);
-          await _initializeSentry(dsn);
-        } catch (e) {
-          debugPrint('WARN: Sentry deferred init failed: $e');
-        }
-      }
-    } else {
-      debugPrint('INFO: Sentry initialization skipped (DISABLE_SENTRY=true)');
-    }
-
+    _startupLog('postframe.local_services.start');
     await _initializeDeferredLocalServices();
+    _startupLog('postframe.local_services.ok');
 
     // Обработка launch route от уведомлений — ПОСЛЕ инициализации Hive!
     // Раньше это было в FutureBuilder в MyApp.build(), но вызывало HiveError.
+    _startupLog('postframe.launch_route.start');
     await _handleNotificationLaunchRoute();
+    _startupLog('postframe.launch_route.ok');
 
+    _startupLog('postframe.push_auth_gate.setup');
     _setupPushInitOnAuth();
+
+    // Sentry: максимально выносим из критического окна интерактивности.
+    // Инициализация происходит "позже", в idle‑задаче (см. `_scheduleDeferredSentryInit()`).
+    _scheduleDeferredSentryInit();
+    _startupLog('postframe.done');
   });
+}
+
+void _scheduleDeferredSentryInit() {
+  if (_sentryDeferredInitScheduled) return;
+  _sentryDeferredInitScheduled = true;
+  if (_isSentryDisabled()) {
+    _startupLog('postframe.sentry.deferred.skip', {'reason': 'disabled'});
+    return;
+  }
+  final dsn = envOrDefine('SENTRY_DSN');
+  if (dsn.isEmpty) {
+    _startupLog('postframe.sentry.deferred.skip', {'reason': 'dsn_empty'});
+    return;
+  }
+
+  unawaited(() async {
+    // Небольшая задержка, чтобы дать UI "прокрутиться" и не ловить hang в момент первых тапов.
+    await Future<void>.delayed(const Duration(milliseconds: 1500));
+    await SchedulerBinding.instance.scheduleTask<void>(
+      () async {
+        _startupLog('postframe.sentry.deferred.start');
+        try {
+          await _prewarmSentryCache(dsn);
+          await _initializeSentry(dsn);
+          _startupLog('postframe.sentry.deferred.ok');
+        } catch (e) {
+          _startupLog('postframe.sentry.deferred.err', {'e': '$e'});
+        }
+      },
+      Priority.idle,
+      debugLabel: 'sentry_init_idle',
+    );
+  }());
 }
 
 class _BootstrapApp extends StatelessWidget {
@@ -192,6 +268,12 @@ class _BootstrapScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (!_bootstrapFirstFrameLogged) {
+      _bootstrapFirstFrameLogged = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _startupLog('ui.bootstrap.first_frame');
+      });
+    }
     return Scaffold(
       body: Container(
         decoration: BoxDecoration(
@@ -339,6 +421,18 @@ class _RouterApp extends StatelessWidget {
               )
             : textTheme;
 
+        // Упрощённая метка: логируем только один раз, чтобы не спамить и не добавлять нагрузку в debug.
+        if (!_routerFirstFrameLogged) {
+          _routerFirstFrameLogged = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _startupLog('ui.router.first_frame', {
+              'w': math.max(0, MediaQuery.of(context).size.width).toInt(),
+              'h': math.max(0, MediaQuery.of(context).size.height).toInt(),
+              'dpr': MediaQuery.of(context).devicePixelRatio,
+            });
+          });
+        }
+
         return Container(
           decoration: BoxDecoration(
             gradient: Theme.of(context).brightness == Brightness.dark
@@ -394,7 +488,20 @@ void _setupPushInitOnAuth() {
   final client = Supabase.instance.client;
 
   Future<void> trigger(Session? session) async {
-    if (session?.user == null) return;
+    if (session?.user == null) {
+      // ВАЖНО: Supabase может эмитить initialSession с session=null на старте.
+      // Нельзя вызывать OneSignal.logout() до OneSignal.initialize(), иначе получаем:
+      // "logout before app ID has been set" + лишний main-thread I/O.
+      final bool wasStarted = _pushInitStarted;
+      _pushInitStarted = false;
+      if (wasStarted) {
+        // Логаут — только если мы реально успели запустить пуш-сервис в этом процессе.
+        try {
+          PushService.instance.onLogout();
+        } catch (_) {}
+      }
+      return;
+    }
     if (_pushInitStarted) return;
     _pushInitStarted = true;
     unawaited(_initPushes());
@@ -506,15 +613,15 @@ Future<void> _initializeDeferredLocalServices() async {
       );
     }
     final hiveSpan = transaction?.startChild('local.hive_init');
-    final tzSpan = transaction?.startChild('local.timezone_init');
-    final notifSpan = transaction?.startChild('local.notifications_init');
-
-    await Future.wait([
-      _ensureHiveInitialized().whenComplete(() => hiveSpan?.finish()),
-      _warmUpTimezone().whenComplete(() => tzSpan?.finish()),
-      _initializeNotifications().whenComplete(() => notifSpan?.finish()),
-      _preloadNotificationsLaunchData(), // Перенесено из main()
-    ]);
+    // ВАЖНО: не инициализируем flutter_local_notifications на старте.
+    // В свежих логах postframe.local_services занимал ~4.8s и совпадал с "Hang detected",
+    // из‑за чего страдала интерактивность (в том числе первая клавиша клавиатуры).
+    //
+    // На старте нам нужен только быстрый preload маршрута запуска (Hive),
+    // а сам NotificationsService инициализируется лениво (при showNow/schedule).
+    // Hive init сам по себе лёгкий, но openBox'ы могут быть дорогими.
+    // На старте избегаем Hive.openBox вообще — launch route теперь хранится в SharedPreferences.
+    await _ensureHiveInitialized().whenComplete(() => hiveSpan?.finish());
     transaction?.finish(status: const SpanStatus.ok());
   } catch (error, stackTrace) {
     transaction?.finish(status: const SpanStatus.internalError());
@@ -557,64 +664,16 @@ Future<void> _ensureHiveInitialized() async {
   }
 }
 
-Future<void> _openHiveBoxes() async {
-  if (kIsWeb) return;
-  const boxes = [
-    'levels',
-    'lessons',
-    'goals',
-    'user_goal',
-    'practice_log',
-    'quotes',
-    'gp',
-    'notifications',
-  ];
-  final futures = <Future>[];
-  for (final box in boxes) {
-    if (!Hive.isBoxOpen(box)) {
-      futures.add(Hive.openBox(box));
-    }
-  }
-  if (futures.isNotEmpty) {
-    await Future.wait(futures);
-  }
-}
+// Timezone инициализируется лениво через TimezoneGate.ensureInitialized()
+// (см. lib/services/timezone_gate.dart), чтобы не добавлять тяжёлый tzdata init в cold start.
+//
+// NotificationsService также инициализируется лениво (showNow / schedulePracticeReminders),
+// чтобы не конкурировать с интерактивностью (клавиатура/первые тапы) на старте.
 
-Future<void> _warmUpTimezone() async {
-  try {
-    tzdata.initializeTimeZones();
-    final timeZoneInfo = await FlutterTimezone.getLocalTimezone();
-    tz.setLocalLocation(tz.getLocation(timeZoneInfo.identifier));
-    TimezoneGate.markReady();
-  } catch (error, stackTrace) {
-    TimezoneGate.markError(error, stackTrace);
-    rethrow;
-  }
-}
-
-Future<void> _initializeNotifications() async {
-  await _openHiveBoxes();
-  if (!kIsWeb && Hive.isBoxOpen('notifications')) {
-    NotificationsService.instance.attachLaunchBox(Hive.box('notifications'));
-  }
-  await NotificationsService.instance.initialize();
-  await NotificationsService.instance.prefetchReminderPrefs();
-}
-
-Future<void> _preloadNotificationsLaunchData() async {
-  if (kIsWeb) return;
-  try {
-    final box = Hive.isBoxOpen('notifications')
-        ? Hive.box('notifications')
-        : await Hive.openBox('notifications');
-    NotificationsService.instance.attachLaunchBox(box);
-    final stored = box.get('launch_route');
-    if (stored is String && stored.isNotEmpty) {
-      await box.delete('launch_route');
-      NotificationsService.instance.cacheStoredLaunchRoute(stored);
-    }
-  } catch (_) {}
-}
+// Удалено: preload launch_route через Hive.
+// Причина: Hive.openBox('notifications') на iOS может занимать секунды и блокировать главный поток
+// (см. Hang detected / gesture gate timed out в свежих логах).
+// Launch route теперь хранится в SharedPreferences (см. NotificationsService.persistLaunchRoute/consumeAnyLaunchRoute).
 
 class _LinkListener extends StatefulWidget {
   final GoRouter router;

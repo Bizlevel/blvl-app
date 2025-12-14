@@ -54,6 +54,26 @@ class AppEffects {
   static const List<BoxShadow> floatingShadow = [shadowXl];
 
   // ==========================================================================
+  // "Liquid glass" shadows (light-mode)
+  // ==========================================================================
+  /// Мягкая тень для стеклянных карточек (ощущение глубины без "грязи").
+  static const BoxShadow glassShadow = BoxShadow(
+    color: Color(0x14000000), // ~8% opacity
+    blurRadius: 24,
+    offset: Offset(0, 12),
+  );
+
+  /// Более лёгкая тень для небольших стеклянных элементов.
+  static const BoxShadow glassShadowSm = BoxShadow(
+    color: Color(0x0D000000), // ~5% opacity
+    blurRadius: 16,
+    offset: Offset(0, 8),
+  );
+
+  static const List<BoxShadow> glassCardShadow = [glassShadow];
+  static const List<BoxShadow> glassCardShadowSm = [glassShadowSm];
+
+  // ==========================================================================
   // GLOW эффекты
   // ==========================================================================
 

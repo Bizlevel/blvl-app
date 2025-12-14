@@ -251,7 +251,6 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
     final lessonsAsync = ref.watch(lessonsProvider(widget.levelId));
 
     return Scaffold(
-      backgroundColor: AppColor.appBgColor,
       body: lessonsAsync.when(
         data: (lessons) {
           _buildBlocks(lessons);

@@ -1,5 +1,5 @@
-/// Smoke-тесты провайдеров: проверяют, что они не падают при создании.
-/// Не требуют моков — используют реальный Supabase SDK (без сети).
+// Smoke-тесты провайдеров: проверяют, что они не падают при создании.
+// Не требуют моков — используют реальный Supabase SDK (без сети).
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';

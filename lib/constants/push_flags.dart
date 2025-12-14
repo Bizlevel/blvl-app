@@ -4,4 +4,4 @@ const bool kEnableIosPush =
 
 // Исторический флаг для iOS FCM; по умолчанию выключен, оставлен для совместимости.
 const bool kEnableIosFcm =
-    bool.fromEnvironment('ENABLE_IOS_FCM', defaultValue: false);
+    bool.fromEnvironment('ENABLE_IOS_FCM');

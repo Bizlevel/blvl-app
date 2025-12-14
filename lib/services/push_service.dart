@@ -16,6 +16,14 @@ class PushService {
   PushService._();
   static final PushService instance = PushService._();
 
+  // OneSignal имеет собственное состояние инициализации.
+  // Мы держим флаг, чтобы:
+  // - не вызывать logout/login до initialize (иначе warning: "logout before app ID has been set")
+  // - не дублировать initialize при повторных логинах в рамках одного процесса.
+  bool _oneSignalInitialized = false;
+  String? _pendingExternalId;
+  String? _linkedExternalId;
+
   Future<void> initialize() async {
     // В вебе этот сервис не должен работать
     if (kIsWeb) return;
@@ -31,6 +39,12 @@ class PushService {
     }
 
     // Не блокируем первый кадр: OneSignal в фоне
+    if (_oneSignalInitialized) {
+      // OneSignal уже поднят — просто обновим привязку External ID (если нужно).
+      _pendingExternalId = Supabase.instance.client.auth.currentUser?.id;
+      _tryLinkExternalIdIfReady();
+      return;
+    }
     unawaited(_initializeOneSignal());
   }
 
@@ -47,7 +61,19 @@ class PushService {
 
     try {
       OneSignal.initialize(appId);
-      await OneSignal.Notifications.requestPermission(true);
+      _oneSignalInitialized = true;
+
+      // ВАЖНО: не делаем OneSignal.login() сразу после initialize.
+      // В свежих логах это приводит к:
+      // - "null OneSignal ID"
+      // - "OSUserExecutor.executePendingRequests() is blocked by unexecutable request"
+      // Поэтому ждём появления OneSignal ID (pushSubscription.id) и только потом логиним External ID.
+      _pendingExternalId = Supabase.instance.client.auth.currentUser?.id;
+      // ВАЖНО: не запрашиваем permission на cold start / при инициализации.
+      // В свежих логах это давало:
+      // - "Requesting authorization with options ..."
+      // - Hang detected / деактивацию сцены / UI-фризы.
+      // Разрешение просим только по явному действию пользователя (например, на экране "Напоминания").
 
       OneSignal.Notifications.addForegroundWillDisplayListener((event) {
         final payload = event.notification;
@@ -96,6 +122,8 @@ class PushService {
         await _registerToken(primaryToken, provider: 'onesignal');
       }
 
+      _tryLinkExternalIdIfReady();
+
       OneSignal.User.pushSubscription.addObserver((state) async {
         final newId = state.current.id;
         final newToken = state.current.token;
@@ -103,6 +131,7 @@ class PushService {
         if (refreshed != null && refreshed.isNotEmpty) {
           await _registerToken(refreshed, provider: 'onesignal');
         }
+        _tryLinkExternalIdIfReady();
       });
 
       Sentry.addBreadcrumb(Breadcrumb(
@@ -112,6 +141,45 @@ class PushService {
       ));
     } catch (e, st) {
       await Sentry.captureException(e, stackTrace: st);
+    }
+  }
+
+  void _tryLinkExternalIdIfReady() {
+    final externalId = _pendingExternalId;
+    if (externalId == null || externalId.isEmpty) return;
+
+    // OneSignal ID должен быть задан, иначе login() приводит к блокировке identify-запроса.
+    final oneSignalId = OneSignal.User.pushSubscription.id;
+    if (oneSignalId == null || oneSignalId.isEmpty) return;
+
+    if (_linkedExternalId == externalId) {
+      _pendingExternalId = null;
+      return;
+    }
+
+    try {
+      OneSignal.login(externalId);
+      _linkedExternalId = externalId;
+      _pendingExternalId = null;
+    } catch (e, st) {
+      unawaited(Sentry.captureException(e, stackTrace: st));
+    }
+  }
+
+  /// Сбрасывает External ID в OneSignal при logout.
+  ///
+  /// Важно: вызываем при переходе auth-сессии в null (signOut), иначе OneSignal
+  /// может сохранять связь устройства с предыдущим пользователем.
+  void onLogout() {
+    if (kIsWeb) return;
+    // Нельзя вызывать logout до initialize — SDK пишет warning и делает лишний main-thread I/O.
+    if (!_oneSignalInitialized) return;
+    try {
+      OneSignal.logout();
+      _pendingExternalId = null;
+      _linkedExternalId = null;
+    } catch (e, st) {
+      unawaited(Sentry.captureException(e, stackTrace: st));
     }
   }
 
