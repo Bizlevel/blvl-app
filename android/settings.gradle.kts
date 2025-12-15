@@ -1,22 +1,6 @@
 pluginManagement {
-    repositories {
-        google()
-        mavenCentral()
-        gradlePluginPortal()
-    }
-}
-
-dependencyResolutionManagement {
-    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-    repositories {
-        google()
-        mavenCentral()
-    }
-}
-
-rootProject.name = "app-flutter-online-course"
-include(":app")
-pluginManagement {
+    // Единственный pluginManagement в файле: Gradle требует один блок на скрипт.
+    // Также здесь подключаем Flutter Gradle tooling через includeBuild.
     val flutterSdkPath = run {
         val properties = java.util.Properties()
         file("local.properties").inputStream().use { properties.load(it) }
@@ -40,4 +24,14 @@ plugins {
     id("org.jetbrains.kotlin.android") version "2.1.0" apply false
 }
 
+dependencyResolutionManagement {
+    // Не используем FAIL_ON_PROJECT_REPOS: dev.flutter.flutter-gradle-plugin
+    // может добавлять репозиторий, и строгий режим ломает сборку.
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+rootProject.name = "app-flutter-online-course"
 include(":app")
