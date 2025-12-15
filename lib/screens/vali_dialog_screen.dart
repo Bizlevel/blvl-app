@@ -1,0 +1,1050 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
+import 'package:bizlevel/services/vali_service.dart';
+import 'package:bizlevel/theme/color.dart';
+import 'package:bizlevel/theme/spacing.dart';
+import 'package:bizlevel/theme/typography.dart';
+import 'package:bizlevel/theme/dimensions.dart';
+import 'package:bizlevel/widgets/leo_message_bubble.dart';
+import 'package:bizlevel/widgets/typing_indicator.dart';
+import 'package:bizlevel/providers/gp_providers.dart';
+import 'package:bizlevel/providers/auth_provider.dart';
+import 'package:go_router/go_router.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:bizlevel/screens/leo_dialog_screen.dart';
+
+/// Dialog screen for chatting with Vali AI (idea validator).
+/// Supports 7-question validation flow, scoring, and report display.
+class ValiDialogScreen extends ConsumerStatefulWidget {
+  final String? chatId;
+  final String? validationId;
+  final String? ideaSummary;
+
+  const ValiDialogScreen({
+    super.key,
+    this.chatId,
+    this.validationId,
+    this.ideaSummary,
+  });
+
+  @override
+  ConsumerState<ValiDialogScreen> createState() => _ValiDialogScreenState();
+}
+
+class _ValiDialogScreenState extends ConsumerState<ValiDialogScreen> {
+  static const int maxSteps = 7;
+
+  String? _chatId;
+  String? _validationId;
+  Map<String, dynamic>? _validationData;
+
+  final _scrollController = ScrollController();
+  final _inputController = TextEditingController();
+  final _inputFocus = FocusNode();
+  final List<Map<String, dynamic>> _messages = [];
+
+  bool _isSending = false;
+  bool _isScoring = false;
+  bool _showScrollToBottom = false;
+  int _currentStep = 1;
+
+  late final ValiService _vali;
+
+  // Debounce timer
+  Timer? _debounceTimer;
+  static const Duration _debounceDelay = Duration(milliseconds: 500);
+
+  // #region agent log
+  Future<void> _debugLog(String location, String message, Map<String, dynamic> data, {String? hypothesisId}) async {
+    try {
+      final logEntry = {
+        'id': 'log_${DateTime.now().millisecondsSinceEpoch}_${message.hashCode}',
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+        'location': location,
+        'message': message,
+        'data': data,
+        'sessionId': 'debug-session',
+        'runId': 'run1',
+        if (hypothesisId != null) 'hypothesisId': hypothesisId,
+      };
+      final logFile = File('/home/nail/Documents/Projects/BizLevel/blvl-app-main/.cursor/debug.log');
+      await logFile.writeAsString('${jsonEncode(logEntry)}\n', mode: FileMode.append);
+    } catch (_) {}
+  }
+  // #endregion
+
+  @override
+  void initState() {
+    super.initState();
+    _vali = ValiService(Supabase.instance.client);
+    _chatId = widget.chatId;
+    _validationId = widget.validationId;
+
+    // Следим за позицией скролла для показа FAB «вниз»
+    _scrollController.addListener(() {
+      if (!_scrollController.hasClients) return;
+      final metrics = _scrollController.position;
+      final distFromBottom = (metrics.maxScrollExtent - metrics.pixels)
+          .clamp(0.0, double.infinity);
+      final show = distFromBottom > 200;
+      if (show != _showScrollToBottom && mounted) {
+        setState(() => _showScrollToBottom = show);
+      }
+    });
+
+    // Загружаем валидацию или создаём новую
+    _initializeValidation();
+  }
+
+  @override
+  void dispose() {
+    _debounceTimer?.cancel();
+    _scrollController.dispose();
+    _inputController.dispose();
+    _inputFocus.dispose();
+    super.dispose();
+  }
+
+  Future<void> _initializeValidation() async {
+    // #region agent log
+    await _debugLog('vali_dialog_screen.dart:91', '_initializeValidation_entry', {
+      'validationId': _validationId,
+      'chatId': _chatId,
+      'ideaSummary': widget.ideaSummary,
+    }, hypothesisId: 'A');
+    // #endregion
+    try {
+      // Если передан chatId, но нет validationId, ищем валидацию по chatId
+      if (_validationId == null && _chatId != null) {
+        // #region agent log
+        await _debugLog('vali_dialog_screen.dart:124', '_initializeValidation_find_by_chatId', {
+          'chatId': _chatId,
+        }, hypothesisId: 'A');
+        // #endregion
+        _validationData = await _vali.getValidationByChatId(_chatId!);
+        if (_validationData != null) {
+          _validationId = _validationData!['id'] as String?;
+        }
+      }
+
+      if (_validationId != null) {
+        // #region agent log
+        await _debugLog('vali_dialog_screen.dart:95', '_initializeValidation_load_existing', {
+          'validationId': _validationId,
+        }, hypothesisId: 'A');
+        // #endregion
+        // Загружаем существующую валидацию
+        _validationData = await _vali.getValidation(_validationId!);
+        
+        // #region agent log
+        await _debugLog('vali_dialog_screen.dart:99', '_initializeValidation_loaded', {
+          'validationData': _validationData != null,
+          'status': _validationData?['status'],
+          'currentStep': _validationData?['current_step'],
+        }, hypothesisId: 'A');
+        // #endregion
+        
+        if (_validationData == null) {
+          throw ValiFailure('Валидация не найдена');
+        }
+
+        _currentStep = _validationData!['current_step'] ?? 1;
+        _chatId = _validationData!['chat_id'] ?? _chatId;
+
+        // Если валидация завершена, показываем отчёт
+        if (_validationData!['status'] == 'completed') {
+          // #region agent log
+          await _debugLog('vali_dialog_screen.dart:110', '_initializeValidation_completed', {
+            'validationId': _validationId,
+          }, hypothesisId: 'A');
+          // #endregion
+          if (mounted) {
+            setState(() {});
+          }
+          return;
+        }
+
+        // Загружаем историю сообщений
+        if (_chatId != null) {
+          await _loadMessages();
+        }
+      } else {
+        // #region agent log
+        await _debugLog('vali_dialog_screen.dart:118', '_initializeValidation_create_new', {
+          'chatId': _chatId,
+        }, hypothesisId: 'B');
+        // #endregion
+        // Создаём новую валидацию
+        _validationId = await _vali.createValidation(
+          chatId: _chatId,
+          ideaSummary: widget.ideaSummary,
+        );
+
+        // #region agent log
+        await _debugLog('vali_dialog_screen.dart:125', '_initializeValidation_created', {
+          'validationId': _validationId,
+        }, hypothesisId: 'B');
+        // #endregion
+
+        // Добавляем приветственное сообщение от Валли
+        if (mounted) {
+          setState(() {
+            _messages.add({
+              'role': 'assistant',
+              'content': 'Привет! Я Валли — помогаю проверить бизнес-идеи на прочность.\n\n'
+                  'Задам 7 коротких вопросов, а потом дам честную оценку: что уже хорошо, '
+                  'а где есть слепые зоны.\n\nРасскажи, какую идею хочешь проверить?',
+              'created_at': DateTime.now().toIso8601String(),
+            });
+          });
+          _scrollToBottom();
+        }
+      }
+      // #region agent log
+      await _debugLog('vali_dialog_screen.dart:141', '_initializeValidation_success', {
+        'validationId': _validationId,
+        'currentStep': _currentStep,
+        'messagesCount': _messages.length,
+      }, hypothesisId: 'A');
+      // #endregion
+    } catch (e) {
+      // #region agent log
+      await _debugLog('vali_dialog_screen.dart:145', '_initializeValidation_error', {
+        'error': e.toString(),
+        'errorType': e.runtimeType.toString(),
+      }, hypothesisId: 'C');
+      // #endregion
+      if (!mounted) return;
+      _showError('Не удалось загрузить валидацию: $e');
+    }
+  }
+
+  Future<void> _loadMessages() async {
+    if (_chatId == null) return;
+
+    try {
+      // #region agent log
+      await _debugLog('vali_dialog_screen.dart:144', '_loadMessages_entry', {
+        'chatId': _chatId,
+      }, hypothesisId: 'I');
+      // #endregion
+      final data = await Supabase.instance.client
+          .from('leo_messages')
+          .select('role, content, created_at')
+          .eq('chat_id', _chatId!)
+          .order('created_at', ascending: true);
+
+      final fetched = List<Map<String, dynamic>>.from(
+          data.map((e) => Map<String, dynamic>.from(e as Map)));
+
+      if (!mounted) return;
+      setState(() {
+        _messages.clear();
+        _messages.addAll(fetched);
+      });
+
+      _scrollToBottom();
+      // #region agent log
+      await _debugLog('vali_dialog_screen.dart:162', '_loadMessages_success', {
+        'messagesCount': fetched.length,
+      }, hypothesisId: 'I');
+      // #endregion
+    } catch (e) {
+      debugPrint('Failed to load messages: $e');
+      // #region agent log
+      await _debugLog('vali_dialog_screen.dart:167', '_loadMessages_error', {
+        'error': e.toString(),
+        'errorType': e.runtimeType.toString(),
+      }, hypothesisId: 'I');
+      // #endregion
+    }
+  }
+
+  void _scrollToBottom() => WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scrollController.hasClients) {
+          _scrollController.animateTo(
+            _scrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          );
+        }
+      });
+
+  Future<void> _sendMessage() async {
+    final text = _inputController.text.trim();
+    if (text.isEmpty || _isSending) return;
+
+    // Отменяем предыдущий таймер debounce
+    _debounceTimer?.cancel();
+
+    // Устанавливаем новый таймер debounce
+    _debounceTimer = Timer(_debounceDelay, () async {
+      await _sendMessageInternal(text);
+    });
+  }
+
+  Future<void> _sendMessageInternal(String text) async {
+    // #region agent log
+    await _debugLog('vali_dialog_screen.dart:191', '_sendMessageInternal_entry', {
+      'text': text.substring(0, text.length > 50 ? 50 : text.length),
+      'isSending': _isSending,
+      'currentStep': _currentStep,
+      'validationId': _validationId,
+    }, hypothesisId: 'D');
+    // #endregion
+    if (_isSending || !mounted) return;
+
+    setState(() {
+      _isSending = true;
+      _messages.add({'role': 'user', 'content': text});
+    });
+    _inputController.clear();
+    _scrollToBottom();
+
+    try {
+      // #region agent log
+      await _debugLog('vali_dialog_screen.dart:203', '_sendMessageInternal_before_save', {
+        'chatId': _chatId,
+        'validationId': _validationId,
+      }, hypothesisId: 'D');
+      // #endregion
+      // Сохраняем сообщение пользователя в БД
+      _chatId = await _vali.saveConversation(
+        role: 'user',
+        content: text,
+        chatId: _chatId,
+        validationId: _validationId,
+      );
+
+      // #region agent log
+      await _debugLog('vali_dialog_screen.dart:211', '_sendMessageInternal_before_send', {
+        'chatId': _chatId,
+        'messagesCount': _buildChatContext().length,
+      }, hypothesisId: 'D');
+      // #endregion
+      // Отправляем в Edge Function (режим dialog)
+      final response = await _vali.sendMessage(
+        messages: _buildChatContext(),
+        validationId: _validationId,
+      );
+
+      // #region agent log
+      await _debugLog('vali_dialog_screen.dart:220', '_sendMessageInternal_response_received', {
+        'hasMessage': response['message'] != null,
+        'messageLength': (response['message']?['content'] as String?)?.length ?? 0,
+      }, hypothesisId: 'D');
+      // #endregion
+
+      final assistantMessage = response['message']['content'] as String? ?? '';
+
+      // Сохраняем ответ Валли в БД
+      await _vali.saveConversation(
+        role: 'assistant',
+        content: assistantMessage,
+        chatId: _chatId,
+        validationId: _validationId,
+      );
+
+      if (!mounted) return;
+      final oldStep = _currentStep;
+      setState(() {
+        _messages.add({'role': 'assistant', 'content': assistantMessage});
+        
+        // Увеличиваем шаг после каждого вопроса пользователя
+        if (_currentStep < maxSteps) {
+          _currentStep++;
+        }
+      });
+
+      // #region agent log
+      await _debugLog('vali_dialog_screen.dart:240', '_sendMessageInternal_step_updated', {
+        'oldStep': oldStep,
+        'newStep': _currentStep,
+      }, hypothesisId: 'E');
+      // #endregion
+
+      // Обновляем прогресс в БД
+      if (_validationId != null) {
+        await _vali.updateValidationProgress(
+          validationId: _validationId!,
+          currentStep: _currentStep,
+        );
+      }
+
+      // Обновляем баланс GP в фоне
+      try {
+        ref.invalidate(gpBalanceProvider);
+      } catch (_) {}
+
+      _scrollToBottom();
+
+      // Если достигли 7-го шага, предлагаем завершить валидацию
+      if (_currentStep >= maxSteps && mounted) {
+        await _showCompletionDialog();
+      }
+      // #region agent log
+      await _debugLog('vali_dialog_screen.dart:260', '_sendMessageInternal_success', {
+        'currentStep': _currentStep,
+        'messagesCount': _messages.length,
+      }, hypothesisId: 'D');
+      // #endregion
+    } on ValiFailure catch (e) {
+      // #region agent log
+      await _debugLog('vali_dialog_screen.dart:265', '_sendMessageInternal_vali_failure', {
+        'statusCode': e.statusCode,
+        'message': e.message,
+      }, hypothesisId: 'F');
+      // #endregion
+      if (!mounted) return;
+      
+      if (e.statusCode == 402) {
+        // Недостаточно GP
+        _showInsufficientGpDialog(e.data?['required'] ?? 100);
+      } else {
+        _showError(e.message);
+      }
+    } catch (e) {
+      // #region agent log
+      await _debugLog('vali_dialog_screen.dart:277', '_sendMessageInternal_error', {
+        'error': e.toString(),
+        'errorType': e.runtimeType.toString(),
+      }, hypothesisId: 'F');
+      // #endregion
+      if (!mounted) return;
+      _showError('Ошибка: $e');
+      
+      try {
+        await Sentry.captureException(e);
+      } catch (_) {}
+    } finally {
+      if (mounted) setState(() => _isSending = false);
+    }
+  }
+
+  Future<void> _showCompletionDialog() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Готов узнать результат?'),
+        content: const Text(
+          'Ты ответил на все 7 вопросов. Давай проанализирую твою идею '
+          'и покажу, что уже хорошо, а где есть слепые зоны.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Ещё подумаю'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Показать результат'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      await _requestScoring();
+    }
+  }
+
+  Future<void> _requestScoring() async {
+    // #region agent log
+    await _debugLog('vali_dialog_screen.dart:304', '_requestScoring_entry', {
+      'validationId': _validationId,
+      'isScoring': _isScoring,
+      'messagesCount': _buildChatContext().length,
+    }, hypothesisId: 'G');
+    // #endregion
+    if (_validationId == null || _isScoring) return;
+
+    setState(() => _isScoring = true);
+
+    try {
+      Sentry.addBreadcrumb(Breadcrumb(
+        category: 'vali',
+        message: 'validation_scoring_start',
+        data: {'validationId': _validationId},
+      ));
+
+      // Показываем индикатор анализа
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                SizedBox(width: 12),
+                Text('Анализирую твою идею...'),
+              ],
+            ),
+            duration: Duration(hours: 1), // Закроем вручную
+          ),
+        );
+      }
+
+      // #region agent log
+      await _debugLog('vali_dialog_screen.dart:337', '_requestScoring_before_score', {
+        'validationId': _validationId,
+      }, hypothesisId: 'G');
+      // #endregion
+      // Запрашиваем скоринг
+      final result = await _vali.scoreValidation(
+        messages: _buildChatContext(),
+        validationId: _validationId!,
+      );
+
+      // #region agent log
+      await _debugLog('vali_dialog_screen.dart:345', '_requestScoring_score_received', {
+        'hasScores': result['scores'] != null,
+        'totalScore': result['scores']?['total'],
+        'hasReport': result['report_markdown'] != null,
+      }, hypothesisId: 'G');
+      // #endregion
+
+      // Закрываем snackbar
+      if (mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      }
+
+      // Обновляем данные валидации
+      _validationData = await _vali.getValidation(_validationId!);
+
+      // #region agent log
+      await _debugLog('vali_dialog_screen.dart:355', '_requestScoring_validation_loaded', {
+        'status': _validationData?['status'],
+        'hasReport': _validationData?['report_markdown'] != null,
+        'totalScore': _validationData?['total_score'],
+      }, hypothesisId: 'G');
+      // #endregion
+
+      if (!mounted) return;
+      setState(() {});
+
+      Sentry.addBreadcrumb(Breadcrumb(
+        category: 'vali',
+        message: 'validation_scoring_complete',
+        data: {
+          'validationId': _validationId,
+          'totalScore': result['scores']?['total'],
+        },
+      ));
+      // #region agent log
+      await _debugLog('vali_dialog_screen.dart:370', '_requestScoring_success', {
+        'validationId': _validationId,
+      }, hypothesisId: 'G');
+      // #endregion
+    } on ValiFailure catch (e) {
+      // #region agent log
+      await _debugLog('vali_dialog_screen.dart:375', '_requestScoring_vali_failure', {
+        'statusCode': e.statusCode,
+        'message': e.message,
+      }, hypothesisId: 'H');
+      // #endregion
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      _showError('Ошибка анализа: ${e.message}');
+    } catch (e) {
+      // #region agent log
+      await _debugLog('vali_dialog_screen.dart:383', '_requestScoring_error', {
+        'error': e.toString(),
+        'errorType': e.runtimeType.toString(),
+      }, hypothesisId: 'H');
+      // #endregion
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      _showError('Не удалось проанализировать идею: $e');
+      
+      try {
+        await Sentry.captureException(e);
+      } catch (_) {}
+    } finally {
+      if (mounted) setState(() => _isScoring = false);
+    }
+  }
+
+  List<Map<String, dynamic>> _buildChatContext() {
+    return _messages
+        .map((m) => {'role': m['role'], 'content': m['content']})
+        .toList();
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  void _showInsufficientGpDialog(int required) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Недостаточно GP'),
+        content: Text(
+          'Для валидации идеи нужно $required GP.\n\n'
+          'Первая валидация бесплатно, повторные — 100 GP.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Отмена'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              context.push('/gp-purchase');
+            },
+            child: const Text('Пополнить GP'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Если валидация завершена, показываем отчёт
+    if (_validationData?['status'] == 'completed') {
+      return _buildReportView();
+    }
+
+    // Обычный диалоговый режим
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: AppColor.primary,
+        title: Row(
+          children: [
+            const CircleAvatar(
+              radius: 14,
+              backgroundImage: AssetImage('assets/images/avatars/avatar_vali.png'),
+              backgroundColor: Colors.transparent,
+            ),
+            const SizedBox(width: 8),
+            const Text('Валли'),
+            const Spacer(),
+            // Индикатор прогресса
+            Text(
+              '$_currentStep/$maxSteps',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Colors.white70,
+              ),
+            ),
+          ],
+        ),
+      ),
+      body: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: Stack(
+          children: [
+            Column(
+              children: [
+                // Прогресс-бар
+                _buildProgressBar(),
+                Expanded(child: _buildMessageList()),
+                _buildInput(),
+              ],
+            ),
+            // FAB «Вниз»
+            if (_showScrollToBottom)
+              Positioned(
+                right: 12,
+                bottom: 90,
+                child: FloatingActionButton.small(
+                  heroTag: 'vali_scroll_down',
+                  onPressed: _scrollToBottom,
+                  child: const Icon(Icons.arrow_downward),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProgressBar() {
+    final progress = _currentStep / maxSteps;
+    return Container(
+      height: 4,
+      decoration: BoxDecoration(
+        color: AppColor.borderColor,
+      ),
+      child: FractionallySizedBox(
+        alignment: Alignment.centerLeft,
+        widthFactor: progress,
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppColor.primary,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMessageList() {
+    return ListView.builder(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      controller: _scrollController,
+      padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.lg, vertical: AppSpacing.s10),
+      itemCount: _messages.length + (_isSending ? 1 : 0),
+      itemBuilder: (context, index) {
+        // Индикатор набора
+        if (_isSending && index == _messages.length) {
+          return Align(
+            alignment: Alignment.centerLeft,
+            child: Container(
+              margin: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+              padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+              constraints: BoxConstraints(
+                  maxWidth: MediaQuery.of(context).size.width * 0.8),
+              decoration: BoxDecoration(
+                color: AppColor.appBarColor,
+                borderRadius:
+                    BorderRadius.circular(AppDimensions.radiusLg).copyWith(
+                  topLeft: const Radius.circular(0),
+                  topRight: const Radius.circular(AppDimensions.radiusLg),
+                ),
+              ),
+              child: const TypingIndicator.small(),
+            ),
+          );
+        }
+
+        final msg = _messages[index];
+        final isUser = msg['role'] == 'user';
+        final bubble = LeoMessageBubble(
+          text: msg['content'] as String? ?? '',
+          isUser: isUser,
+        );
+
+        // Метка времени
+        final ts = msg['created_at'] as String?;
+        final timeWidget = (ts != null)
+            ? Padding(
+                padding: const EdgeInsets.only(top: 2, bottom: 4),
+                child: Text(
+                  _formatTime(ts),
+                  style: Theme.of(context)
+                      .textTheme
+                      .labelSmall
+                      ?.copyWith(color: Colors.black45),
+                ),
+              )
+            : const SizedBox.shrink();
+
+        // Анимация для последних 6 сообщений
+        final bool animate = index >= (_messages.length - 6).clamp(0, _messages.length);
+        if (!animate) {
+          return Column(
+            crossAxisAlignment:
+                isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+            children: [bubble, timeWidget],
+          );
+        }
+
+        return TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0.0, end: 1.0),
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+          builder: (context, v, child) => Opacity(
+            opacity: v,
+            child: Transform.translate(
+              offset: Offset(0, (1 - v) * 20),
+              child: child,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment:
+                isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+            children: [bubble, timeWidget],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildInput() {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+        child: Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _inputController,
+                focusNode: _inputFocus,
+                minLines: 1,
+                maxLines: 4,
+                textInputAction: TextInputAction.send,
+                decoration: const InputDecoration(
+                  hintText: 'Введите ответ...',
+                  border: OutlineInputBorder(),
+                ),
+                onTapOutside: (_) => FocusScope.of(context).unfocus(),
+                onSubmitted: (text) {
+                  if (text.trim().isNotEmpty && !_isSending) {
+                    _sendMessage();
+                  }
+                },
+              ),
+            ),
+            const SizedBox(width: 8),
+            IconButton(
+              tooltip: 'Скрыть клавиатуру',
+              icon: const Icon(Icons.keyboard_hide),
+              onPressed: () => FocusScope.of(context).unfocus(),
+            ),
+            _isSending
+                ? const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator())
+                : IconButton(
+                    tooltip: 'Отправить',
+                    icon: const Icon(Icons.send),
+                    color: AppColor.primary,
+                    onPressed: _sendMessage,
+                  ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReportView() {
+    final reportRaw = _validationData?['report_markdown'] as String? ?? '';
+    // Убираем разделители "----" и "━━━" из markdown
+    final report = reportRaw
+        .replaceAll(RegExp(r'^----+$', multiLine: true), '')
+        .replaceAll(RegExp(r'^━━━+$', multiLine: true), '')
+        .replaceAll(RegExp(r'\n\n\n+', multiLine: true), '\n\n')
+        .trim();
+    final totalScore = _validationData?['total_score'] as int? ?? 0;
+    final archetype = _validationData?['archetype'] as String? ?? 'МЕЧТАТЕЛЬ';
+    final recommendedLevels = _validationData?['recommended_levels'] as List? ?? [];
+    // #region agent log
+    _debugLog('vali_dialog_screen.dart:635', '_buildReportView_render', {
+      'hasReport': report.isNotEmpty,
+      'totalScore': totalScore,
+      'archetype': archetype,
+      'recommendedLevelsCount': recommendedLevels.length,
+    }, hypothesisId: 'J');
+    // #endregion
+
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: AppColor.primary,
+        title: const Text('Результат валидации'),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Карточка с баллом
+            Card(
+              color: AppColor.surface,
+              elevation: 2,
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                child: Column(
+                  children: [
+                    Text(
+                      '$totalScore/100',
+                      style: Theme.of(context).textTheme.displayLarge?.copyWith(
+                            color: AppColor.primary,
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      archetype,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+
+            // Markdown отчёт
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                child: MarkdownBody(
+                  data: report,
+                  styleSheet: MarkdownStyleSheet(
+                    p: Theme.of(context).textTheme.bodyMedium,
+                    h1: Theme.of(context).textTheme.titleLarge,
+                    h2: Theme.of(context).textTheme.titleMedium,
+                    strong: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xl),
+
+            // CTA кнопки
+            _buildCTAButtons(recommendedLevels),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCTAButtons(List recommendedLevels) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Кнопка "Пройти рекомендованный уровень"
+        if (recommendedLevels.isNotEmpty)
+          Builder(
+            builder: (context) {
+              final firstLevel = recommendedLevels.first;
+              // Обрабатываем разные форматы данных
+              Map<String, dynamic> levelData;
+              if (firstLevel is Map) {
+                levelData = Map<String, dynamic>.from(firstLevel);
+              } else {
+                levelData = {'level_number': 1, 'name': 'урок'};
+              }
+              
+              final levelNumber = levelData['level_number'] as int? ?? 
+                                  (levelData['level_id'] as int?);
+              final levelName = levelData['name'] as String? ?? 
+                               (levelData['title'] as String?);
+              
+              // Если levelNumber не найден, не показываем кнопку
+              if (levelNumber == null) {
+                return const SizedBox.shrink();
+              }
+              
+              return ElevatedButton.icon(
+                onPressed: () async {
+                  // #region agent log
+                  _debugLog('vali_dialog_screen.dart:708', '_cta_recommended_level_click', {
+                    'levelNumber': levelNumber,
+                    'levelName': levelName,
+                  }, hypothesisId: 'K');
+                  // #endregion
+                  
+                  // Проверяем текущий уровень пользователя
+                  try {
+                    final currentLevel = await ref.read(currentLevelNumberProvider.future);
+                    
+                    if (currentLevel < levelNumber) {
+                      // Пользователь ещё не достиг этого уровня
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Вы ещё не достигли этого уровня. Сначала пройдите предыдущие уровни.'),
+                            duration: Duration(seconds: 4),
+                          ),
+                        );
+                      }
+                      return;
+                    }
+                    
+                    // Уровень доступен — переходим
+                    if (mounted) {
+                      context.push('/levels/$levelNumber');
+                    }
+                  } catch (e) {
+                    // В случае ошибки логируем и всё равно переходим
+                    debugPrint('Failed to check user level: $e');
+                    if (mounted) {
+                      context.push('/levels/$levelNumber');
+                    }
+                  }
+                },
+                icon: const Icon(Icons.school),
+                label: Text(
+                  levelName != null ? 'Пройти $levelName' : 'Пройти урок $levelNumber',
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColor.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+              );
+            },
+          ),
+        const SizedBox(height: AppSpacing.md),
+
+        // Кнопка "Поставить цель с Максом"
+        OutlinedButton.icon(
+          onPressed: () {
+            // #region agent log
+            _debugLog('vali_dialog_screen.dart:724', '_cta_max_click', {
+              'validationId': _validationId,
+            }, hypothesisId: 'L');
+            // #endregion
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => LeoDialogScreen(
+                  bot: 'max',
+                  userContext: null,
+                  levelContext: null,
+                ),
+              ),
+            );
+          },
+          icon: const Icon(Icons.flag),
+          label: const Text('Поставить цель с Максом'),
+        ),
+        const SizedBox(height: AppSpacing.md),
+
+        // Кнопка "Проверить другую идею"
+        OutlinedButton.icon(
+          onPressed: () {
+            // Создаём новую валидацию
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (context) => const ValiDialogScreen(),
+              ),
+            );
+          },
+          icon: const Icon(Icons.refresh),
+          label: const Text('Проверить другую идею'),
+        ),
+        const SizedBox(height: AppSpacing.md),
+
+        // Кнопка "Назад"
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Вернуться в Башню'),
+        ),
+      ],
+    );
+  }
+
+  String _formatTime(String ts) {
+    try {
+      final dt = DateTime.tryParse(ts);
+      if (dt == null) return '';
+      final hh = dt.hour.toString().padLeft(2, '0');
+      final mm = dt.minute.toString().padLeft(2, '0');
+      return '$hh:$mm';
+    } catch (_) {
+      return '';
+    }
+  }
+}
