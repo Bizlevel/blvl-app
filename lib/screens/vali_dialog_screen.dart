@@ -1,6 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -9,7 +7,6 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:bizlevel/services/vali_service.dart';
 import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/theme/spacing.dart';
-import 'package:bizlevel/theme/typography.dart';
 import 'package:bizlevel/theme/dimensions.dart';
 import 'package:bizlevel/widgets/leo_message_bubble.dart';
 import 'package:bizlevel/widgets/typing_indicator.dart';
@@ -60,24 +57,6 @@ class _ValiDialogScreenState extends ConsumerState<ValiDialogScreen> {
   Timer? _debounceTimer;
   static const Duration _debounceDelay = Duration(milliseconds: 500);
 
-  // #region agent log
-  Future<void> _debugLog(String location, String message, Map<String, dynamic> data, {String? hypothesisId}) async {
-    try {
-      final logEntry = {
-        'id': 'log_${DateTime.now().millisecondsSinceEpoch}_${message.hashCode}',
-        'timestamp': DateTime.now().millisecondsSinceEpoch,
-        'location': location,
-        'message': message,
-        'data': data,
-        'sessionId': 'debug-session',
-        'runId': 'run1',
-        if (hypothesisId != null) 'hypothesisId': hypothesisId,
-      };
-      final logFile = File('/home/nail/Documents/Projects/BizLevel/blvl-app-main/.cursor/debug.log');
-      await logFile.writeAsString('${jsonEncode(logEntry)}\n', mode: FileMode.append);
-    } catch (_) {}
-  }
-  // #endregion
 
   @override
   void initState() {
@@ -112,21 +91,9 @@ class _ValiDialogScreenState extends ConsumerState<ValiDialogScreen> {
   }
 
   Future<void> _initializeValidation() async {
-    // #region agent log
-    await _debugLog('vali_dialog_screen.dart:91', '_initializeValidation_entry', {
-      'validationId': _validationId,
-      'chatId': _chatId,
-      'ideaSummary': widget.ideaSummary,
-    }, hypothesisId: 'A');
-    // #endregion
     try {
       // Если передан chatId, но нет validationId, ищем валидацию по chatId
       if (_validationId == null && _chatId != null) {
-        // #region agent log
-        await _debugLog('vali_dialog_screen.dart:124', '_initializeValidation_find_by_chatId', {
-          'chatId': _chatId,
-        }, hypothesisId: 'A');
-        // #endregion
         _validationData = await _vali.getValidationByChatId(_chatId!);
         if (_validationData != null) {
           _validationId = _validationData!['id'] as String?;
@@ -134,21 +101,8 @@ class _ValiDialogScreenState extends ConsumerState<ValiDialogScreen> {
       }
 
       if (_validationId != null) {
-        // #region agent log
-        await _debugLog('vali_dialog_screen.dart:95', '_initializeValidation_load_existing', {
-          'validationId': _validationId,
-        }, hypothesisId: 'A');
-        // #endregion
         // Загружаем существующую валидацию
         _validationData = await _vali.getValidation(_validationId!);
-        
-        // #region agent log
-        await _debugLog('vali_dialog_screen.dart:99', '_initializeValidation_loaded', {
-          'validationData': _validationData != null,
-          'status': _validationData?['status'],
-          'currentStep': _validationData?['current_step'],
-        }, hypothesisId: 'A');
-        // #endregion
         
         if (_validationData == null) {
           throw ValiFailure('Валидация не найдена');
@@ -159,11 +113,6 @@ class _ValiDialogScreenState extends ConsumerState<ValiDialogScreen> {
 
         // Если валидация завершена, показываем отчёт
         if (_validationData!['status'] == 'completed') {
-          // #region agent log
-          await _debugLog('vali_dialog_screen.dart:110', '_initializeValidation_completed', {
-            'validationId': _validationId,
-          }, hypothesisId: 'A');
-          // #endregion
           if (mounted) {
             setState(() {});
           }
@@ -175,22 +124,11 @@ class _ValiDialogScreenState extends ConsumerState<ValiDialogScreen> {
           await _loadMessages();
         }
       } else {
-        // #region agent log
-        await _debugLog('vali_dialog_screen.dart:118', '_initializeValidation_create_new', {
-          'chatId': _chatId,
-        }, hypothesisId: 'B');
-        // #endregion
         // Создаём новую валидацию
         _validationId = await _vali.createValidation(
           chatId: _chatId,
           ideaSummary: widget.ideaSummary,
         );
-
-        // #region agent log
-        await _debugLog('vali_dialog_screen.dart:125', '_initializeValidation_created', {
-          'validationId': _validationId,
-        }, hypothesisId: 'B');
-        // #endregion
 
         // Добавляем приветственное сообщение от Валли
         if (mounted) {
@@ -206,20 +144,7 @@ class _ValiDialogScreenState extends ConsumerState<ValiDialogScreen> {
           _scrollToBottom();
         }
       }
-      // #region agent log
-      await _debugLog('vali_dialog_screen.dart:141', '_initializeValidation_success', {
-        'validationId': _validationId,
-        'currentStep': _currentStep,
-        'messagesCount': _messages.length,
-      }, hypothesisId: 'A');
-      // #endregion
     } catch (e) {
-      // #region agent log
-      await _debugLog('vali_dialog_screen.dart:145', '_initializeValidation_error', {
-        'error': e.toString(),
-        'errorType': e.runtimeType.toString(),
-      }, hypothesisId: 'C');
-      // #endregion
       if (!mounted) return;
       _showError('Не удалось загрузить валидацию: $e');
     }
@@ -229,11 +154,6 @@ class _ValiDialogScreenState extends ConsumerState<ValiDialogScreen> {
     if (_chatId == null) return;
 
     try {
-      // #region agent log
-      await _debugLog('vali_dialog_screen.dart:144', '_loadMessages_entry', {
-        'chatId': _chatId,
-      }, hypothesisId: 'I');
-      // #endregion
       final data = await Supabase.instance.client
           .from('leo_messages')
           .select('role, content, created_at')
@@ -250,19 +170,8 @@ class _ValiDialogScreenState extends ConsumerState<ValiDialogScreen> {
       });
 
       _scrollToBottom();
-      // #region agent log
-      await _debugLog('vali_dialog_screen.dart:162', '_loadMessages_success', {
-        'messagesCount': fetched.length,
-      }, hypothesisId: 'I');
-      // #endregion
     } catch (e) {
       debugPrint('Failed to load messages: $e');
-      // #region agent log
-      await _debugLog('vali_dialog_screen.dart:167', '_loadMessages_error', {
-        'error': e.toString(),
-        'errorType': e.runtimeType.toString(),
-      }, hypothesisId: 'I');
-      // #endregion
     }
   }
 
@@ -290,14 +199,6 @@ class _ValiDialogScreenState extends ConsumerState<ValiDialogScreen> {
   }
 
   Future<void> _sendMessageInternal(String text) async {
-    // #region agent log
-    await _debugLog('vali_dialog_screen.dart:191', '_sendMessageInternal_entry', {
-      'text': text.substring(0, text.length > 50 ? 50 : text.length),
-      'isSending': _isSending,
-      'currentStep': _currentStep,
-      'validationId': _validationId,
-    }, hypothesisId: 'D');
-    // #endregion
     if (_isSending || !mounted) return;
 
     setState(() {
@@ -308,12 +209,6 @@ class _ValiDialogScreenState extends ConsumerState<ValiDialogScreen> {
     _scrollToBottom();
 
     try {
-      // #region agent log
-      await _debugLog('vali_dialog_screen.dart:203', '_sendMessageInternal_before_save', {
-        'chatId': _chatId,
-        'validationId': _validationId,
-      }, hypothesisId: 'D');
-      // #endregion
       // Сохраняем сообщение пользователя в БД
       _chatId = await _vali.saveConversation(
         role: 'user',
@@ -322,24 +217,11 @@ class _ValiDialogScreenState extends ConsumerState<ValiDialogScreen> {
         validationId: _validationId,
       );
 
-      // #region agent log
-      await _debugLog('vali_dialog_screen.dart:211', '_sendMessageInternal_before_send', {
-        'chatId': _chatId,
-        'messagesCount': _buildChatContext().length,
-      }, hypothesisId: 'D');
-      // #endregion
       // Отправляем в Edge Function (режим dialog)
       final response = await _vali.sendMessage(
         messages: _buildChatContext(),
         validationId: _validationId,
       );
-
-      // #region agent log
-      await _debugLog('vali_dialog_screen.dart:220', '_sendMessageInternal_response_received', {
-        'hasMessage': response['message'] != null,
-        'messageLength': (response['message']?['content'] as String?)?.length ?? 0,
-      }, hypothesisId: 'D');
-      // #endregion
 
       final assistantMessage = response['message']['content'] as String? ?? '';
 
@@ -352,7 +234,6 @@ class _ValiDialogScreenState extends ConsumerState<ValiDialogScreen> {
       );
 
       if (!mounted) return;
-      final oldStep = _currentStep;
       setState(() {
         _messages.add({'role': 'assistant', 'content': assistantMessage});
         
@@ -361,13 +242,6 @@ class _ValiDialogScreenState extends ConsumerState<ValiDialogScreen> {
           _currentStep++;
         }
       });
-
-      // #region agent log
-      await _debugLog('vali_dialog_screen.dart:240', '_sendMessageInternal_step_updated', {
-        'oldStep': oldStep,
-        'newStep': _currentStep,
-      }, hypothesisId: 'E');
-      // #endregion
 
       // Обновляем прогресс в БД
       if (_validationId != null) {
@@ -388,19 +262,7 @@ class _ValiDialogScreenState extends ConsumerState<ValiDialogScreen> {
       if (_currentStep >= maxSteps && mounted) {
         await _showCompletionDialog();
       }
-      // #region agent log
-      await _debugLog('vali_dialog_screen.dart:260', '_sendMessageInternal_success', {
-        'currentStep': _currentStep,
-        'messagesCount': _messages.length,
-      }, hypothesisId: 'D');
-      // #endregion
     } on ValiFailure catch (e) {
-      // #region agent log
-      await _debugLog('vali_dialog_screen.dart:265', '_sendMessageInternal_vali_failure', {
-        'statusCode': e.statusCode,
-        'message': e.message,
-      }, hypothesisId: 'F');
-      // #endregion
       if (!mounted) return;
       
       if (e.statusCode == 402) {
@@ -410,12 +272,6 @@ class _ValiDialogScreenState extends ConsumerState<ValiDialogScreen> {
         _showError(e.message);
       }
     } catch (e) {
-      // #region agent log
-      await _debugLog('vali_dialog_screen.dart:277', '_sendMessageInternal_error', {
-        'error': e.toString(),
-        'errorType': e.runtimeType.toString(),
-      }, hypothesisId: 'F');
-      // #endregion
       if (!mounted) return;
       _showError('Ошибка: $e');
       
@@ -456,13 +312,6 @@ class _ValiDialogScreenState extends ConsumerState<ValiDialogScreen> {
   }
 
   Future<void> _requestScoring() async {
-    // #region agent log
-    await _debugLog('vali_dialog_screen.dart:304', '_requestScoring_entry', {
-      'validationId': _validationId,
-      'isScoring': _isScoring,
-      'messagesCount': _buildChatContext().length,
-    }, hypothesisId: 'G');
-    // #endregion
     if (_validationId == null || _isScoring) return;
 
     setState(() => _isScoring = true);
@@ -494,24 +343,11 @@ class _ValiDialogScreenState extends ConsumerState<ValiDialogScreen> {
         );
       }
 
-      // #region agent log
-      await _debugLog('vali_dialog_screen.dart:337', '_requestScoring_before_score', {
-        'validationId': _validationId,
-      }, hypothesisId: 'G');
-      // #endregion
       // Запрашиваем скоринг
       final result = await _vali.scoreValidation(
         messages: _buildChatContext(),
         validationId: _validationId!,
       );
-
-      // #region agent log
-      await _debugLog('vali_dialog_screen.dart:345', '_requestScoring_score_received', {
-        'hasScores': result['scores'] != null,
-        'totalScore': result['scores']?['total'],
-        'hasReport': result['report_markdown'] != null,
-      }, hypothesisId: 'G');
-      // #endregion
 
       // Закрываем snackbar
       if (mounted) {
@@ -520,14 +356,6 @@ class _ValiDialogScreenState extends ConsumerState<ValiDialogScreen> {
 
       // Обновляем данные валидации
       _validationData = await _vali.getValidation(_validationId!);
-
-      // #region agent log
-      await _debugLog('vali_dialog_screen.dart:355', '_requestScoring_validation_loaded', {
-        'status': _validationData?['status'],
-        'hasReport': _validationData?['report_markdown'] != null,
-        'totalScore': _validationData?['total_score'],
-      }, hypothesisId: 'G');
-      // #endregion
 
       if (!mounted) return;
       setState(() {});
@@ -540,28 +368,11 @@ class _ValiDialogScreenState extends ConsumerState<ValiDialogScreen> {
           'totalScore': result['scores']?['total'],
         },
       ));
-      // #region agent log
-      await _debugLog('vali_dialog_screen.dart:370', '_requestScoring_success', {
-        'validationId': _validationId,
-      }, hypothesisId: 'G');
-      // #endregion
     } on ValiFailure catch (e) {
-      // #region agent log
-      await _debugLog('vali_dialog_screen.dart:375', '_requestScoring_vali_failure', {
-        'statusCode': e.statusCode,
-        'message': e.message,
-      }, hypothesisId: 'H');
-      // #endregion
       if (!mounted) return;
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
       _showError('Ошибка анализа: ${e.message}');
     } catch (e) {
-      // #region agent log
-      await _debugLog('vali_dialog_screen.dart:383', '_requestScoring_error', {
-        'error': e.toString(),
-        'errorType': e.runtimeType.toString(),
-      }, hypothesisId: 'H');
-      // #endregion
       if (!mounted) return;
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
       _showError('Не удалось проанализировать идею: $e');
@@ -836,14 +647,6 @@ class _ValiDialogScreenState extends ConsumerState<ValiDialogScreen> {
     final totalScore = _validationData?['total_score'] as int? ?? 0;
     final archetype = _validationData?['archetype'] as String? ?? 'МЕЧТАТЕЛЬ';
     final recommendedLevels = _validationData?['recommended_levels'] as List? ?? [];
-    // #region agent log
-    _debugLog('vali_dialog_screen.dart:635', '_buildReportView_render', {
-      'hasReport': report.isNotEmpty,
-      'totalScore': totalScore,
-      'archetype': archetype,
-      'recommendedLevelsCount': recommendedLevels.length,
-    }, hypothesisId: 'J');
-    // #endregion
 
     return Scaffold(
       appBar: AppBar(
@@ -939,13 +742,6 @@ class _ValiDialogScreenState extends ConsumerState<ValiDialogScreen> {
               
               return ElevatedButton.icon(
                 onPressed: () async {
-                  // #region agent log
-                  _debugLog('vali_dialog_screen.dart:708', '_cta_recommended_level_click', {
-                    'levelNumber': levelNumber,
-                    'levelName': levelName,
-                  }, hypothesisId: 'K');
-                  // #endregion
-                  
                   // Проверяем текущий уровень пользователя
                   try {
                     final currentLevel = await ref.read(currentLevelNumberProvider.future);
@@ -992,11 +788,6 @@ class _ValiDialogScreenState extends ConsumerState<ValiDialogScreen> {
         // Кнопка "Поставить цель с Максом"
         OutlinedButton.icon(
           onPressed: () {
-            // #region agent log
-            _debugLog('vali_dialog_screen.dart:724', '_cta_max_click', {
-              'validationId': _validationId,
-            }, hypothesisId: 'L');
-            // #endregion
             Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (_) => LeoDialogScreen(
