@@ -217,9 +217,10 @@ serve(async (req) => {
     // Environment validation
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
     const xaiApiKey = Deno.env.get("XAI_API_KEY");
 
-    if (!supabaseUrl || !supabaseServiceKey || !xaiApiKey) {
+    if (!supabaseUrl || !supabaseServiceKey || !supabaseAnonKey || !xaiApiKey) {
       throw new Error("Missing required environment variables");
     }
 
@@ -256,11 +257,21 @@ serve(async (req) => {
 
     const userId = user.id;
 
+    // Create user-authenticated client for GP operations (uses anon key + user JWT)
+    const supabaseUser = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: {
+          Authorization: `Bearer ${authHeader}`,
+        },
+      },
+    });
+
     // ============================
     // GP Economy: Check if payment required
     // ============================
     // First validation is FREE, subsequent validations cost 100 GP
-    if (mode === 'dialog' && !validationId) {
+    // Check on EVERY dialog message to ensure payment
+    if (mode === 'dialog') {
       // Check how many completed validations user has
       const { count, error: countError } = await supabaseAdmin
         .from('idea_validations')
@@ -275,45 +286,76 @@ serve(async (req) => {
       const isFirstValidation = (count || 0) === 0;
 
       if (!isFirstValidation) {
-        // Charge 100 GP for validation
-        // Call gp_spend RPC function
-        try {
-          const { data: spendResult, error: spendError } = await supabaseAdmin
-            .rpc('gp_spend', {
-              p_type: 'idea_validation',
-              p_amount: 100,
-              p_reference_id: validationId || '',
-              p_idempotency_key: `validation_${userId}_${Date.now()}`,
-            });
-
-          if (spendError) {
-            console.error('ERR gp_spend', { message: spendError.message });
-            
-            // Check if insufficient balance
-            if (spendError.message?.includes('insufficient') || spendError.code === '23514') {
-              return new Response(
-                JSON.stringify({ 
-                  error: "insufficient_gp",
-                  message: "Недостаточно GP. Нужно 100 GP для валидации идеи.",
-                  required: 100
-                }),
-                { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-              );
-            }
-            
-            throw spendError;
+        // Check if we already charged GP for this validation
+        let alreadyCharged = false;
+        
+        if (validationId) {
+          const { data: validation, error: validationError } = await supabaseAdmin
+            .from('idea_validations')
+            .select('gp_spent')
+            .eq('id', validationId)
+            .eq('user_id', userId)
+            .single();
+          
+          if (validationError) {
+            console.error('ERR check_gp_spent', { message: validationError.message });
           }
+          
+          alreadyCharged = validation?.gp_spent === 100;
+        }
+        
+        if (!alreadyCharged) {
+          // Charge 100 GP for validation
+          // Call gp_spend RPC function with user auth context
+          try {
+            const { data: spendResult, error: spendError } = await supabaseUser
+              .rpc('gp_spend', {
+                p_type: 'spend_message',
+                p_amount: 100,
+                p_reference_id: validationId || '',
+                p_idempotency_key: validationId ? `validation_${validationId}` : `validation_${userId}_${Date.now()}`,
+              });
 
-          console.log('INFO gp_spent', { amount: 100, type: 'idea_validation', balance_after: spendResult });
-        } catch (gpError) {
-          console.error('ERR gp_spend_exception', { message: String(gpError).slice(0, 200) });
-          return new Response(
-            JSON.stringify({ 
-              error: "gp_error",
-              message: "Ошибка списания GP. Попробуйте позже."
-            }),
-            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
+            if (spendError) {
+              console.error('ERR gp_spend', { message: spendError.message });
+              
+              // Check if insufficient balance
+              if (spendError.message?.includes('insufficient') || spendError.code === '23514') {
+                return new Response(
+                  JSON.stringify({ 
+                    error: "insufficient_gp",
+                    message: "Недостаточно GP. Нужно 100 GP для валидации идеи.",
+                    required: 100
+                  }),
+                  { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                );
+              }
+              
+              throw spendError;
+            }
+
+            console.log('INFO gp_spent', { amount: 100, type: 'spend_message', validationId, balance_after: spendResult });
+            
+            // Mark validation as charged
+            if (validationId) {
+              await supabaseAdmin
+                .from('idea_validations')
+                .update({ gp_spent: 100 })
+                .eq('id', validationId)
+                .eq('user_id', userId);
+            }
+          } catch (gpError) {
+            console.error('ERR gp_spend_exception', { message: String(gpError).slice(0, 200) });
+            return new Response(
+              JSON.stringify({ 
+                error: "gp_error",
+                message: "Ошибка списания GP. Попробуйте позже."
+              }),
+              { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+        } else {
+          console.log('INFO gp_already_charged', { validationId });
         }
       } else {
         console.log('INFO first_validation_free', { userId });
