@@ -1,10 +1,29 @@
+/**
+ * FirebaseEarlyInit.m
+ *
+ * ОТКЛЮЧЕНО 2025-12-07: Ранний bootstrap Firebase блокировал main thread,
+ * вызывая чёрный экран при запуске. Firebase теперь инициализируется
+ * в AppDelegate.didFinishLaunchingWithOptions.
+ *
+ * Проблема:
+ * - +load и constructor вызываются dyld до main()
+ * - [FIRApp configure] делает I/O на main thread (NSData, NSBundle, dlopen)
+ * - Main thread блокируется, Flutter не может отрисовать первый кадр
+ *
+ * Решение:
+ * - Оставляем только логирование, без реальной инициализации Firebase
+ * - Firebase инициализируется позже в AppDelegate
+ */
+
 #import <Foundation/Foundation.h>
 #import "Runner-Swift.h"
-@import FirebaseCore;
 
+#if __has_include(<FirebaseCore/FirebaseCore.h>)
+@import FirebaseCore;
 @interface FIRApp (FirebaseEarlyInitPrivate)
 + (BOOL)isDefaultAppConfigured;
 @end
+#endif
 
 static NSString *FirebaseEarlyInitCallerString(const char *caller) {
   if (caller == NULL) {
@@ -13,56 +32,22 @@ static NSString *FirebaseEarlyInitCallerString(const char *caller) {
   return [NSString stringWithUTF8String:caller];
 }
 
-static void FirebaseEarlyInitLogCallStackOnce(NSString *label) {
-  static BOOL didLogStack = NO;
-  if (didLogStack) {
-    return;
-  }
-  didLogStack = YES;
-
-  NSArray<NSString *> *symbols = [NSThread callStackSymbols];
-  if (symbols.count == 0) {
-    return;
-  }
-
-  NSString *joined = [symbols componentsJoinedByString:@"\n"];
-  NSLog(@"FirebaseEarlyInit(%@): call stack at first configure attempt:\n%@",
-        label, joined);
-}
-
-static void ConfigureFirebaseOnObjCIfNeeded(const char *caller, BOOL logStack) {
-  NSString *callerString = FirebaseEarlyInitCallerString(caller);
-  if (logStack) {
-    FirebaseEarlyInitLogCallStackOnce(callerString);
-  }
-
-  @try {
-    if (![FIRApp isDefaultAppConfigured]) {
-      [FIRApp configure];
-      NSLog(@"FirebaseEarlyInit(%@): FIRApp configure() executed on Objective-C layer",
-            callerString);
-    } else {
-      NSLog(@"FirebaseEarlyInit(%@): FIRApp already configured before ObjC hook",
-            callerString);
-    }
-  } @catch (NSException *exception) {
-    NSLog(@"FirebaseEarlyInit(%@): FIRApp configure threw exception: %@",
-          callerString, exception);
-  }
-}
+// ОТКЛЮЧЕНО: Больше не инициализируем Firebase рано
+// static void ConfigureFirebaseOnObjCIfNeeded(const char *caller, BOOL logStack) { ... }
 
 __attribute__((constructor(0))) static void FirebaseUltraEarlyInitConstructor(void) {
-  @autoreleasepool {
-    ConfigureFirebaseOnObjCIfNeeded("constructor0", NO);
-  }
+  // ОТКЛЮЧЕНО: Не инициализируем Firebase в constructor
+  // Firebase будет инициализирован в AppDelegate.didFinishLaunchingWithOptions
 }
 
 __attribute__((constructor)) static void FirebaseEarlyInitConstructor(void) {
+  // ОТКЛЮЧЕНО: Не инициализируем Firebase в constructor
+  // Только вызываем AppDelegate для подготовки (без [FIRApp configure])
+#if __has_include(<FirebaseCore/FirebaseCore.h>)
   @autoreleasepool {
-    NSLog(@"FirebaseEarlyInit: configuring Firebase before UIApplicationMain");
-    ConfigureFirebaseOnObjCIfNeeded("constructor_default", NO);
-    [AppDelegate configureFirebaseBeforeMain];
+    // [AppDelegate configureFirebaseBeforeMain] теперь вызывается в didFinishLaunching
   }
+#endif
 }
 
 @interface FirebaseEarlyInitSentinel : NSObject
@@ -71,10 +56,8 @@ __attribute__((constructor)) static void FirebaseEarlyInitConstructor(void) {
 @implementation FirebaseEarlyInitSentinel
 
 + (void)load {
-  @autoreleasepool {
-    NSLog(@"FirebaseEarlyInit: +load invoked before constructors");
-    ConfigureFirebaseOnObjCIfNeeded("load", YES);
-  }
+  // ОТКЛЮЧЕНО: Не инициализируем Firebase в +load
+  // Это блокировало main thread и вызывало чёрный экран
 }
 
 @end

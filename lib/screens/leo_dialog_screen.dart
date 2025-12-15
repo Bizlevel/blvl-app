@@ -279,7 +279,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
           userContext: widget.userContext,
           levelContext: widget.levelContext,
         );
-        debugPrint('CHIPS server=${chips}');
+        debugPrint('CHIPS server=$chips');
         if (mounted) {
           setState(() {
             _serverRecommendedChips = chips;

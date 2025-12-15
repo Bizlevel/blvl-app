@@ -3,6 +3,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'dart:io';
 
 import '../services/supabase_service.dart';
+import '../utils/hive_box_helper.dart';
 
 class LessonsRepository {
   // ignore: unused_field
@@ -10,7 +11,7 @@ class LessonsRepository {
   LessonsRepository(this._client);
 
   Future<List<Map<String, dynamic>>> fetchLessons(int levelId) async {
-    final Box cache = Hive.box('lessons');
+    final Box cache = await HiveBoxHelper.openBox('lessons');
     final String cacheKey = 'level_$levelId';
 
     try {

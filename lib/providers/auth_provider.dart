@@ -38,14 +38,23 @@ final authStateProvider = StreamProvider<AuthState>((ref) {
 });
 
 /// Loads current user profile from `users` table or returns null if not signed in.
+/// 
+/// ВАЖНО: Не используем authStateProvider.future или .watch(), так как это StreamProvider,
+/// и он может блокировать при холодном старте.
+/// Вместо этого используем currentSession напрямую.
+/// 
+/// Инвалидация при логине/логауте происходит через onAuthStateChange callback
+/// в login_controller и auth_service, которые invalidate providers.
 final currentUserProvider = FutureProvider<UserModel?>((ref) async {
-  // Ждём актуальное состояние аутентификации.
-  final auth = await ref.watch(authStateProvider.future);
-  final supabaseUser = auth.session?.user;
+  // Получаем текущую сессию СИНХРОННО — она уже кэширована в Supabase SDK.
+  // НЕ подписываемся на authStateProvider — это может блокировать!
+  final client = ref.read(supabaseClientProvider);
+  final session = client.auth.currentSession;
+  final supabaseUser = session?.user;
 
   if (kDebugMode) {
     debugPrint(
-        'currentUserProvider: auth session = ${auth.session != null}, user = ${supabaseUser?.id}');
+        'currentUserProvider: session = ${session != null}, user = ${supabaseUser?.id}');
   }
 
   if (supabaseUser == null) return null;

@@ -30,7 +30,6 @@ class ArtifactsScreen extends ConsumerWidget {
           )
         ],
       ),
-      backgroundColor: AppColor.appBgColor,
       body: levelsAsync.when(
         loading: () => const _ArtifactsSkeletonGrid(),
         error: (e, st) => Center(
@@ -318,7 +317,7 @@ class _ArtifactTileState extends State<_ArtifactTile> {
                             child: Image.asset(image, fit: BoxFit.cover),
                           )
                         else
-                          Container(color: AppColor.appBgColor),
+                          Container(color: AppColor.glassSurfaceStrong),
                         if (!widget.isLocked && _isNew)
                           Positioned(
                             top: 8,

@@ -18,11 +18,11 @@ class LevelsMapScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       key: const Key('levels_map_screen'),
-      backgroundColor: AppColor.appBgColor,
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
-            backgroundColor: AppColor.appBarColor,
+            // Прозрачный AppBar: используем общий фон/градиент приложения.
+            backgroundColor: Colors.transparent,
             pinned: true,
             snap: true,
             floating: true,

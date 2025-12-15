@@ -446,11 +446,12 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
                 'В мобильных приложениях веб‑оплата отключена. Используйте Google/Apple Pay в сторе.')));
         return;
       }
+      if (!context.mounted) return;
       await _startWebPurchase(context, packageId);
     } catch (e) {
       var message = _describePurchaseError(e);
       if (message == _rpcNoBalanceMessage) {
-        final fallbackBalance = await _refreshBalanceAfterDelay(context);
+        final fallbackBalance = await _refreshBalanceAfterDelay(ref);
         if (fallbackBalance != null) {
           message = 'Покупка подтверждена, баланс: $fallbackBalance';
         }
@@ -632,7 +633,7 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
               packageName: packageName,
             );
           } else if (_looksLikeRpcNoBalance(e)) {
-            final fallbackBalance = await _refreshBalanceAfterDelay(context);
+            final fallbackBalance = await _refreshBalanceAfterDelay(ref);
             if (fallbackBalance != null) {
               balance = fallbackBalance;
             } else {
@@ -642,7 +643,7 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
             rethrow;
           }
         } else if (_looksLikeRpcNoBalance(e)) {
-          final fallbackBalance = await _refreshBalanceAfterDelay(context);
+          final fallbackBalance = await _refreshBalanceAfterDelay(ref);
           if (fallbackBalance == null) rethrow;
           balance = fallbackBalance;
         } else {
@@ -1039,12 +1040,11 @@ bool _looksLikeRpcNoBalance(Object error) {
 const _rpcNoBalanceMessage =
     'Покупка завершена, идёт обновление баланса. Через пару секунд обновите экран.';
 
-Future<int?> _refreshBalanceAfterDelay(BuildContext context) async {
+Future<int?> _refreshBalanceAfterDelay(WidgetRef ref) async {
   try {
     await Future.delayed(const Duration(seconds: 2));
-    final container = ProviderScope.containerOf(context);
-    container.invalidate(gpBalanceProvider);
-    final map = await container.read(gpBalanceProvider.future);
+    ref.invalidate(gpBalanceProvider);
+    final map = await ref.read(gpBalanceProvider.future);
     return map['balance'];
   } catch (_) {
     return null;

@@ -5,12 +5,12 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bizlevel/providers/leo_service_provider.dart';
 import 'package:bizlevel/widgets/chat_item.dart';
 import 'package:bizlevel/screens/leo_dialog_screen.dart';
+import 'package:bizlevel/widgets/common/bizlevel_card.dart';
 
 import 'package:bizlevel/theme/color.dart' show AppColor;
 import 'package:bizlevel/providers/auth_provider.dart';
 import 'package:bizlevel/services/context_service.dart';
 import 'package:bizlevel/theme/spacing.dart';
-import 'package:bizlevel/theme/dimensions.dart';
 
 class LeoChatScreen extends ConsumerStatefulWidget {
   const LeoChatScreen({super.key});
@@ -65,12 +65,13 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
         future: _loadFuture,
         builder: (context, snapshot) {
           return SingleChildScrollView(
-            padding: AppSpacing.insetsSymmetric(h: 15, v: 8),
+            padding:
+                AppSpacing.insetsSymmetric(h: AppSpacing.lg, v: AppSpacing.sm),
             child: Column(
               children: [
-                AppSpacing.gapH(4),
+                AppSpacing.gapH(AppSpacing.xs),
                 _buildBotSelectorCards(),
-                AppSpacing.gapH(10),
+                AppSpacing.gapH(AppSpacing.s10),
                 _buildChats(),
               ],
             ),
@@ -171,65 +172,63 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
         required String subtitle,
         required String avatar}) {
       return Expanded(
-        child: GestureDetector(
-          onTap: () => _onNewChat(bot),
-          child: Container(
-            padding: AppSpacing.insetsAll(12),
-            margin: AppSpacing.insetsSymmetric(h: 6),
-            constraints: const BoxConstraints(minHeight: 128),
-            decoration: BoxDecoration(
-              color: AppColor.surface,
-              borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
-              border: Border.all(color: AppColor.borderSubtle),
-              boxShadow: const [
-                BoxShadow(
-                  color: AppColor.shadowColor,
-                  blurRadius: 6,
-                  offset: Offset(0, 3),
-                )
-              ],
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                CircleAvatar(
-                  radius: 32,
-                  backgroundImage: AssetImage(avatar),
-                  backgroundColor: AppColor.surface.withValues(alpha: 0.0),
-                ),
-                AppSpacing.gapW(12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(name,
+        child: Padding(
+          padding: AppSpacing.insetsSymmetric(h: AppSpacing.s6),
+          child: BizLevelCard(
+            onTap: () => _onNewChat(bot),
+            outlined: true,
+            tonal: true,
+            padding: AppSpacing.insetsAll(AppSpacing.md),
+            semanticsLabel: 'Начать чат с $name',
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 128),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircleAvatar(
+                    radius: 32,
+                    backgroundImage: AssetImage(avatar),
+                    backgroundColor: AppColor.surface.withValues(alpha: 0.0),
+                  ),
+                  AppSpacing.gapW(AppSpacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name,
                           style: Theme.of(context)
                               .textTheme
                               .headlineSmall
-                              ?.copyWith(fontWeight: FontWeight.w600)),
-                      AppSpacing.gapH(2),
-                      Text(
-                        subtitle,
-                        maxLines: 2,
-                        softWrap: true,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context)
-                            .textTheme
-                            .labelMedium
-                            ?.copyWith(color: AppColor.labelColor),
-                      ),
-                      AppSpacing.gapH(8),
-                      const Text(
-                        'Начать чат',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          color: AppColor.primary,
+                              ?.copyWith(fontWeight: FontWeight.w600),
                         ),
-                      ),
-                    ],
+                        AppSpacing.gapH(AppSpacing.xxs),
+                        Text(
+                          subtitle,
+                          maxLines: 2,
+                          softWrap: true,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context)
+                              .textTheme
+                              .labelMedium
+                              ?.copyWith(color: AppColor.labelColor),
+                        ),
+                        AppSpacing.gapH(AppSpacing.sm),
+                        Text(
+                          'Начать чат',
+                          style: Theme.of(context)
+                              .textTheme
+                              .labelLarge
+                              ?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: AppColor.primary,
+                              ),
+                        ),
+                      ],
+                    ),
                   ),
-                )
-              ],
+                ],
+              ),
             ),
           ),
         ),

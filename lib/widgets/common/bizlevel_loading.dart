@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:bizlevel/theme/color.dart';
 
 class BizLevelLoading {
   static Widget fullscreen({String? message}) {
     return Scaffold(
-      backgroundColor: AppColor.appBgColor,
       body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
