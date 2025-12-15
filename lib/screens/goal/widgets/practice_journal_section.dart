@@ -30,6 +30,7 @@ class _PracticeJournalSectionState
   bool _showMomentum = false;
   bool _selectingGuard = false;
   bool _reminderSheetOpen = false;
+  bool _savingEntry = false;
 
   @override
   void dispose() {
@@ -253,10 +254,18 @@ class _PracticeJournalSectionState
               Align(
                 alignment: Alignment.centerLeft,
                 child: BizLevelButton(
-                  label: 'Сохранить запись',
+                  label: _savingEntry ? 'Сохраняю…' : 'Сохранить запись',
                   onPressed: () async {
+                    if (_savingEntry) return;
                     try {
+                      setState(() => _savingEntry = true);
                       final repo = ref.read(goalsRepositoryProvider);
+                      // Снимаем "снапшот" ввода ДО любых await, чтобы:
+                      // - не потерять текст из‑за очистки контроллера
+                      // - не отправить дефолтное сообщение Максу при подвисаниях/рефокусе
+                      final String noteSnapshot = _practiceNoteCtrl.text.trim();
+                      final List<String> toolsSnapshot =
+                          _selectedTools.toList(growable: false);
                       final String metricUpdateRaw =
                           _metricUpdateCtrl.text.trim();
                       final num? metricUpdate = metricUpdateRaw.isEmpty
@@ -265,19 +274,19 @@ class _PracticeJournalSectionState
                       // Пытаемся выполнить транзакционный RPC; при ошибке — фоллбек
                       try {
                         await repo.logPracticeAndUpdateMetricTx(
-                          appliedTools: _selectedTools.toList(),
-                          note: _practiceNoteCtrl.text.trim().isEmpty
+                          appliedTools: toolsSnapshot,
+                          note: noteSnapshot.isEmpty
                               ? null
-                              : _practiceNoteCtrl.text.trim(),
+                              : noteSnapshot,
                           appliedAt: DateTime.now(),
                           metricCurrent: metricUpdate,
                         );
                       } catch (_) {
                         await repo.addPracticeEntry(
-                          appliedTools: _selectedTools.toList(),
-                          note: _practiceNoteCtrl.text.trim().isEmpty
+                          appliedTools: toolsSnapshot,
+                          note: noteSnapshot.isEmpty
                               ? null
-                              : _practiceNoteCtrl.text.trim(),
+                              : noteSnapshot,
                           appliedAt: DateTime.now(),
                         );
                         if (metricUpdate != null) {
@@ -301,7 +310,6 @@ class _PracticeJournalSectionState
                                   Text('Метрика обновлена до $metricUpdate')),
                         );
                       }
-                      final String note = _practiceNoteCtrl.text.trim();
                       _practiceNoteCtrl.clear();
                       _metricUpdateCtrl.clear();
                       _selectedTools.clear();
@@ -338,13 +346,14 @@ class _PracticeJournalSectionState
                           bot: 'max',
                           userContext: buildMaxUserContext(
                             goal: ref.read(userGoalProvider).asData?.value,
-                            practiceNote: note.isEmpty ? null : note,
-                            appliedTools: const [],
+                            practiceNote:
+                                noteSnapshot.isEmpty ? null : noteSnapshot,
+                            appliedTools: toolsSnapshot,
                             metricCurrentUpdated: metricUpdate,
                           ),
                           levelContext: '',
-                          autoUserMessage: note.isNotEmpty
-                              ? 'Сегодня сделал(а): $note'
+                          autoUserMessage: noteSnapshot.isNotEmpty
+                              ? 'Сегодня сделал(а): $noteSnapshot'
                               : 'Я сделал запись в дневнике применений. Подскажи, как усилить эффект?',
                         ),
                       ));
@@ -352,6 +361,10 @@ class _PracticeJournalSectionState
                       if (!context.mounted) return;
                       ScaffoldMessenger.of(context)
                           .showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+                    } finally {
+                      if (mounted) {
+                        setState(() => _savingEntry = false);
+                      }
                     }
                   },
                 ),

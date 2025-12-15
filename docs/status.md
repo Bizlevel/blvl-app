@@ -1,3 +1,6 @@
+Задача practice-log-history fix: восстановлена «история применений» — при наличии `current_history_id` журнал грузит записи для текущей истории **и** legacy-записи с `goal_history_id IS NULL`; обновлены тесты, чтобы мок-репозиторий учитывал `fetchPracticeLogForHistory`.
+Задача practice-log-ux fix: история применений теперь грузится без зависимости от `current_history_id` (по `user_id`); авто‑сообщение Максу берёт снапшот текста до `await` и не теряет инструменты; обновление бонуса/баланса GP после записи вынесено из критического пути (не блокирует сохранение).
+Задача quote-no-hive+gp-ui fix: «Цитата дня» теперь грузится напрямую из `motivational_quotes` без Hive (чтобы не ловить iOS openBox фризы); snackbar «+30 GP за регистрацию» показывается только после регистрации (`registered=true`); обновлён тест `GoalsRepository`.
 Задача ios-onesignal-clean fix: полностью отключён Firebase на iOS/Android, пропатчен onesignal_flutter (init через OneSignalAppID, типы removeTags/aliases, sharedInstance), обновлён Podfile (OneSignalXCFramework 5.2.14), pod install выполнен с DISABLE_IOS_FIREBASE=true.
 Задача onesignal-ios fix: подготовка миграции iOS пушей на OneSignal, убрана инициализация Firebase на iOS, добавлен onesignal_flutter и защита Podfile от возврата Firebase.
 

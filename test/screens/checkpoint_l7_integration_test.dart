@@ -38,6 +38,17 @@ class _FakeRepo extends GoalsRepository {
   }
 
   @override
+  Future<List<Map<String, dynamic>>> fetchPracticeLogForHistory({
+    required String? historyId,
+    int limit = 100,
+  }) async {
+    // В тестах не моделируем goal_history_id — просто возвращаем то, что «сохранили».
+    // В реальном приложении фильтрация делается по current_history_id и legacy (NULL).
+    final items = List<Map<String, dynamic>>.from(practice);
+    return items.length <= limit ? items : items.take(limit).toList();
+  }
+
+  @override
   Future<Map<String, dynamic>> addPracticeEntry({
     List<String> appliedTools = const <String>[],
     String? note,

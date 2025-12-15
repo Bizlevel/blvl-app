@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:hive_flutter/hive_flutter.dart';
@@ -269,8 +270,10 @@ class GoalsRepository {
         .eq('user_id', userId)
         .order('applied_at', ascending: false)
         .limit(limit);
+    // Для текущей цели показываем как "новые" записи (привязанные к истории),
+    // так и legacy-записи, сделанные до появления goal_history_id.
     final List rows = await ((historyId != null && historyId.isNotEmpty)
-        ? base.eq('goal_history_id', historyId)
+        ? base.or('goal_history_id.eq.$historyId,goal_history_id.is.null')
         : base);
     return List<Map<String, dynamic>>.from(
         rows.map((e) => Map<String, dynamic>.from(e as Map)));
@@ -365,7 +368,8 @@ class GoalsRepository {
       ));
     } catch (_) {}
 
-    await _claimDailyBonusAndRefresh();
+    // Бонус/обновление GP — best-effort, не должен блокировать UX сохранения записи.
+    unawaited(_claimDailyBonusAndRefresh());
 
     // Invalidate/refresh cache roughly
     try {
@@ -392,7 +396,8 @@ class GoalsRepository {
     };
     await _client.rpc('log_practice_and_update_metric', params: params);
     try {
-      await _claimDailyBonusAndRefresh();
+      // Бонус/обновление GP — best-effort, не должен блокировать UX сохранения записи.
+      unawaited(_claimDailyBonusAndRefresh());
       final Box cache = Hive.box('practice_log');
       await cache.delete('list_20');
     } catch (_) {}
@@ -551,35 +556,39 @@ class GoalsRepository {
   // Quotes (motivational_quotes)
   // ============================
 
-  /// Возвращает случайную цитату из активных. Кэширует список активных.
+  /// Возвращает «цитату дня» из активных.
+  ///
+  /// ВАЖНО: не используем Hive для цитат.
+  /// Исторически `Hive.openBox(...)` на iOS мог быть дорогим и провоцировать фризы на старте
+  /// (см. docs/ios-debug-nov-dec.md). Цитат немного (≈50), поэтому держим простой запрос в Supabase.
   Future<Map<String, dynamic>?> getDailyQuote() async {
-    final Box cache = Hive.box('quotes');
-    const String cacheKey = 'active';
+    try {
+      _ensureAnonApikey();
+    } catch (_) {}
 
-    final result = await _cachedQuery<List>(
-      cache: cache,
-      cacheKey: cacheKey,
-      query: () async {
-        final resp = await _client
-            .from('motivational_quotes')
-            .select('id, quote_text, author, category')
-            .eq('is_active', true);
-        return (resp as List)
-            .map((e) => Map<String, dynamic>.from(e as Map))
-            .toList();
-      },
-      fromCache: (cached) => List<Map<String, dynamic>>.from(
-          (cached as List).map((e) => Map<String, dynamic>.from(e as Map))),
-    );
+    try {
+      final resp = await _client
+          .from('motivational_quotes')
+          .select('id, quote_text, author, category')
+          .eq('is_active', true);
 
-    final active = result ?? <Map<String, dynamic>>[];
-    if (active.isEmpty) return null;
+      final active = (resp as List)
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+      if (active.isEmpty) return null;
 
-    // Детерминированный выбор по UTC-дню: стабильная «цитата дня» без перезапуска
-    final int dayIndex =
-        DateTime.now().toUtc().difference(DateTime.utc(1970)).inDays;
-    final int pick = dayIndex % active.length;
-    return active[pick];
+      // Детерминированный выбор по UTC-дню: стабильная «цитата дня» без перезапуска
+      final int dayIndex =
+          DateTime.now().toUtc().difference(DateTime.utc(1970)).inDays;
+      final int pick = dayIndex % active.length;
+      return active[pick];
+    } catch (error, stackTrace) {
+      // UI сам решает как отображать отсутствие цитаты.
+      try {
+        await Sentry.captureException(error, stackTrace: stackTrace);
+      } catch (_) {}
+      return null;
+    }
   }
 
   // buildMaxContext (v1–v4) удалён как legacy — используем buildMaxUserContext helper на клиенте
