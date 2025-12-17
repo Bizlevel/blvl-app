@@ -25,6 +25,8 @@ import 'package:bizlevel/widgets/level/blocks/quiz_block.dart';
 import 'package:bizlevel/widgets/level/blocks/goal_v1_block.dart';
 import 'package:bizlevel/widgets/level/blocks/artifact_block.dart';
 import 'package:bizlevel/widgets/level/blocks/profile_form_block.dart';
+import 'package:bizlevel/screens/vali_dialog_screen.dart';
+import 'package:flutter/scheduler.dart';
 
 /// Shows a level as full-screen blocks (Intro → Lesson → Quiz → …).
 class LevelDetailScreen extends ConsumerStatefulWidget {
@@ -129,9 +131,18 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
                           ));
                         } catch (_) {}
                         await SupabaseService.completeLevel(widget.levelId);
-                        ref.invalidate(levelsProvider);
-                        ref.invalidate(currentUserProvider);
-                        ref.invalidate(userSkillsProvider);
+                        
+                        // Проверяем, является ли это уровнем 5
+                        final isLevel5 = (widget.levelNumber ?? -1) == 5;
+                        
+                        // Для уровня 5 откладываем ref.invalidate до конца всех диалогов
+                        // Для остальных уровней обновляем сразу
+                        if (!isLevel5) {
+                          ref.invalidate(levelsProvider);
+                          ref.invalidate(currentUserProvider);
+                          ref.invalidate(userSkillsProvider);
+                        }
+                        
                         try {
                           sentry.Sentry.addBreadcrumb(sentry.Breadcrumb(
                             category: 'level',
@@ -143,19 +154,103 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
                             },
                           ));
                         } catch (_) {}
+                        
                         if (context.mounted) {
                           await showDialog(
                             context: context,
-                            builder: (_) => Dialog(
+                            builder: (dialogContext) => Dialog(
                               backgroundColor: Colors.transparent,
                               insetPadding: AppSpacing.insetsAll(AppSpacing.lg),
                               child: MilestoneCelebration(
-                                  gpGain: 20,
-                                  onClose: () =>
-                                      Navigator.of(context).maybePop()),
+                                gpGain: 20,
+                                onClose: () => Navigator.of(dialogContext).pop(),
+                              ),
                             ),
                           );
+                          
+                          // Обновляем баланс GP ДО показа диалога (чтобы не вызывать после размонтирования)
                           ref.invalidate(gpBalanceProvider);
+                          
+                          // Предложение проверить идею после завершения Уровня 5
+                          if (isLevel5 && context.mounted) {
+                            
+                            // Показываем диалог в следующем кадре через SchedulerBinding
+                            // Это гарантирует, что виджет еще смонтирован
+                            SchedulerBinding.instance.addPostFrameCallback((_) {
+                              if (!mounted || !context.mounted) {
+                                return;
+                              }
+                              
+                              showDialog<bool>(
+                                context: context,
+                                barrierDismissible: false,
+                                builder: (dialogCtx) => AlertDialog(
+                                  title: const Text('Проверь свою идею'),
+                                  content: const Text(
+                                    'Ты освоил создание УТП. Готов проверить свою бизнес-идею с Валли?',
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () {
+                                        Navigator.of(dialogCtx).pop(false);
+                                      },
+                                      child: const Text('Позже'),
+                                    ),
+                                    ElevatedButton(
+                                      onPressed: () {
+                                        Navigator.of(dialogCtx).pop(true);
+                                      },
+                                      child: const Text('Проверить идею'),
+                                    ),
+                                  ],
+                                ),
+                              ).then((shouldValidate) {
+                                if (!mounted || !context.mounted) return;
+                                
+                                if (shouldValidate == true) {
+                                  
+                                  try {
+                                    sentry.Sentry.addBreadcrumb(sentry.Breadcrumb(
+                                      category: 'ui.tap',
+                                      message: 'level_5_cta_tap:vali',
+                                      level: sentry.SentryLevel.info,
+                                    ));
+                                  } catch (_) {}
+                                  
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => const ValiDialogScreen(),
+                                    ),
+                                  ).then((_) {
+                                    // После возврата из ValiDialogScreen
+                                    // Пользователь уже вернулся назад, pop() не нужен
+                                    // Обновляем провайдеры только после полного завершения всех диалогов
+                                    ref.invalidate(levelsProvider);
+                                    ref.invalidate(currentUserProvider);
+                                    ref.invalidate(userSkillsProvider);
+                                  });
+                                } else {
+                                  // Если выбрали "Позже" - возвращаемся на главный экран
+                                  if (mounted && context.mounted) {
+                                    // Обновляем провайдеры только после полного завершения всех диалогов
+                                    ref.invalidate(levelsProvider);
+                                    ref.invalidate(currentUserProvider);
+                                    ref.invalidate(userSkillsProvider);
+                                    
+                                    // Возвращаемся на главный экран через GoRouter
+                                    context.go('/home');
+                                  }
+                                }
+                              });
+                            });
+                            
+                            return; // Выходим, чтобы не выполнять навигацию ниже
+                          }
+                          
+                          // Обновляем баланс GP для остальных уровней
+                          ref.invalidate(gpBalanceProvider);
+                          
+                          // Навигация для остальных уровней (кроме 5)
                           if ((widget.levelNumber ?? -1) == 1) {
                             if (context.mounted) {
                               context.go('/goal');
@@ -165,7 +260,8 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
                             Navigator.of(context).pop();
                           }
                         }
-                      } catch (e) {
+                      } catch (e, stackTrace) {
+                        await sentry.Sentry.captureException(e, stackTrace: stackTrace);
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(content: Text('Ошибка: $e')),

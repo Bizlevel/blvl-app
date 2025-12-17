@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bizlevel/providers/leo_service_provider.dart';
 import 'package:bizlevel/widgets/chat_item.dart';
 import 'package:bizlevel/screens/leo_dialog_screen.dart';
+import 'package:bizlevel/screens/vali_dialog_screen.dart';
 import 'package:bizlevel/widgets/common/bizlevel_card.dart';
 
 import 'package:bizlevel/theme/color.dart' show AppColor;
@@ -133,7 +134,7 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
               Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (_) => ValiDialogScreen(
-                    chatId: chat['id'],
+                    chatId: chat['id'] as String?,
                   ),
                 ),
               );
@@ -199,64 +200,62 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
         required String name,
         required String subtitle,
         required String avatar}) {
-      return Expanded(
-        child: Padding(
-          padding: AppSpacing.insetsSymmetric(h: AppSpacing.s6),
-          child: BizLevelCard(
-            onTap: () => _onNewChat(bot),
-            outlined: true,
-            tonal: true,
-            padding: AppSpacing.insetsAll(AppSpacing.md),
-            semanticsLabel: 'Начать чат с $name',
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(minHeight: 128),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircleAvatar(
-                    radius: 32,
-                    backgroundImage: AssetImage(avatar),
-                    backgroundColor: AppColor.surface.withValues(alpha: 0.0),
+      return Padding(
+        padding: AppSpacing.insetsSymmetric(v: AppSpacing.s6),
+        child: BizLevelCard(
+          onTap: () => _onNewChat(bot),
+          outlined: true,
+          tonal: true,
+          padding: AppSpacing.insetsAll(AppSpacing.md),
+          semanticsLabel: 'Начать чат с $name',
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 128),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircleAvatar(
+                  radius: 32,
+                  backgroundImage: AssetImage(avatar),
+                  backgroundColor: AppColor.surface.withValues(alpha: 0.0),
+                ),
+                AppSpacing.gapW(AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        style: Theme.of(context)
+                            .textTheme
+                            .headlineSmall
+                            ?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                      AppSpacing.gapH(AppSpacing.xxs),
+                      Text(
+                        subtitle,
+                        maxLines: 2,
+                        softWrap: true,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context)
+                            .textTheme
+                            .labelMedium
+                            ?.copyWith(color: AppColor.labelColor),
+                      ),
+                      AppSpacing.gapH(AppSpacing.sm),
+                      Text(
+                        'Начать чат',
+                        style: Theme.of(context)
+                            .textTheme
+                            .labelLarge
+                            ?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: AppColor.primary,
+                            ),
+                      ),
+                    ],
                   ),
-                  AppSpacing.gapW(AppSpacing.md),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          name,
-                          style: Theme.of(context)
-                              .textTheme
-                              .headlineSmall
-                              ?.copyWith(fontWeight: FontWeight.w600),
-                        ),
-                        AppSpacing.gapH(AppSpacing.xxs),
-                        Text(
-                          subtitle,
-                          maxLines: 2,
-                          softWrap: true,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context)
-                              .textTheme
-                              .labelMedium
-                              ?.copyWith(color: AppColor.labelColor),
-                        ),
-                        AppSpacing.gapH(AppSpacing.sm),
-                        Text(
-                          'Начать чат',
-                          style: Theme.of(context)
-                              .textTheme
-                              .labelLarge
-                              ?.copyWith(
-                                fontWeight: FontWeight.w600,
-                                color: AppColor.primary,
-                              ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
