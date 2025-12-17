@@ -1052,17 +1052,33 @@ Future<int?> _refreshBalanceAfterDelay(WidgetRef ref) async {
 }
 
 String _describePurchaseError(Object error) {
-  if (error is GpFailure && error.message.isNotEmpty) {
-    return error.message;
-  }
   final raw = error.toString();
-  if (raw.contains('unknown_product')) {
+  final message =
+      (error is GpFailure && error.message.isNotEmpty) ? error.message : raw;
+
+  if (message.contains('unknown_product')) {
     return 'Store пока не вернул данные о товаре. Проверьте статусы SKU в консоли и повторите попытку.';
   }
-  if (raw.contains('web_verify_not_allowed_on_mobile')) {
-    return 'Подтверждать покупку нужно в том же флоу Google/Apple Pay внутри приложения.';
+  // web не поддерживаем, но код ошибки может прилететь в тексте — покажем понятное сообщение
+  if (message.contains('web_verify_not_allowed_on_mobile')) {
+    return 'Покупка должна подтверждаться внутри приложения (Google/Apple).';
   }
-  if (_looksLikeRpcNoBalance(error)) {
+  if (message.contains('android_package_missing')) {
+    return 'Не удалось определить пакет приложения для Google Play. Обновите приложение и попробуйте снова.';
+  }
+  if (message.contains('google_purchase_failed')) {
+    return 'Google Play не подтвердил покупку. Попробуйте позже или обратитесь в поддержку.';
+  }
+  if (message.contains('google_oauth_failed') ||
+      message.contains('google_service_account_missing')) {
+    return 'Сервис подтверждения Google Play временно недоступен. Попробуйте позже.';
+  }
+  if (message.contains('apple_invalid_receipt') ||
+      message.contains('apple_product_mismatch') ||
+      message.contains('apple_no_transaction_id')) {
+    return 'App Store не подтвердил покупку. Попробуйте позже или обратитесь в поддержку.';
+  }
+  if (message.contains('rpc_no_balance') || _looksLikeRpcNoBalance(error)) {
     return _rpcNoBalanceMessage;
   }
   return 'Не удалось создать оплату';
