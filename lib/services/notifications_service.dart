@@ -28,6 +28,7 @@ class NotificationsService {
 
   bool _initialized = false;
   bool _permissionsRequested = false;
+  bool? _lastPermissionGranted;
   Box? _launchBox;
   String? _cachedStoredRoute;
 
@@ -93,14 +94,20 @@ class NotificationsService {
   /// Запрос разрешений на уведомления — **только по явному действию** (например, при сохранении напоминаний).
   ///
   /// Не вызываем на cold start, чтобы не ловить фризы/задержки и неожиданные системные диалоги.
-  Future<void> ensurePermissionsRequested() async {
-    if (kIsWeb) return;
+  Future<bool> ensurePermissionsRequested() async {
+    if (kIsWeb) return false;
     if (!_initialized) await initialize();
-    if (_permissionsRequested) return;
+    // Если ранее уже получили "true" — не делаем лишних проверок в рамках процесса.
+    // Если было "false" — разрешаем повторную попытку (пользователь мог включить в Settings).
+    if (_permissionsRequested && _lastPermissionGranted == true) {
+      return true;
+    }
     _startupLog('notif.permissions.request.start');
-    await _requestPermissionsIfNeeded();
+    final allowed = await _requestPermissionsIfNeeded();
     _permissionsRequested = true;
-    _startupLog('notif.permissions.request.done');
+    _lastPermissionGranted = allowed;
+    _startupLog('notif.permissions.request.done', {'allowed': allowed});
+    return allowed;
   }
 
   void _startupLog(String name, [Map<String, Object?> data = const {}]) {
@@ -192,6 +199,16 @@ class NotificationsService {
         _logReminderStage('cloud_fetch_empty', {'source': source});
         return;
       }
+      // Этап 1: если пользователь локально выключил напоминания (пустые дни),
+      // не перезаписываем это состояние данными из облака.
+      try {
+        final local = await _loadReminderPrefsFromCache();
+        if (local.$1.isEmpty) {
+          _logReminderStage(
+              'cloud_fetch_skip_local_disabled', {'source': source});
+          return;
+        }
+      } catch (_) {}
       final List<dynamic>? rawDays = data['weekdays'] as List<dynamic>?;
       final int hour = (data['hour'] as num?)?.toInt() ?? 19;
       final int minute = (data['minute'] as num?)?.toInt() ?? 0;
@@ -255,6 +272,9 @@ class NotificationsService {
     final client = Supabase.instance.client;
     final userId = client.auth.currentUser?.id;
     if (userId == null) return;
+    // Этап 1: пустые дни означают "напоминания выключены" локально.
+    // RPC в базе требует непустые weekdays, поэтому здесь синк пропускаем.
+    if (days.isEmpty) return;
     try {
       await client.rpc('upsert_practice_reminders', params: {
         'p_weekdays': days.toList(),
@@ -400,10 +420,37 @@ class NotificationsService {
     required List<int> weekdays,
     int hour = 19,
     int minute = 0,
+    bool requestPermissions = true,
+    bool syncToCloud = true,
   }) async {
     if (kIsWeb) return;
     if (!_initialized) await initialize();
-    await ensurePermissionsRequested();
+    final Set<int> uniqueWeekdays = weekdays.toSet();
+
+    // Пустой набор дней = пользователь выключил напоминания.
+    if (uniqueWeekdays.isEmpty) {
+      await cancelDailyPracticeReminder();
+      await _cacheReminderPrefs(
+        <int>{},
+        hour,
+        minute,
+        // tz.local может быть не готов, используем сохранённую или UTC.
+        timezone: (await _getCachedTimezone()) ?? 'UTC',
+      );
+      // Обновим in-memory cache, чтобы UI сразу увидел "выключено".
+      ReminderPrefsCache.instance.set(
+        ReminderPrefs(weekdays: const <int>{}, hour: hour, minute: minute),
+      );
+      // Важно: не синкаем в Supabase (RPC требует непустые weekdays).
+      return;
+    }
+
+    if (requestPermissions) {
+      final allowed = await ensurePermissionsRequested();
+      if (!allowed) {
+        throw const NotificationsPermissionDenied();
+      }
+    }
     await _ensureTimezoneReady();
     const channelId = 'goal_reminder';
     const AndroidNotificationDetails android = AndroidNotificationDetails(
@@ -414,7 +461,12 @@ class NotificationsService {
       priority: Priority.high,
     );
     const details = NotificationDetails(android: android);
-    final Set<int> uniqueWeekdays = weekdays.toSet();
+
+    // Для надёжности: удаляем старые practice reminders перед созданием новых,
+    // чтобы избежать "залипания" старого расписания.
+    await cancelDailyPracticeReminder();
+
+    final mode = await _resolveAndroidScheduleMode();
     for (final wd in uniqueWeekdays) {
       const idBase = 9000;
       await _plugin.zonedSchedule(
@@ -423,7 +475,7 @@ class NotificationsService {
         'Загляни в «Цель» и отметь действие сегодня',
         _nextInstanceOf(weekday: wd, hour: hour, minute: minute),
         details,
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        androidScheduleMode: mode,
         matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
         payload: '{"route":"/goal"}',
       );
@@ -434,7 +486,13 @@ class NotificationsService {
       minute,
       timezone: tz.local.name,
     );
-    await _syncReminderPrefsToCloud(uniqueWeekdays, hour, minute);
+    // Обновим in-memory cache сразу после успешного расписания.
+    ReminderPrefsCache.instance.set(
+      ReminderPrefs(weekdays: uniqueWeekdays, hour: hour, minute: minute),
+    );
+    if (syncToCloud) {
+      await _syncReminderPrefsToCloud(uniqueWeekdays, hour, minute);
+    }
   }
 
   /// Convenience: default Mon/Wed/Fri
@@ -498,23 +556,30 @@ class NotificationsService {
     return scheduled;
   }
 
-  Future<void> _requestPermissionsIfNeeded() async {
-    if (kIsWeb) return;
+  Future<bool> _requestPermissionsIfNeeded() async {
+    if (kIsWeb) return false;
+    bool allowed = true;
     if (Platform.isIOS) {
-      await _plugin
+      final res = await _plugin
           .resolvePlatformSpecificImplementation<
               IOSFlutterLocalNotificationsPlugin>()
           ?.requestPermissions(alert: true, badge: true, sound: true);
+      allowed = (res ?? false);
     }
     if (Platform.isAndroid) {
       final android = _plugin.resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin>();
-      if ((await android?.areNotificationsEnabled()) == false) {
+      final before = await android?.areNotificationsEnabled();
+      if (before == false) {
         try {
           await android?.requestNotificationsPermission();
         } catch (_) {}
       }
+      final after = await android?.areNotificationsEnabled();
+      // Если API недоступен (null) — считаем, что разрешено (старые Android/прошивки).
+      allowed = (after ?? true);
     }
+    return allowed;
   }
 
   /// Возвращает Hive box для launch route, или null если Hive не инициализирован.
@@ -559,6 +624,27 @@ class NotificationsService {
     }
   }
 
+  Future<AndroidScheduleMode> _resolveAndroidScheduleMode() async {
+    if (!Platform.isAndroid) return AndroidScheduleMode.exactAllowWhileIdle;
+    final android = _plugin.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+    if (android == null) return AndroidScheduleMode.exactAllowWhileIdle;
+
+    // Android 12+ может запретить точные алармы. В этом случае выбираем inexact,
+    // чтобы напоминания "приходили", пусть и не минута-в-минуту.
+    try {
+      final dynamic dyn = android;
+      final dynamic res = await dyn.canScheduleExactNotifications();
+      final bool canExact = res is bool ? res : true;
+      return canExact
+          ? AndroidScheduleMode.exactAllowWhileIdle
+          : AndroidScheduleMode.inexactAllowWhileIdle;
+    } catch (_) {
+      // Метод может отсутствовать на старых версиях плагина — используем прежнее поведение.
+      return AndroidScheduleMode.exactAllowWhileIdle;
+    }
+  }
+
   void _logReminderStage(String stage, [Map<String, String>? data]) {
     final payload = data ?? const <String, String>{};
     debugPrint('REMINDER_PREFS[$stage] $payload');
@@ -573,4 +659,10 @@ class NotificationsService {
       );
     } catch (_) {}
   }
+}
+
+class NotificationsPermissionDenied implements Exception {
+  const NotificationsPermissionDenied();
+  @override
+  String toString() => 'Уведомления выключены в системных настройках';
 }

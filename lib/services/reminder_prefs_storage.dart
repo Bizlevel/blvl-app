@@ -13,12 +13,17 @@ class ReminderPrefsStorage {
   Future<(Set<int>, int, int)> load() async {
     final prefs = await SharedPreferences.getInstance();
     final List<String>? raw = prefs.getStringList(_kWeekdaysKey);
-    final Set<int> days = raw == null || raw.isEmpty
+    // ВАЖНО:
+    // - raw == null  → пользователь ещё не сохранял настройки → показываем дефолт.
+    // - raw.isEmpty  → пользователь явно выключил напоминания → возвращаем пустой набор.
+    final Set<int> days = raw == null
         ? {DateTime.monday, DateTime.wednesday, DateTime.friday}
-        : raw
-            .map((e) => int.tryParse(e) ?? 0)
-            .where((v) => v >= DateTime.monday && v <= DateTime.sunday)
-            .toSet();
+        : raw.isEmpty
+            ? <int>{}
+            : raw
+                .map((e) => int.tryParse(e) ?? 0)
+                .where((v) => v >= DateTime.monday && v <= DateTime.sunday)
+                .toSet();
     final hour = prefs.getInt(_kHourKey) ?? 19;
     final minute = prefs.getInt(_kMinuteKey) ?? 0;
     return (days, hour, minute);
