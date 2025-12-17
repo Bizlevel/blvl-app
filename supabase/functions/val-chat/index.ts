@@ -29,6 +29,9 @@ const SYSTEM_PROMPT = `Ты Валли — AI-валидатор идей шко
 - Короткие сообщения (2-4 предложения)
 - Один вопрос за раз
 - Если ответ расплывчатый — уточни
+- Избегай жёстких формулировок ("Ответ слишком общий", "Ответ не соответствует вопросу").
+  Вместо этого используй мягкие фразы: "чуть-чуть не хватает деталей про ...", "давай добавим примеры про ...".
+- Не повторяй одно и то же замечание подряд больше одного раза.
 - Используй эмпатию: "Понимаю", "Интересно", "Хороший вопрос"
 
 ПОСЛЕДОВАТЕЛЬНОСТЬ ВОПРОСОВ:
@@ -53,6 +56,147 @@ const SYSTEM_PROMPT = `Ты Валли — AI-валидатор идей шко
 
 ТОН:
 Прямота + Эмпатия + Конкретика`;
+
+// Промпт для валидатора ответа пользователя
+const VALIDATOR_PROMPT = `Ты строгий, но доброжелательный валидатор ответов пользователя на вопросы Валли.
+
+ТВОЯ ЗАДАЧА:
+Оценить, достаточно ли конкретен и развёрнут ответ пользователя для перехода к следующему вопросу.
+
+КРИТЕРИИ ОЦЕНКИ зависят от текущего шага (см. ниже).
+
+ШАГ 1 — ПРОВЕРЬ РЕЛЕВАНТНОСТЬ:
+- Сначала оцени, отвечает ли смысл ответа на сам ВОПРОС шага.
+- Если ответ явно про другое, состоит из бессмысленного набора букв/слов, мема или шутки,
+  или вообще не пытается ответить на вопрос → is_sufficient: false (даже если случайно задевает 1-2 критерия).
+
+ШАГ 2 — ПРОВЕРЬ ГЛУБИНУ (ТОЛЬКО ДЛЯ РЕЛЕВАНТНЫХ ОТВЕТОВ):
+- Считай ответ ДОСТАТОЧНЫМ (is_sufficient: true), если он покрывает хотя бы 2 из 3 критериев шага.
+- Ставь is_sufficient: false ТОЛЬКО если ответ:
+  - совсем общий ("хочу сделать приложение для всех", без деталей),
+  - очень короткий (1-2 общие фразы без примеров/деталей),
+  - не раскрывает ни одного критерия шага.
+- Будь требовательным, но не жёстким: хороший ответ с 1-2 конкретными деталями уже достаточен, чтобы двигаться дальше.
+
+ТОН ФИДБЕКА:
+- При is_sufficient: false можно мягко подсветить проблему, но избегай жёстких формулировок:
+  НЕ используй фразы вроде "Ответ слишком общий", "Ответ не соответствует вопросу", "Это не то".
+  Вместо этого пиши: "Чуть не хватает деталей про ...", "Давай добавим пару примеров о ...", "Хочется понять точнее ...".
+- При is_sufficient: true фидбек должен быть поддерживающим или нейтральным
+  (НЕ используй в feedback_short негативные формулировки про качество ответа).
+
+ФОРМАТ ОТВЕТА — СТРОГО JSON (без markdown, без комментариев):
+{
+  "is_sufficient": true/false,
+  "feedback_short": "Короткий фидбек (1 фраза)",
+  "missing_points": ["Что уточнить 1", "Что уточнить 2"],
+  "example_template": "Мини-шаблон ответа (3-6 строк)",
+  "repeat_question": "Перефразированный вопрос с мягким подталкиванием"
+}`;
+
+// ============================
+// Validation Steps Configuration
+// ============================
+interface ValidationStep {
+  id: number;
+  question: string;
+  criteria: string[];
+  exampleTemplate: string;
+}
+
+const VALIDATION_STEPS: ValidationStep[] = [
+  {
+    id: 1,
+    question: "Расскажи о своей идее. Что ты создаёшь?",
+    criteria: [
+      "Что конкретно создаётся (продукт/услуга)",
+      "Какой результат получит пользователь",
+      "Краткое описание сути (1-2 предложения)"
+    ],
+    exampleTemplate: `Например:
+"Я создаю мобильное приложение для учёта личных финансов.
+Пользователь сможет видеть все расходы в одном месте и получать рекомендации по экономии.
+Это поможет ему не тратить лишнего и копить на цели."`
+  },
+  {
+    id: 2,
+    question: "Какую проблему решает твоя идея? Кто от неё страдает?",
+    criteria: [
+      "Кто страдает (роль/тип человека/компании)",
+      "Как часто / в каком сценарии возникает боль",
+      "Почему это реально больно сейчас (последствия: деньги/время/стресс/риски)"
+    ],
+    exampleTemplate: `Например:
+"Фрилансеры и самозанятые теряют деньги, потому что не контролируют мелкие расходы.
+Каждый день они тратят 2000-3000 тенге на кофе, обеды, такси — в конце месяца не хватает на аренду.
+Это вызывает стресс и мешает копить на развитие бизнеса."`
+  },
+  {
+    id: 3,
+    question: "Для кого конкретно твоя идея? Кто твоя целевая аудитория?",
+    criteria: [
+      "Кто пользователь, кто покупатель (если отличаются)",
+      "Сегмент/роль (микро-сегмент, не 'все предприниматели')",
+      "Где найти этих людей (каналы: сообщества/площадки/поиск/офлайн)"
+    ],
+    exampleTemplate: `Например:
+"Фрилансеры из Алматы и Астаны, 25-35 лет, зарабатывают 300-700 тыс тенге в месяц.
+Работают в дизайне, маркетинге, IT.
+Ищу их в телеграм-каналах для фрилансеров, на Kwork, в коворкингах."`
+  },
+  {
+    id: 4,
+    question: "Как ты узнал об этой проблеме? Что уже проверял?",
+    criteria: [
+      "Откуда знание о проблеме (личный опыт / разговоры / наблюдения)",
+      "Что уже пробовали проверить (если ничего — так и пишем)",
+      "С кем разговаривал / какие сигналы получил"
+    ],
+    exampleTemplate: `Например:
+"Я сам фрилансер, постоянно сталкиваюсь с этой проблемой.
+Поговорил с 5 коллегами из коворкинга — все жалуются на то же самое.
+Запустил опрос в телеграм-канале — 80% ответили, что не контролируют расходы."`
+  },
+  {
+    id: 5,
+    question: "Как люди решают эту проблему сейчас? Кого считаешь конкурентами?",
+    criteria: [
+      "Как решают сейчас (ручные обходные пути/замены)",
+      "Почему текущие способы плохи (1-2 причины)",
+      "Кого считаешь альтернативой/конкурентом (хотя бы 1 пример или 'нет прямых, но есть замены')"
+    ],
+    exampleTemplate: `Например:
+"Сейчас люди записывают расходы в блокнот или Excel, но это неудобно и забывают вносить.
+Есть приложения типа 1Money, но они сложные и перегружены функциями.
+Некоторые вообще ничего не делают и просто тратят всё."`
+  },
+  {
+    id: 6,
+    question: "Почему именно ты? В чём твоё уникальное преимущество?",
+    criteria: [
+      "Почему вас сложно скопировать (скорость/доступ/компетенция/данные/комьюнити)",
+      "Что делаете лучше/проще текущих альтернатив",
+      "Личное преимущество (опыт/связи/знания)"
+    ],
+    exampleTemplate: `Например:
+"Я 5 лет работаю фрилансером, понимаю боли изнутри.
+Уже есть аудитория в 2000 подписчиков в телеграме.
+Сделаю самый простой интерфейс — 3 кнопки вместо 20 функций."`
+  },
+  {
+    id: 7,
+    question: "Что может убить твою идею? Какой главный риск?",
+    criteria: [
+      "Главный риск (спрос/канал/юнит-экономика/право/доступ)",
+      "План валидации на 24-72 часа (1-2 быстрых эксперимента)",
+      "Что сделаешь, если гипотеза не подтвердится (пивот/упрощение/другой сегмент)"
+    ],
+    exampleTemplate: `Например:
+"Главный риск — люди не захотят платить за ещё одно приложение.
+Проверю это за 3 дня: запущу пост с офером 'первым 50 — бесплатно навсегда'.
+Если не наберу 20 заявок — упрощу до телеграм-бота вместо приложения."`
+  }
+];
 
 const SCORING_PROMPT = `Оцени ответы пользователя по 5 критериям (0-20 каждый):
 
@@ -106,6 +250,166 @@ const SCORING_PROMPT = `Оцени ответы пользователя по 5 
 // ============================
 // Helper Functions
 // ============================
+
+/**
+ * Форматирует сообщение-уточнение при недостаточном ответе
+ */
+function formatClarificationMessage(validationResult: any, step: ValidationStep): string {
+  const { feedback_short, missing_points, example_template, repeat_question } = validationResult;
+  
+  let message = `${feedback_short}\n\n`;
+  
+  if (missing_points && missing_points.length > 0) {
+    message += `Уточни, пожалуйста:\n`;
+    missing_points.forEach((point: string) => {
+      message += `• ${point}\n`;
+    });
+    message += `\n`;
+  }
+  
+  if (example_template) {
+    message += `Ответ может быть примерно таким:\n${example_template}\n\n`;
+  }
+  
+  message += repeat_question || step.question;
+  
+  return message;
+}
+
+/**
+ * Двухпроходная валидация ответа пользователя
+ * 1) Generator (основной ответ Валли)
+ * 2) Validator (проверка достаточности ответа)
+ */
+async function validateUserResponse(
+  openai: any,
+  messages: any[],
+  currentStep: number
+): Promise<{ isValid: boolean; response: string; shouldAdvance: boolean }> {
+  const step = VALIDATION_STEPS.find(s => s.id === currentStep);
+  
+  if (!step) {
+    // Если шаг не найден (например, currentStep > 7), считаем валидацию пройденной
+    return {
+      isValid: true,
+      response: "Отличная работа! Теперь давай подведём итоги и оценим твою идею.",
+      shouldAdvance: false // Не продвигаем шаг, т.к. это конец
+    };
+  }
+
+  // ШАГ 1: Generator — генерируем ответ Валли
+  const generatorCompletion = await openai.chat.completions.create({
+    model: "grok-2-latest",
+    messages: [
+      { role: "system", content: SYSTEM_PROMPT },
+      ...messages
+    ],
+    temperature: 0.7,
+    max_tokens: 500,
+  });
+
+  const generatorResponse = generatorCompletion.choices[0].message.content;
+
+  // Получаем последнее сообщение пользователя
+  const lastUserMessage = messages
+    .slice()
+    .reverse()
+    .find((m: any) => m.role === 'user');
+
+  if (!lastUserMessage) {
+    // Если нет ответа пользователя (первое сообщение), возвращаем generator-ответ
+    return {
+      isValid: true,
+      response: generatorResponse,
+      shouldAdvance: false // Первый вопрос, не продвигаем шаг
+    };
+  }
+
+  // ТЕХНИЧЕСКИЙ ФИЛЬТР КАЧЕСТВА ОТВЕТА (до вызова валидатора)
+  const rawUserContent = String(lastUserMessage.content ?? '').trim();
+  const lettersOnly = rawUserContent.replace(/[^a-zA-ZА-Яа-яЁё]/g, '');
+
+  const isTooShort = rawUserContent.length < 15;
+  const hasFewLetters = lettersOnly.length < 5;
+
+  if (isTooShort || hasFewLetters) {
+    // Ответ слишком короткий/мусорный — мягко просим уточнить, не продвигаем шаг
+    const fallbackValidation = {
+      feedback_short: "Пока ответ очень короткий, давай добавим чуть больше деталей.",
+      missing_points: step.criteria,
+      example_template: step.exampleTemplate,
+      repeat_question: step.question,
+    };
+
+    const clarificationMessage = formatClarificationMessage(fallbackValidation, step);
+
+    return {
+      isValid: false,
+      response: clarificationMessage,
+      shouldAdvance: false,
+    };
+  }
+
+  // ШАГ 2: Validator — проверяем достаточность ответа
+  const criteriaText = step.criteria.map((c, i) => `${i + 1}. ${c}`).join('\n');
+  
+  const validatorPrompt = `${VALIDATOR_PROMPT}
+
+ТЕКУЩИЙ ШАГ: ${step.id}/7
+ВОПРОС ВАЛЛИ: "${step.question}"
+
+КРИТЕРИИ ДОСТАТОЧНОСТИ:
+${criteriaText}
+
+ОТВЕТ ПОЛЬЗОВАТЕЛЯ:
+"${lastUserMessage.content}"
+
+Оцени, достаточен ли ответ для перехода к следующему вопросу.`;
+
+  try {
+    const validatorCompletion = await openai.chat.completions.create({
+      model: "grok-2-latest",
+      messages: [
+        { role: "system", content: validatorPrompt },
+        { role: "user", content: "Оцени ответ пользователя согласно критериям." }
+      ],
+      temperature: 0.3,
+      max_tokens: 600,
+      response_format: { type: "json_object" },
+    });
+
+    const rawValidation = validatorCompletion.choices[0].message.content || "{}";
+    const validationResult = JSON.parse(rawValidation);
+
+    if (validationResult.is_sufficient === true) {
+      // Ответ достаточен → продвигаем шаг, возвращаем generator-ответ
+      return {
+        isValid: true,
+        response: generatorResponse,
+        shouldAdvance: true
+      };
+    } else {
+      // Ответ недостаточен → НЕ продвигаем шаг, возвращаем уточняющее сообщение
+      const clarificationMessage = formatClarificationMessage(validationResult, step);
+      return {
+        isValid: false,
+        response: clarificationMessage,
+        shouldAdvance: false
+      };
+    }
+  } catch (validatorError) {
+    // Fail-safe: при ошибке валидатора НЕ продвигаем шаг
+    console.error('ERR validator_failed', { message: String(validatorError).slice(0, 200), step: currentStep });
+    
+    // Возвращаем стандартное уточнение
+    return {
+      isValid: false,
+      response: `Хм, не совсем понял твой ответ. Попробуй ответить более развёрнуто, чтобы я мог лучше оценить идею.\n\n${step.exampleTemplate}\n\n${step.question}`,
+      shouldAdvance: false
+    };
+  }
+}
+
 function getArchetypeDescription(archetype: string): string {
   const descriptions = {
     'МЕЧТАТЕЛЬ': 'Идея пока в голове — давай приземлим её на реальность',
@@ -119,7 +423,7 @@ function getArchetypeDescription(archetype: string): string {
 
 function generateReport(scoringResult: any): string {
   const { total, archetype, strengths, red_flags, one_thing, recommended_levels } = scoringResult;
-  
+
   let report = `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 📊 **ТВОЙ РЕЗУЛЬТАТ: ${total}/100**
@@ -131,37 +435,45 @@ function generateReport(scoringResult: any): string {
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ✅ **ЧТО УЖЕ ХОРОШО**
-
 `;
 
-  strengths.forEach((strength: string) => {
-    report += `• ${strength}<br>\n`;
-  });
+  if (Array.isArray(strengths) && strengths.length > 0) {
+    report += '\n';
+    strengths.forEach((strength: string) => {
+      report += `- ${strength}\n`;
+    });
+  } else {
+    report += '\n- (пока без явных сильных сторон — это тоже результат)\n';
+  }
 
   report += `
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 🚩 **КРАСНЫЕ ФЛАГИ** (вопросы без ответа)
-
 `;
 
-  red_flags.forEach((flag: string) => {
-    report += `• ${flag}<br>\n`;
-  });
+  if (Array.isArray(red_flags) && red_flags.length > 0) {
+    report += '\n';
+    red_flags.forEach((flag: string) => {
+      report += `- ${flag}\n`;
+    });
+  } else {
+    report += '\n- Явных красных флагов нет, но продолжай проверять гипотезы.\n';
+  }
 
   report += `
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 📚 **ЧТО ИЗУЧИТЬ В BIZLEVEL**
-
 `;
 
   if (recommended_levels && recommended_levels.length > 0) {
+    report += '\n';
     recommended_levels.forEach((level: any) => {
-      report += `· **Уровень ${level.level_number}: ${level.name || 'Урок'}** — ${level.reason}<br>\n`;
+      report += `- **Уровень ${level.level_number}: ${level.name || 'Урок'}** — ${level.reason}\n`;
     });
   } else {
-    report += `· Пока нет конкретных рекомендаций — продолжай валидацию!<br>\n`;
+    report += '\n- Пока нет конкретных рекомендаций — продолжай валидацию!\n';
   }
 
   report += `
@@ -370,23 +682,54 @@ serve(async (req) => {
 
     // Mode: DIALOG (default)
     if (mode === 'dialog') {
-      // Generate next question
-      const completion = await openai.chat.completions.create({
-        model: "grok-2-latest",
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          ...messages
-        ],
-        temperature: 0.7,
-        max_tokens: 500,
-      });
+      // Получаем текущий шаг валидации
+      let currentStep = 1;
+      
+      if (validationId) {
+        const { data: validation, error: validationError } = await supabaseAdmin
+          .from('idea_validations')
+          .select('current_step')
+          .eq('id', validationId)
+          .eq('user_id', userId)
+          .single();
+        
+        if (validationError) {
+          console.error('ERR get_current_step', { message: validationError.message });
+        } else if (validation) {
+          currentStep = validation.current_step || 1;
+        }
+      }
 
-      const assistantMessage = completion.choices[0].message.content;
+      // Двухпроходная валидация: generator + validator
+      const validationResult = await validateUserResponse(openai, messages, currentStep);
+
+      // Если ответ достаточен и нужно продвинуть шаг
+      if (validationResult.shouldAdvance && validationId && currentStep < 7) {
+        const newStep = currentStep + 1;
+        
+        const { error: updateError } = await supabaseAdmin
+          .from('idea_validations')
+          .update({ current_step: newStep })
+          .eq('id', validationId)
+          .eq('user_id', userId);
+        
+        if (updateError) {
+          console.error('ERR update_step', { message: updateError.message, currentStep, newStep });
+        } else {
+          console.log('INFO step_advanced', { validationId, from: currentStep, to: newStep });
+        }
+      } else if (!validationResult.shouldAdvance) {
+        console.log('INFO step_blocked', { validationId, currentStep, isValid: validationResult.isValid });
+      }
 
       return new Response(
         JSON.stringify({
-          message: { role: "assistant", content: assistantMessage },
-          usage: completion.usage,
+          message: { role: "assistant", content: validationResult.response },
+          metadata: {
+            current_step: currentStep,
+            is_valid: validationResult.isValid,
+            should_advance: validationResult.shouldAdvance
+          }
         }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );

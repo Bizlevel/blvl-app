@@ -224,6 +224,22 @@ class _ValiDialogScreenState extends ConsumerState<ValiDialogScreen> {
       );
 
       final assistantMessage = response['message']['content'] as String? ?? '';
+      final meta = response['metadata'] as Map<String, dynamic>?;
+
+      // Используем флаг backend-валидации: можно ли продвинуться дальше
+      final bool shouldAdvance = meta == null
+          ? true
+          : (meta['should_advance'] == true);
+
+      // Текущий шаг на backend до возможного инкремента
+      final int backendStep =
+          meta != null && meta['current_step'] is int ? meta['current_step'] as int : _currentStep;
+
+      // Локально считаем следующий шаг так же, как backend:
+      int nextStep = backendStep;
+      if (shouldAdvance && backendStep < maxSteps) {
+        nextStep = backendStep + 1;
+      }
 
       // Сохраняем ответ Валли в БД
       await _vali.saveConversation(
@@ -236,18 +252,14 @@ class _ValiDialogScreenState extends ConsumerState<ValiDialogScreen> {
       if (!mounted) return;
       setState(() {
         _messages.add({'role': 'assistant', 'content': assistantMessage});
-        
-        // Увеличиваем шаг после каждого вопроса пользователя
-        if (_currentStep < maxSteps) {
-          _currentStep++;
-        }
+        _currentStep = nextStep;
       });
 
-      // Обновляем прогресс в БД
-      if (_validationId != null) {
+      // Обновляем прогресс в БД только если backend решил продвинуть шаг
+      if (_validationId != null && shouldAdvance) {
         await _vali.updateValidationProgress(
           validationId: _validationId!,
-          currentStep: _currentStep,
+          currentStep: nextStep,
         );
       }
 
@@ -638,11 +650,16 @@ class _ValiDialogScreenState extends ConsumerState<ValiDialogScreen> {
 
   Widget _buildReportView() {
     final reportRaw = _validationData?['report_markdown'] as String? ?? '';
-    // Убираем разделители "----" и "━━━" из markdown
+
+    // Нормализуем markdown-отчёт:
+    // - убираем текстовые разделители "----" и "━━━"
+    // - конвертируем HTML-переносы <br> в обычные переводы строк
+    // - схлопываем тройные переводы строк
     final report = reportRaw
+        .replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n')
         .replaceAll(RegExp(r'^----+$', multiLine: true), '')
         .replaceAll(RegExp(r'^━━━+$', multiLine: true), '')
-        .replaceAll(RegExp(r'\n\n\n+', multiLine: true), '\n\n')
+        .replaceAll(RegExp(r'\n{3,}', multiLine: true), '\n\n')
         .trim();
     final totalScore = _validationData?['total_score'] as int? ?? 0;
     final archetype = _validationData?['archetype'] as String? ?? 'МЕЧТАТЕЛЬ';

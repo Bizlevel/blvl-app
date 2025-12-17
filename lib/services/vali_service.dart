@@ -6,7 +6,6 @@ import 'package:dio/dio.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bizlevel/utils/env_helper.dart';
-import 'package:bizlevel/services/gp_service.dart';
 
 /// Typed failure for any Vali related errors.
 class ValiFailure implements Exception {
@@ -502,14 +501,17 @@ class ValiService {
     if (user == null) throw ValiFailure('Не авторизован');
 
     try {
-      final result = await _client
+      // Проверяем наличие хотя бы одной завершённой валидации.
+      // Запрашиваем только один id, чтобы не тянуть все строки.
+      final List<dynamic> result = await _client
           .from('idea_validations')
           .select('id')
           .eq('user_id', user.id)
-          .eq('status', 'completed');
+          .eq('status', 'completed')
+          .limit(1);
 
-      final count = (result as List).length;
-      return count == 0;
+      // Если записей нет — это первая валидация.
+      return result.isEmpty;
     } on PostgrestException catch (e) {
       debugPrint('Warning: Failed to check first validation: ${e.message}');
       return false; // При ошибке считаем, что не первая (безопаснее)
