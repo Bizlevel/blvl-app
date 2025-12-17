@@ -27,6 +27,9 @@ class ValiService {
 
   final SupabaseClient _client;
 
+  /// Стоимость валидации в GP (для повторных валидаций, первая бесплатна)
+  static const int kValidationCostGp = 20;
+
   // Используем Dio для Edge Functions
   static final Dio _edgeDio = Dio(BaseOptions(
     baseUrl:
@@ -128,7 +131,7 @@ class ValiService {
 
   String _humanizeServerError(String raw) {
     if (raw.contains('insufficient_gp')) {
-      return 'Недостаточно GP для валидации. Нужно 100 GP.';
+      return 'Недостаточно GP для валидации. Нужно ${ValiService.kValidationCostGp} GP.';
     }
     if (raw.contains('openai_config_error') || raw.contains('xai')) {
       return 'Сервис ИИ не настроен. Обратитесь к поддержке.';
@@ -144,11 +147,15 @@ class ValiService {
   /// Отправляет сообщение в режиме диалога (mode='dialog').
   /// Возвращает ответ ассистента + usage статистику.
   /// 
-  /// GP-экономика: первая валидация бесплатно, повторные — 100 GP.
+  /// GP-экономика: первая валидация бесплатно, повторные — [kValidationCostGp] GP.
   /// При недостаточном балансе выбрасывается [ValiFailure] с кодом 402.
+  /// 
+  /// [action] - опциональный параметр для специальных действий:
+  ///   - 'start_validation' - начать валидацию (списать GP и перейти на Step 1)
   Future<Map<String, dynamic>> sendMessage({
     required List<Map<String, dynamic>> messages,
     String? validationId,
+    String? action,
   }) async {
     final session = _client.auth.currentSession;
     if (session == null) {
@@ -166,6 +173,7 @@ class ValiService {
           'messages': messages,
           'validationId': validationId,
           'mode': 'dialog',
+          if (action != null) 'action': action,
         });
 
         final response = await _postValChat(payload);
@@ -193,12 +201,12 @@ class ValiService {
         if (_isInsufficientGpError(e)) {
           _addBreadcrumb('vali', 'insufficient_gp', {
             'validationId': validationId ?? 'new',
-            'required': 100,
+            'required': ValiService.kValidationCostGp,
           });
           throw ValiFailure(
-            'Недостаточно GP. Нужно 100 GP для валидации идеи.',
+            'Недостаточно GP. Нужно ${ValiService.kValidationCostGp} GP для валидации идеи.',
             statusCode: 402,
-            data: {'required': 100},
+            data: {'required': ValiService.kValidationCostGp},
           );
         }
 
@@ -325,7 +333,7 @@ class ValiService {
             'user_id': user.id,
             if (chatId != null) 'chat_id': chatId,
             'status': 'in_progress',
-            'current_step': 1,
+            'current_step': 0, // Начинаем с Step 0 (онбординг)
             if (ideaSummary != null) 'idea_summary': ideaSummary,
           })
           .select('id')

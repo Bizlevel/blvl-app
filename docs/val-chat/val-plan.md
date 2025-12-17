@@ -1,8 +1,8 @@
 # План реализации бота Валли — AI-валидатора идей
 
-**Статус:** В процессе реализации  
+**Статус:** V2.0 — Slot Filling Architecture  
 **Дата начала:** 15.12.2024  
-**Последнее обновление:** 15.12.2024
+**Последнее обновление:** 17.12.2024 (переход на Slot Filling)
 
 ---
 
@@ -20,36 +20,61 @@
   - ✅ Интеграция с Максом (CTA кнопка)
   - ✅ Интеграция с уровнями (CTA кнопка)
   - ✅ GP-экономика (обработка 402)
- - ✅ **Этап 5: Дополнительные точки входа** — Завершён (см. ENTRY_POINTS_SUMMARY.md)
+- ✅ **Этап 5: Дополнительные точки входа** — Завершён (см. ENTRY_POINTS_SUMMARY.md)
+- ✅ **Этап 6: Рефакторинг на Slot Filling** — Завершён (17.12.2024)
+  - ✅ 6.1 Миграция БД (slots_state, retry_count)
+  - ✅ 6.2 Slot Filling Validator Prompt
+  - ✅ 6.3 Логика validateUserResponseSlotFilling
+  - ✅ 6.4 Функции mergeSlots, safeParseSlotFillingResponse
+  - ✅ 6.5 Soft Validation (retry_count >= 2)
+  - ✅ 6.6 Документация (SLOT_FILLING_ARCHITECTURE.md)
 
 ---
 
-## 🎉 MVP ЗАВЕРШЁН (15.12.2024)
+## 🎉 V2.0 ЗАВЕРШЁН (17.12.2024) — Slot Filling Architecture
 
 **Статус:** ✅ Готов к тестированию и деплою
 
 **Что готово:**
-- ✅ Backend (БД, Edge Function, GP-экономика)
+- ✅ Backend (БД с slots_state, Edge Function, GP-экономика)
 - ✅ Frontend (ValiService, ValiDialogScreen, интеграция)
-- ✅ Документация (6 файлов, ~2500 строк)
+- ✅ Slot Filling Architecture (накопительная валидация)
+- ✅ Документация (7 файлов, ~3500 строк)
 - ✅ Примеры кода (2 файла, ~400 строк)
 
-**Функциональность:**
-- ✅ Диалог с Валли (7 вопросов / 7 шагов)
+**Функциональность V2.0:**
+- ✅ Диалог с Валли (7 слотов, гибкие переходы)
+- ✅ Slot Filling валидация (анализ всей истории)
+- ✅ Soft Validation (защита от блокировки после 2 попыток)
 - ✅ Прогресс-бар
 - ✅ Скоринг и отчёт
-- ✅ CTA кнопки
+- ✅ CTA кнопки (уровни, переход к Максу)
 - ✅ История чатов
 - ✅ GP-экономика
-‑ ✅ Контроль качества ответов (двухпроходная валидация на backend)
+
+**Улучшения V2.0 vs V1.0:**
+- 🚀 Нет риска блокировки пользователя (soft validation)
+- 🚀 Гибкие переходы между шагами (можно перепрыгивать)
+- 🚀 Анализ всей истории диалога (не только последнего ответа)
 
 **Готов к:**
 - 🧪 Функциональному тестированию
 - 🎨 UX тестированию
 - 🔗 Интеграционному тестированию
 - 👥 Beta-тестированию с пользователями
+- 📊 Мониторингу метрик Slot Filling
 
 ---
+
+---
+
+## 📚 Документация V2.0
+
+**Ключевые документы:**
+- 📖 **[SLOT_FILLING_ARCHITECTURE.md](./SLOT_FILLING_ARCHITECTURE.md)** — Полное описание Slot Filling архитектуры
+- 📖 [vali-service-usage.md](./vali-service-usage.md) — Использование ValiService
+- 📖 [vali-dialog-screen-usage.md](./vali-dialog-screen-usage.md) — Использование ValiDialogScreen
+- 📖 [base-trainers-integration.md](./base-trainers-integration.md) — Интеграция в Base Trainers
 
 ---
 
@@ -66,15 +91,16 @@
 │ • ValiDialogScreen (переиспользует LeoDialogScreen)     │
 │ • Карточка Валли в Base Trainers                        │
 │ • Отображение отчёта со скорингом                       │
-│ • CTA кнопки (к Максу, к уровням)                       │
+│ • CTA кнопки (переход к уровням и к Максу)              │
 └───────────────────┬─────────────────────────────────────┘
                     │
 ┌───────────────────▼─────────────────────────────────────┐
-│              EDGE FUNCTION: val-chat                     │
+│              EDGE FUNCTION: val-chat (V2.0)              │
 ├─────────────────────────────────────────────────────────┤
 │ • Системный промпт Валли                                │
-│ • Логика 7 вопросов (адаптивная, пошаговая)             │
-│ • Контроль качества ответов (двухпроходная валидация)   │
+│ • Slot Filling валидация (7 слотов)                     │
+│ • Накопительный анализ всей истории                     │
+│ • Soft Validation (retry_count >= 2)                    │
 │ • Скоринг по 5 критериям (0-20 каждый)                  │
 │ • Генерация отчёта (markdown)                           │
 │ • Маппинг рекомендаций BizLevel                         │
@@ -83,7 +109,7 @@
 ┌───────────────────▼─────────────────────────────────────┐
 │              SUPABASE (PostgreSQL)                       │
 ├─────────────────────────────────────────────────────────┤
-│ • idea_validations (метаданные валидаций)               │
+│ • idea_validations (метаданные + slots_state JSONB)     │
 │ • leo_chats (bot='vali') — история диалога              │
 │ • leo_messages (сообщения)                              │
 └─────────────────────────────────────────────────────────┘
@@ -199,7 +225,7 @@ ALTER TABLE leo_chats
 8. ✅ Интеграция с xAI (Grok API)
 9. ✅ Аутентификация через JWT
 10. ✅ Сохранение результатов в таблицу `idea_validations`
-11. ✅ **GP-экономика** — первая валидация бесплатно, остальные 100 GP
+11. ✅ **GP-экономика** — первая валидация бесплатно, остальные 20 GP
 12. ✅ **Функция задеплоена в Supabase** (15.12.2024, 12:48 PM)
 
 ### Файлы:
@@ -494,12 +520,12 @@ const levelMapping = {
 
 **Модель монетизации:**
 - Первая валидация — **БЕСПЛАТНО** (онбординг)
-- Повторные валидации — **100 GP** за сессию
+- Повторные валидации — **20 GP** за сессию
 - История валидаций — всегда доступна
 
 **Что реализовано:**
 1. ✅ Проверка количества завершённых валидаций пользователя
-2. ✅ Списание 100 GP через RPC функцию `gp_spend`
+2. ✅ Списание 20 GP через RPC функцию `gp_spend`
 3. ✅ Обработка ошибки недостаточного баланса (402 Payment Required)
 4. ✅ Логирование бесплатной первой валидации
 5. ✅ Сохранение `gp_spent` в таблице `idea_validations`
@@ -518,11 +544,11 @@ const { count } = await supabaseAdmin
 const isFirstValidation = (count || 0) === 0;
 
 if (!isFirstValidation) {
-  // Списываем 100 GP через RPC
+  // Списываем VALIDATION_COST_GP через RPC
   const { data: spendResult, error: spendError } = await supabaseAdmin
     .rpc('gp_spend', {
       p_type: 'idea_validation',
-      p_amount: 100,
+      p_amount: VALIDATION_COST_GP,
       p_reference_id: validationId || '',
       p_idempotency_key: `validation_${userId}_${Date.now()}`,
     });
@@ -533,8 +559,8 @@ if (!isFirstValidation) {
       return new Response(
         JSON.stringify({ 
           error: "insufficient_gp",
-          message: "Недостаточно GP. Нужно 100 GP для валидации идеи.",
-          required: 100
+          message: `Недостаточно GP. Нужно ${VALIDATION_COST_GP} GP для валидации идеи.`,
+          required: VALIDATION_COST_GP
         }),
         { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -831,7 +857,7 @@ if (bot == 'vali') {
 
 - ✅ Markdown рендеринг через `flutter_markdown`
 - ✅ Карточка с баллом и архетипом
-- ✅ CTA кнопки (уровни, Макс, новая валидация)
+- ✅ CTA кнопки (уровни, переход к Максу, новая валидация)
 - ✅ Responsive layout
 
 **Примечание:** Отдельный виджет `ValiReportWidget` не требуется, так как логика уже встроена в ValiDialogScreen.
@@ -915,10 +941,10 @@ class ValiReportWidget extends StatelessWidget {
     
     return Column(
       children: [
-        // Кнопка к Максу
+        // Кнопка к Максу (только переход, без передачи данных Валли)
         ElevatedButton(
           onPressed: () {
-            // Переход к Max с контекстом
+            // Переход к Max
           },
           child: Text('Поставить цель с Максом'),
         ),
@@ -951,45 +977,7 @@ class ValiReportWidget extends StatelessWidget {
 
 ## Этап 4: Интеграции
 
-### 4.1 Интеграция с Максом
-
-После завершения валидации при нажатии "Поставить цель с Максом":
-
-```dart
-void _navigateToMax(BuildContext context, Map<String, dynamic> validation) {
-  final ideaSummary = validation['idea_summary'] ?? '';
-  final oneThing = validation['one_thing'] ?? '';
-  
-  final userContext = '''
-Идея пользователя: $ideaSummary
-
-Валли рекомендует сделать на этой неделе: $oneThing
-
-Рекомендованный срок: 7 дней
-''';
-  
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) => FutureBuilder<List<String?>>(
-        future: Future.wait([
-          ContextService.buildUserContext(user),
-          Future.value(userContext), // Передаём контекст от Валли
-        ]),
-        builder: (context, snap) {
-          return LeoDialogScreen(
-            userContext: snap.data?[1], // Контекст от Валли
-            levelContext: null,
-            bot: 'max',
-          );
-        },
-      ),
-    ),
-  );
-}
-```
-
-### 4.2 Навигация к уровням
+### 4.1 Навигация к уровням
 
 При нажатии "Пройти Уровень X":
 
@@ -999,7 +987,7 @@ void _navigateToLevel(BuildContext context, int levelNumber) {
   // Например, через GoRouter или существующий механизм
   context.go('/levels/$levelNumber');
   
-  // Или показать SnackBar с контекстом:
+  // Или показать SnackBar с пояснением:
   ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(
       content: Text('Валли рекомендовал этот уровень для твоей идеи'),
@@ -1008,7 +996,7 @@ void _navigateToLevel(BuildContext context, int levelNumber) {
 }
 ```
 
-### 4.3 GP-экономика (Frontend)
+### 4.2 GP-экономика (Frontend)
 
 В `ValiService` добавить проверку перед созданием валидации:
 
@@ -1029,7 +1017,7 @@ Future<String> createValidation({String? chatId}) async {
     final balance = await gpService.getBalance();
     
     if (balance < 100) {
-      throw ValiFailure('Недостаточно GP. Нужно 100 GP для валидации идеи.');
+      throw ValiFailure('Недостаточно GP. Нужно 20 GP для валидации идеи.');
     }
     
     // Списываем GP (или это делается на сервере?)
@@ -1073,7 +1061,7 @@ Future<String> createValidation({String? chatId}) async {
    - Логика скоринга (режим `score`, JSON output) ✅
    - Генерация отчёта (markdown) ✅
    - Маппинг рекомендаций BizLevel ✅
-4. ✅ **GP-логика**: проверка первой валидации, списание 100 GP — выполнено
+4. ✅ **GP-логика**: проверка первой валидации, списание 20 GP — выполнено
    - Проверка количества завершённых валидаций ✅
    - Списание через RPC `gp_spend` ✅
    - Обработка ошибки недостаточного баланса ✅
@@ -1100,9 +1088,9 @@ Future<String> createValidation({String? chatId}) async {
    - Прогресс-бар (1/7, 2/7, ..., 7/7) ✅
    - Скоринг после завершения ✅
    - Отображение отчёта (markdown) ✅
-4. ✅ **CTA кнопки**: интеграция с Максом и уровнями — выполнено
+4. ✅ **CTA кнопки**: действия после валидации — выполнено
    - "Пройти рекомендованный урок" ✅
-   - "Поставить цель с Максом" ✅
+   - "Поставить цель с Максом" (переход в Max без передачи данных Валли) ✅
    - "Проверить другую идею" ✅
 5. ✅ **GP-логика на фронтенде**: обработка 402 ошибки — выполнено
    - Диалог пополнения GP ✅

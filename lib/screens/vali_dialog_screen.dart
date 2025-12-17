@@ -34,12 +34,43 @@ class ValiDialogScreen extends ConsumerStatefulWidget {
   ConsumerState<ValiDialogScreen> createState() => _ValiDialogScreenState();
 }
 
-class _ValiDialogScreenState extends ConsumerState<ValiDialogScreen> {
+class _ValiDialogScreenState extends ConsumerState<ValiDialogScreen>
+    with SingleTickerProviderStateMixin {
   static const int maxSteps = 7;
+  static const List<String> _slotOrder = [
+    'product',
+    'problem',
+    'audience',
+    'validation',
+    'competitors',
+    'utp',
+    'risks',
+  ];
+
+  static const Map<String, String> _slotTitles = {
+    'product': 'Суть идеи',
+    'problem': 'Проблема',
+    'audience': 'Целевая аудитория',
+    'validation': 'Валидация',
+    'competitors': 'Конкуренты',
+    'utp': 'Уникальное преимущество',
+    'risks': 'Риски',
+  };
+
+  static const Map<String, IconData> _slotIcons = {
+    'product': Icons.lightbulb_outline,
+    'problem': Icons.warning_amber_outlined,
+    'audience': Icons.group_outlined,
+    'validation': Icons.check_circle_outline,
+    'competitors': Icons.track_changes_outlined,
+    'utp': Icons.star_outline,
+    'risks': Icons.shield_outlined,
+  };
 
   String? _chatId;
   String? _validationId;
   Map<String, dynamic>? _validationData;
+  Map<String, dynamic>? _slotsState;
 
   final _scrollController = ScrollController();
   final _inputController = TextEditingController();
@@ -48,19 +79,33 @@ class _ValiDialogScreenState extends ConsumerState<ValiDialogScreen> {
 
   bool _isSending = false;
   bool _isScoring = false;
+  bool _isAnalyzing = false;
   bool _showScrollToBottom = false;
-  int _currentStep = 1;
+  int _currentStep = 0; // Начинаем с Step 0 (онбординг)
+  Map<String, dynamic>? _onboardingMetadata; // Метаданные для кнопок онбординга
 
   late final ValiService _vali;
+  late final AnimationController _focusPulseController;
+  late final Animation<double> _focusPulse;
 
   // Debounce timer
   Timer? _debounceTimer;
   static const Duration _debounceDelay = Duration(milliseconds: 500);
 
-
   @override
   void initState() {
     super.initState();
+    _focusPulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat(reverse: true);
+
+    _focusPulse = Tween<double>(begin: 0.92, end: 1.08).animate(
+      CurvedAnimation(
+        parent: _focusPulseController,
+        curve: Curves.easeInOut,
+      ),
+    );
     _vali = ValiService(Supabase.instance.client);
     _chatId = widget.chatId;
     _validationId = widget.validationId;
@@ -84,6 +129,7 @@ class _ValiDialogScreenState extends ConsumerState<ValiDialogScreen> {
   @override
   void dispose() {
     _debounceTimer?.cancel();
+    _focusPulseController.dispose();
     _scrollController.dispose();
     _inputController.dispose();
     _inputFocus.dispose();
@@ -102,20 +148,25 @@ class _ValiDialogScreenState extends ConsumerState<ValiDialogScreen> {
 
       if (_validationId != null) {
         // Загружаем существующую валидацию
-        _validationData = await _vali.getValidation(_validationId!);
-        
-        if (_validationData == null) {
+        final validation = await _vali.getValidation(_validationId!);
+
+        if (validation == null) {
           throw ValiFailure('Валидация не найдена');
         }
 
-        _currentStep = _validationData!['current_step'] ?? 1;
-        _chatId = _validationData!['chat_id'] ?? _chatId;
+        final nextStep = validation['current_step'] ?? 0;
+        final normalizedSlots = _normalizeSlotsState(validation['slots_state']);
+        final status = (validation['status'] as String?) ?? 'in_progress';
 
-        // Если валидация завершена, показываем отчёт
-        if (_validationData!['status'] == 'completed') {
-          if (mounted) {
-            setState(() {});
-          }
+        if (!mounted) return;
+        setState(() {
+          _validationData = validation;
+          _slotsState = normalizedSlots;
+          _currentStep = nextStep is int ? nextStep : 0;
+          _chatId = validation['chat_id'] ?? _chatId;
+        });
+
+        if (status == 'completed') {
           return;
         }
 
@@ -132,14 +183,39 @@ class _ValiDialogScreenState extends ConsumerState<ValiDialogScreen> {
 
         // Добавляем приветственное сообщение от Валли
         if (mounted) {
+          // Проверяем, первая ли это валидация (для определения цены)
+          final isFirst = await _vali.isFirstValidation();
+          
           setState(() {
+            _currentStep = 0; // Устанавливаем Step 0 для онбординга
             _messages.add({
               'role': 'assistant',
-              'content': 'Привет! Я Валли — помогаю проверить бизнес-идеи на прочность.\n\n'
-                  'Задам 7 коротких вопросов, а потом дам честную оценку: что уже хорошо, '
-                  'а где есть слепые зоны.\n\nРасскажи, какую идею хочешь проверить?',
+              'content': 'Привет! Я Валли 🤖 Я здесь, чтобы сэкономить тебе время и деньги. '
+                  'Вместо того чтобы пилить продукт полгода, давай проверим твою идею за 10 минут. '
+                  'Я задам вопросы, найду слабые места и дам отчет.\n\n'
+                  'Готов начать или хочешь узнать обо мне больше?',
               'created_at': DateTime.now().toIso8601String(),
             });
+            
+            // Устанавливаем метаданные онбординга локально (кнопки появятся сразу)
+            _onboardingMetadata = {
+              'price': isFirst ? 0 : ValiService.kValidationCostGp,
+              'is_free': isFirst,
+              'actions': [
+                {
+                  'id': 'start_validation',
+                  'label': isFirst 
+                      ? 'Начать проверку (Бесплатно)' 
+                      : 'Начать проверку (${ValiService.kValidationCostGp} GP)',
+                  'is_primary': true,
+                },
+                {
+                  'id': 'ask_about',
+                  'label': 'А что ты умеешь?',
+                  'is_primary': false,
+                },
+              ],
+            };
           });
           _scrollToBottom();
         }
@@ -173,6 +249,27 @@ class _ValiDialogScreenState extends ConsumerState<ValiDialogScreen> {
     } catch (e) {
       debugPrint('Failed to load messages: $e');
     }
+  }
+
+  Map<String, dynamic>? _normalizeSlotsState(dynamic raw) {
+    if (raw is Map<String, dynamic>) {
+      return Map<String, dynamic>.from(raw);
+    }
+    if (raw is Map) {
+      return Map<String, dynamic>.from(
+        raw.map((key, value) => MapEntry(key.toString(), value)),
+      );
+    }
+    return null;
+  }
+
+  void _applySlotsState(dynamic raw) {
+    final normalized = _normalizeSlotsState(raw);
+    if (normalized == null) return;
+    if (!mounted) return;
+    setState(() {
+      _slotsState = normalized;
+    });
   }
 
   void _scrollToBottom() => WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -226,20 +323,24 @@ class _ValiDialogScreenState extends ConsumerState<ValiDialogScreen> {
       final assistantMessage = response['message']['content'] as String? ?? '';
       final meta = response['metadata'] as Map<String, dynamic>?;
 
-      // Используем флаг backend-валидации: можно ли продвинуться дальше
-      final bool shouldAdvance = meta == null
-          ? true
-          : (meta['should_advance'] == true);
-
-      // Текущий шаг на backend до возможного инкремента
-      final int backendStep =
-          meta != null && meta['current_step'] is int ? meta['current_step'] as int : _currentStep;
-
-      // Локально считаем следующий шаг так же, как backend:
-      int nextStep = backendStep;
-      if (shouldAdvance && backendStep < maxSteps) {
-        nextStep = backendStep + 1;
+      // Сохраняем метаданные онбординга если они есть
+      if (meta?['onboarding'] != null) {
+        setState(() {
+          _onboardingMetadata = meta!['onboarding'] as Map<String, dynamic>?;
+        });
+      } else {
+        setState(() {
+          _onboardingMetadata = null; // Скрываем кнопки онбординга когда перешли на Step 1+
+        });
       }
+
+      // Проверяем флаг завершения валидации от backend
+      final bool isComplete = meta?['is_complete'] == true;
+
+      // Текущий шаг на backend
+      final int backendStep = meta != null && meta['current_step'] is int
+          ? meta['current_step'] as int
+          : _currentStep;
 
       // Сохраняем ответ Валли в БД
       await _vali.saveConversation(
@@ -252,14 +353,16 @@ class _ValiDialogScreenState extends ConsumerState<ValiDialogScreen> {
       if (!mounted) return;
       setState(() {
         _messages.add({'role': 'assistant', 'content': assistantMessage});
-        _currentStep = nextStep;
+        _currentStep = backendStep;
       });
 
-      // Обновляем прогресс в БД только если backend решил продвинуть шаг
-      if (_validationId != null && shouldAdvance) {
+      _applySlotsState(meta?['slots_state']);
+
+      // Обновляем прогресс в БД
+      if (_validationId != null) {
         await _vali.updateValidationProgress(
           validationId: _validationId!,
-          currentStep: nextStep,
+          currentStep: backendStep,
         );
       }
 
@@ -270,23 +373,24 @@ class _ValiDialogScreenState extends ConsumerState<ValiDialogScreen> {
 
       _scrollToBottom();
 
-      // Если достигли 7-го шага, предлагаем завершить валидацию
-      if (_currentStep >= maxSteps && mounted) {
+      // Если валидация завершена (backend вернул is_complete), показываем диалог
+      if (isComplete && mounted) {
+        setState(() => _isAnalyzing = true);
         await _showCompletionDialog();
       }
     } on ValiFailure catch (e) {
       if (!mounted) return;
-      
+
       if (e.statusCode == 402) {
         // Недостаточно GP
-        _showInsufficientGpDialog(e.data?['required'] ?? 100);
+        _showInsufficientGpDialog(e.data?['required'] ?? ValiService.kValidationCostGp);
       } else {
         _showError(e.message);
       }
     } catch (e) {
       if (!mounted) return;
       _showError('Ошибка: $e');
-      
+
       try {
         await Sentry.captureException(e);
       } catch (_) {}
@@ -320,6 +424,9 @@ class _ValiDialogScreenState extends ConsumerState<ValiDialogScreen> {
 
     if (confirmed == true && mounted) {
       await _requestScoring();
+    } else if (confirmed == false && mounted) {
+      // Пользователь отказался — снимаем флаг анализа
+      setState(() => _isAnalyzing = false);
     }
   }
 
@@ -384,11 +491,13 @@ class _ValiDialogScreenState extends ConsumerState<ValiDialogScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
       _showError('Ошибка анализа: ${e.message}');
+      setState(() => _isAnalyzing = false);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
       _showError('Не удалось проанализировать идею: $e');
-      
+      setState(() => _isAnalyzing = false);
+
       try {
         await Sentry.captureException(e);
       } catch (_) {}
@@ -416,7 +525,7 @@ class _ValiDialogScreenState extends ConsumerState<ValiDialogScreen> {
         title: const Text('Недостаточно GP'),
         content: Text(
           'Для валидации идеи нужно $required GP.\n\n'
-          'Первая валидация бесплатно, повторные — 100 GP.',
+          'Первая валидация бесплатно, повторные — ${ValiService.kValidationCostGp} GP.',
         ),
         actions: [
           TextButton(
@@ -426,7 +535,7 @@ class _ValiDialogScreenState extends ConsumerState<ValiDialogScreen> {
           ElevatedButton(
             onPressed: () {
               Navigator.of(ctx).pop();
-              context.push('/gp-purchase');
+              context.push('/gp-store');
             },
             child: const Text('Пополнить GP'),
           ),
@@ -450,7 +559,8 @@ class _ValiDialogScreenState extends ConsumerState<ValiDialogScreen> {
           children: [
             const CircleAvatar(
               radius: 14,
-              backgroundImage: AssetImage('assets/images/avatars/avatar_vali.png'),
+              backgroundImage:
+                  AssetImage('assets/images/avatars/avatar_vali.png'),
               backgroundColor: Colors.transparent,
             ),
             const SizedBox(width: 8),
@@ -460,8 +570,8 @@ class _ValiDialogScreenState extends ConsumerState<ValiDialogScreen> {
             Text(
               '$_currentStep/$maxSteps',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Colors.white70,
-              ),
+                    color: Colors.white70,
+                  ),
             ),
           ],
         ),
@@ -473,7 +583,9 @@ class _ValiDialogScreenState extends ConsumerState<ValiDialogScreen> {
           children: [
             Column(
               children: [
-                // Прогресс-бар
+                // Динамический чек-лист (скрыт на Step 0)
+                _buildSlotChecklist(),
+                // Прогресс-бар (скрыт на Step 0)
                 _buildProgressBar(),
                 Expanded(child: _buildMessageList()),
                 _buildInput(),
@@ -496,7 +608,10 @@ class _ValiDialogScreenState extends ConsumerState<ValiDialogScreen> {
     );
   }
 
+
   Widget _buildProgressBar() {
+    // На Step 0 не показываем прогресс-бар
+    if (_currentStep == 0) return const SizedBox.shrink();
     final progress = _currentStep / maxSteps;
     return Container(
       height: 4,
@@ -514,6 +629,113 @@ class _ValiDialogScreenState extends ConsumerState<ValiDialogScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildSlotChecklist() {
+    // На Step 0 не показываем чек-лист
+    if (_currentStep == 0) return const SizedBox.shrink();
+    final slots = (_slotsState?['slots'] as Map<String, dynamic>?) ?? {};
+    final currentIndex = (_currentStep - 1).clamp(0, _slotOrder.length - 1);
+    final currentSlotKey = _slotOrder[currentIndex];
+    final activeLabel = _slotTitles[currentSlotKey];
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        AppSpacing.sm,
+        AppSpacing.lg,
+        AppSpacing.xs,
+      ),
+      padding: const EdgeInsets.symmetric(
+        vertical: AppSpacing.sm,
+        horizontal: AppSpacing.md,
+      ),
+      decoration: BoxDecoration(
+        color: AppColor.glassSurfaceStrong,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColor.glassBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            child: Row(
+              children: List.generate(
+                _slotOrder.length,
+                (index) => _buildSlotIndicator(
+                  _slotOrder[index],
+                  index,
+                  slots,
+                ),
+              ),
+            ),
+          ),
+          if (activeLabel != null) ...[
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              activeLabel,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: AppColor.labelColor),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSlotIndicator(
+    String slotKey,
+    int index,
+    Map<String, dynamic> slots,
+  ) {
+    final slotData = slots[slotKey];
+    final status = slotData is Map ? slotData['status'] as String? : null;
+    final normalizedStatus = status ?? 'empty';
+    final isCurrent = _currentStep == index + 1;
+    final baseColor = _colorForStatus(normalizedStatus);
+    final backgroundColor =
+        isCurrent ? AppColor.info : baseColor.withOpacity(0.95);
+    final icon = _slotIcons[slotKey] ?? Icons.circle_outlined;
+
+    final circle = CircleAvatar(
+      radius: 20,
+      backgroundColor: backgroundColor,
+      child: Icon(
+        icon,
+        size: 20,
+        color: Colors.white,
+      ),
+    );
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Tooltip(
+        message: _slotTitles[slotKey] ?? 'Этап ${index + 1}',
+        child: isCurrent && !_isAnalyzing
+            ? ScaleTransition(
+                scale: _focusPulse,
+                child: circle,
+              )
+            : circle,
+      ),
+    );
+  }
+
+  Color _colorForStatus(String status) {
+    switch (status) {
+      case 'filled':
+        return AppColor.success;
+      case 'partial':
+      case 'skipped_by_retry':
+        return AppColor.warning;
+      default:
+        return AppColor.inActiveColor;
+    }
   }
 
   Widget _buildMessageList() {
@@ -570,7 +792,8 @@ class _ValiDialogScreenState extends ConsumerState<ValiDialogScreen> {
             : const SizedBox.shrink();
 
         // Анимация для последних 6 сообщений
-        final bool animate = index >= (_messages.length - 6).clamp(0, _messages.length);
+        final bool animate =
+            index >= (_messages.length - 6).clamp(0, _messages.length);
         if (!animate) {
           return Column(
             crossAxisAlignment:
@@ -601,52 +824,211 @@ class _ValiDialogScreenState extends ConsumerState<ValiDialogScreen> {
   }
 
   Widget _buildInput() {
+    // Показываем кнопки онбординга когда currentStep === 0
+    final showOnboardingActions = _currentStep == 0 && _onboardingMetadata != null;
+    
     return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-        child: Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _inputController,
-                focusNode: _inputFocus,
-                minLines: 1,
-                maxLines: 4,
-                textInputAction: TextInputAction.send,
-                decoration: const InputDecoration(
-                  hintText: 'Введите ответ...',
-                  border: OutlineInputBorder(),
-                ),
-                onTapOutside: (_) => FocusScope.of(context).unfocus(),
-                onSubmitted: (text) {
-                  if (text.trim().isNotEmpty && !_isSending) {
-                    _sendMessage();
-                  }
-                },
-              ),
-            ),
-            const SizedBox(width: 8),
-            IconButton(
-              tooltip: 'Скрыть клавиатуру',
-              icon: const Icon(Icons.keyboard_hide),
-              onPressed: () => FocusScope.of(context).unfocus(),
-            ),
-            _isSending
-                ? const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator())
-                : IconButton(
-                    tooltip: 'Отправить',
-                    icon: const Icon(Icons.send),
-                    color: AppColor.primary,
-                    onPressed: _sendMessage,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Кнопки онбординга (над полем ввода)
+          if (showOnboardingActions) _buildOnboardingActions(),
+          
+          // Поле ввода
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _inputController,
+                    focusNode: _inputFocus,
+                    minLines: 1,
+                    maxLines: 4,
+                    textInputAction: TextInputAction.send,
+                    decoration: InputDecoration(
+                      hintText: _currentStep == 0 
+                          ? 'Задай вопрос о валидации...' 
+                          : 'Введите ответ...',
+                      border: const OutlineInputBorder(),
+                    ),
+                    onTapOutside: (_) => FocusScope.of(context).unfocus(),
+                    onSubmitted: (text) {
+                      if (text.trim().isNotEmpty && !_isSending) {
+                        _sendMessage();
+                      }
+                    },
                   ),
-          ],
-        ),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  tooltip: 'Скрыть клавиатуру',
+                  icon: const Icon(Icons.keyboard_hide),
+                  onPressed: () => FocusScope.of(context).unfocus(),
+                ),
+                _isSending
+                    ? const SizedBox(
+                        width: 24, height: 24, child: CircularProgressIndicator())
+                    : IconButton(
+                        tooltip: 'Отправить',
+                        icon: const Icon(Icons.send),
+                        color: AppColor.primary,
+                        onPressed: _sendMessage,
+                      ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
+
+  Widget _buildOnboardingActions() {
+    final onboardingMeta = _onboardingMetadata;
+    if (onboardingMeta == null) return const SizedBox.shrink();
+
+    final price = onboardingMeta['price'] as int? ?? ValiService.kValidationCostGp;
+    final isFree = onboardingMeta['is_free'] as bool? ?? false;
+    final actions = onboardingMeta['actions'] as List? ?? [];
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Главная кнопка "Начать проверку"
+          if (actions.isNotEmpty)
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                icon: const Icon(Icons.rocket_launch),
+                label: Text(
+                  isFree 
+                      ? 'Начать проверку (Бесплатно)' 
+                      : 'Начать проверку ($price GP)',
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isFree ? AppColor.success : AppColor.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                ),
+                onPressed: _isSending ? null : () => _handleStartValidation(price, isFree),
+              ),
+            ),
+          
+          const SizedBox(height: 12),
+          
+          // Вторичная кнопка "А что ты умеешь?"
+          if (actions.length > 1)
+            SizedBox(
+              width: double.infinity,
+              child: TextButton(
+                child: const Text('А что ты умеешь?'),
+                onPressed: _isSending ? null : () {
+                  _inputController.text = 'Расскажи подробнее, как ты работаешь и зачем ты нужен?';
+                  _sendMessage();
+                },
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _handleStartValidation(int price, bool isFree) async {
+    if (_isSending) return;
+
+    // Проверяем баланс для платной валидации (опционально на фронтенде)
+    // Финальная проверка будет на бэкенде при списании GP
+    if (!isFree) {
+      try {
+        // Обновляем баланс перед проверкой
+        ref.invalidate(gpBalanceProvider);
+        final balanceMap = await ref.read(gpBalanceProvider.future);
+        final balance = (balanceMap['balance'] ?? 0) as int;
+        if (balance < price) {
+          if (mounted) {
+            _showInsufficientGpDialog(price);
+          }
+          return;
+        }
+      } catch (e) {
+        // Если не удалось проверить баланс на фронтенде, продолжаем
+        // Финальная проверка будет на бэкенде при списании GP
+        debugPrint('Failed to check GP balance on frontend, will check on backend: $e');
+      }
+    }
+
+    // Отправляем action: 'start_validation' для перехода на Step 1
+    setState(() {
+      _isSending = true;
+    });
+
+    try {
+      final response = await _vali.sendMessage(
+        messages: _buildChatContext(),
+        validationId: _validationId,
+        action: 'start_validation',
+      );
+
+      final assistantMessage = response['message']['content'] as String? ?? '';
+      final meta = response['metadata'] as Map<String, dynamic>?;
+      final int backendStep = meta != null && meta['current_step'] is int
+          ? meta['current_step'] as int
+          : 1;
+
+      // Сохраняем ответ Валли в БД
+      await _vali.saveConversation(
+        role: 'assistant',
+        content: assistantMessage,
+        chatId: _chatId,
+        validationId: _validationId,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _messages.add({'role': 'assistant', 'content': assistantMessage});
+        _currentStep = backendStep;
+        _onboardingMetadata = null; // Скрываем кнопки онбординга
+        _isSending = false;
+      });
+
+      _applySlotsState(meta?['slots_state']);
+
+      // Обновляем прогресс в БД
+      if (_validationId != null) {
+        await _vali.updateValidationProgress(
+          validationId: _validationId!,
+          currentStep: backendStep,
+        );
+      }
+
+      // Обновляем баланс GP
+      try {
+        ref.invalidate(gpBalanceProvider);
+      } catch (_) {}
+
+      _scrollToBottom();
+    } on ValiFailure catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isSending = false;
+      });
+
+      if (e.statusCode == 402) {
+        _showInsufficientGpDialog(e.data?['required'] ?? ValiService.kValidationCostGp);
+      } else {
+        _showError(e.message);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isSending = false;
+      });
+      _showError('Ошибка: $e');
+    }
+  }
+
 
   Widget _buildReportView() {
     final reportRaw = _validationData?['report_markdown'] as String? ?? '';
@@ -663,7 +1045,8 @@ class _ValiDialogScreenState extends ConsumerState<ValiDialogScreen> {
         .trim();
     final totalScore = _validationData?['total_score'] as int? ?? 0;
     final archetype = _validationData?['archetype'] as String? ?? 'МЕЧТАТЕЛЬ';
-    final recommendedLevels = _validationData?['recommended_levels'] as List? ?? [];
+    final recommendedLevels =
+        _validationData?['recommended_levels'] as List? ?? [];
 
     return Scaffold(
       appBar: AppBar(
@@ -746,36 +1129,38 @@ class _ValiDialogScreenState extends ConsumerState<ValiDialogScreen> {
               } else {
                 levelData = {'level_number': 1, 'name': 'урок'};
               }
-              
-              final levelNumber = levelData['level_number'] as int? ?? 
-                                  (levelData['level_id'] as int?);
-              final levelName = levelData['name'] as String? ?? 
-                               (levelData['title'] as String?);
-              
+
+              final levelNumber = levelData['level_number'] as int? ??
+                  (levelData['level_id'] as int?);
+              final levelName = levelData['name'] as String? ??
+                  (levelData['title'] as String?);
+
               // Если levelNumber не найден, не показываем кнопку
               if (levelNumber == null) {
                 return const SizedBox.shrink();
               }
-              
+
               return ElevatedButton.icon(
                 onPressed: () async {
                   // Проверяем текущий уровень пользователя
                   try {
-                    final currentLevel = await ref.read(currentLevelNumberProvider.future);
-                    
+                    final currentLevel =
+                        await ref.read(currentLevelNumberProvider.future);
+
                     if (currentLevel < levelNumber) {
                       // Пользователь ещё не достиг этого уровня
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('Вы ещё не достигли этого уровня. Сначала пройдите предыдущие уровни.'),
+                            content: Text(
+                                'Вы ещё не достигли этого уровня. Сначала пройдите предыдущие уровни.'),
                             duration: Duration(seconds: 4),
                           ),
                         );
                       }
                       return;
                     }
-                    
+
                     // Уровень доступен — переходим
                     if (mounted) {
                       context.push('/levels/$levelNumber');
@@ -790,7 +1175,9 @@ class _ValiDialogScreenState extends ConsumerState<ValiDialogScreen> {
                 },
                 icon: const Icon(Icons.school),
                 label: Text(
-                  levelName != null ? 'Пройти $levelName' : 'Пройти урок $levelNumber',
+                  levelName != null
+                      ? 'Пройти $levelName'
+                      : 'Пройти урок $levelNumber',
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColor.primary,

@@ -94,6 +94,64 @@ const VALIDATOR_PROMPT = `Ты строгий, но доброжелательн
   "repeat_question": "Перефразированный вопрос с мягким подталкиванием"
 }`;
 
+// Промпт для Slot Filling валидатора
+const SLOT_FILLING_VALIDATOR_PROMPT = `Ты AI-валидатор, работающий в режиме Slot Filling для анализа бизнес-идей.
+
+ТВОЯ ЗАДАЧА:
+1. Проанализируй входящее сообщение пользователя в контексте всей истории диалога
+2. Обнови состояние слотов (Slots State), используя НОВУЮ информацию и ТЕКУЩИЙ КОНТЕКСТ
+3. Оцени уверенность (confidence) заполнения каждого затронутого слота (0.0 - 1.0)
+4. Определи, какой слот сейчас наиболее приоритетен для уточнения (suggested_step_index)
+
+СТРУКТУРА СЛОТОВ (7 обязательных):
+1. product — Суть идеи (что создаётся?)
+2. problem — Проблема (какую боль решаешь?)
+3. audience — Целевая аудитория (для кого конкретно?)
+4. validation — Валидация (откуда знаешь о проблеме?)
+5. competitors — Конкуренты (как решают сейчас?)
+6. utp — Уникальное преимущество (почему ты?)
+7. risks — Риски (что может убить идею?)
+
+ПРАВИЛА ЗАПОЛНЕНИЯ:
+- Если пользователь ответил на текущий вопрос, но попутно упомянул информацию для других слотов — заполни ВСЕ затронутые слоты
+- Status 'filled' ставь ТОЛЬКО если confidence > 0.7 И информация конкретная (не абстрактная)
+- Status 'partial' ставь если есть информация, но она неполная или расплывчатая (confidence 0.3-0.7)
+- Status 'empty' если информации нет совсем
+- Если пользователь исправил/изменил информацию для уже заполненного слота — ПЕРЕЗАПИСЫВАЙ с новым контентом и timestamp
+- В поле 'content' сохраняй краткую выжимку (2-4 предложения), а не весь ответ пользователя
+- В поле 'feedback' пиши уточняющий вопрос ТОЛЬКО для partial/empty слотов
+
+КОНТЕКСТ ОЦЕНКИ:
+- Учитывай реалии Казахстана (тенге, Kaspi, WhatsApp, местные особенности)
+- Будь требовательным к конкретике, но не жёстким
+- "Всем нужно" / "Конкурентов нет" → низкий confidence
+- Конкретные примеры, цифры, имена → высокий confidence
+
+ФОРМАТ ОТВЕТА — СТРОГО JSON (без markdown, без комментариев):
+{
+  "updated_slots": {
+    "product": {
+      "content": "Краткая выжимка (2-4 предложения)",
+      "status": "filled|partial|empty",
+      "confidence": 0.85,
+      "feedback": "Уточняющий вопрос (если нужен)"
+    },
+    "problem": { ... },
+    // ... остальные слоты, которые были затронуты в ответе
+  },
+  "suggested_step_index": 3,
+  "bot_response_text": "Текст ответа Валли пользователю (короткий, эмпатичный, 2-4 предложения)"
+}
+
+ВАЖНО:
+- Возвращай ТОЛЬКО JSON, без дополнительного текста
+- В 'updated_slots' включай ТОЛЬКО те слоты, которые были затронуты в ответе пользователя
+- 'suggested_step_index' должен указывать на следующий приоритетный слот (1-7) или 8 если все заполнены
+- 'bot_response_text' должен быть мягким, поддерживающим, с одним конкретным вопросом
+- ЕСЛИ suggested_step_index == 8 (все слоты заполнены), то bot_response_text должен быть финальным сообщением:
+  "Отлично! Я записал все твои ответы. Готов проанализировать идею и показать результат?"
+  (БЕЗ нового вопроса)`;
+
 // ============================
 // Validation Steps Configuration
 // ============================
@@ -102,6 +160,126 @@ interface ValidationStep {
   question: string;
   criteria: string[];
   exampleTemplate: string;
+}
+
+// Максимальное количество шагов (слотов) в валидации
+const MAX_STEPS = 7;
+
+// Стоимость валидации в GP (для повторных валидаций, первая бесплатна)
+const VALIDATION_COST_GP = 20;
+
+// Промпт для Step 0: Знакомство и защита от халявы
+const ONBOARDING_SYSTEM_PROMPT = `Ты — Валли, специализированный AI-валидатор бизнес-идей.
+
+ТВОЯ ЦЕЛЬ: Познакомиться с пользователем, объяснить ценность валидации и мотивировать его начать проверку идеи.
+
+ТВОИ ПРАВИЛА:
+1. Твоя компетенция СТРОГО ограничена стартапами, бизнес-моделями и валидацией идей.
+2. ЕСЛИ пользователь просит написать код, рецепт, эссе, решить математику или просто поболтать о погоде — ВЕЖЛИВО ОТКАЖИ.
+   - Пример отказа: "Я бы с радостью поболтал о погоде, но мои нейроны заточены только под разбор бизнес-идей. Давай лучше обсудим твой будущий единорог?"
+   - Пример отказа 2: "Прости, но я не умею писать код. Зато я отлично умею находить дыры в бизнес-планах. Есть идеи?"
+3. Отвечай коротко, с юмором, в стиле "свой парень".
+
+О СЕБЕ:
+- Ты задаешь 7 вопросов по Lean Startup.
+- Ищешь "слепые зоны" и риски.
+- Даешь честный скоринг (0-100).
+- Первая проверка — бесплатно, дальше за GP.
+
+ВАЖНО:
+- Ты НЕ начинаешь валидацию сам. Ты ждешь, пока пользователь нажмет кнопку начала проверки.
+- НИКОГДА не упоминай точные названия кнопок (например, "нажми кнопку 'Начать проверку'", "Step 1", и т.д.).
+- Вместо этого используй общие фразы: "когда будешь готов начать", "когда нажмешь кнопку начала", "готов начать проверку", "кнопка для старта будет внизу".
+- Можешь намекать на начало проверки, но не называй конкретное название кнопки.`;
+
+// ============================
+// Slot Filling Configuration
+// ============================
+type SlotStatus = 'empty' | 'partial' | 'filled' | 'skipped_by_retry';
+
+interface SlotData {
+  content: string;
+  status: SlotStatus;
+  confidence: number; // 0.0 - 1.0
+  feedback: string;
+  updated_at: string;
+}
+
+interface SlotsState {
+  slots: {
+    product: SlotData;
+    problem: SlotData;
+    audience: SlotData;
+    validation: SlotData;
+    competitors: SlotData;
+    utp: SlotData;
+    risks: SlotData;
+  };
+  metadata: {
+    last_updated: string;
+    forced_slots: string[];
+  };
+}
+
+// Маппинг шагов на слоты
+const STEP_TO_SLOT_MAP: Record<number, keyof SlotsState['slots']> = {
+  1: 'product',
+  2: 'problem',
+  3: 'audience',
+  4: 'validation',
+  5: 'competitors',
+  6: 'utp',
+  7: 'risks',
+};
+
+const SLOT_KEYS: Array<keyof SlotsState['slots']> = [
+  'product',
+  'problem',
+  'audience',
+  'validation',
+  'competitors',
+  'utp',
+  'risks',
+];
+
+const SLOT_TITLES: Record<keyof SlotsState['slots'], string> = {
+  product: 'Суть идеи',
+  problem: 'Проблема',
+  audience: 'Целевая аудитория',
+  validation: 'Валидация',
+  competitors: 'Конкуренты',
+  utp: 'Уникальное преимущество',
+  risks: 'Риски',
+};
+
+// Дефолтное состояние слота
+function createEmptySlot(): SlotData {
+  return {
+    content: '',
+    status: 'empty',
+    confidence: 0.0,
+    feedback: '',
+    updated_at: new Date().toISOString(),
+  };
+}
+
+// Создание дефолтного состояния всех слотов
+function createDefaultSlotsState(): SlotsState {
+  return {
+    slots: {
+      product: createEmptySlot(),
+      problem: createEmptySlot(),
+      audience: createEmptySlot(),
+      validation: createEmptySlot(),
+      competitors: createEmptySlot(),
+      utp: createEmptySlot(),
+      risks: createEmptySlot(),
+    },
+    metadata: {
+      last_updated: new Date().toISOString(),
+      forced_slots: [],
+    },
+  };
 }
 
 const VALIDATION_STEPS: ValidationStep[] = [
@@ -252,6 +430,217 @@ const SCORING_PROMPT = `Оцени ответы пользователя по 5 
 // ============================
 
 /**
+ * Получить ключ слота по номеру шага
+ */
+function getSlotKeyByStep(stepId: number): keyof SlotsState['slots'] | null {
+  return STEP_TO_SLOT_MAP[stepId] || null;
+}
+
+/**
+ * Генерация персонализированного примера для подсказки на основе уже заполненных слотов
+ */
+async function generatePersonalizedHint(
+  openai: any,
+  targetSlotKey: keyof SlotsState['slots'],
+  currentSlotsState: SlotsState,
+  step: ValidationStep | undefined,
+  model: string = 'grok-2-latest'
+): Promise<string> {
+  // Собираем информацию из заполненных слотов
+  const filledSlots: Record<string, string> = {};
+  for (const [key, slot] of Object.entries(currentSlotsState.slots)) {
+    if (slot.status === 'filled' && slot.content) {
+      filledSlots[key] = slot.content;
+    }
+  }
+
+  // Если нет заполненных слотов или нет шага - возвращаем статический шаблон
+  if (Object.keys(filledSlots).length === 0 || !step) {
+    return step?.exampleTemplate || '';
+  }
+
+  // Формируем короткий промпт для генерации персонализированного примера
+  const filledSlotsText = Object.entries(filledSlots)
+    .map(([key, content]) => `${SLOT_TITLES[key] || key}: ${content}`)
+    .join('\n');
+
+  const hintPrompt = `Ты помощник для валидации бизнес-идей. Пользователь уже ответил на некоторые вопросы:
+
+${filledSlotsText}
+
+Сейчас нужно помочь ему ответить на вопрос: "${step.question}"
+
+Сгенерируй КОРОТКИЙ (3-5 строк) конкретный пример ответа, который:
+1. Учитывает уже указанную информацию (продукт, проблему, аудиторию и т.д.)
+2. Релевантен контексту Казахстана (тенге, Kaspi, WhatsApp, местные особенности)
+3. Конкретный и реалистичный (не абстрактный)
+4. Показывает, как ответ должен выглядеть
+
+Пример должен быть в формате готового ответа пользователя, а не инструкции.`;
+
+  try {
+    const completion = await openai.chat.completions.create({
+      model,
+      messages: [
+        { role: 'system', content: hintPrompt },
+        { role: 'user', content: 'Сгенерируй пример ответа для этого вопроса.' },
+      ],
+      temperature: 0.7,
+      max_tokens: 200, // Короткий ответ
+    });
+
+    const generatedHint = completion.choices[0]?.message?.content?.trim() || '';
+    
+    // Если LLM вернул что-то осмысленное - используем, иначе fallback
+    if (generatedHint.length > 20) {
+      console.log('INFO personalized_hint_generated', {
+        targetSlotKey,
+        hintLength: generatedHint.length,
+        filledSlotsCount: Object.keys(filledSlots).length,
+      });
+      return generatedHint;
+    } else {
+      console.log('INFO personalized_hint_too_short', {
+        targetSlotKey,
+        hintLength: generatedHint.length,
+      });
+    }
+  } catch (error) {
+    console.error('ERR generate_personalized_hint', {
+      message: String(error).slice(0, 200),
+      targetSlotKey,
+    });
+  }
+
+  // Fallback на статический шаблон
+  return step.exampleTemplate || '';
+}
+
+/**
+ * Очистка JSON от markdown обёрток
+ */
+function cleanJsonString(raw: string): string {
+  // Убираем markdown code blocks
+  let cleaned = raw.trim();
+  if (cleaned.startsWith('```json')) {
+    cleaned = cleaned.replace(/^```json\s*/i, '').replace(/```\s*$/, '');
+  } else if (cleaned.startsWith('```')) {
+    cleaned = cleaned.replace(/^```\s*/, '').replace(/```\s*$/, '');
+  }
+  return cleaned.trim();
+}
+
+/**
+ * Безопасный парсинг JSON с валидацией структуры слотов
+ */
+function safeParseSlotFillingResponse(raw: string): any | null {
+  try {
+    const cleaned = cleanJsonString(raw);
+    const parsed = JSON.parse(cleaned);
+    
+    // Базовая валидация структуры
+    if (!parsed || typeof parsed !== 'object') {
+      console.error('ERR invalid_slot_response_structure', { raw: raw.slice(0, 100) });
+      return null;
+    }
+    
+    // Проверяем наличие обязательных полей
+    if (!parsed.updated_slots || !parsed.suggested_step_index || !parsed.bot_response_text) {
+      console.error('ERR missing_required_fields', { 
+        hasSlots: !!parsed.updated_slots, 
+        hasStep: !!parsed.suggested_step_index,
+        hasResponse: !!parsed.bot_response_text 
+      });
+      return null;
+    }
+    
+    return parsed;
+  } catch (parseError) {
+    console.error('ERR parse_slot_response', { 
+      message: String(parseError).slice(0, 200),
+      raw: raw.slice(0, 200)
+    });
+    return null;
+  }
+}
+
+/**
+ * Слияние слотов с приоритетом свежести и confidence
+ */
+function mergeSlots(
+  currentSlots: SlotsState,
+  updatedSlots: Partial<Record<keyof SlotsState['slots'], Partial<SlotData>>>
+): SlotsState {
+  const now = new Date().toISOString();
+  const merged: SlotsState = {
+    ...currentSlots,
+    metadata: {
+      ...currentSlots.metadata,
+      last_updated: now,
+    },
+  };
+  
+  // Проходим по всем обновлённым слотам
+  for (const [slotKey, updatedData] of Object.entries(updatedSlots)) {
+    const key = slotKey as keyof SlotsState['slots'];
+    const currentData = merged.slots[key];
+    
+    if (!updatedData || typeof updatedData !== 'object') {
+      continue;
+    }
+    
+    // Правила слияния:
+    // 1. Если новый слот имеет status 'filled' и confidence > 0.7 → перезаписываем
+    // 2. Если текущий слот пустой → берём новый
+    // 3. Если новый confidence выше → обновляем
+    // 4. Иначе сохраняем текущий, но обновляем feedback если есть
+    
+    const shouldOverwrite = 
+      currentData.status === 'empty' ||
+      (updatedData.status === 'filled' && (updatedData.confidence ?? 0) > 0.7) ||
+      (updatedData.confidence ?? 0) > currentData.confidence;
+    
+    if (shouldOverwrite) {
+      merged.slots[key] = {
+        content: updatedData.content ?? currentData.content,
+        status: updatedData.status ?? currentData.status,
+        confidence: updatedData.confidence ?? currentData.confidence,
+        feedback: updatedData.feedback ?? currentData.feedback,
+        updated_at: now,
+      };
+    } else {
+      // Обновляем только feedback если статус не меняется
+      if (updatedData.feedback) {
+        merged.slots[key] = {
+          ...currentData,
+          feedback: updatedData.feedback,
+          updated_at: now,
+        };
+      }
+    }
+  }
+  
+  return merged;
+}
+
+/**
+ * Вычислить следующий незаполненный шаг на основе слотов
+ */
+function calculateNextStep(slotsState: SlotsState): number {
+  for (let i = 0; i < SLOT_KEYS.length; i++) {
+    const slotKey = SLOT_KEYS[i];
+    const slot = slotsState.slots[slotKey];
+    
+    if (slot.status !== 'filled' && slot.status !== 'skipped_by_retry') {
+      return i + 1; // Возвращаем номер шага (1-based)
+    }
+  }
+  
+  // Все слоты заполнены или пропущены
+  return 8; // Завершение
+}
+
+/**
  * Расчет стоимости запроса к LLM
  */
 function calculateCost(usage: any, model = 'grok-2-latest'): number {
@@ -281,6 +670,7 @@ function calculateCost(usage: any, model = 'grok-2-latest'): number {
  */
 async function saveAIMessageData(
   userId: string,
+  chatId: string | null,
   validationId: string | null,
   usage: any,
   cost: number,
@@ -288,7 +678,11 @@ async function saveAIMessageData(
   requestType: string,
   supabaseAdminInstance: any
 ): Promise<void> {
-  if (!userId) return; // Пропускаем, если пользователь не авторизован
+  // Требуем наличие userId и chatId, чтобы не нарушать NOT NULL constraint в ai_message.chat_id
+  if (!userId || !chatId) {
+    console.warn('WARN save_ai_message_skipped_missing_ids', { userId, chatId, validationId, requestType });
+    return;
+  }
 
   // Безопасное преобразование к integer
   const safeInt = (v: any): number => {
@@ -309,7 +703,7 @@ async function saveAIMessageData(
 
   const payload = {
     user_id: userId,
-    chat_id: null, // Валли не использует chat_id
+    chat_id: chatId,
     leo_message_id: null, // Валли не использует leo_message_id
     model_used: model,
     input_tokens: inputTokens,
@@ -317,9 +711,7 @@ async function saveAIMessageData(
     total_tokens: totalTokens,
     cost_usd: safeCost,
     bot_type: 'valli',
-    request_type: requestType,
-    // Добавляем reference на validation_id для связи
-    metadata: validationId ? { validation_id: validationId } : null
+    request_type: requestType
   };
 
   try {
@@ -376,6 +768,7 @@ async function validateUserResponse(
   currentStep: number,
   userId: string,
   validationId: string | null,
+  chatId: string | null,
   supabaseAdmin: any
 ): Promise<{ isValid: boolean; response: string; shouldAdvance: boolean }> {
   const step = VALIDATION_STEPS.find(s => s.id === currentStep);
@@ -408,6 +801,7 @@ async function validateUserResponse(
   const generatorCost = calculateCost(generatorUsage, model);
   await saveAIMessageData(
     userId,
+    chatId,
     validationId,
     generatorUsage,
     generatorCost,
@@ -492,6 +886,7 @@ ${criteriaText}
     const validatorCost = calculateCost(validatorUsage, model);
     await saveAIMessageData(
       userId,
+      chatId,
       validationId,
       validatorUsage,
       validatorCost,
@@ -525,6 +920,420 @@ ${criteriaText}
       isValid: false,
       response: `Хм, не совсем понял твой ответ. Попробуй ответить более развёрнуто, чтобы я мог лучше оценить идею.\n\n${step.exampleTemplate}\n\n${step.question}`,
       shouldAdvance: false
+    };
+  }
+}
+
+/**
+ * Slot Filling валидация ответа пользователя (НОВАЯ АРХИТЕКТУРА)
+ * Вместо инкрементального шага анализирует всю картину и обновляет слоты
+ */
+async function validateUserResponseSlotFilling(
+  openai: any,
+  messages: any[],
+  validationId: string | null,
+  userId: string,
+  chatId: string | null,
+  supabaseAdmin: any
+): Promise<{ 
+  response: string; 
+  newStep: number; 
+  slotsState: SlotsState;
+  retryCount: number;
+  isComplete?: boolean;
+}> {
+  const model = "grok-2-latest";
+
+  // 1. Загружаем текущий стейт из БД
+  let currentSlotsState: SlotsState = createDefaultSlotsState();
+  let currentStep = 1;
+  let retryCount = 0;
+  
+  if (validationId) {
+    try {
+      const { data: validation, error: validationError } = await supabaseAdmin
+        .from('idea_validations')
+        .select('slots_state, current_step, retry_count')
+        .eq('id', validationId)
+        .eq('user_id', userId)
+        .single();
+      
+      if (validationError) {
+        console.error('ERR get_validation_state', { message: validationError.message });
+      } else if (validation) {
+        currentStep = validation.current_step || 1;
+        retryCount = validation.retry_count || 0;
+        
+        // Парсим slots_state из БД (может быть пустым объектом)
+        if (validation.slots_state && typeof validation.slots_state === 'object') {
+          const savedSlots = validation.slots_state as any;
+          
+          // Мержим с дефолтным состоянием (на случай если в БД не все слоты)
+          if (savedSlots.slots) {
+            currentSlotsState = {
+              ...currentSlotsState,
+              slots: {
+                ...currentSlotsState.slots,
+                ...savedSlots.slots,
+              },
+              metadata: savedSlots.metadata || currentSlotsState.metadata,
+            };
+          }
+        }
+      }
+    } catch (e) {
+      console.error('ERR load_slots_state', { message: String(e).slice(0, 200) });
+    }
+  }
+
+  // 2. Получаем последнее сообщение пользователя
+  const lastUserMessage = messages
+    .slice()
+    .reverse()
+    .find((m: any) => m.role === 'user');
+
+  if (!lastUserMessage) {
+    // Если нет ответа пользователя (первое сообщение), возвращаем приветствие
+    const step = VALIDATION_STEPS.find(s => s.id === currentStep);
+    return {
+      response: step?.question || "Привет! Расскажи о своей идее. Что ты создаёшь?",
+      newStep: currentStep,
+      slotsState: currentSlotsState,
+      retryCount: 0,
+      isComplete: false,
+    };
+  }
+
+  // 3. ТЕХНИЧЕСКИЙ ФИЛЬТР КАЧЕСТВА ОТВЕТА
+  const rawUserContent = String(lastUserMessage.content ?? '').trim();
+  const lettersOnly = rawUserContent.replace(/[^a-zA-ZА-Яа-яЁё]/g, '');
+
+  const isTooShort = rawUserContent.length < 15;
+  const hasFewLetters = lettersOnly.length < 5;
+
+  if (isTooShort || hasFewLetters) {
+    // FIX: Увеличиваем счётчик даже на мусорных ответах, чтобы не держать юзера вечно
+    const newRetryCount = retryCount + 1;
+
+    // Ищем первый незаполненный слот для релевантной подсказки
+    let targetSlotKey = SLOT_KEYS[currentStep - 1]; // Fallback на текущий шаг
+
+    if (currentSlotsState && currentSlotsState.slots) {
+      const firstUnfinished = SLOT_KEYS.find(key => {
+        const slot = currentSlotsState.slots[key];
+        return slot.status !== 'filled' && slot.status !== 'skipped_by_retry';
+      });
+
+      if (firstUnfinished) {
+        targetSlotKey = firstUnfinished;
+      }
+    }
+
+    // Если пользователь уже несколько раз отвечает мусором — применяем soft-skip прямо здесь
+    if (newRetryCount >= 2) {
+      const now = new Date().toISOString();
+
+      // Определяем текущий слот по шагу
+      const currentSlotKey =
+        getSlotKeyByStep(currentStep) || (targetSlotKey as keyof SlotsState['slots']);
+
+      let updatedSlotsState = currentSlotsState;
+      let nextStep = currentStep;
+
+      if (currentSlotKey) {
+        updatedSlotsState = {
+          ...currentSlotsState,
+          slots: {
+            ...currentSlotsState.slots,
+            [currentSlotKey]: {
+              ...currentSlotsState.slots[currentSlotKey],
+              status: 'skipped_by_retry',
+              feedback:
+                'Слот пропущен из-за множественных попыток уточнения. Рекомендуется вернуться позже.',
+              updated_at: now,
+            },
+          },
+          metadata: {
+            ...currentSlotsState.metadata,
+            last_updated: now,
+            forced_slots: Array.from(
+              new Set([
+                ...currentSlotsState.metadata.forced_slots,
+                String(currentSlotKey),
+              ]),
+            ),
+          },
+        };
+
+        // Двигаем шаг вперёд (до 8, где 8 = все слоты пройдены логически,
+        // но в БД храним максимум 7 из-за CHECK-constraint)
+        nextStep = Math.min(8, currentStep + 1);
+      }
+
+      const isComplete = nextStep >= 8;
+
+      // Сохраняем в БД: помеченный слот, новый шаг (с ограничением по CHECK) и сброшенный retry_count
+      if (validationId) {
+        try {
+          const dbStep = Math.min(nextStep, MAX_STEPS);
+          await supabaseAdmin
+            .from('idea_validations')
+            .update({
+              slots_state: updatedSlotsState,
+              current_step: dbStep,
+              retry_count: 0,
+            })
+            .eq('id', validationId)
+            .eq('user_id', userId);
+
+          console.log('INFO soft_validation_short_answer', {
+            validationId,
+            currentStep,
+            nextStep,
+            slotKey: currentSlotKey,
+            retryCount: newRetryCount,
+          });
+        } catch (updateError) {
+          console.error('ERR update_short_answer_soft_skip', {
+            message: String(updateError).slice(0, 200),
+            validationId,
+          });
+        }
+      }
+
+      let responseText: string;
+      if (isComplete) {
+        responseText =
+          'Вижу, что с этим вопросом сейчас сложно. Давай перейдём к анализу твоих ответов.';
+      } else {
+        const nextStepConfig = VALIDATION_STEPS.find(s => s.id === nextStep);
+        responseText = `Вижу, что с этим вопросом сейчас сложно. Давай пока пойдём дальше.\n\n${
+          nextStepConfig?.question || ''
+        }`;
+      }
+
+      return {
+        response: responseText,
+        newStep: Math.min(nextStep, MAX_STEPS), // Ограничиваем для БД
+        slotsState: updatedSlotsState,
+        retryCount: 0,
+        isComplete, // Определяется по логическому nextStep >= 8
+      };
+    }
+
+    // Иначе (первые 1–2 мусорных ответа) — просто подсказка по релевантному слоту
+    if (validationId) {
+      await supabaseAdmin
+        .from('idea_validations')
+        .update({ retry_count: newRetryCount })
+        .eq('id', validationId)
+        .eq('user_id', userId);
+    }
+
+    // Находим индекс шага для получения релевантного шаблона
+    const targetStepIndex = SLOT_KEYS.indexOf(targetSlotKey);
+    const step =
+      VALIDATION_STEPS[targetStepIndex] ||
+      VALIDATION_STEPS.find(s => s.id === currentStep);
+
+    // Генерируем персонализированный пример на основе уже заполненных слотов
+    const personalizedHint = await generatePersonalizedHint(
+      openai,
+      targetSlotKey as keyof SlotsState['slots'],
+      currentSlotsState,
+      step,
+      model
+    );
+
+    return {
+      response: `Пока ответ очень короткий, давай добавим чуть больше деталей.\n\n${
+        personalizedHint || ''
+      }\n\n${step?.question || 'Расскажи подробнее.'}`,
+      newStep: currentStep,
+      slotsState: currentSlotsState,
+      retryCount: newRetryCount,
+      isComplete: false,
+    };
+  }
+
+  // 4. Формируем контекст для Slot Filling валидатора
+  const conversationHistory = messages
+    .map((m: any) => `${m.role === 'user' ? 'Пользователь' : 'Валли'}: ${m.content}`)
+    .join('\n\n');
+
+  const currentSlotsJson = JSON.stringify(currentSlotsState.slots, null, 2);
+
+  const slotFillingPrompt = `${SLOT_FILLING_VALIDATOR_PROMPT}
+
+ТЕКУЩЕЕ СОСТОЯНИЕ СЛОТОВ:
+${currentSlotsJson}
+
+ИСТОРИЯ ДИАЛОГА:
+${conversationHistory}
+
+ПОСЛЕДНИЙ ОТВЕТ ПОЛЬЗОВАТЕЛЯ:
+"${lastUserMessage.content}"
+
+Проанализируй ответ пользователя и обнови состояние слотов.`;
+
+  // 5. Вызываем LLM для Slot Filling анализа
+  try {
+    const slotFillingCompletion = await openai.chat.completions.create({
+      model,
+      messages: [
+        { role: "system", content: slotFillingPrompt },
+        { role: "user", content: "Проанализируй ответ и верни обновлённое состояние слотов в формате JSON." }
+      ],
+      temperature: 0.3,
+      max_tokens: 1500,
+      response_format: { type: "json_object" },
+    });
+
+    const rawResponse = slotFillingCompletion.choices[0].message.content || "{}";
+    
+    // Логируем usage и стоимость
+    const usage = slotFillingCompletion.usage;
+    const cost = calculateCost(usage, model);
+    await saveAIMessageData(
+      userId,
+      chatId,
+      validationId,
+      usage,
+      cost,
+      model,
+      'valli_slot_filling',
+      supabaseAdmin
+    );
+
+    // 6. Безопасный парсинг ответа
+    const slotFillingResult = safeParseSlotFillingResponse(rawResponse);
+    
+    if (!slotFillingResult) {
+      // Fallback: если парсинг провалился, используем персонализированную подсказку
+      console.error('ERR slot_filling_parse_failed', { validationId, currentStep });
+      const step = VALIDATION_STEPS.find(s => s.id === currentStep);
+      const currentSlotKey = getSlotKeyByStep(currentStep);
+      
+      const personalizedHint = await generatePersonalizedHint(
+        openai,
+        currentSlotKey || 'product',
+        currentSlotsState,
+        step,
+        model
+      );
+      
+      return {
+        response: `Хм, не совсем понял твой ответ. Попробуй ответить более развёрнуто.\n\n${personalizedHint}\n\n${step?.question || 'Расскажи подробнее.'}`,
+        newStep: currentStep,
+        slotsState: currentSlotsState,
+        retryCount: retryCount + 1,
+        isComplete: false,
+      };
+    }
+
+    // 7. Мержим слоты
+    const mergedSlotsState = mergeSlots(currentSlotsState, slotFillingResult.updated_slots);
+
+    // 8. Применяем Soft Validation (форсированное продвижение после 2 попыток)
+    // Сохраняем исходный suggested_step_index для определения isComplete
+    const originalSuggestedStep = slotFillingResult.suggested_step_index;
+    // Ограничиваем suggested_step_index для вычисления nextStep
+    let suggestedStepIndex = Math.min(originalSuggestedStep, MAX_STEPS);
+    let newRetryCount = 0;
+
+    if (retryCount >= 2 && suggestedStepIndex === currentStep) {
+      // Форсируем переход, помечая текущий слот как 'skipped_by_retry'
+      const currentSlotKey = getSlotKeyByStep(currentStep);
+      
+      if (currentSlotKey) {
+        mergedSlotsState.slots[currentSlotKey] = {
+          ...mergedSlotsState.slots[currentSlotKey],
+          status: 'skipped_by_retry',
+          feedback: 'Слот пропущен из-за множественных попыток уточнения. Рекомендуется вернуться позже.',
+          updated_at: new Date().toISOString(),
+        };
+        
+        mergedSlotsState.metadata.forced_slots.push(currentSlotKey);
+        
+        // Искусственно двигаем шаг вперёд (но не больше MAX_STEPS для БД)
+        suggestedStepIndex = Math.min(currentStep + 1, MAX_STEPS);
+        
+        console.log('INFO soft_validation_triggered', { 
+          validationId, 
+          currentStep, 
+          slotKey: currentSlotKey,
+          retryCount 
+        });
+      }
+    }
+
+    // 9. Вычисляем новый шаг (не позволяем откатываться назад, но ограничиваем MAX_STEPS)
+    const nextStep = Math.min(Math.max(currentStep, suggestedStepIndex), MAX_STEPS);
+    
+    // Определяем isComplete по исходному suggested_step_index (до ограничения)
+    // Если LLM вернул 8+, значит все слоты заполнены
+    const isComplete = originalSuggestedStep >= 8;
+    
+    // Сбрасываем retry_count если шаг изменился
+    if (nextStep > currentStep) {
+      newRetryCount = 0;
+    } else {
+      newRetryCount = retryCount + 1;
+    }
+
+    // 10. Сохраняем обновлённое состояние в БД (с ограничением шага по CHECK-constraint)
+    if (validationId) {
+      try {
+        const dbStep = Math.min(nextStep, MAX_STEPS);
+        await supabaseAdmin
+          .from('idea_validations')
+          .update({
+            slots_state: mergedSlotsState,
+            current_step: dbStep,
+            retry_count: newRetryCount,
+          })
+          .eq('id', validationId)
+          .eq('user_id', userId);
+        
+        console.log('INFO slots_state_updated', { 
+          validationId, 
+          oldStep: currentStep, 
+          newStep: nextStep,
+          dbStep, // Шаг, сохранённый в БД (ограничен MAX_STEPS)
+          isComplete,
+          retryCount: newRetryCount 
+        });
+      } catch (updateError) {
+        console.error('ERR update_slots_state', { 
+          message: String(updateError).slice(0, 200),
+          validationId 
+        });
+      }
+    }
+
+    return {
+      response: slotFillingResult.bot_response_text,
+      newStep: nextStep, // Ограничен MAX_STEPS для БД
+      slotsState: mergedSlotsState,
+      retryCount: newRetryCount,
+      isComplete, // Определяется по originalSuggestedStep >= 8
+    };
+
+  } catch (slotFillingError) {
+    // Fail-safe: при ошибке LLM используем fallback
+    console.error('ERR slot_filling_failed', { 
+      message: String(slotFillingError).slice(0, 200),
+      validationId,
+      currentStep 
+    });
+    
+    const step = VALIDATION_STEPS.find(s => s.id === currentStep);
+    return {
+      response: `Хм, не совсем понял твой ответ. Попробуй ответить более развёрнуто.\n\n${step?.exampleTemplate || ''}\n\n${step?.question || 'Расскажи подробнее.'}`,
+      newStep: currentStep,
+      slotsState: currentSlotsState,
+      retryCount: retryCount + 1,
+      isComplete: false,
     };
   }
 }
@@ -635,6 +1444,96 @@ function getRecommendedLevels(scores: any): any[] {
   return recommendations;
 }
 
+/**
+ * Подготовка структурированного контекста для Макса на основе SlotsState и итогового score
+ */
+function prepareContextForMax(slotsState: SlotsState | null, score: number | null): any | null {
+  if (!slotsState || !slotsState.slots) {
+    return null;
+  }
+
+  const safeScore = typeof score === 'number' && isFinite(score) ? score : 0;
+
+  // 1. Собираем краткую структурированную выжимку по заполненным слотам
+  const summaryLines: string[] = [];
+
+  for (const [key, slot] of Object.entries(slotsState.slots)) {
+    if (!slot) continue;
+    if (slot.status === 'filled' || slot.status === 'partial') {
+      const title = key.toUpperCase();
+      const content = (slot as SlotData).content || '';
+      if (content.trim().length > 0) {
+        summaryLines.push(`${title}: ${content}`);
+      }
+    }
+  }
+
+  const structuredSummary = summaryLines.join('\n');
+
+  // 2. Собираем слабые места: partial или принудительно пропущенные (skipped_by_retry)
+  const forcedSlots = new Set<string>((slotsState.metadata?.forced_slots || []).map(String));
+  const weakSpots: Array<{
+    topic: string;
+    issue: string;
+    is_forced: boolean;
+  }> = [];
+
+  for (const [key, slot] of Object.entries(slotsState.slots)) {
+    if (!slot) continue;
+    const s = slot as SlotData;
+    const isForced = s.status === 'skipped_by_retry' || forcedSlots.has(key);
+
+    if (s.status === 'partial' || isForced) {
+      weakSpots.push({
+        topic: key,
+        issue: s.feedback || (isForced ? 'Пропущено (soft validation)' : 'Хочется больше конкретики по этому пункту'),
+        is_forced: isForced,
+      });
+    }
+  }
+
+  return {
+    source: 'validator_wally_v2',
+    validation_score: safeScore,
+    structured_summary: structuredSummary,
+    weak_spots: weakSpots,
+    has_blind_spots: weakSpots.length > 0,
+  };
+}
+
+// ============================
+// Helper Functions
+// ============================
+
+/**
+ * Определяет стоимость валидации для пользователя
+ * @param userId ID пользователя
+ * @param supabaseAdmin Admin клиент Supabase
+ * @returns Объект с ценой и флагом бесплатности
+ */
+async function getValidationPrice(
+  userId: string,
+  supabaseAdmin: any
+): Promise<{ price: number; isFree: boolean }> {
+  const { count, error: countError } = await supabaseAdmin
+    .from('idea_validations')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .eq('status', 'completed');
+
+  if (countError) {
+    console.error('ERR get_validation_price', { message: countError.message });
+    // В случае ошибки считаем платным (безопаснее)
+    return { price: VALIDATION_COST_GP, isFree: false };
+  }
+
+  const isFree = (count || 0) === 0;
+  return {
+    price: isFree ? 0 : VALIDATION_COST_GP,
+    isFree,
+  };
+}
+
 // ============================
 // Main Handler
 // ============================
@@ -660,7 +1559,7 @@ serve(async (req) => {
 
     // Parse request body
     const body = await req.json();
-    const { messages, validationId, mode = 'dialog' } = body;
+    const { messages, validationId, mode = 'dialog', action } = body;
 
     if (!Array.isArray(messages) || messages.length === 0) {
       return new Response(
@@ -688,6 +1587,29 @@ serve(async (req) => {
 
     const userId = user.id;
 
+    // Попробуем привязать валидацию к существующему leo-чату (idea_validations.chat_id)
+    let chatId: string | null = null;
+    if (validationId) {
+      try {
+        const { data: validationRow, error: chatErr } = await supabaseAdmin
+          .from('idea_validations')
+          .select('chat_id')
+          .eq('id', validationId)
+          .eq('user_id', userId)
+          .single();
+
+        if (chatErr) {
+          console.error('ERR get_validation_chat_id', { message: chatErr.message, validationId, userId });
+        } else if (validationRow?.chat_id) {
+          chatId = String(validationRow.chat_id);
+        } else {
+          console.warn('WARN validation_chat_id_missing', { validationId, userId });
+        }
+      } catch (e) {
+        console.error('ERR get_validation_chat_id_exception', { message: String(e).slice(0, 200), validationId, userId });
+      }
+    }
+
     // Create user-authenticated client for GP operations (uses anon key + user JWT)
     const supabaseUser = createClient(supabaseUrl, supabaseAnonKey, {
       global: {
@@ -698,99 +1620,100 @@ serve(async (req) => {
     });
 
     // ============================
+    // Определяем текущий шаг валидации
+    // ============================
+    let currentStep = 1; // По умолчанию Step 1
+    if (mode === 'dialog' && validationId) {
+      try {
+        const { data: validation, error: stepError } = await supabaseAdmin
+          .from('idea_validations')
+          .select('current_step')
+          .eq('id', validationId)
+          .eq('user_id', userId)
+          .single();
+
+        if (!stepError && validation?.current_step !== null && validation?.current_step !== undefined) {
+          currentStep = validation.current_step;
+        }
+      } catch (e) {
+        console.error('ERR get_current_step', { message: String(e).slice(0, 200) });
+      }
+    } else if (mode === 'dialog' && !validationId) {
+      // Если нет validationId, значит это новый диалог - начинаем с Step 0
+      currentStep = 0;
+    }
+
+    // ============================
     // GP Economy: Check if payment required
     // ============================
-    // First validation is FREE, subsequent validations cost 100 GP
-    // Check on EVERY dialog message to ensure payment
-    if (mode === 'dialog') {
-      // Check how many completed validations user has
-      const { count, error: countError } = await supabaseAdmin
-        .from('idea_validations')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', userId)
-        .eq('status', 'completed');
+    // Списываем GP только при переходе на Step 1 (action === 'start_validation')
+    // На Step 0 общение бесплатное
+    if (mode === 'dialog' && action === 'start_validation') {
+      const pricing = await getValidationPrice(userId, supabaseAdmin);
+      
+      if (!pricing.isFree) {
+        // Списываем GP (gp_spend сама проверит баланс и вернет ошибку, если недостаточно)
+        try {
+          const { data: spendResult, error: spendError } = await supabaseUser
+            .rpc('gp_spend', {
+              p_type: 'spend_message',
+              p_amount: VALIDATION_COST_GP,
+              p_reference_id: validationId || '',
+              p_idempotency_key: validationId ? `validation_${validationId}` : `validation_${userId}_${Date.now()}`,
+            });
 
-      if (countError) {
-        console.error('ERR count_validations', { message: countError.message });
-      }
-
-      const isFirstValidation = (count || 0) === 0;
-
-      if (!isFirstValidation) {
-        // Check if we already charged GP for this validation
-        let alreadyCharged = false;
-        
-        if (validationId) {
-          const { data: validation, error: validationError } = await supabaseAdmin
-            .from('idea_validations')
-            .select('gp_spent')
-            .eq('id', validationId)
-            .eq('user_id', userId)
-            .single();
-          
-          if (validationError) {
-            console.error('ERR check_gp_spent', { message: validationError.message });
-          }
-          
-          alreadyCharged = validation?.gp_spent === 100;
-        }
-        
-        if (!alreadyCharged) {
-          // Charge 100 GP for validation
-          // Call gp_spend RPC function with user auth context
-          try {
-            const { data: spendResult, error: spendError } = await supabaseUser
-              .rpc('gp_spend', {
-                p_type: 'spend_message',
-                p_amount: 100,
-                p_reference_id: validationId || '',
-                p_idempotency_key: validationId ? `validation_${validationId}` : `validation_${userId}_${Date.now()}`,
-              });
-
-            if (spendError) {
-              console.error('ERR gp_spend', { message: spendError.message });
-              
-              // Check if insufficient balance
-              if (spendError.message?.includes('insufficient') || spendError.code === '23514') {
-                return new Response(
-                  JSON.stringify({ 
-                    error: "insufficient_gp",
-                    message: "Недостаточно GP. Нужно 100 GP для валидации идеи.",
-                    required: 100
-                  }),
-                  { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-                );
-              }
-              
-              throw spendError;
-            }
-
-            console.log('INFO gp_spent', { amount: 100, type: 'spend_message', validationId, balance_after: spendResult });
+          if (spendError) {
+            console.error('ERR gp_spend', { message: spendError.message });
             
-            // Mark validation as charged
-            if (validationId) {
-              await supabaseAdmin
-                .from('idea_validations')
-                .update({ gp_spent: 100 })
-                .eq('id', validationId)
-                .eq('user_id', userId);
+            if (spendError.message?.includes('insufficient') || spendError.code === '23514') {
+              return new Response(
+                JSON.stringify({
+                  error: "insufficient_gp",
+                  message: `Недостаточно GP. Нужно ${VALIDATION_COST_GP} GP для валидации идеи.`,
+                  required: VALIDATION_COST_GP
+                }),
+                { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+              );
             }
-          } catch (gpError) {
-            console.error('ERR gp_spend_exception', { message: String(gpError).slice(0, 200) });
-            return new Response(
-              JSON.stringify({ 
-                error: "gp_error",
-                message: "Ошибка списания GP. Попробуйте позже."
-              }),
-              { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-            );
+            
+            throw spendError;
           }
-        } else {
-          console.log('INFO gp_already_charged', { validationId });
+
+          console.log('INFO gp_spent_on_start', { amount: VALIDATION_COST_GP, validationId, balance_after: spendResult });
+
+          // Отмечаем списание в валидации
+          if (validationId) {
+            await supabaseAdmin
+              .from('idea_validations')
+              .update({ gp_spent: VALIDATION_COST_GP, current_step: 1 })
+              .eq('id', validationId)
+              .eq('user_id', userId);
+          }
+        } catch (gpError) {
+          console.error('ERR gp_spend_exception', { message: String(gpError).slice(0, 200) });
+          return new Response(
+            JSON.stringify({
+              error: "gp_error",
+              message: "Ошибка списания GP. Попробуйте позже."
+            }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
         }
       } else {
         console.log('INFO first_validation_free', { userId });
+        
+        // Обновляем шаг на 1 для бесплатной валидации
+        if (validationId) {
+          await supabaseAdmin
+            .from('idea_validations')
+            .update({ current_step: 1 })
+            .eq('id', validationId)
+            .eq('user_id', userId);
+        }
       }
+      
+      // После списания GP переходим на Step 1
+      currentStep = 1;
     }
 
     // Initialize OpenAI client (using xAI)
@@ -801,60 +1724,97 @@ serve(async (req) => {
 
     // Mode: DIALOG (default)
     if (mode === 'dialog') {
-      // Получаем текущий шаг валидации
-      let currentStep = 1;
-      
-      if (validationId) {
-        const { data: validation, error: validationError } = await supabaseAdmin
-          .from('idea_validations')
-          .select('current_step')
-          .eq('id', validationId)
-          .eq('user_id', userId)
-          .single();
+      // Step 0: Онбординг - бесплатное общение без списания GP
+      // НО если action === 'start_validation', то currentStep уже обновлен на 1 выше
+      if (currentStep === 0 && action !== 'start_validation') {
+        // Определяем цену для метаданных кнопок
+        const pricing = await getValidationPrice(userId, supabaseAdmin);
         
-        if (validationError) {
-          console.error('ERR get_current_step', { message: validationError.message });
-        } else if (validation) {
-          currentStep = validation.current_step || 1;
-        }
+        // Генерируем ответ через обычный LLM вызов с ONBOARDING_SYSTEM_PROMPT
+        const onboardingCompletion = await openai.chat.completions.create({
+          model: "grok-2-latest",
+          messages: [
+            { role: "system", content: ONBOARDING_SYSTEM_PROMPT },
+            ...messages
+          ],
+          temperature: 0.7,
+          max_tokens: 300,
+        });
+
+        const botResponse = onboardingCompletion.choices[0].message.content;
+
+        // Логируем usage (но не списываем GP)
+        const usage = onboardingCompletion.usage;
+        const cost = calculateCost(usage, "grok-2-latest");
+        await saveAIMessageData(
+          userId,
+          chatId,
+          validationId,
+          usage,
+          cost,
+          "grok-2-latest",
+          'valli_onboarding',
+          supabaseAdmin
+        );
+
+        // Возвращаем ответ с метаданными для кнопок онбординга
+        return new Response(
+          JSON.stringify({
+            message: { role: "assistant", content: botResponse },
+            metadata: {
+              current_step: 0,
+              onboarding: {
+                price: pricing.price,
+                is_free: pricing.isFree,
+                actions: [
+                  {
+                    id: 'start_validation',
+                    label: pricing.isFree 
+                      ? 'Начать проверку (Бесплатно)' 
+                      : `Начать проверку (${pricing.price} GP)`,
+                    is_primary: true
+                  },
+                  {
+                    id: 'ask_about',
+                    label: 'А что ты умеешь?',
+                    is_primary: false
+                  }
+                ]
+              }
+            }
+          }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
 
-      // Двухпроходная валидация: generator + validator
-      const validationResult = await validateUserResponse(
+      // Step 1-7: Используем архитектуру Slot Filling
+      const slotFillingResult = await validateUserResponseSlotFilling(
         openai,
         messages,
-        currentStep,
-        userId,
         validationId,
+        userId,
+        chatId,
         supabaseAdmin
       );
 
-      // Если ответ достаточен и нужно продвинуть шаг
-      if (validationResult.shouldAdvance && validationId && currentStep < 7) {
-        const newStep = currentStep + 1;
-        
-        const { error: updateError } = await supabaseAdmin
-          .from('idea_validations')
-          .update({ current_step: newStep })
-          .eq('id', validationId)
-          .eq('user_id', userId);
-        
-        if (updateError) {
-          console.error('ERR update_step', { message: updateError.message, currentStep, newStep });
-        } else {
-          console.log('INFO step_advanced', { validationId, from: currentStep, to: newStep });
-        }
-      } else if (!validationResult.shouldAdvance) {
-        console.log('INFO step_blocked', { validationId, currentStep, isValid: validationResult.isValid });
+      // Проверяем завершение диалога (все слоты заполнены)
+      const isComplete = slotFillingResult.isComplete || false;
+      
+      if (isComplete) {
+        console.log('INFO validation_complete', { 
+          validationId, 
+          finalStep: slotFillingResult.newStep 
+        });
       }
 
       return new Response(
         JSON.stringify({
-          message: { role: "assistant", content: validationResult.response },
+          message: { role: "assistant", content: slotFillingResult.response },
           metadata: {
-            current_step: currentStep,
-            is_valid: validationResult.isValid,
-            should_advance: validationResult.shouldAdvance
+            current_step: slotFillingResult.newStep,
+            retry_count: slotFillingResult.retryCount,
+            is_complete: isComplete,
+            slots_state: slotFillingResult.slotsState, // Возвращаем для отладки/UI
           }
         }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -885,6 +1845,7 @@ serve(async (req) => {
       const scoringCost = calculateCost(scoringUsage, model);
       await saveAIMessageData(
         userId,
+        chatId,
         validationId,
         scoringUsage,
         scoringCost,
@@ -911,6 +1872,27 @@ serve(async (req) => {
       // Generate report
       const report = generateReport(scoringResult);
 
+       // Подготовим контекст для Макса на основе slots_state (если есть)
+       let maxContext: any | null = null;
+       if (validationId) {
+         try {
+           const { data: validationForContext, error: contextError } = await supabaseAdmin
+             .from('idea_validations')
+             .select('slots_state')
+             .eq('id', validationId)
+             .eq('user_id', userId)
+             .single();
+
+           if (contextError) {
+             console.error('ERR load_slots_state_for_max', { message: contextError.message, validationId, userId });
+           } else if (validationForContext?.slots_state) {
+             maxContext = prepareContextForMax(validationForContext.slots_state as SlotsState, scoringResult.total);
+           }
+         } catch (e) {
+           console.error('ERR prepare_max_context', { message: String(e).slice(0, 200), validationId, userId });
+         }
+       }
+
       // Save to database if validationId provided
       if (validationId) {
         // Check if GP was spent (not first validation)
@@ -920,7 +1902,7 @@ serve(async (req) => {
           .eq('user_id', userId)
           .eq('status', 'completed');
         
-        const gpSpent = (count || 0) > 0 ? 100 : 0;
+        const gpSpent = (count || 0) > 0 ? VALIDATION_COST_GP : 0;
 
         await supabaseAdmin
           .from('idea_validations')
@@ -943,6 +1925,7 @@ serve(async (req) => {
         JSON.stringify({
           scores: scoringResult,
           report: report,
+          max_context: maxContext,
         }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );

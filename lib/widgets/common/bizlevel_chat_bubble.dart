@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/theme/spacing.dart';
 import 'package:bizlevel/theme/dimensions.dart';
@@ -67,10 +68,24 @@ class BizLevelChatBubble extends StatelessWidget {
             ),
           ),
           child: role == ChatBubbleRole.assistant
-              ? SelectableText(
-                  text,
-                  style:
-                      AppTypography.textTheme.bodyMedium?.copyWith(color: fg),
+              ? MarkdownBody(
+                  data: text,
+                  styleSheet: MarkdownStyleSheet(
+                    p: AppTypography.textTheme.bodyMedium?.copyWith(color: fg),
+                    strong: AppTypography.textTheme.bodyMedium?.copyWith(
+                      color: fg,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    listBullet: AppTypography.textTheme.bodyMedium?.copyWith(color: fg),
+                    // Минимальные отступы для списков
+                    listIndent: 16.0,
+                    blockquotePadding: const EdgeInsets.all(8.0),
+                    blockquoteDecoration: BoxDecoration(
+                      color: bg.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(4.0),
+                    ),
+                  ),
+                  selectable: true,
                 )
               : Text(
                   text,
