@@ -252,6 +252,95 @@ const SCORING_PROMPT = `Оцени ответы пользователя по 5 
 // ============================
 
 /**
+ * Расчет стоимости запроса к LLM
+ */
+function calculateCost(usage: any, model = 'grok-2-latest'): number {
+  const inputTokens = usage?.prompt_tokens || 0;
+  const outputTokens = usage?.completion_tokens || 0;
+  let inputCostPer1K = 0.001; // defaults for grok-2-latest
+  let outputCostPer1K = 0.003;
+  
+  try {
+    if (typeof model === 'string' && model.startsWith('grok-')) {
+      // Позволяем конфигурировать стоимость для XAI через ENV
+      const envIn = parseFloat(Deno.env.get('XAI_INPUT_COST_PER_1K') || '0.001');
+      const envOut = parseFloat(Deno.env.get('XAI_OUTPUT_COST_PER_1K') || '0.003');
+      inputCostPer1K = isFinite(envIn) ? envIn : inputCostPer1K;
+      outputCostPer1K = isFinite(envOut) ? envOut : outputCostPer1K;
+    }
+  } catch (_) {
+    // keep defaults on any parsing error
+  }
+  
+  const totalCost = (inputTokens * inputCostPer1K / 1000) + (outputTokens * outputCostPer1K / 1000);
+  return Math.round(totalCost * 1000000) / 1000000; // Округляем до 6 знаков
+}
+
+/**
+ * Сохранение данных о стоимости AI запроса
+ */
+async function saveAIMessageData(
+  userId: string,
+  validationId: string | null,
+  usage: any,
+  cost: number,
+  model: string,
+  requestType: string,
+  supabaseAdminInstance: any
+): Promise<void> {
+  if (!userId) return; // Пропускаем, если пользователь не авторизован
+
+  // Безопасное преобразование к integer
+  const safeInt = (v: any): number => {
+    const n = parseInt(v);
+    return isNaN(n) ? 0 : Math.min(Math.max(n, 0), 2147483647);
+  };
+
+  const inputTokens = safeInt(usage?.prompt_tokens);
+  const outputTokens = safeInt(usage?.completion_tokens);
+  const totalTokens = safeInt(usage?.total_tokens ?? (usage?.prompt_tokens ?? 0) + (usage?.completion_tokens ?? 0));
+
+  // Проверка cost
+  let safeCost = cost;
+  if (typeof safeCost !== 'number' || isNaN(safeCost)) {
+    console.warn('WARN cost_is_nan', { cost });
+    safeCost = 0;
+  }
+
+  const payload = {
+    user_id: userId,
+    chat_id: null, // Валли не использует chat_id
+    leo_message_id: null, // Валли не использует leo_message_id
+    model_used: model,
+    input_tokens: inputTokens,
+    output_tokens: outputTokens,
+    total_tokens: totalTokens,
+    cost_usd: safeCost,
+    bot_type: 'valli',
+    request_type: requestType,
+    // Добавляем reference на validation_id для связи
+    metadata: validationId ? { validation_id: validationId } : null
+  };
+
+  try {
+    const { error } = await supabaseAdminInstance.from('ai_message').insert(payload);
+    if (error) {
+      console.error('ERR save_ai_message', { message: error.message });
+    } else {
+      console.log('INFO ai_message_saved', { 
+        userId, 
+        botType: 'valli', 
+        requestType, 
+        cost: safeCost,
+        tokens: totalTokens 
+      });
+    }
+  } catch (e) {
+    console.error('ERR save_ai_message_exception', { message: String(e).slice(0, 200) });
+  }
+}
+
+/**
  * Форматирует сообщение-уточнение при недостаточном ответе
  */
 function formatClarificationMessage(validationResult: any, step: ValidationStep): string {
@@ -284,7 +373,10 @@ function formatClarificationMessage(validationResult: any, step: ValidationStep)
 async function validateUserResponse(
   openai: any,
   messages: any[],
-  currentStep: number
+  currentStep: number,
+  userId: string,
+  validationId: string | null,
+  supabaseAdmin: any
 ): Promise<{ isValid: boolean; response: string; shouldAdvance: boolean }> {
   const step = VALIDATION_STEPS.find(s => s.id === currentStep);
   
@@ -298,8 +390,9 @@ async function validateUserResponse(
   }
 
   // ШАГ 1: Generator — генерируем ответ Валли
+  const model = "grok-2-latest";
   const generatorCompletion = await openai.chat.completions.create({
-    model: "grok-2-latest",
+    model,
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
       ...messages
@@ -309,6 +402,19 @@ async function validateUserResponse(
   });
 
   const generatorResponse = generatorCompletion.choices[0].message.content;
+  
+  // Логируем usage и стоимость для генератора
+  const generatorUsage = generatorCompletion.usage;
+  const generatorCost = calculateCost(generatorUsage, model);
+  await saveAIMessageData(
+    userId,
+    validationId,
+    generatorUsage,
+    generatorCost,
+    model,
+    'valli_generator',
+    supabaseAdmin
+  );
 
   // Получаем последнее сообщение пользователя
   const lastUserMessage = messages
@@ -368,7 +474,7 @@ ${criteriaText}
 
   try {
     const validatorCompletion = await openai.chat.completions.create({
-      model: "grok-2-latest",
+      model,
       messages: [
         { role: "system", content: validatorPrompt },
         { role: "user", content: "Оцени ответ пользователя согласно критериям." }
@@ -380,6 +486,19 @@ ${criteriaText}
 
     const rawValidation = validatorCompletion.choices[0].message.content || "{}";
     const validationResult = JSON.parse(rawValidation);
+    
+    // Логируем usage и стоимость для валидатора
+    const validatorUsage = validatorCompletion.usage;
+    const validatorCost = calculateCost(validatorUsage, model);
+    await saveAIMessageData(
+      userId,
+      validationId,
+      validatorUsage,
+      validatorCost,
+      model,
+      'valli_validator',
+      supabaseAdmin
+    );
 
     if (validationResult.is_sufficient === true) {
       // Ответ достаточен → продвигаем шаг, возвращаем generator-ответ
@@ -701,7 +820,14 @@ serve(async (req) => {
       }
 
       // Двухпроходная валидация: generator + validator
-      const validationResult = await validateUserResponse(openai, messages, currentStep);
+      const validationResult = await validateUserResponse(
+        openai,
+        messages,
+        currentStep,
+        userId,
+        validationId,
+        supabaseAdmin
+      );
 
       // Если ответ достаточен и нужно продвинуть шаг
       if (validationResult.shouldAdvance && validationId && currentStep < 7) {
@@ -742,8 +868,9 @@ serve(async (req) => {
         .map((m: any) => `${m.role}: ${m.content}`)
         .join('\n\n');
 
+      const model = "grok-2-latest";
       const completion = await openai.chat.completions.create({
-        model: "grok-2-latest",
+        model,
         messages: [
           { role: "system", content: SCORING_PROMPT },
           { role: "user", content: `Оцени эту беседу:\n\n${conversationText}` }
@@ -752,6 +879,19 @@ serve(async (req) => {
         max_tokens: 1000,
         response_format: { type: "json_object" },
       });
+
+      // Логируем usage и стоимость для scoring
+      const scoringUsage = completion.usage;
+      const scoringCost = calculateCost(scoringUsage, model);
+      await saveAIMessageData(
+        userId,
+        validationId,
+        scoringUsage,
+        scoringCost,
+        model,
+        'valli_scoring',
+        supabaseAdmin
+      );
 
       let scoringResult;
       try {
