@@ -1,5 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- Нужен для восстановления scheduled notifications после перезагрузки устройства.
+         Receiver обычно поставляется самим flutter_local_notifications через manifest merge. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <uses-permission android:name="com.android.vending.BILLING" />
     <application
         android:label="bizlevel"

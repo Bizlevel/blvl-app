@@ -82,13 +82,50 @@ async function callPostgrestRpc(
   return data as RpcResponse;
 }
 
-function parseBalanceAfter(data: RpcResponse): number | null {
-  if (typeof data === "number") return data;
-  if (Array.isArray(data) && data.length && typeof data[0] === "number") return Number(data[0]);
-  if (typeof data === "object" && data && "balance_after" in data) {
-    const v = (data as any).balance_after;
-    if (typeof v === "number") return v;
+function _asNumber(v: unknown): number | null {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string") {
+    const t = v.trim();
+    if (!t) return null;
+    const n = Number(t);
+    if (Number.isFinite(n)) return n;
   }
+  return null;
+}
+
+function parseBalanceAfter(data: RpcResponse): number | null {
+  // PostgREST может вернуть:
+  // - число (scalar)
+  // - массив чисел
+  // - массив объектов [{ balance_after: 123 }] для RETURNS TABLE
+  // - массив объектов [{ balance: 123, ... }] для gp_balance()
+  // - объект { balance_after: 123 } (редко, но поддержим)
+  // - объект { balance: 123 } (редко, но поддержим)
+  const n0 = _asNumber(data as unknown);
+  if (n0 != null) return n0;
+
+  if (Array.isArray(data)) {
+    if (!data.length) return null;
+    const first = data[0] as any;
+    const n1 = _asNumber(first);
+    if (n1 != null) return n1;
+    if (first && typeof first === "object") {
+      const ba = _asNumber(first.balance_after);
+      if (ba != null) return ba;
+      const b = _asNumber(first.balance);
+      if (b != null) return b;
+    }
+    return null;
+  }
+
+  if (typeof data === "object" && data) {
+    const o = data as any;
+    const ba = _asNumber(o.balance_after);
+    if (ba != null) return ba;
+    const b = _asNumber(o.balance);
+    if (b != null) return b;
+  }
+
   return null;
 }
 

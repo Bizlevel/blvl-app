@@ -18,11 +18,6 @@ class RemindersSettingsContent extends ConsumerStatefulWidget {
 
 class _RemindersSettingsContentState
     extends ConsumerState<RemindersSettingsContent> {
-  static const Set<int> _defaultDays = {
-    DateTime.monday,
-    DateTime.wednesday,
-    DateTime.friday
-  };
   TimeOfDay? _time;
   Set<int>? _days;
   bool _dirty = false;
@@ -51,7 +46,9 @@ class _RemindersSettingsContentState
 
     final selectedDays = _resolveDays(resolvedPrefs);
     final selectedTime = _resolveTime(resolvedPrefs);
-    final next = _computeNextOccurrence(selectedDays, selectedTime);
+    final next = selectedDays.isEmpty
+        ? null
+        : _computeNextOccurrence(selectedDays, selectedTime);
     final bool syncing = prefsAsync.isLoading && prefsAsync.valueOrNull != null;
 
     return Column(
@@ -131,7 +128,8 @@ class _RemindersSettingsContentState
                           } else {
                             update.remove(e.$2);
                           }
-                          _days = update.isEmpty ? _defaultDays : update;
+                          // Пустой набор = "выключено".
+                          _days = update;
                           _dirty = true;
                         }),
               )
@@ -141,10 +139,12 @@ class _RemindersSettingsContentState
         Padding(
           padding: const EdgeInsets.only(bottom: 8),
           child: Text(
-            'Следующее напоминание: '
-            '${next.day.toString().padLeft(2, '0')}.'
-            '${next.month.toString().padLeft(2, '0')}.'
-            '${next.year} ${_fmt(selectedTime)}',
+            selectedDays.isEmpty
+                ? 'Напоминания выключены'
+                : 'Следующее напоминание: '
+                    '${next!.day.toString().padLeft(2, '0')}.'
+                    '${next.month.toString().padLeft(2, '0')}.'
+                    '${next.year} ${_fmt(selectedTime)}',
             style: Theme.of(context).textTheme.labelMedium,
           ),
         ),
@@ -182,7 +182,7 @@ class _RemindersSettingsContentState
   Set<int> _resolveDays(ReminderPrefs prefs) {
     if (!_dirty || _days == null) {
       _days = {
-        ...(prefs.weekdays.isEmpty ? _defaultDays : prefs.weekdays),
+        ...prefs.weekdays,
       };
     }
     return _days!;
@@ -224,7 +224,7 @@ class _RemindersSettingsContentState
       await NotificationsService.instance.cancelWeeklyPlan();
       await NotificationsService.instance.cancelDailyPracticeReminder();
       await NotificationsService.instance.schedulePracticeReminders(
-        weekdays: days.toList(),
+        weekdays: days.toList(), // может быть пустым → "выключено"
         hour: time.hour,
         minute: time.minute,
       );
@@ -238,12 +238,20 @@ class _RemindersSettingsContentState
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Напоминания настроены')),
+        SnackBar(
+          content:
+              Text(days.isEmpty ? 'Напоминания выключены' : 'Напоминания настроены'),
+        ),
       );
       Navigator.of(context).maybePop();
     } catch (error) {
       setState(() {
-        _error = 'Не удалось сохранить: $error';
+        if (error is NotificationsPermissionDenied) {
+          _error =
+              'Разрешите уведомления в настройках телефона и попробуйте снова.';
+        } else {
+          _error = 'Не удалось сохранить: $error';
+        }
       });
     } finally {
       if (mounted) {
@@ -340,7 +348,7 @@ class _ReminderStatus extends StatelessWidget {
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                'Синхронизация через BizLevel — пуши придут даже после смены устройства.',
+                'Расписание сохраняется и синхронизируется. Облачные пуши будут настроены на этапе 2.',
                 style: theme.textTheme.bodySmall,
               ),
             ),
