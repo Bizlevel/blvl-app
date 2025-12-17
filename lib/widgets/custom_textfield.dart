@@ -16,6 +16,14 @@ class CustomTextBox extends StatelessWidget {
     this.keyboardType,
     this.readOnlySoftBackground = false,
     this.maxLines = 1,
+    this.autocorrect,
+    this.enableSuggestions,
+    this.enableIMEPersonalizedLearning,
+    this.textInputAction,
+    this.autofillHints,
+    this.textCapitalization = TextCapitalization.none,
+    this.smartDashesType,
+    this.smartQuotesType,
   });
 
   final String hint;
@@ -27,6 +35,14 @@ class CustomTextBox extends StatelessWidget {
   final TextInputType? keyboardType;
   final bool readOnlySoftBackground;
   final int maxLines;
+  final bool? autocorrect;
+  final bool? enableSuggestions;
+  final bool? enableIMEPersonalizedLearning;
+  final TextInputAction? textInputAction;
+  final Iterable<String>? autofillHints;
+  final TextCapitalization textCapitalization;
+  final SmartDashesType? smartDashesType;
+  final SmartQuotesType? smartQuotesType;
 
   @override
   Widget build(BuildContext context) {
@@ -59,6 +75,16 @@ class CustomTextBox extends StatelessWidget {
         obscureText: obscureText,
         keyboardType: keyboardType,
         maxLines: maxLines,
+        // Для большинства полей оставляем системные значения по умолчанию,
+        // а на чувствительных экранах (login/password) можем явно отключать подсказки/автокоррекцию.
+        autocorrect: autocorrect ?? true,
+        enableSuggestions: enableSuggestions ?? true,
+        enableIMEPersonalizedLearning: enableIMEPersonalizedLearning ?? true,
+        textInputAction: textInputAction,
+        autofillHints: autofillHints,
+        textCapitalization: textCapitalization,
+        smartDashesType: smartDashesType,
+        smartQuotesType: smartQuotesType,
         textAlignVertical: TextAlignVertical.center,
         decoration: InputDecoration(
           prefixIcon: prefix,

@@ -1,8 +1,16 @@
 #import "BizPluginRegistrant.h"
 #import "GeneratedPluginRegistrant.h"
 
-#if __has_include(<in_app_purchase_storekit/InAppPurchasePlugin.h>)
-#import <in_app_purchase_storekit/InAppPurchasePlugin.h>
+#if __has_include(<photo_manager/PhotoManagerPlugin.h>)
+#import <photo_manager/PhotoManagerPlugin.h>
+#endif
+
+#if __has_include(<file_selector_ios/FileSelectorPlugin.h>)
+#import <file_selector_ios/FileSelectorPlugin.h>
+#endif
+
+#if __has_include(<webview_flutter_wkwebview/WebViewFlutterPlugin.h>)
+#import <webview_flutter_wkwebview/WebViewFlutterPlugin.h>
 #endif
 
 @implementation BizPluginRegistrant
@@ -13,22 +21,36 @@
 }
 
 + (void)registerDeferredIap:(NSObject<FlutterPluginRegistry> *)registry {
-#if __has_include(<in_app_purchase_storekit/InAppPurchasePlugin.h>)
-  static dispatch_once_t onceToken;
-  dispatch_once(&onceToken, ^{
-    NSLog(@"BizPluginRegistrant: registerDeferredIap invoked");
-    id<FlutterPluginRegistrar> registrar =
-        [registry registrarForPlugin:@"InAppPurchasePlugin"];
-    if (registrar) {
-      [InAppPurchasePlugin registerWithRegistrar:registrar];
-      NSLog(@"BizPluginRegistrant: InAppPurchasePlugin registered lazily");
-    } else {
-      NSLog(@"BizPluginRegistrant: registrar for InAppPurchasePlugin not found");
-    }
-  });
-#else
-  NSLog(@"BizPluginRegistrant: in_app_purchase_storekit headers not present, skipping deferred IAP");
+  NSLog(@"BizPluginRegistrant: registerDeferredIap skipped (StoreKit1 disabled)");
   (void)registry;
+}
+
++ (void)registerMediaPlugins:(NSObject<FlutterPluginRegistry> *)registry {
+#if __has_include(<photo_manager/PhotoManagerPlugin.h>)
+  id<FlutterPluginRegistrar> photoRegistrar =
+      [registry registrarForPlugin:@"PhotoManagerPlugin"];
+  if (photoRegistrar) {
+    [PhotoManagerPlugin registerWithRegistrar:photoRegistrar];
+    NSLog(@"BizPluginRegistrant: PhotoManagerPlugin registered lazily");
+  }
+#endif
+
+#if __has_include(<file_selector_ios/FileSelectorPlugin.h>)
+  id<FlutterPluginRegistrar> fileSelectorRegistrar =
+      [registry registrarForPlugin:@"FileSelectorPlugin"];
+  if (fileSelectorRegistrar) {
+    [FileSelectorPlugin registerWithRegistrar:fileSelectorRegistrar];
+    NSLog(@"BizPluginRegistrant: FileSelectorPlugin registered lazily");
+  }
+#endif
+
+#if __has_include(<webview_flutter_wkwebview/WebViewFlutterPlugin.h>)
+  id<FlutterPluginRegistrar> webviewRegistrar =
+      [registry registrarForPlugin:@"FLTWebViewFlutterPlugin"];
+  if (webviewRegistrar) {
+    [WebViewFlutterPlugin registerWithRegistrar:webviewRegistrar];
+    NSLog(@"BizPluginRegistrant: WebViewFlutterPlugin registered lazily");
+  }
 #endif
 }
 

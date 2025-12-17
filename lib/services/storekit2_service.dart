@@ -12,13 +12,43 @@ class StoreKit2Service {
   static const _methodChannel = MethodChannel('bizlevel/storekit2');
   static const _transactionChannel =
       EventChannel('bizlevel/storekit2/transactions');
+  static const _bootstrapChannel = MethodChannel('bizlevel/native_bootstrap');
+
+  static bool _nativeBridgeInstalled = false;
+  static Future<void>? _nativeBridgeInstallFuture;
 
   Stream<StoreKitTransaction>? _transactionStream;
+
+  static bool get _isIos =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
+
+  static Future<void> _ensureNativeBridgeInstalled(String caller) async {
+    if (!_isIos) return;
+    if (_nativeBridgeInstalled) return;
+
+    _nativeBridgeInstallFuture ??= _bootstrapChannel
+        .invokeMethod<void>('installStoreKit2Bridge')
+        .then<void>((_) {
+      _nativeBridgeInstalled = true;
+    });
+
+    try {
+      await _nativeBridgeInstallFuture;
+    } catch (error) {
+      // Сбрасываем future, чтобы следующая попытка могла повторить установку.
+      _nativeBridgeInstallFuture = null;
+      debugPrint(
+        '[StoreKit2Service] failed to install native bridge (caller=$caller): $error',
+      );
+      rethrow;
+    }
+  }
 
   Future<StoreKitFetchResponse> fetchProducts(List<String> productIds) async {
     if (productIds.isEmpty) {
       return const StoreKitFetchResponse(products: []);
     }
+    await _ensureNativeBridgeInstalled('fetchProducts');
     try {
       final raw = await _methodChannel.invokeMethod<dynamic>(
         'fetchProducts',
@@ -45,6 +75,7 @@ class StoreKit2Service {
   }
 
   Future<StoreKitPurchaseResult> purchase(String productId) async {
+    await _ensureNativeBridgeInstalled('purchase');
     try {
       final payload = await _methodChannel.invokeMapMethod<String, dynamic>(
         'purchaseProduct',
@@ -67,6 +98,7 @@ class StoreKit2Service {
   }
 
   Future<List<StoreKitTransaction>> restorePurchases() async {
+    await _ensureNativeBridgeInstalled('restorePurchases');
     try {
       final response =
           await _methodChannel.invokeListMethod<dynamic>('restorePurchases');
@@ -86,18 +118,43 @@ class StoreKit2Service {
   }
 
   Stream<StoreKitTransaction> transactionUpdates() {
-    return _transactionStream ??= _transactionChannel
-        .receiveBroadcastStream()
-        .where((event) => event is Map)
-        .map((event) => Map<String, dynamic>.from(event as Map))
-        .where((event) => event['type'] == 'transactionUpdate')
-        .map((event) {
-      final tx = event['transaction'];
-      if (tx is Map) {
-        return StoreKitTransaction.fromJson(Map<String, dynamic>.from(tx));
-      }
-      throw StateError('Malformed StoreKit transaction event');
-    });
+    if (!_isIos) return const Stream.empty();
+
+    return _transactionStream ??= () {
+      StreamSubscription<dynamic>? sub;
+      late final StreamController<StoreKitTransaction> controller;
+
+      controller = StreamController<StoreKitTransaction>.broadcast(
+        onListen: () async {
+          try {
+            await _ensureNativeBridgeInstalled('transactionUpdates');
+          } catch (error, stackTrace) {
+            controller.addError(error, stackTrace);
+            return;
+          }
+
+          sub ??= _transactionChannel
+              .receiveBroadcastStream()
+              .where((event) => event is Map)
+              .map((event) => Map<String, dynamic>.from(event as Map))
+              .where((event) => event['type'] == 'transactionUpdate')
+              .map((event) {
+            final tx = event['transaction'];
+            if (tx is Map) {
+              return StoreKitTransaction.fromJson(
+                  Map<String, dynamic>.from(tx));
+            }
+            throw StateError('Malformed StoreKit transaction event');
+          }).listen(controller.add, onError: controller.addError);
+        },
+        onCancel: () async {
+          await sub?.cancel();
+          sub = null;
+        },
+      );
+
+      return controller.stream;
+    }();
   }
 }
 

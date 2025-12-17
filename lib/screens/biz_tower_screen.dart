@@ -94,9 +94,7 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
             child: Center(child: GpBalanceWidget()),
           )
         ],
-        backgroundColor: AppColor.appBarColor,
       ),
-      backgroundColor: AppColor.appBgColor,
       body: Consumer(builder: (context, ref, _) {
         final nodesAsync = ref.watch(towerNodesProvider);
         return nodesAsync.when(

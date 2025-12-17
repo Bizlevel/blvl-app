@@ -20,9 +20,7 @@ import 'package:bizlevel/widgets/common/gp_balance_widget.dart';
 import 'package:bizlevel/widgets/common/bizlevel_card.dart';
 import 'package:bizlevel/widgets/common/bizlevel_text_field.dart';
 import 'package:bizlevel/widgets/reminders_settings_sheet.dart';
-import 'package:bizlevel/services/media_picker_service.dart';
 import 'package:bizlevel/widgets/common/achievement_badge.dart';
-import 'package:bizlevel/providers/theme_provider.dart';
 import 'package:bizlevel/theme/dimensions.dart';
 
 class ProfileScreen extends ConsumerWidget {
@@ -164,7 +162,9 @@ class ProfileScreen extends ConsumerWidget {
         return CustomScrollView(
           slivers: [
             SliverAppBar(
-              backgroundColor: AppColor.appBgColor,
+              // Единый фон приложения задаётся в main.dart (градиент). AppBar делаем прозрачным,
+              // чтобы работал общий "glass/surface system".
+              backgroundColor: Colors.transparent,
               pinned: true,
               snap: true,
               floating: true,
@@ -199,13 +199,6 @@ class ProfileScreen extends ConsumerWidget {
                       color: AppColor.onSurfaceSubtle),
                   onSelected: (value) async {
                     switch (value) {
-                      case 'theme':
-                        final mode = ref.read(themeModeProvider);
-                        final next = mode == ThemeMode.light
-                            ? ThemeMode.dark
-                            : ThemeMode.light;
-                        ref.read(themeModeProvider.notifier).state = next;
-                        break;
                       case 'notifications':
                         await showRemindersSettingsSheet(context);
                         break;
@@ -227,16 +220,6 @@ class ProfileScreen extends ConsumerWidget {
                     }
                   },
                   itemBuilder: (context) => [
-                    PopupMenuItem(
-                      value: 'theme',
-                      child: Row(
-                        children: [
-                          const Icon(Icons.brightness_6, size: 18),
-                          AppSpacing.gapW(AppSpacing.s10),
-                          const Text('Тема: переключить'),
-                        ],
-                      ),
-                    ),
                     PopupMenuItem(
                       value: 'notifications',
                       child: Row(
@@ -397,15 +380,10 @@ class _BodyState extends ConsumerState<_Body> {
   Uint8List? _avatarPreviewBytes;
 
   Future<void> _pickAvatarFromGallery() async {
-    final result =
-        await MediaPickerService.instance.pickImageFromGallery(context);
-    if (!mounted || result == null) return;
-    setState(() {
-      _avatarPreviewBytes = result.bytes;
-    });
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Фото выбрано. Синхронизация с профилем появится позже.'),
+        content: Text('Загрузка фото из галереи отключена в текущей версии.'),
       ),
     );
   }
@@ -500,7 +478,8 @@ class _BodyState extends ConsumerState<_Body> {
               child: Stack(
                 children: [
                   ClipRRect(
-                    borderRadius: BorderRadius.circular(AppDimensions.radiusAvatar),
+                    borderRadius:
+                        BorderRadius.circular(AppDimensions.radiusAvatar),
                     child: Image.asset(asset, fit: BoxFit.cover),
                   ),
                   if (isSelected)
@@ -508,7 +487,8 @@ class _BodyState extends ConsumerState<_Body> {
                       child: Container(
                         decoration: BoxDecoration(
                           border: Border.all(color: AppColor.primary, width: 3),
-                          borderRadius: BorderRadius.circular(AppDimensions.radiusAvatar),
+                          borderRadius:
+                              BorderRadius.circular(AppDimensions.radiusAvatar),
                         ),
                       ),
                     ),
@@ -965,7 +945,8 @@ class _AboutMeCardState extends ConsumerState<_AboutMeCard> {
                       SizedBox(
                         height: 3,
                         child: ClipRRect(
-                          borderRadius: BorderRadius.circular(AppDimensions.radiusXs),
+                          borderRadius:
+                              BorderRadius.circular(AppDimensions.radiusXs),
                           child: LinearProgressIndicator(
                             value: completion.$1,
                             backgroundColor:
@@ -1389,7 +1370,8 @@ class _ChallengesEditorState extends State<_ChallengesEditor> {
                       color: isSelected
                           ? AppColor.primary.withValues(alpha: 0.1)
                           : AppColor.surface,
-                      borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
+                      borderRadius:
+                          BorderRadius.circular(AppDimensions.radiusLg),
                       border: Border.all(
                         color: isSelected
                             ? AppColor.primary
@@ -1434,7 +1416,8 @@ class _ChallengesEditorState extends State<_ChallengesEditor> {
                       color: isSelected
                           ? AppColor.primary.withValues(alpha: 0.1)
                           : AppColor.surface,
-                      borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
+                      borderRadius:
+                          BorderRadius.circular(AppDimensions.radiusLg),
                       border: Border.all(
                         color: isSelected
                             ? AppColor.primary
@@ -1472,7 +1455,7 @@ class _ChallengesEditorState extends State<_ChallengesEditor> {
                     horizontal: AppSpacing.s10, vertical: AppSpacing.s6),
                 decoration: BoxDecoration(
                   color: AppColor.surface,
-                      borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
+                  borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
                   border: Border.all(
                     color: AppColor.onSurfaceSubtle.withValues(alpha: 0.3),
                   ),

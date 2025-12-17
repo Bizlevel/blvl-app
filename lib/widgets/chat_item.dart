@@ -4,7 +4,7 @@ import 'package:bizlevel/theme/color.dart';
 import 'chat_notify.dart';
 import 'custom_image.dart';
 import 'package:bizlevel/theme/spacing.dart';
-import 'package:bizlevel/theme/dimensions.dart';
+import 'package:bizlevel/widgets/common/bizlevel_card.dart';
 
 class ChatItem extends StatefulWidget {
   const ChatItem(
@@ -40,34 +40,20 @@ class _ChatItemState extends State<ChatItem> {
       onExit: (_) {
         if (kIsWeb) setState(() => _isHover = false);
       },
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedScale(
-          scale: _isHover ? 1.03 : 1.0,
-          duration: const Duration(milliseconds: 120),
-          child: Container(
-            // fix: магические числа → AppSpacing
-            margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: AnimatedScale(
+        scale: _isHover ? 1.03 : 1.0,
+        duration: const Duration(milliseconds: 120),
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+          child: BizLevelCard(
+            onTap: widget.onTap,
             padding: const EdgeInsets.symmetric(
               horizontal: AppSpacing.md,
               vertical: AppSpacing.itemSpacing,
             ),
-            decoration: BoxDecoration(
-              // fix: хардкод цвета → AppColor.card / Theme.surface
-              color: AppColor.card,
-              // fix: радиус → AppDimensions
-              borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
-              boxShadow: [
-                BoxShadow(
-                  // fix: тень → AppColor.shadow
-                  color:
-                      AppColor.shadow.withValues(alpha: _isHover ? 0.2 : 0.1),
-                  spreadRadius: _isHover ? 2 : 1,
-                  blurRadius: _isHover ? 4 : 1,
-                  offset: const Offset(1, 1),
-                ),
-              ],
-            ),
+            semanticsLabel: (widget.chatData['name'] as String?)?.isNotEmpty == true
+                ? 'Открыть диалог: ${widget.chatData['name']}'
+                : 'Открыть диалог',
             child: Row(
               children: [
                 if (showPhoto) _buildPhoto(imagePath, botLabel),

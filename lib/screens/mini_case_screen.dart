@@ -117,9 +117,7 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
             child: const Text('Пропустить'),
           ),
         ],
-        backgroundColor: AppColor.appBarColor,
       ),
-      backgroundColor: AppColor.appBgColor,
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : PageView(

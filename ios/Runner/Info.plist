@@ -36,26 +36,14 @@
 	<string>355423136369-rv6g5rhcjionialj4ho5pvbmvss6gk9h.apps.googleusercontent.com</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
-	<key>FirebaseAppDelegateProxyEnabled</key>
-	<false/>
-	<key>FirebaseMessagingAutoInitEnabled</key>
-	<false/>
-	<key>FirebaseAppCheckUseDebugProvider</key>
-	<false/>
-	<key>EnableIosFcm</key>
-	<true/>
-	<key>FirebaseEnableDebugLogging</key>
-	<false/>
-	<key>FirebaseInstallationsAutoInitEnabled</key>
-	<false/>
 	<key>SentryDisableLaunchProfile</key>
 	<true/>
 	<key>SentryAsyncNativeInit</key>
-	<true/>
+	<false/>
 	<key>SentryNativeInitDelaySeconds</key>
 	<integer>0</integer>
-	<key>GULAppDelegateSwizzlerEnabled</key>
-	<false/>
+	<key>OneSignalAppID</key>
+	<string>$(ONESIGNAL_APP_ID)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>

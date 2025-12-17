@@ -1,3 +1,20 @@
+Задача practice-log-history fix: восстановлена «история применений» — при наличии `current_history_id` журнал грузит записи для текущей истории **и** legacy-записи с `goal_history_id IS NULL`; обновлены тесты, чтобы мок-репозиторий учитывал `fetchPracticeLogForHistory`.
+Задача practice-log-ux fix: история применений теперь грузится без зависимости от `current_history_id` (по `user_id`); авто‑сообщение Максу берёт снапшот текста до `await` и не теряет инструменты; обновление бонуса/баланса GP после записи вынесено из критического пути (не блокирует сохранение).
+Задача android-gradle-repos fix: `android/settings.gradle.kts` — оставлен один `pluginManagement` (с `flutter.sdk` + `includeBuild`), убран `FAIL_ON_PROJECT_REPOS`; `android/build.gradle.kts` — убраны `buildscript/allprojects` репозитории, чтобы `dependencyResolutionManagement` в settings был единственным источником репозиториев.
+Задача quote-no-hive+gp-ui fix: «Цитата дня» теперь грузится напрямую из `motivational_quotes` без Hive (чтобы не ловить iOS openBox фризы); snackbar «+30 GP за регистрацию» показывается только после регистрации (`registered=true`); обновлён тест `GoalsRepository`.
+Задача ios-onesignal-clean fix: полностью отключён Firebase на iOS/Android, пропатчен onesignal_flutter (init через OneSignalAppID, типы removeTags/aliases, sharedInstance), обновлён Podfile (OneSignalXCFramework 5.2.14), pod install выполнен с DISABLE_IOS_FIREBASE=true.
+Задача onesignal-ios fix: подготовка миграции iOS пушей на OneSignal, убрана инициализация Firebase на iOS, добавлен onesignal_flutter и защита Podfile от возврата Firebase.
+
+- Задача ios-firebase-gating fix: Вернул FLUTTER_TARGET=lib/main.dart, загейтил Firebase (AppDelegate, GeneratedPluginRegistrant, Podfile, DisableIosFirebase=true), отключил рискованные Sentry патчи по умолчанию, пересобрал pods с DISABLE_IOS_FIREBASE=true.
+# Задача iOS-perf fix: Устранение блокировок запуска (2025-12-08)
+- Исправлен `user_skills_provider.dart`: `ref.watch(authStateProvider)` → синхронное чтение
+- Удалён дубль `currentUserProvider.future` в `levels_provider.dart`  
+- Упрощён `FirebaseEarlyInit.m` (placeholder вместо dead code)
+- Обновлён `sign_in_with_apple` 6.1.0 → 7.0.1 (iOS 18 switch fix)
+- Упрощён `profile_screen.dart`: убран внешний `.when(authStateProvider)`
+- Все 17 тестов пройдены (providers + routing). Требуется тест в Xcode.
+
+
 # Этап 52-fix: Чаты — UX быстрых ответов и чтения
 - 52.fix-1: `LeoDialogScreen` — скрытие клавиатуры по жесту скролла (`keyboardDismissBehavior:onDrag`), по тапу вне поля (`onTapOutside`) и иконка «Скрыть клавиатуру». Добавлен FAB «Вниз» при отскролле.
 - 52.fix-2: Подсказки переведены в компактную горизонтальную ленту (1 строка, прокрутка) с кнопкой «Ещё…» (bottom‑sheet) и «Показать подсказки» при сворачивании.
@@ -644,3 +661,65 @@
 - `NotificationsService.getPracticeReminderPrefs/prefetch` теперь работают только с in-memory кешом + SharedPreferences, запись в Supabase остаётся асинхронной.
 - Таймзона для RPC читается из нового стораджа, так что никаких `NSFileManager`/`NSData` операций на UI-потоке не осталось.
 - Добавлены Sentry breadcrumbs и мгновенный показ локальных данных: `reminderPrefsProvider` больше не блокирует UI, `RemindersSettingsContent` показывает последнюю конфигурацию с индикатором синхронизации и сообщением об ошибке при оффлайне.
+
+## 2025-12-07 — Задача startup-blocking fix:
+- Исправлены 4 блокирующих паттерна в провайдерах:
+  - `currentUserProvider`: убрано `await authStateProvider.future` и `ref.watch(authStateProvider)` — теперь синхронное чтение `currentSession`
+  - `gpBalanceProvider`: убрано `await authStateProvider.future` и `ref.watch(authStateProvider)` — синхронная проверка сессии
+- Sentry init перенесён в `_schedulePostFrameBootstraps()` — не блокирует `runApp()`
+- Созданы тесты производительности (`test/providers/startup_performance_test.dart`) — 13 тестов, все проходят
+- **Важно:** Медленный запуск в Debug сборке (13+ сек до Dart VM, 2+ мин до Flutter main) — нормально для JIT, Release должен запускаться за <3 сек
+
+## 2025-12-07 — ✅ Задача startup-blocking fix ЗАВЕРШЕНА!
+
+**Приложение запускается! Экран уведомлений работает!**
+
+### Исправленные критические проблемы:
+
+1. **Podfile** — сломанный патч `patch_sentry_installation` вызывал ошибки компиляции
+2. **FirebaseEarlyInit.m** — init в `+load` и `constructor` блокировал main thread
+3. **AppDelegate.swift** — Firebase init перенесён в `willFinishLaunchingWithOptions` (до SceneDelegate)
+4. **auth_provider.dart** — `await authStateProvider.future` блокировал 73+ сек
+5. **gp_providers.dart** — `ref.watch(authStateProvider)` блокировал UI
+6. **app_router.dart** — `ref.watch(authStateProvider)` блокировал GoRouter
+7. **main.dart** — Sentry init блокировал `runApp()`, перенесён в post-frame
+8. **main.dart** — HiveError из-за FutureBuilder в MyApp.build(), убран
+9. **notifications_service.dart** — `_ensureLaunchBox()` теперь возвращает null при ошибке
+10. **login_controller.dart** — добавлена инвалидация провайдеров после логина
+
+### Тесты:
+- GoRouter тесты: 3/3 ✅
+- Provider тесты: 14/14 ✅
+- Всего тестов: 17/17 ✅
+
+---
+
+## 🔴 Fix (2025-12-08): Устранение корневой причины зависания iOS
+
+### Проблема:
+После предыдущих исправлений логи устройства показали:
+- `Hang detected: 56.83s`
+- `Waited 15.417541 seconds for a drawable, giving up`
+- `System gesture gate timed out`
+
+### Корневая причина:
+`FirebaseApp.configure()` в `willFinishLaunchingWithOptions` блокировал main thread на 15-60 сек из-за синхронного disk I/O.
+
+### Исправления:
+1. **AppDelegate.swift** — удалены вызовы `configureFirebaseBeforeMain()`:
+   - `willFinishLaunchingWithOptions` — закомментировано
+   - `didFinishLaunchingWithOptions` — закомментировано
+   - Firebase теперь инициализируется на Flutter стороне в post-frame
+
+2. **ios/Podfile** — добавлен патч `patch_sign_in_with_apple_switch`:
+   - Исправляет switch exhaustive warning для iOS 18
+
+### Тесты:
+- Provider тесты: 14/14 ✅
+- Routing тесты: 3/3 ✅  
+- Всего: 17/17 ✅
+
+### Требуется:
+1. `cd ios && pod install`
+2. Пересборка в Xcode
+3. Тестирование на устройстве — ожидается устранение зависания

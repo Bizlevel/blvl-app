@@ -49,7 +49,6 @@ class _MainStreetScreenState extends ConsumerState<MainStreetScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColor.appBgColor,
       body: Stack(
         children: [
           const Positioned.fill(child: _BackgroundLayer()),

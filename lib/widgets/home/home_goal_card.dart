@@ -8,6 +8,7 @@ import 'package:bizlevel/providers/goals_providers.dart';
 import 'package:bizlevel/providers/goals_repository_provider.dart';
 import 'package:bizlevel/screens/leo_dialog_screen.dart';
 import 'package:bizlevel/widgets/common/bizlevel_button.dart';
+import 'package:bizlevel/widgets/common/bizlevel_card.dart';
 import 'package:bizlevel/widgets/common/donut_progress.dart';
 import 'package:intl/intl.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
@@ -19,49 +20,33 @@ class HomeGoalCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final goalAsync = ref.watch(userGoalProvider);
-    return Semantics(
-      label: 'Моя цель',
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => context.go('/goal'),
-          borderRadius: BorderRadius.circular(AppDimensions.radiusXl),
-          child: Container(
-            constraints: const BoxConstraints(
-              minHeight: AppDimensions.homeGoalMinHeight,
-            ),
-            padding: AppSpacing.insetsAll(AppSpacing.s20),
-            decoration: BoxDecoration(
-              // fix: цвета/радиусы/тени → токены
-              color: Theme.of(context).cardTheme.color ?? AppColor.card,
-              borderRadius: BorderRadius.circular(AppDimensions.radiusXl),
-              boxShadow: const [
-                BoxShadow(
-                  color: AppColor.shadowSoft,
-                  blurRadius: 24,
-                  offset: Offset(0, 8),
-                ),
-              ],
-            ),
-            child: goalAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (_, __) => const Text('Не удалось загрузить цель'),
-              data: (goal) {
-                final repo = ref.read(goalsRepositoryProvider);
-                final double? progress = repo.computeGoalProgressPercent(goal);
-                final String goalText = (goal?['goal_text'] ?? '').toString();
+    return BizLevelCard(
+      semanticsLabel: 'Моя цель',
+      onTap: () => context.go('/goal'),
+      radius: AppDimensions.radiusXl,
+      padding: AppSpacing.insetsAll(AppSpacing.s20),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(
+          minHeight: AppDimensions.homeGoalMinHeight,
+        ),
+        child: goalAsync.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (_, __) => const Text('Не удалось загрузить цель'),
+          data: (goal) {
+            final repo = ref.read(goalsRepositoryProvider);
+            final double? progress = repo.computeGoalProgressPercent(goal);
+            final String goalText = (goal?['goal_text'] ?? '').toString();
 
-                DateTime? targetDate;
-                try {
-                  final td = (goal?['target_date']?.toString());
-                  targetDate = td == null
-                      ? null
-                      : DateTime.tryParse(td)?.toLocal();
-                } catch (_) {}
+            DateTime? targetDate;
+            try {
+              final td = (goal?['target_date']?.toString());
+              targetDate =
+                  td == null ? null : DateTime.tryParse(td)?.toLocal();
+            } catch (_) {}
 
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                     // Верхняя часть: текст цели + прогресс справа
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -192,9 +177,7 @@ class HomeGoalCard extends ConsumerWidget {
                     ),
                   ],
                 );
-              },
-            ),
-          ),
+          },
         ),
       ),
     );

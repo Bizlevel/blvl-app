@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:bizlevel/theme/color.dart';
+import 'package:bizlevel/theme/dimensions.dart';
+import 'package:bizlevel/theme/effects.dart';
+import 'package:bizlevel/theme/spacing.dart';
 
 /// Унифицированная карточка BizLevel с преднастройками
 class BizLevelCard extends StatelessWidget {
@@ -19,8 +22,8 @@ class BizLevelCard extends StatelessWidget {
     super.key,
     required this.child,
     this.onTap,
-    this.padding = const EdgeInsets.all(16),
-    this.radius = 12,
+    this.padding = const EdgeInsets.all(AppSpacing.cardPadding),
+    this.radius = AppDimensions.radiusLg,
     this.elevation = 2,
     this.color,
     this.borderColor,
@@ -32,29 +35,50 @@ class BizLevelCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final content = Padding(padding: padding, child: child);
+    final BorderRadius r = BorderRadius.circular(radius);
+    final Widget content = Padding(padding: padding, child: child);
 
-    final cardColor =
-        tonal ? AppColor.appBarColor : (color ?? AppColor.surface);
-    final card = Card(
-      color: cardColor,
-      elevation: elevation,
-      shadowColor: AppColor.shadow,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(radius),
-        side: BorderSide(
-          color: outlined
-              ? (borderColor ?? AppColor.border)
-              : (borderColor ?? Colors.transparent),
-        ),
+    // Liquid glass: псевдо‑glass (градиент + highlight‑border + мягкая тень).
+    // Blur (BackdropFilter) намеренно НЕ используется по умолчанию — снижает риски
+    // производительности на web/low-end; при необходимости включим точечно позже.
+    final LinearGradient? gradient = color == null
+        ? (tonal ? AppColor.glassTonalGradient : AppColor.glassCardGradient)
+        : null;
+    final Color fill =
+        color ?? (tonal ? AppColor.glassSurfaceTonal : AppColor.glassSurface);
+
+    final Color resolvedBorderColor = borderColor ??
+        (outlined ? AppColor.borderSubtle : AppColor.glassBorder);
+
+    // elevation — не Material elevation, а "интенсивность" тени.
+    final List<BoxShadow> shadows = elevation <= 0
+        ? const <BoxShadow>[]
+        : (elevation <= 1
+            ? AppEffects.glassCardShadowSm
+            : AppEffects.glassCardShadow);
+
+    final Decoration decoration = BoxDecoration(
+      gradient: gradient,
+      color: gradient == null ? fill : null,
+      borderRadius: r,
+      border: Border.all(color: resolvedBorderColor),
+      boxShadow: shadows,
+    );
+
+    final Widget card = Material(
+      color: Colors.transparent,
+      borderRadius: r,
+      clipBehavior: Clip.antiAlias,
+      child: Ink(
+        decoration: decoration,
+        child: onTap == null
+            ? content
+            : InkWell(
+                borderRadius: r,
+                onTap: onTap,
+                child: content,
+              ),
       ),
-      child: onTap == null
-          ? content
-          : InkWell(
-              borderRadius: BorderRadius.circular(radius),
-              onTap: onTap,
-              child: content,
-            ),
     );
 
     if (semanticsLabel != null) {

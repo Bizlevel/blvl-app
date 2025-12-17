@@ -3,6 +3,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 import '../services/supabase_service.dart';
+import '../utils/hive_box_helper.dart';
 
 class LevelsRepository {
   // ignore: unused_field
@@ -33,7 +34,7 @@ class LevelsRepository {
 
   /// Загрузка с Hive кешем и offline fallback (для Mobile)
   Future<List<Map<String, dynamic>>> _fetchWithCache(String? userId) async {
-    final Box cache = Hive.box('levels');
+    final Box cache = await HiveBoxHelper.openBox('levels');
     final String cacheKey = userId == null ? 'public' : 'user_$userId';
 
     try {

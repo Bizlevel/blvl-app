@@ -44,6 +44,47 @@ class AppColor {
   static const borderSubtle = Color(0xFFE5E7EB);
   static const borderStrong = Color(0xFFE2E8F0);
 
+  // ==========================================================================
+  // Liquid glass surfaces (light-mode)
+  // ==========================================================================
+  /// Базовая "стеклянная" поверхность карточки (полупрозрачная).
+  static const Color glassSurface = Color(0xD9FFFFFF); // ~85%
+
+  /// Более плотная поверхность для модалов/верхних панелей.
+  static const Color glassSurfaceStrong = Color(0xEFFFFFFF); // ~94%
+
+  /// Тональная поверхность (слегка "синяя" под фирменный градиент).
+  static const Color glassSurfaceTonal = Color(0xD9F8FAFF);
+
+  /// Светлый хайлайт (для бордера/блика).
+  static const Color glassHighlight = Color(0x80FFFFFF); // 50%
+
+  /// Бордер для glass‑поверхностей (нейтральный, без жёсткого серого).
+  static const Color glassBorder = Color(0x33FFFFFF); // 20%
+
+  /// Затемнение фона под модал/оверлей (мягче, чем чистый чёрный).
+  static const Color glassScrim = Color(0x660F172A); // ~40% slate-900
+
+  /// Градиент стеклянной карточки (псевдо‑glass без blur).
+  static const LinearGradient glassCardGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [
+      Color(0xF2FFFFFF), // верхний блик
+      Color(0xD9FFFFFF), // основная поверхность
+    ],
+  );
+
+  /// Тональный градиент (для info/тональных карточек).
+  static const LinearGradient glassTonalGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [
+      Color(0xE6F0F6FF),
+      Color(0xD9FFFFFF),
+    ],
+  );
+
   // Доп. семантические алиасы для удобства
   static const onSurface = textColor;
   static const onSurfaceSubtle = labelColor;

@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:bizlevel/screens/profile_screen.dart';
 import 'package:bizlevel/screens/leo_chat_screen.dart';
 import 'package:bizlevel/theme/color.dart';
+import 'package:bizlevel/theme/dimensions.dart';
+import 'package:bizlevel/theme/effects.dart';
+import 'package:bizlevel/theme/spacing.dart';
 import 'package:bizlevel/utils/constant.dart';
 import 'package:bizlevel/widgets/bottombar_item.dart';
 import 'package:bizlevel/screens/levels_map_screen.dart';
@@ -39,7 +42,6 @@ class RootApp extends ConsumerWidget {
     final pageWidget = _tabs[activeTab]["page"] as Widget;
 
     return Scaffold(
-      backgroundColor: AppColor.appBgColor,
       bottomNavigationBar: isDesktop ? null : _buildBottomBar(ref, activeTab),
       body: isDesktop
           ? Row(
@@ -71,22 +73,21 @@ class RootApp extends ConsumerWidget {
       height: 75,
       width: double.infinity,
       decoration: BoxDecoration(
-        color: AppColor.bottomBarColor,
+        // Liquid glass: стеклянная панель поверх общего фона приложения.
+        color: AppColor.glassSurfaceStrong,
         borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(25),
-          topRight: Radius.circular(25),
+          topLeft: Radius.circular(AppDimensions.radius24),
+          topRight: Radius.circular(AppDimensions.radius24),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColor.shadowColor.withValues(alpha: 0.1),
-            blurRadius: 1,
-            spreadRadius: 1,
-            offset: const Offset(1, 1),
-          )
-        ],
+        border: Border.all(color: AppColor.glassBorder),
+        boxShadow: AppEffects.glassCardShadowSm,
       ),
       child: Padding(
-        padding: const EdgeInsets.only(left: 25, right: 25, bottom: 15),
+        padding: const EdgeInsets.only(
+          left: AppSpacing.s25,
+          right: AppSpacing.s25,
+          bottom: AppSpacing.s15,
+        ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: List.generate(

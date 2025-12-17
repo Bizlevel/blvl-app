@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/foundation.dart';
 import 'auth_provider.dart';
+import '../routing/app_router.dart';
 
 /// [LoginController] управляет процессом авторизации.
 /// Его состояние - [AsyncValue], что позволяет отслеживать статусы
@@ -16,9 +18,22 @@ class LoginController extends StateNotifier<AsyncValue<void>> {
           .read(authServiceProvider)
           .signIn(email: email, password: password);
       state = const AsyncData(null);
+      // КРИТИЧНО: После успешного логина инвалидируем провайдеры,
+      // чтобы GoRouter обновился и перенаправил на /home
+      _invalidateAuthDependentProviders();
     } catch (e, st) {
       state = AsyncError(e, st);
     }
+  }
+  
+  /// Инвалидирует провайдеры, зависящие от auth state.
+  /// Вызывается после успешного логина/логаута.
+  void _invalidateAuthDependentProviders() {
+    if (kDebugMode) {
+      debugPrint('LoginController: invalidating auth-dependent providers');
+    }
+    ref.invalidate(currentUserProvider);
+    ref.invalidate(goRouterProvider);
   }
 
   Future<void> signInWithGoogle() async {
@@ -26,6 +41,7 @@ class LoginController extends StateNotifier<AsyncValue<void>> {
     try {
       await ref.read(authServiceProvider).signInWithGoogle();
       state = const AsyncData(null);
+      _invalidateAuthDependentProviders();
     } catch (e, st) {
       state = AsyncError(e, st);
     }
@@ -36,6 +52,7 @@ class LoginController extends StateNotifier<AsyncValue<void>> {
     try {
       await ref.read(authServiceProvider).signInWithApple();
       state = const AsyncData(null);
+      _invalidateAuthDependentProviders();
     } catch (e, st) {
       state = AsyncError(e, st);
     }

@@ -42,14 +42,16 @@ class LoginScreen extends HookConsumerWidget {
               SnackBar(content: Text('Произошла неизвестная ошибка: $error')));
         }
       } else if (next is AsyncData<void>) {
-        // Показать бонус за регистрацию при первом входе (если применимо)
-        // Сервер начисляет идемпотентно; показываем дружелюбный снэкбар один раз после входа
-        try {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-                content: Text('Добро пожаловать! +30 GP за регистрацию')),
-          );
-        } catch (_) {}
+        // Показать бонус за регистрацию только после регистрации (registered=true).
+        // Сервер начисляет идемпотентно, но UI-сообщение не должно появляться на каждом логине.
+        if (registered) {
+          try {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                  content: Text('Добро пожаловать! +30 GP за регистрацию')),
+            );
+          } catch (_) {}
+        }
       }
     });
 
@@ -163,6 +165,16 @@ class LoginScreen extends HookConsumerWidget {
                           hint: 'Email',
                           prefix: const Icon(Icons.email_outlined),
                           controller: emailController,
+                          keyboardType: TextInputType.emailAddress,
+                          textInputAction: TextInputAction.next,
+                          // На iOS первая инициализация клавиатуры + генерация подсказок может давать фризы.
+                          // Для email подсказки/автокоррекция не нужны — отключаем.
+                          autocorrect: false,
+                          enableSuggestions: false,
+                          enableIMEPersonalizedLearning: false,
+                          autofillHints: const [AutofillHints.email],
+                          smartDashesType: SmartDashesType.disabled,
+                          smartQuotesType: SmartQuotesType.disabled,
                         ),
                         AppSpacing.gapH(AppSpacing.lg),
                         // поле пароля с глазом
@@ -172,6 +184,14 @@ class LoginScreen extends HookConsumerWidget {
                           prefix: const Icon(Icons.lock_outline),
                           controller: passwordController,
                           obscureText: obscurePassword.value,
+                          keyboardType: TextInputType.visiblePassword,
+                          textInputAction: TextInputAction.done,
+                          autocorrect: false,
+                          enableSuggestions: false,
+                          enableIMEPersonalizedLearning: false,
+                          autofillHints: const [AutofillHints.password],
+                          smartDashesType: SmartDashesType.disabled,
+                          smartQuotesType: SmartQuotesType.disabled,
                           suffix: IconButton(
                             tooltip: obscurePassword.value
                                 ? 'Показать пароль'

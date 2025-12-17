@@ -26,6 +26,8 @@ String envOrDefine(String key, {String defaultValue = ''}) {
       return const String.fromEnvironment('SENTRY_DSN');
     case 'OPENAI_API_KEY':
       return const String.fromEnvironment('OPENAI_API_KEY');
+    case 'ONESIGNAL_APP_ID':
+      return const String.fromEnvironment('ONESIGNAL_APP_ID');
     default:
       return defaultValue;
   }
