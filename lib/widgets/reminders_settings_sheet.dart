@@ -81,22 +81,29 @@ class _RemindersSettingsContentState
           children: [
             const Text('Время:'),
             const SizedBox(width: 12),
-            OutlinedButton(
-              onPressed: _saving
-                  ? null
-                  : () async {
-                      final picked = await showTimePicker(
-                        context: context,
-                        initialTime: selectedTime,
-                      );
-                      if (picked != null) {
-                        setState(() {
-                          _time = picked;
-                          _dirty = true;
-                        });
-                      }
-                    },
-              child: Text(_fmt(selectedTime)),
+            // Важно: кнопки в теме имеют minimumSize с "шириной в бесконечность" (Size.fromHeight),
+            // что в Row может приводить к некорректным constraints и визуальному "пусто".
+            // Expanded даёт кнопке нормальные ограничения ширины и делает её кликабельной на iOS/Android.
+            Expanded(
+              child: OutlinedButton(
+                onPressed: _saving
+                    ? null
+                    : () async {
+                        final picked = await showTimePicker(
+                          context: context,
+                          initialTime: selectedTime,
+                          // showTimePicker по умолчанию использует root navigator (useRootNavigator=true),
+                          // что важно для корректного отображения поверх bottom-sheet.
+                        );
+                        if (picked != null) {
+                          setState(() {
+                            _time = picked;
+                            _dirty = true;
+                          });
+                        }
+                      },
+                child: Text(_fmt(selectedTime)),
+              ),
             ),
           ],
         ),

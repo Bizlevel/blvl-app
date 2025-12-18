@@ -28,6 +28,10 @@ class PushService {
     // В вебе этот сервис не должен работать
     if (kIsWeb) return;
 
+    // Этап 2 (cloud push) выключен по умолчанию.
+    // Пока мы используем только локальные напоминания (Stage 1).
+    if (!kEnableCloudPush) return;
+
     // OneSignal для обеих платформ
     if (!kEnableIosPush && Platform.isIOS) {
       Sentry.addBreadcrumb(Breadcrumb(

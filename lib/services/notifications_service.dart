@@ -47,8 +47,10 @@ class NotificationsService {
       } catch (_) {}
       return;
     }
+    // Для flutter_local_notifications Android требует drawable-ресурс small icon.
+    // ic_launcher лежит в mipmap и может приводить к PlatformException(invalid_icon).
     const AndroidInitializationSettings androidInit =
-        AndroidInitializationSettings('ic_launcher');
+        AndroidInitializationSettings('ic_stat_ic_notification');
     // ВАЖНО (iOS): не запрашиваем permission на cold start.
     // Иначе в логах появляется "Requesting authorization..." + возможные фризы/деактивации сцены.
     // Разрешение просим только по явному действию пользователя (см. ensurePermissionsRequested()).
@@ -345,6 +347,7 @@ class NotificationsService {
       channelDescription: _channelDesc(channelId),
       importance: Importance.high,
       priority: Priority.high,
+      icon: 'ic_stat_ic_notification',
     );
     final details = NotificationDetails(android: android);
     final payload =
@@ -459,6 +462,7 @@ class NotificationsService {
       channelDescription: 'План недели, середина недели и чекин',
       importance: Importance.high,
       priority: Priority.high,
+      icon: 'ic_stat_ic_notification',
     );
     const details = NotificationDetails(android: android);
 
