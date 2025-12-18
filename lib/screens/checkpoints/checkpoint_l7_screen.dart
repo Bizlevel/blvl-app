@@ -102,8 +102,9 @@ class CheckpointL7Screen extends ConsumerWidget {
 
           return Padding(
             padding: const EdgeInsets.all(AppSpacing.lg),
-            child: Column(
-              children: [
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
                 // Чат (как в L4)
                 LayoutBuilder(
                   builder: (ctx, constraints) {
@@ -164,6 +165,7 @@ class CheckpointL7Screen extends ConsumerWidget {
                   ],
                 ),
               ],
+            ),
             ),
           );
         },
