@@ -62,6 +62,9 @@ jobs:
     name: "Integration tests (Web)"
     runs-on: ubuntu-latest
     needs: unit
+    env:
+      # Включает integration-mode в test/flutter_test_config.dart (не мокируем Supabase/Prefs).
+      BIZLEVEL_INTEGRATION_TEST: "1"
     steps:
       - uses: actions/checkout@v4
 
