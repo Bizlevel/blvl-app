@@ -248,3 +248,5 @@ where pl.applied_at >= b.day_start and pl.applied_at < b.day_end;
 
 
 
+
+

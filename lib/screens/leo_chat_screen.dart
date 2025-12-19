@@ -5,7 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bizlevel/providers/leo_service_provider.dart';
 import 'package:bizlevel/widgets/chat_item.dart';
 import 'package:bizlevel/screens/leo_dialog_screen.dart';
-import 'package:bizlevel/screens/vali_dialog_screen.dart';
+import 'package:bizlevel/screens/ray_dialog_screen.dart';
 import 'package:bizlevel/widgets/common/bizlevel_card.dart';
 
 import 'package:bizlevel/theme/color.dart' show AppColor;
@@ -105,16 +105,17 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
             '${dt.day.toString().padLeft(2, '0')}.${dt.month.toString().padLeft(2, '0')}';
 
         final String botRaw = (chat['bot'] as String?)?.toLowerCase() ?? 'leo';
-        final String bot = ['leo', 'max', 'vali'].contains(botRaw) ? botRaw : 'leo';
-        final String botLabel = bot == 'max' 
-            ? 'Max AI' 
-            : bot == 'vali' 
-                ? 'Vali AI' 
-                : 'Leo AI';
+        final String bot = ['leo', 'max', 'ray'].contains(botRaw) ? botRaw : 'leo';
+        final String botLabel =
+            bot == 'max'
+                ? 'Max AI'
+                : bot == 'ray'
+                    ? 'Ray AI'
+                    : 'Leo AI';
         final String avatarPath = bot == 'max'
             ? 'assets/images/avatars/avatar_max.png'
-            : bot == 'vali'
-                ? 'assets/images/avatars/avatar_vali.png'
+            : bot == 'ray'
+                ? 'assets/images/avatars/avatar_12.png'
                 : 'assets/images/avatars/avatar_leo.png';
 
         final chatData = {
@@ -129,36 +130,33 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
           chatData,
           isNotified: false,
           onTap: () {
-            // Для Валли используем ValiDialogScreen
-            if (bot == 'vali') {
+            if (bot == 'ray') {
               Navigator.of(context).push(
                 MaterialPageRoute(
-                  builder: (_) => ValiDialogScreen(
-                    chatId: chat['id'] as String?,
-                  ),
+                  builder: (_) => RayDialogScreen(chatId: chat['id'] as String?),
                 ),
               );
-            } else {
-              // Для Лео и Макса используем LeoDialogScreen
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => FutureBuilder<List<String?>>(
-                      future:
-                          Future.wait([_getUserContext(), _getLevelContext()]),
-                      builder: (context, snap) {
-                        final userCtx =
-                            (snap.data != null) ? snap.data![0] : null;
-                        final lvlCtx = (snap.data != null) ? snap.data![1] : null;
-                        return LeoDialogScreen(
-                          chatId: chat['id'],
-                          userContext: userCtx,
-                          levelContext: lvlCtx,
-                          bot: bot,
-                        );
-                      }),
-                ),
-              );
+              return;
             }
+
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => FutureBuilder<List<String?>>(
+                    future:
+                        Future.wait([_getUserContext(), _getLevelContext()]),
+                    builder: (context, snap) {
+                      final userCtx =
+                          (snap.data != null) ? snap.data![0] : null;
+                      final lvlCtx = (snap.data != null) ? snap.data![1] : null;
+                      return LeoDialogScreen(
+                        chatId: chat['id'],
+                        userContext: userCtx,
+                        levelContext: lvlCtx,
+                        bot: bot,
+                      );
+                    }),
+              ),
+            );
           },
         );
       },
@@ -166,32 +164,31 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
   }
 
   void _onNewChat(String bot) {
-    // Для Валли используем ValiDialogScreen
-    if (bot == 'vali') {
+    if (bot == 'ray') {
       Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => const ValiDialogScreen(),
+          builder: (_) => const RayDialogScreen(),
         ),
       );
-    } else {
-      // Для Лео и Макса используем LeoDialogScreen
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => FutureBuilder<List<String?>>(
-            future: Future.wait([_getUserContext(), _getLevelContext()]),
-            builder: (context, snap) {
-              final userCtx = (snap.data != null) ? snap.data![0] : null;
-              final lvlCtx = (snap.data != null) ? snap.data![1] : null;
-              return LeoDialogScreen(
-                userContext: userCtx,
-                levelContext: lvlCtx,
-                bot: bot,
-              );
-            },
-          ),
-        ),
-      );
+      return;
     }
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => FutureBuilder<List<String?>>(
+          future: Future.wait([_getUserContext(), _getLevelContext()]),
+          builder: (context, snap) {
+            final userCtx = (snap.data != null) ? snap.data![0] : null;
+            final lvlCtx = (snap.data != null) ? snap.data![1] : null;
+            return LeoDialogScreen(
+              userContext: userCtx,
+              levelContext: lvlCtx,
+              bot: bot,
+            );
+          },
+        ),
+      ),
+    );
   }
 
   Widget _buildBotSelectorCards() {
@@ -209,9 +206,8 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
           padding: AppSpacing.insetsAll(AppSpacing.md),
           semanticsLabel: 'Начать чат с $name',
           child: ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: 128),
+            constraints: const BoxConstraints(minHeight: 112),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 CircleAvatar(
                   radius: 32,
@@ -222,6 +218,7 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
                         name,
@@ -244,10 +241,7 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
                       AppSpacing.gapH(AppSpacing.sm),
                       Text(
                         'Начать чат',
-                        style: Theme.of(context)
-                            .textTheme
-                            .labelLarge
-                            ?.copyWith(
+                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
                               fontWeight: FontWeight.w600,
                               color: AppColor.primary,
                             ),
@@ -277,10 +271,10 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
           avatar: 'assets/images/avatars/avatar_max.png',
         ),
         buildCard(
-          bot: 'vali',
-          name: 'Vali AI',
+          bot: 'ray',
+          name: 'Ray AI',
           subtitle: 'Проверь идею на прочность',
-          avatar: 'assets/images/avatars/avatar_vali.png',
+          avatar: 'assets/images/avatars/avatar_12.png',
         ),
       ],
     );

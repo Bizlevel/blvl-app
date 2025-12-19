@@ -26,11 +26,13 @@ void main() {
     });
 
     testWidgets('Public content: levels is readable', (tester) async {
-      final rows = await Supabase.instance.client.from('levels').select('id').limit(1);
+      final rows =
+          await Supabase.instance.client.from('levels').select('id').limit(1);
       expect(rows, isA<List<dynamic>>());
     });
 
-    testWidgets('RLS: users table is not readable without auth', (tester) async {
+    testWidgets('RLS: users table is not readable without auth',
+        (tester) async {
       try {
         await Supabase.instance.client.from('users').select('id').limit(1);
         fail('Expected RLS to block anonymous access to users table');
@@ -45,9 +47,4 @@ void main() {
     });
   });
 }
-
-
-
-
-
 

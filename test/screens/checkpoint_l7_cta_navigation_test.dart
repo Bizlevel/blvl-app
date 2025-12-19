@@ -9,11 +9,11 @@ void main() {
   testWidgets('L7 CTA «Завершить чекпоинт» ведёт в башню', (tester) async {
     // На дефолтном тестовом viewport L7 может давать RenderFlex overflow из-за высокого чата.
     // Делаем экран "высоким", ближе к реальным мобилкам.
-    tester.binding.window.devicePixelRatioTestValue = 1.0;
-    tester.binding.window.physicalSizeTestValue = const Size(1080, 1920);
+    tester.view.devicePixelRatio = 1.0;
+    tester.view.physicalSize = const Size(1080, 1920);
     addTearDown(() {
-      tester.binding.window.clearPhysicalSizeTestValue();
-      tester.binding.window.clearDevicePixelRatioTestValue();
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
     });
 
     final goal = <String, dynamic>{

@@ -95,3 +95,5 @@ grant execute on function public.gp_claim_daily_application() to authenticated;
 
 
 
+
+

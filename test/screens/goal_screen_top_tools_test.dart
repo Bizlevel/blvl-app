@@ -9,11 +9,11 @@ void main() {
       (tester) async {
     // На дефолтном тестовом viewport часть контента GoalScreen может оказаться "ниже экрана",
     // из-за чего tap() по найденному Text промахивается.
-    tester.binding.window.devicePixelRatioTestValue = 1.0;
-    tester.binding.window.physicalSizeTestValue = const Size(1080, 1920);
+    tester.view.devicePixelRatio = 1.0;
+    tester.view.physicalSize = const Size(1080, 1920);
     addTearDown(() {
-      tester.binding.window.clearPhysicalSizeTestValue();
-      tester.binding.window.clearDevicePixelRatioTestValue();
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
     });
 
     final goal = <String, dynamic>{
