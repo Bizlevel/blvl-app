@@ -25,7 +25,7 @@ import 'package:bizlevel/widgets/level/blocks/quiz_block.dart';
 import 'package:bizlevel/widgets/level/blocks/goal_v1_block.dart';
 import 'package:bizlevel/widgets/level/blocks/artifact_block.dart';
 import 'package:bizlevel/widgets/level/blocks/profile_form_block.dart';
-import 'package:bizlevel/screens/vali_dialog_screen.dart';
+import 'package:bizlevel/screens/ray_dialog_screen.dart';
 import 'package:flutter/scheduler.dart';
 
 /// Shows a level as full-screen blocks (Intro → Lesson → Quiz → …).
@@ -219,10 +219,10 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
                                   
                                   Navigator.of(context).push(
                                     MaterialPageRoute(
-                                      builder: (_) => const ValiDialogScreen(),
+                                      builder: (_) => const RayDialogScreen(),
                                     ),
                                   ).then((_) {
-                                    // После возврата из ValiDialogScreen
+                                    // После возврата из RayDialogScreen
                                     // Пользователь уже вернулся назад, pop() не нужен
                                     // Обновляем провайдеры только после полного завершения всех диалогов
                                     ref.invalidate(levelsProvider);

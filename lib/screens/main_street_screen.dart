@@ -19,7 +19,7 @@ import 'package:bizlevel/widgets/home/home_continue_card.dart';
 import 'package:bizlevel/widgets/home/home_quote_card.dart';
 import 'package:bizlevel/widgets/common/notification_center.dart';
 import 'package:bizlevel/theme/animations.dart';
-import 'package:bizlevel/screens/vali_dialog_screen.dart';
+import 'package:bizlevel/screens/ray_dialog_screen.dart';
 
 class MainStreetScreen extends ConsumerStatefulWidget {
   const MainStreetScreen({super.key});
@@ -426,7 +426,7 @@ class _QuickAccessSection extends ConsumerWidget {
                 );
                 Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (_) => const ValiDialogScreen(),
+                    builder: (_) => const RayDialogScreen(),
                   ),
                 );
               },

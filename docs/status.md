@@ -749,3 +749,8 @@
   - `flutter analyze lib` — без проблем.
   - `flutter test` — зелёный.
 - Примечание: аватар Ray сейчас **плейсхолдер** `assets/images/avatars/avatar_12.png` (можно заменить на отдельный ассет позже).
+- **Исправление миграции (2025-01-XX):**
+  - Переименована Edge Function: `val-chat` → `ray-chat` (локально, в Supabase -функция дуплицирована).
+  - Обновлены системные промпты: "Валли" → "Рэй" во всех промптах (`SYSTEM_PROMPT`, `VALIDATOR_PROMPT`, `ONBOARDING_SYSTEM_PROMPT`).
+  - Обновлены логи и комментарии: все упоминания "val-chat" и "Валли" заменены на "ray-chat" и "Рэй".
+  - Теперь локальная функция `supabase/functions/ray-chat/` соответствует тому, что вызывает `RayService`.

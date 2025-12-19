@@ -15,7 +15,7 @@ import 'package:bizlevel/widgets/common/bizlevel_button.dart';
 import 'package:bizlevel/widgets/common/bizlevel_empty.dart';
 import 'package:bizlevel/widgets/common/bizlevel_error.dart';
 import 'package:bizlevel/widgets/common/bizlevel_loading.dart';
-import 'package:bizlevel/screens/vali_dialog_screen.dart';
+import 'package:bizlevel/screens/ray_dialog_screen.dart';
 
 class LibraryScreen extends ConsumerWidget {
   const LibraryScreen({super.key});
@@ -147,7 +147,7 @@ class _SectionsTab extends ConsumerWidget {
                 );
                 Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (_) => const ValiDialogScreen(),
+                    builder: (_) => const RayDialogScreen(),
                   ),
                 );
               } catch (e, st) {
