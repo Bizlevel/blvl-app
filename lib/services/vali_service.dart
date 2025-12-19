@@ -314,6 +314,7 @@ class ValiService {
   }
 
   /// Создаёт новую запись валидации в таблице idea_validations.
+  /// Если chatId не передан, создаёт новый чат автоматически.
   /// Возвращает ID созданной валидации.
   Future<String> createValidation({
     String? chatId,
@@ -327,11 +328,31 @@ class ValiService {
         'chatId': chatId ?? 'none',
       });
 
+      // Создаём чат, если он не передан
+      String? effectiveChatId = chatId;
+      if (effectiveChatId == null) {
+        final insertedChat = await _client
+            .from('leo_chats')
+            .insert({
+              'user_id': user.id,
+              'title': 'Проверка идеи',
+              'bot': 'vali',
+            })
+            .select('id')
+            .single();
+
+        effectiveChatId = insertedChat['id'] as String;
+        
+        _addBreadcrumb('vali', 'chat_created_for_validation', {
+          'chatId': effectiveChatId,
+        });
+      }
+
       final inserted = await _client
           .from('idea_validations')
           .insert({
             'user_id': user.id,
-            if (chatId != null) 'chat_id': chatId,
+            'chat_id': effectiveChatId, // Всегда передаём chat_id
             'status': 'in_progress',
             'current_step': 0, // Начинаем с Step 0 (онбординг)
             if (ideaSummary != null) 'idea_summary': ideaSummary,
@@ -343,6 +364,7 @@ class ValiService {
       
       _addBreadcrumb('vali', 'create_validation_success', {
         'validationId': validationId,
+        'chatId': effectiveChatId,
       });
 
       return validationId;
@@ -564,10 +586,24 @@ class ValiService {
     if (user == null) throw ValiFailure('Не авторизован');
 
     try {
+      // Если chatId не передан, получаем его из валидации
       String effectiveChatId = chatId ?? '';
+      
+      if (effectiveChatId.isEmpty && validationId != null) {
+        // Пытаемся получить chat_id из валидации
+        final validation = await _client
+            .from('idea_validations')
+            .select('chat_id')
+            .eq('id', validationId)
+            .eq('user_id', user.id)
+            .single();
+        
+        effectiveChatId = validation['chat_id'] as String? ?? '';
+      }
 
-      // Создаём новый чат при необходимости
-      if (chatId == null) {
+      // Создаём новый чат только если его действительно нет
+      // (это fallback на случай, если валидация была создана без chat_id)
+      if (effectiveChatId.isEmpty) {
         final inserted = await _client
             .from('leo_chats')
             .insert({
@@ -580,7 +616,7 @@ class ValiService {
 
         effectiveChatId = inserted['id'] as String;
 
-        // Связываем валидацию с чатом
+        // Связываем валидацию с чатом (fallback для старых валидаций)
         if (validationId != null) {
           await _client
               .from('idea_validations')
