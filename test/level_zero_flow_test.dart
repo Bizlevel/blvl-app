@@ -22,11 +22,11 @@ void main() {
       (tester) async {
     // Стандартный тестовый viewport 800x600 слишком мал для формы профиля (она в scroll view),
     // из-за чего tap() может промахиваться. Делаем экран ближе к реальным мобилкам.
-    tester.binding.window.devicePixelRatioTestValue = 1.0;
-    tester.binding.window.physicalSizeTestValue = const Size(1080, 1920);
+    tester.view.devicePixelRatio = 1.0;
+    tester.view.physicalSize = const Size(1080, 1920);
     addTearDown(() {
-      tester.binding.window.clearPhysicalSizeTestValue();
-      tester.binding.window.clearDevicePixelRatioTestValue();
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
     });
 
     final mockAuth = _MockAuthService();

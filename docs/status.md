@@ -1,3 +1,6 @@
+Задача ray-rename fix: полный ребрендинг бота‑валидатора в Ray — Edge Function `ray-chat`, bot=`ray` в `leo_chats`, метрики `ai_message` пишутся под `ray`, `flutter analyze`/`flutter test` зелёные.
+Задача ray-chat-ui fix: `RayDialogScreen` приведён к паттерну Leo/Max (AppBar/компоновка/панель ввода), устранены iOS лаги клавиатуры (не выключаем `TextField` во время отправки), отчёт в Markdown стилизован под BizLevel + копирование в буфер.
+Задача repo-cleanup-desktop-platforms fix: удалены папки `macos/`, `windows/`, `linux/` (Flutter desktop runner проекты); мобильные сборки iOS/Android и CI не зависят от них.
 Задача reminders-timepicker+android-icon fix: в настройке напоминаний время снова отображается и выбирается; Android local notifications используют drawable `ic_stat_ic_notification` (убран `PlatformException(invalid_icon, ic_launcher ...)`).
 Задача profile-menu-payments fix: в меню профиля «Платежи» ведёт на `/gp-store`, убран дублирующий подпункт «Настройки».
 Задача practice-log-history fix: восстановлена «история применений» — при наличии `current_history_id` журнал грузит записи для текущей истории **и** legacy-записи с `goal_history_id IS NULL`; обновлены тесты, чтобы мок-репозиторий учитывал `fetchPracticeLogForHistory`.
@@ -732,3 +735,17 @@
 - Напоминания можно полностью выключить (пустые дни) — состояние корректно сохраняется/загружается.
 - Если разрешения на уведомления не выданы — показываем понятную ошибку вместо “настроено”.
 - Cloud refresh больше не перезаписывает локально выключенные напоминания (до этапа 2).
+
+## 2025-12-19 — Ray (валидатор бизнес‑идей) — Mentors-only интеграция
+- Добавлен новый AI‑ментор **Ray** на экране **«Менторы»** (без входов на Главной/в Библиотеке).
+- Клиент:
+  - Новый модуль: `lib/services/ray_service.dart`, `lib/providers/ray_service_provider.dart`, `lib/screens/ray_dialog_screen.dart`.
+  - `LeoChatScreen`: добавлена карточка Ray, история чатов `bot='ray'` и переход в `RayDialogScreen`.
+  - Отчёт отображается как Markdown (`flutter_markdown` добавлен в `pubspec.yaml`).
+  - Онбординг **статический**: до старта проверки не вызываем `ray-chat` (guard против “бесплатной болталки”).
+  - Старт проверки вызывает Edge Function `ray-chat` с `action=start_validation`; обработка `402 insufficient_gp` ведёт в `GpStoreScreen`.
+  - Чат/история: создаём `leo_chats` с `bot='ray'`, пишем `leo_messages`, создаём `idea_validations` (минимальная вставка с дефолтами).
+- Самопроверка:
+  - `flutter analyze lib` — без проблем.
+  - `flutter test` — зелёный.
+- Примечание: аватар Ray сейчас **плейсхолдер** `assets/images/avatars/avatar_12.png` (можно заменить на отдельный ассет позже).
