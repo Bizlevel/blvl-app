@@ -2923,12 +2923,14 @@ serve(async (req) => {
       });
     }
 
-    // Специальный режим "chips" - возвращаем только чипы без обработки сообщений
-    // В этом режиме messages может отсутствовать или быть пустым
-    if (mode === 'chips') {
-      // Для режима chips нужна аутентификация, но messages не обязательны
+    // Специальные режимы, где messages не обязательны:
+    // - "chips": возвращаем только чипы без обработки сообщений
+    // - "quiz": режим викторины, данные приходят в body.quiz и body.isCorrect
+    const specialModesWithoutMessages = ['chips', 'quiz'];
+    if (specialModesWithoutMessages.includes(mode)) {
+      // Для этих режимов нужна аутентификация, но messages не обязательны
       // Пропускаем валидацию messages и обрабатываем в движке
-      // messages будет пустым массивом или минимальным для генерации чипов
+      // messages будет пустым массивом или минимальным
     } else {
       // Validate messages для обычных режимов
       if (!Array.isArray(messages)) {
@@ -2944,7 +2946,7 @@ serve(async (req) => {
         });
       }
 
-      // Проверяем, что messages не пустой (кроме режима chips)
+      // Проверяем, что messages не пустой (кроме специальных режимов)
       if (messages.length === 0) {
         console.error('ERR empty_messages_array', { mode, bot });
         return new Response(JSON.stringify({ error: "messages array is empty" }), {
@@ -2954,10 +2956,10 @@ serve(async (req) => {
       }
     }
 
-    // Нормализуем messages для режима chips (создаём минимальный массив если нужно)
+    // Нормализуем messages для специальных режимов (создаём минимальный массив если нужно)
     let normalizedMessages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>;
-    if (mode === 'chips') {
-      // Для режима chips messages может отсутствовать - создаём минимальный массив
+    if (specialModesWithoutMessages.includes(mode)) {
+      // Для специальных режимов messages может отсутствовать - создаём минимальный массив
       if (!Array.isArray(messages) || messages.length === 0) {
         normalizedMessages = [{ role: 'user' as const, content: '' }];
       } else {
@@ -2968,8 +2970,8 @@ serve(async (req) => {
       normalizedMessages = Array.isArray(messages) ? messages : [];
     }
 
-    // Валидация структуры сообщений (только для normalizedMessages, не для mode === 'chips')
-    if (mode !== 'chips') {
+    // Валидация структуры сообщений (только для обычных режимов, не для специальных)
+    if (!specialModesWithoutMessages.includes(mode)) {
       for (let i = 0; i < normalizedMessages.length; i++) {
         const msg = normalizedMessages[i];
         if (!msg || typeof msg !== 'object') {
