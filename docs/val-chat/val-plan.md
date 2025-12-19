@@ -2,7 +2,7 @@
 
 **Статус:** V2.0 — Slot Filling Architecture  
 **Дата начала:** 15.12.2024  
-**Последнее обновление:** 17.12.2024 (переход на Slot Filling)
+**Последнее обновление:** 19.12.2024 (улучшения качества кода)
 
 ---
 
@@ -28,6 +28,107 @@
   - ✅ 6.4 Функции mergeSlots, safeParseSlotFillingResponse
   - ✅ 6.5 Soft Validation (retry_count >= 2)
   - ✅ 6.6 Документация (SLOT_FILLING_ARCHITECTURE.md)
+- ✅ **Этап 7: Улучшения качества кода** — Завершён (19.12.2024)
+  - ✅ 7.1 JSON-валидация через Zod схемы
+  - ✅ 7.2 Документация soft-skip логики
+  - ✅ 7.3 Явное логирование _parseError флага
+  - ✅ 7.4 Transactional guarantee для updateValidationState()
+  - ✅ 7.5 Schema validation для slots_state перед сохранением
+  - ✅ 7.6 Configuration constants вместо magic numbers
+
+---
+
+## Этап 7: Улучшения качества кода ✅
+
+**Статус:** Завершён  
+**Дата выполнения:** 19.12.2024
+
+### Что выполнено:
+
+#### 7.1 JSON-валидация через Zod схемы ✅
+
+**Проблема:** `safeParseJson()` с fallback-ом игнорировал ошибки парсинга (`_parseError`), что могло привести к silent failures при изменении API LLM.
+
+**Решение:**
+- ✅ Созданы Zod-схемы для всех JSON-ответов LLM:
+  - `SlotFillingResponseSchema` — валидация ответа Slot Filling
+  - `ScoringResultSchema` — валидация результата скоринга
+  - `ValidationResponseSchema` — валидация ответа валидатора
+- ✅ Заменён `safeParseJson()` на явную валидацию через `validateWithSchema()`
+- ✅ Все ошибки валидации логируются с деталями
+
+**Файлы:**
+- `supabase/functions/val-chat/index.ts` (строки 549-607)
+
+#### 7.2 Документация soft-skip логики ✅
+
+**Проблема:** Soft-skip реализован в двух местах (`guardUserInputQuality` и `navigateNextStep`), но не было документации, объясняющей почему.
+
+**Решение:**
+- ✅ Добавлена подробная JSDoc-документация в обе функции
+- ✅ Объяснён двухфазный подход:
+  - **Фаза 1 (Guard)**: проверка БЕЗ LLM для экономии токенов
+  - **Фаза 2 (Navigator)**: backup-проверка после обработки LLM
+- ✅ Описано взаимодействие между фазами
+
+**Файлы:**
+- `supabase/functions/val-chat/index.ts` (строки 1444-1465, 1810-1833)
+
+#### 7.3 Явное логирование _parseError флага ✅
+
+**Проблема:** `_parseError` был молчащим флагом — ошибки парсинга игнорировались.
+
+**Решение:**
+- ✅ Создана функция `alertParseError()` для явного логирования
+- ✅ Добавлены проверки `_parseError === true` во всех местах использования JSON
+- ✅ Разные уровни логирования: ERROR для scoring, WARNING для остальных
+- ✅ Fallback не используется как нормальное состояние — всегда логируется проблема
+
+**Файлы:**
+- `supabase/functions/val-chat/index.ts` (строки 1028-1059, 1117-1137)
+
+#### 7.4 Transactional guarantee для updateValidationState() ✅
+
+**Проблема:** Обновление `slots_state`, `current_step`, `retry_count` происходило не атомарно — при ошибке данные могли потеряться.
+
+**Решение:**
+- ✅ Создана SQL функция `update_validation_atomic()` в миграции
+- ✅ Функция обновляет все поля в одной транзакции
+- ✅ При ошибке автоматический rollback
+- ✅ Заменён обычный UPDATE на RPC-вызов
+
+**Файлы:**
+- `supabase/migrations/20251219_add_atomic_validation_update.sql`
+- `supabase/functions/val-chat/index.ts` (строки 2424-2505)
+
+#### 7.5 Schema validation для slots_state перед сохранением ✅
+
+**Проблема:** В БД могло попасть corrupted состояние `slots_state`.
+
+**Решение:**
+- ✅ Создана Zod-схема `SlotsStateSchema` для валидации структуры
+- ✅ Валидация выполняется в `updateValidationState()` перед записью в БД
+- ✅ При ошибке валидации — CRITICAL логирование и отказ от записи
+
+**Файлы:**
+- `supabase/functions/val-chat/index.ts` (строки 553-575, 2470-2490)
+
+#### 7.6 Configuration constants вместо magic numbers ✅
+
+**Проблема:** Числовые ограничения были разбросаны по коду как magic numbers.
+
+**Решение:**
+- ✅ Создан объект `VALIDATION_LIMITS` с всеми константами:
+  - `MIN_CHAR_LENGTH: 15`
+  - `MIN_LETTER_COUNT: 5`
+  - `MAX_RETRIES: 2`
+  - `CONFIDENCE_THRESHOLD: 0.7`
+  - `MAX_TOKENS` для разных типов запросов
+  - `TEMPERATURE_DEFAULT: 0.7`
+- ✅ Все magic numbers заменены на константы (22 использования)
+
+**Файлы:**
+- `supabase/functions/val-chat/index.ts` (строки 545-575)
 
 ---
 
@@ -1121,6 +1222,8 @@ Future<String> createValidation({String? chatId}) async {
 #### Созданные (Backend):
 - ✅ `supabase/migrations/20251215_create_idea_validations.sql`
 - ✅ `supabase/migrations/20251215_add_vali_bot_to_leo_chats.sql`
+- ✅ `supabase/migrations/20251217_add_slot_filling_to_validations.sql`
+- ✅ `supabase/migrations/20251219_add_atomic_validation_update.sql`
 - ✅ `supabase/functions/val-chat/index.ts`
 
 #### Созданные (Frontend):
