@@ -23,9 +23,12 @@
 # Flutter/Dart/Pub related
 **/doc/api/
 **/ios/Flutter/.last_build_id
+**/ios/Flutter/Generated*.xcconfig
+**/ios/Flutter/flutter_export_environment*.sh
+**/ios/Flutter/Flutter*.podspec
 .dart_tool/
 .flutter-plugins
-.flutter-plugins-dependencies
+.flutter-plugins-dependencies*
 .packages
 .pub-cache/
 .pub/
@@ -61,6 +64,7 @@ ios/GoogleService-Info.plist
 android/app/google-services.json
 google_keys/
 .gradle/
+supabase/.temp/
 
 bizlevel-a8b3b02b14b6.json
 Bizlevel_AuthKey_GYCG9KX7MR.p8
@@ -71,3 +75,4 @@ AuthKey_8H5Y57BHT3.p8
 
 app-store-connect-mcp-server
 integrations/app-store-connect-mcp-server
+mcp-servers/

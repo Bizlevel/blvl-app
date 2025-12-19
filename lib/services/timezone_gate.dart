@@ -15,6 +15,20 @@ class TimezoneGate {
 
   static Future<void> waitUntilReady() => _readyCompleter.future;
 
+  /// Возвращает IANA timezone identifier (например, `Asia/Almaty`) без инициализации tzdata.
+  ///
+  /// Это лёгкий вызов, подходящий для синхронизации таймзоны на сервере
+  /// (например, для daily-бонусов), не блокируя UI тяжёлым `initializeTimeZones()`.
+  static Future<String?> tryGetLocalTimezoneIdentifier() async {
+    try {
+      final timeZoneInfo = await FlutterTimezone.getLocalTimezone();
+      final id = timeZoneInfo.identifier.trim();
+      return id.isEmpty ? null : id;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Инициализирует timezone (tzdata + локальная таймзона) **по требованию**.
   ///
   /// Мы намеренно НЕ делаем это на cold start, потому что `tzdata.initializeTimeZones()`

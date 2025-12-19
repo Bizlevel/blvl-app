@@ -10,6 +10,7 @@ class LessonBlock extends LevelPageBlock {
   @override
   Widget build(BuildContext context, int index) {
     return LessonWidget(
+      key: ValueKey('lesson_${lesson.id}'),
       lesson: lesson,
       onWatched: () => onWatched(index),
     );

@@ -56,8 +56,8 @@ void main() {
     // initial frame
     await tester.pumpAndSettle();
 
-    // Intrо блок содержит текст 'Уровень'
-    expect(find.textContaining('Уровень'), findsOneWidget);
+    // IntroBlock и Breadcrumb оба содержат "Уровень 1", поэтому допускаем несколько совпадений.
+    expect(find.text('Уровень 1'), findsWidgets);
 
     // Кнопка «Далее» активна
     expect(find.text('Далее'), findsOneWidget);

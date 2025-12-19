@@ -65,13 +65,16 @@ void main() {
 
     // Tap login button
     await tester.tap(find.text('Войти'));
-    await tester.pumpAndSettle(); // pumpAndSettle для SnackBar
+    // pumpAndSettle здесь может зависать из-за фоновых анимаций/виджетов на экране.
+    // Для SnackBar достаточно прокачать несколько кадров и дать время анимации появления.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 450));
 
     // assert
     expect(find.text('Ошибка'), findsOneWidget);
   });
 
-  testWidgets('кнопка показывает CircularProgressIndicator во время загрузки',
+  testWidgets('кнопка меняет label на «Входим…» во время загрузки',
       (WidgetTester tester) async {
     // arrange: signIn завершается через 100мс
     when(() => mockService.signIn(
@@ -91,11 +94,11 @@ void main() {
     await tester.tap(find.text('Войти'));
     await tester.pump(); // rebuild после смены состояния -> loading
 
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.text('Входим…'), findsOneWidget);
 
-    // после завершения Future индикатор исчезает
+    // после завершения Future label возвращается
     await tester.pump(const Duration(milliseconds: 120));
-    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.text('Входим…'), findsNothing);
     expect(find.text('Войти'), findsOneWidget);
   });
 }

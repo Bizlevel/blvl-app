@@ -181,7 +181,13 @@ void _schedulePostFrameBootstraps() {
     _startupLog('postframe.launch_route.ok');
 
     _startupLog('postframe.push_auth_gate.setup');
-    _setupPushInitOnAuth();
+    if (kEnableCloudPush) {
+      _setupPushInitOnAuth();
+    } else {
+      _startupLog('postframe.push_auth_gate.skip', {
+        'reason': 'ENABLE_CLOUD_PUSH=false',
+      });
+    }
 
     // Sentry: максимально выносим из критического окна интерактивности.
     // Инициализация происходит "позже", в idle‑задаче (см. `_scheduleDeferredSentryInit()`).

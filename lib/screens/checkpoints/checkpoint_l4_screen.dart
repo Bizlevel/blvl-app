@@ -115,43 +115,36 @@ class _CheckpointL4ScreenState extends ConsumerState<CheckpointL4Screen> {
             child: Column(
               children: [
                 // Чат
-                LayoutBuilder(
-                  builder: (ctx, constraints) {
-                    final screenH = MediaQuery.of(context).size.height;
-                    double h = screenH * 0.7;
-                    if (h < 460) h = 460;
-                    if (h > 800) h = 800;
-                    return SizedBox(
-                      height: h,
-                      child: BizLevelCard(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const _CheckpointHeader(title: 'Чекпоинт L4'),
-                            const SizedBox(height: 8),
-                            Expanded(
-                              child: LeoDialogScreen(
-                                bot: 'max',
-                                embedded: true,
-                                userContext: userCtx,
-                                levelContext: '',
-                                initialAssistantMessages: initialMsgs,
-                                onAssistantMessage: (msg) async {
-                                  try {
-                                    await Sentry.addBreadcrumb(Breadcrumb(
-                                      category: 'checkpoint',
-                                      message: 'l4_dialog_message',
-                                      level: SentryLevel.info,
-                                    ));
-                                  } catch (_) {}
-                                },
-                              ),
-                            ),
-                          ],
+                // Раньше здесь была фиксированная высота (min 460), что приводило к RenderFlex overflow
+                // на маленьких экранах/в тестовом viewport. Делаем чат адаптивным через Expanded.
+                Expanded(
+                  child: BizLevelCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const _CheckpointHeader(title: 'Чекпоинт L4'),
+                        const SizedBox(height: 8),
+                        Expanded(
+                          child: LeoDialogScreen(
+                            bot: 'max',
+                            embedded: true,
+                            userContext: userCtx,
+                            levelContext: '',
+                            initialAssistantMessages: initialMsgs,
+                            onAssistantMessage: (msg) async {
+                              try {
+                                await Sentry.addBreadcrumb(Breadcrumb(
+                                  category: 'checkpoint',
+                                  message: 'l4_dialog_message',
+                                  level: SentryLevel.info,
+                                ));
+                              } catch (_) {}
+                            },
+                          ),
                         ),
-                      ),
-                    );
-                  },
+                      ],
+                    ),
+                  ),
                 ),
                 const SizedBox(height: AppSpacing.md),
                 // Кнопка «Завершить чекпоинт →»

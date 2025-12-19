@@ -3,6 +3,8 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../utils/hive_box_helper.dart';
+
 /// Репозиторий Библиотеки (курсы/гранты/акселераторы/избранное) с SWR‑кешем на Hive.
 /// Для Web: без Hive кеша (только сеть).
 class LibraryRepository {
@@ -12,7 +14,9 @@ class LibraryRepository {
   /// Открывает box только для non-Web платформ
   Future<Box?> _openBox() async {
     if (kIsWeb) return null;
-    return Hive.openBox('library');
+    // Важно: в UI/тестах репозиторий может быть использован до явной инициализации Hive.
+    // HiveBoxHelper унифицирует init/open и защищает от HiveError в рантайме и widget tests.
+    return await HiveBoxHelper.openBox('library');
   }
 
   // === Общие хелперы кеша/логирования ===

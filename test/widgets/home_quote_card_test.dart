@@ -1,13 +1,16 @@
 import 'package:bizlevel/widgets/home/home_quote_card.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   testWidgets('HomeQuoteCard mounts without crash', (tester) async {
     await tester.pumpWidget(
-      const MaterialApp(
-        home: Scaffold(
-          body: HomeQuoteCard(),
+      const ProviderScope(
+        child: MaterialApp(
+          home: Scaffold(
+            body: HomeQuoteCard(),
+          ),
         ),
       ),
     );

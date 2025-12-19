@@ -44,6 +44,11 @@ void main() {
     );
   }
 
+  Finder field(Key key) {
+    // CustomTextBox содержит TextField внутри, поэтому enterText делаем по descendant.
+    return find.descendant(of: find.byKey(key), matching: find.byType(TextField));
+  }
+
   testWidgets('показывает SnackBar при ошибке регистрации',
       (WidgetTester tester) async {
     // arrange: signUp бросает AuthFailure
@@ -54,13 +59,16 @@ void main() {
     await pumpRegisterScreen(tester);
 
     // Заполняем поля
-    await tester.enterText(find.byType(TextField).at(0), 'test@example.com');
-    await tester.enterText(find.byType(TextField).at(1), 'password');
-    await tester.enterText(find.byType(TextField).at(2), 'password');
+    await tester.enterText(field(const Key('email_field')), 'test@example.com');
+    await tester.enterText(field(const Key('password_field')), 'password');
+    await tester.enterText(
+        field(const Key('confirm_password_field')), 'password');
 
     // Tap create account button
     await tester.tap(find.text('Создать аккаунт'));
-    await tester.pumpAndSettle(); // дожидаемся завершения всех анимаций
+    // pumpAndSettle может зависать из-за фоновых анимаций; для SnackBar достаточно пары pump'ов.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 450));
 
     // assert
     expect(find.text('Ошибка'), findsOneWidget);
@@ -78,9 +86,9 @@ void main() {
 
     await pumpRegisterScreen(tester);
 
-    await tester.enterText(find.byType(TextField).at(0), 'a@b.com');
-    await tester.enterText(find.byType(TextField).at(1), 'pass');
-    await tester.enterText(find.byType(TextField).at(2), 'pass');
+    await tester.enterText(field(const Key('email_field')), 'a@b.com');
+    await tester.enterText(field(const Key('password_field')), 'pass');
+    await tester.enterText(field(const Key('confirm_password_field')), 'pass');
 
     await tester.tap(find.text('Создать аккаунт'));
     await tester.pump(); // rebuild после смены состояния -> loading
@@ -88,7 +96,7 @@ void main() {
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
 
     // после завершения Future индикатор исчезает
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 200));
     expect(find.byType(CircularProgressIndicator), findsNothing);
   });
 
@@ -103,13 +111,15 @@ void main() {
 
     // Act
     await tester.enterText(
-        find.byKey(const Key('email_field')), 'test@test.com');
-    await tester.enterText(find.byKey(const Key('password_field')), 'password');
+        field(const Key('email_field')), 'test@test.com');
     await tester.enterText(
-        find.byKey(const Key('confirm_password_field')), 'password');
+        field(const Key('password_field')), 'password');
+    await tester.enterText(
+        field(const Key('confirm_password_field')), 'password');
 
     await tester.tap(find.text('Создать аккаунт'));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
 
     // Assert
     expect(find.text('Регистрация успешна!'), findsOneWidget);
@@ -130,16 +140,19 @@ void main() {
 
     // Act: проходим регистрацию
     await tester.enterText(
-        find.byKey(const Key('email_field')), 'test@test.com');
-    await tester.enterText(find.byKey(const Key('password_field')), 'password');
+        field(const Key('email_field')), 'test@test.com');
     await tester.enterText(
-        find.byKey(const Key('confirm_password_field')), 'password');
+        field(const Key('password_field')), 'password');
+    await tester.enterText(
+        field(const Key('confirm_password_field')), 'password');
     await tester.tap(find.text('Создать аккаунт'));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
 
     // Act: нажимаем на кнопку входа
     await tester.tap(find.text('Уже подтвердили? Войти'));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
 
     // Assert: проверяем вызов GoRouter
     verify(() => mockGoRouter.go('/login?registered=true')).called(1);

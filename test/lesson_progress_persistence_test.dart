@@ -22,7 +22,8 @@ void main() {
       notifier.markQuizPassed(1);
 
       // Wait for async save to prefs
-      await Future.delayed(const Duration(milliseconds: 50));
+      // В LessonProgressNotifier сохранение дебаунсится (200мс), поэтому ждём больше.
+      await Future.delayed(const Duration(milliseconds: 260));
 
       // Verify data in SharedPreferences
       final prefs = await SharedPreferences.getInstance();

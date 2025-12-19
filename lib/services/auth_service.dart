@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:developer';
 import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -8,6 +9,7 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bizlevel/services/gp_service.dart';
 import 'package:bizlevel/services/notifications_service.dart';
+import 'package:bizlevel/services/timezone_gate.dart';
 import '../utils/env_helper.dart';
 
 // No longer importing SupabaseService directly to enable dependency injection.
@@ -19,6 +21,16 @@ class AuthService {
   static bool _googleSdkInitialized = false;
 
   AuthService(this._client);
+
+  Future<void> _syncUserTimezoneBestEffort() async {
+    try {
+      final tz = await TimezoneGate.tryGetLocalTimezoneIdentifier();
+      if (tz == null) return;
+      await _client.rpc('user_set_timezone', params: {'p_timezone': tz});
+    } catch (_) {
+      // Best-effort: timezone sync should never break auth UX.
+    }
+  }
 
   /// Generic wrapper to unify error handling for Supabase auth calls.
   /// [unknownErrorMessage] – сообщение по умолчанию, если исключение не классифицировано.
@@ -76,6 +88,9 @@ class AuthService {
         try {
           await NotificationsService.instance.initialize();
         } catch (_) {}
+
+        // Синхронизация таймзоны пользователя (IANA) для server-side логики (например, daily-бонусов).
+        unawaited(_syncUserTimezoneBestEffort());
       }
       return response;
     }, unknownErrorMessage: 'Неизвестная ошибка входа');
@@ -244,11 +259,40 @@ class AuthService {
           throw AuthFailure('Не удалось получить токены Google');
         }
 
-        return await _client.auth.signInWithIdToken(
+        final response = await _client.auth.signInWithIdToken(
           provider: OAuthProvider.google,
           idToken: idToken,
           accessToken: accessToken,
         );
+
+        final user = response.user;
+        if (user != null) {
+          // Set Sentry user context
+          Sentry.configureScope((scope) {
+            scope.setUser(SentryUser(id: user.id, email: user.email));
+          });
+
+          // Бонус за первый вход: идемпотентно, ошибки не пробрасываем
+          try {
+            final gp = GpService(_client);
+            await gp.claimBonus(ruleKey: 'signup_bonus');
+            // Обновим кеш баланса в фоне
+            try {
+              final fresh = await gp.getBalance();
+              await GpService.saveBalanceCache(fresh);
+            } catch (_) {}
+          } catch (_) {}
+
+          // Локальные уведомления: инициализируем ядро (без запроса permissions).
+          try {
+            await NotificationsService.instance.initialize();
+          } catch (_) {}
+
+          // Синхронизация таймзоны пользователя
+          unawaited(_syncUserTimezoneBestEffort());
+        }
+
+        return response;
       }
       throw AuthFailure('Платформа не поддерживается для входа через Google');
     }, unknownErrorMessage: 'Неизвестная ошибка входа через Google');
@@ -330,6 +374,9 @@ class AuthService {
           try {
             await NotificationsService.instance.initialize();
           } catch (_) {}
+
+          // Синхронизация таймзоны пользователя (IANA) для server-side логики.
+          unawaited(_syncUserTimezoneBestEffort());
         }
 
         return response;

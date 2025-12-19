@@ -26,10 +26,11 @@ void main() {
     await tempDir.delete(recursive: true);
   });
 
-  setUp(() {
+  setUp(() async {
     client = _MockSupabaseClient();
     repository = LibraryRepository(client);
-    box.clear();
+    // Важно: clear() async. Без await возможна гонка и флейки (кеш очищается после put()).
+    await box.clear();
   });
 
   test('fetchCourses returns cached on offline', () async {
