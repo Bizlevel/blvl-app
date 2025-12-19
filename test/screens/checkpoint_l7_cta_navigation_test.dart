@@ -1,11 +1,21 @@
-import 'package:bizlevel/screens/checkpoints/checkpoint_l7_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:bizlevel/providers/goals_providers.dart';
+import 'package:bizlevel/screens/checkpoints/checkpoint_l7_screen.dart';
 
 void main() {
-  testWidgets('L7 primary CTA navigates to Goal with prefill', (tester) async {
+  testWidgets('L7 CTA «Завершить чекпоинт» ведёт в башню', (tester) async {
+    // На дефолтном тестовом viewport L7 может давать RenderFlex overflow из-за высокого чата.
+    // Делаем экран "высоким", ближе к реальным мобилкам.
+    tester.binding.window.devicePixelRatioTestValue = 1.0;
+    tester.binding.window.physicalSizeTestValue = const Size(1080, 1920);
+    addTearDown(() {
+      tester.binding.window.clearPhysicalSizeTestValue();
+      tester.binding.window.clearDevicePixelRatioTestValue();
+    });
+
     final goal = <String, dynamic>{
       'goal_text': 'Цель',
       'metric_type': 'Клиенты/день',
@@ -14,26 +24,39 @@ void main() {
       'target_date':
           DateTime.now().add(const Duration(days: 14)).toIso8601String(),
     };
-    await tester.pumpWidget(ProviderScope(
-      overrides: [
-        userGoalProvider.overrideWith((ref) async => goal),
-        practiceLogProvider
-            .overrideWith((ref) async => const <Map<String, dynamic>>[]),
+
+    final router = GoRouter(
+      initialLocation: '/',
+      routes: [
+        GoRoute(
+          path: '/',
+          builder: (context, state) => const CheckpointL7Screen(),
+        ),
+        GoRoute(
+          path: '/tower',
+          builder: (context, state) =>
+              const Scaffold(body: Text('TOWER_SCREEN')),
+        ),
       ],
-      child: MaterialApp(
-        routes: {
-          '/goal': (_) => const Scaffold(body: Text('GOAL_SCREEN')),
-        },
-        home: const CheckpointL7Screen(),
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          userGoalProvider.overrideWith((ref) async => goal),
+          practiceLogProvider
+              .overrideWith((ref) async => const <Map<String, dynamic>>[]),
+        ],
+        child: MaterialApp.router(routerConfig: router),
       ),
-    ));
+    );
+    await tester.pump(); // первый кадр
+    await tester.pump(const Duration(milliseconds: 50));
 
-    await tester.pumpAndSettle();
+    await tester.tap(find.text('Завершить чекпоинт →'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
 
-    await tester.tap(find.text('Усилить применение'));
-    await tester.pumpAndSettle();
-
-    // Так как мы навигируем на /goal, должен появиться виджет с текстом
-    expect(find.text('GOAL_SCREEN'), findsOneWidget);
+    expect(find.text('TOWER_SCREEN'), findsOneWidget);
   });
 }

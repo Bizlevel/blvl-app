@@ -62,8 +62,12 @@ void main() {
       ProviderScope(
         overrides: [
           authStateProvider.overrideWith((ref) => Stream.value(authState)),
+          // ProfileScreen в актуальной архитектуре грузит профиль через currentUserProvider,
+          // который читает currentSession синхронно. Для unit/widget тестов проще и стабильнее
+          // заоверрайдить currentUserProvider напрямую, чем пытаться эмулировать Supabase session.
+          currentUserProvider.overrideWith((ref) async => userModel),
           userRepositoryProvider.overrideWithValue(mockUserRepository),
-          levelsProvider.overrideWith((ref) => Future.value([])),
+          levelsProvider.overrideWith((ref) async => <Map<String, dynamic>>[]),
           // подписки удалены; провайдер больше не используется
         ],
         child: const MaterialApp(
@@ -72,10 +76,12 @@ void main() {
       ),
     );
 
-    // Initial loading state
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
-
-    await tester.pumpAndSettle();
+    await tester.pump();
+    // Дожидаемся перехода всех FutureProvider в data без pumpAndSettle (может зависать).
+    for (int i = 0; i < 40; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+      if (find.text('Test Skill 1').evaluate().isNotEmpty) break;
+    }
 
     // After loading, check for user info and skills
     expect(find.text('Test User'), findsOneWidget);

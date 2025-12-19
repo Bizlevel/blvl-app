@@ -15,7 +15,9 @@ void main() {
         ),
       ),
     );
-    expect(find.textContaining('Уровень'), findsOneWidget);
+    // Важно: внутри карточки может быть несколько текстов с "Уровень ...",
+    // поэтому проверяем точный subtitle, который мы передали.
+    expect(find.text('Уровень 2: Стресс-Менеджмент'), findsOneWidget);
     expect(find.text('Продолжить обучение'), findsOneWidget);
   }, skip: false);
 }

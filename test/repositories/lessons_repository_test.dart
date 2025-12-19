@@ -26,9 +26,10 @@ void main() {
     await tempDir.delete(recursive: true);
   });
 
-  setUp(() {
+  setUp(() async {
     repository = LessonsRepository(_MockSupabaseClient());
-    box.clear();
+    // Важно: clear() async. Без await возможна гонка и флейки (кеш очищается после put()).
+    await box.clear();
   });
 
   group('LessonsRepository.fetchLessons', () {
