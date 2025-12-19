@@ -202,17 +202,10 @@ class ProfileScreen extends ConsumerWidget {
                       case 'notifications':
                         await showRemindersSettingsSheet(context);
                         break;
-                      case 'settings':
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                              content:
-                                  Text('Раздел настроек скоро будет доступен')),
-                        );
-                        break;
                       case 'payments':
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Скоро: покупки GP')),
-                        );
+                        // В профиле пункт "Платежи" ведёт в магазин GP.
+                        // push() сохраняет возможность вернуться назад на профиль.
+                        context.push('/gp-store');
                         break;
                       case 'logout':
                         await ref.read(authServiceProvider).signOut();
@@ -242,31 +235,6 @@ class ProfileScreen extends ConsumerWidget {
                           ),
                           AppSpacing.gapW(AppSpacing.s10),
                           const Text('Уведомления'),
-                        ],
-                      ),
-                    ),
-                    PopupMenuItem(
-                      value: 'settings',
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(AppSpacing.s6),
-                            decoration: const BoxDecoration(
-                              color: AppColor.blue,
-                              shape: BoxShape.circle,
-                            ),
-                            child: SvgPicture.asset(
-                              'assets/icons/setting.svg',
-                              colorFilter: const ColorFilter.mode(
-                                AppColor.onPrimary,
-                                BlendMode.srcIn,
-                              ),
-                              width: 18,
-                              height: 18,
-                            ),
-                          ),
-                          AppSpacing.gapW(AppSpacing.s10),
-                          const Text('Настройки'),
                         ],
                       ),
                     ),
@@ -757,15 +725,7 @@ class _AvatarControls extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 8),
-        TextButton.icon(
-          onPressed: onPickGallery,
-          style: TextButton.styleFrom(
-            padding: EdgeInsets.zero,
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          ),
-          icon: const Icon(Icons.photo_library_outlined, size: 16),
-          label: const Text('Галерея (beta)'),
-        ),
+        // Загрузка аватара из галереи пока не поддерживается — используем только пресеты.
         if (hasPreview)
           TextButton(
             onPressed: onResetPreview,

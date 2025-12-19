@@ -475,20 +475,30 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
       // Попытка начислить бонус за 3 завершённых кейса (идемпотентно)
       try {
         final client = Supabase.instance.client;
-        final before = await client
-            .from('gp_bonus_grants')
-            .select('rule_key')
-            .eq('rule_key', 'all_three_cases_completed')
-            .maybeSingle();
+        final uid = client.auth.currentUser?.id;
+
+        Map<String, dynamic>? before;
+        if (uid != null && uid.isNotEmpty) {
+          before = await client
+              .from('gp_bonus_grants')
+              .select('rule_key')
+              .eq('user_id', uid)
+              .eq('rule_key', 'all_three_cases_completed')
+              .maybeSingle();
+        }
 
         await client.rpc('gp_bonus_claim',
             params: {'p_rule_key': 'all_three_cases_completed'});
 
-        final after = await client
-            .from('gp_bonus_grants')
-            .select('rule_key')
-            .eq('rule_key', 'all_three_cases_completed')
-            .maybeSingle();
+        Map<String, dynamic>? after;
+        if (uid != null && uid.isNotEmpty) {
+          after = await client
+              .from('gp_bonus_grants')
+              .select('rule_key')
+              .eq('user_id', uid)
+              .eq('rule_key', 'all_three_cases_completed')
+              .maybeSingle();
+        }
 
         final newlyGranted = before == null && after != null;
         if (newlyGranted && mounted) {

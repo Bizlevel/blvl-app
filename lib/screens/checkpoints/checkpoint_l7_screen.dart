@@ -105,34 +105,27 @@ class CheckpointL7Screen extends ConsumerWidget {
             child: Column(
               children: [
                 // Чат (как в L4)
-                LayoutBuilder(
-                  builder: (ctx, constraints) {
-                    final screenH = MediaQuery.of(context).size.height;
-                    double h = screenH * 0.7;
-                    if (h < 460) h = 460;
-                    if (h > 800) h = 800;
-                    return SizedBox(
-                      height: h,
-                      child: BizLevelCard(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const _CheckpointHeader(title: 'Чекпоинт L7'),
-                            const SizedBox(height: 8),
-                            Expanded(
-                              child: LeoDialogScreen(
-                                bot: 'max',
-                                embedded: true,
-                                userContext: userCtx,
-                                levelContext: '',
-                                initialAssistantMessages: initialMsgs,
-                              ),
-                            ),
-                          ],
+                // Раньше была фиксированная высота (min 460), что давало RenderFlex overflow
+                // на маленьких экранах/в тестовом viewport. Делаем чат адаптивным через Expanded.
+                Expanded(
+                  child: BizLevelCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const _CheckpointHeader(title: 'Чекпоинт L7'),
+                        const SizedBox(height: 8),
+                        Expanded(
+                          child: LeoDialogScreen(
+                            bot: 'max',
+                            embedded: true,
+                            userContext: userCtx,
+                            levelContext: '',
+                            initialAssistantMessages: initialMsgs,
+                          ),
                         ),
-                      ),
-                    );
-                  },
+                      ],
+                    ),
+                  ),
                 ),
                 const SizedBox(height: AppSpacing.md),
                 // Кнопки действий

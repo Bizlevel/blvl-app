@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -23,18 +25,30 @@ final remindersStreamProvider =
 // Цитата дня
 // Чтобы цитата реально менялась раз в сутки без перезапуска приложения,
 // добавляем зависимость от «индекса текущего дня», который эмитится раз в час.
-final _todayIndexProvider = StreamProvider<int>((ref) async* {
+final _todayIndexProvider = StreamProvider<int>((ref) {
+  // Важно: нельзя делать бесконечный `while(true) { await Future.delayed(...) }` в StreamProvider,
+  // потому что Future.delayed создаёт таймер, который нельзя отменить. В widget tests это приводит
+  // к ошибке `A Timer is still pending...` при dispose дерева.
+  final controller = StreamController<int>();
+
   int last = _dayIndex();
-  yield last;
-  // Пуллим раз в час: при смене календарного дня значение изменится
-  while (true) {
-    await Future.delayed(const Duration(hours: 1));
+  controller.add(last);
+
+  // Пуллим раз в час: при смене календарного дня значение изменится.
+  final timer = Timer.periodic(const Duration(hours: 1), (_) {
     final nowIdx = _dayIndex();
     if (nowIdx != last) {
       last = nowIdx;
-      yield nowIdx;
+      controller.add(nowIdx);
     }
-  }
+  });
+
+  ref.onDispose(() {
+    timer.cancel();
+    controller.close();
+  });
+
+  return controller.stream;
 });
 
 int _dayIndex() => DateTime.now().toUtc().difference(DateTime.utc(1970)).inDays;
