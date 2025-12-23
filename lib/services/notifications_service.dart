@@ -2,7 +2,24 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart'
+    show
+        AndroidNotificationDetails,
+        AndroidNotificationChannel,
+        AndroidScheduleMode,
+        AndroidInitializationSettings,
+        AndroidFlutterLocalNotificationsPlugin,
+        DarwinInitializationSettings,
+        DarwinNotificationDetails,
+        FlutterLocalNotificationsPlugin,
+        Importance,
+        InitializationSettings,
+        NotificationDetails,
+        Priority,
+        DateTimeComponents,
+        IOSFlutterLocalNotificationsPlugin,
+        UriAndroidNotificationSound;
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
@@ -31,6 +48,28 @@ class NotificationsService {
   bool? _lastPermissionGranted;
   Box? _launchBox;
   String? _cachedStoredRoute;
+  String? _cachedNotificationSoundUri;
+  
+  static const MethodChannel _nativeChannel = MethodChannel('bizlevel/notifications');
+  
+  /// Получить URI системного звука уведомлений через нативный код
+  Future<String?> _getDefaultNotificationSoundUri() async {
+    if (kIsWeb || !Platform.isAndroid) return null;
+    if (_cachedNotificationSoundUri != null) {
+      _logReminderStage('sound_uri_cached', {'uri': _cachedNotificationSoundUri!});
+      return _cachedNotificationSoundUri;
+    }
+    try {
+      final uri = await _nativeChannel.invokeMethod<String>('getDefaultNotificationSoundUri');
+      _cachedNotificationSoundUri = uri;
+      _logReminderStage('sound_uri_obtained', {'uri': uri ?? 'null'});
+      return uri;
+    } catch (e) {
+      _logReminderStage('sound_uri_error', {'error': e.toString()});
+      debugPrint('Failed to get notification sound URI: $e');
+      return null;
+    }
+  }
 
   Future<void> initialize() async {
     if (_initialized) return;
@@ -143,8 +182,7 @@ class NotificationsService {
   }
 
   // Load persisted practice reminder prefs; prioritize Supabase, fallback to Hive
-  Future<(Set<int> weekdays, int hour, int minute)>
-      getPracticeReminderPrefs() async {
+  Future<ReminderPrefs> getPracticeReminderPrefs() async {
     final cached = ReminderPrefsCache.instance.current;
     if (cached != null) {
       _logReminderStage('cache_hit', {
@@ -152,7 +190,7 @@ class NotificationsService {
         'hour': '${cached.hour}',
       });
       unawaited(_refreshCloudPrefs(source: 'cache_hit'));
-      return (cached.weekdays, cached.hour, cached.minute);
+      return cached;
     }
     final local = await _loadReminderPrefsFromCache();
     final prefs = ReminderPrefs(
@@ -166,7 +204,7 @@ class NotificationsService {
       'hour': '${prefs.hour}',
     });
     unawaited(_refreshCloudPrefs(source: 'local_fallback'));
-    return local;
+    return prefs;
   }
 
   Future<void> prefetchReminderPrefs() async {
@@ -220,7 +258,11 @@ class NotificationsService {
               .map((e) => (e as num).toInt())
               .where((v) => v >= 1 && v <= 7)
               .toSet();
-      final prefs = ReminderPrefs(weekdays: days, hour: hour, minute: minute);
+      final prefs = ReminderPrefs(
+        weekdays: days,
+        hour: hour,
+        minute: minute,
+      );
       ReminderPrefsCache.instance.set(prefs);
       await _cacheReminderPrefs(
         days,
@@ -341,6 +383,7 @@ class NotificationsService {
   }) async {
     if (kIsWeb) return;
     if (!_initialized) await initialize();
+    final soundUri = await _getDefaultNotificationSoundUri();
     final android = AndroidNotificationDetails(
       channelId,
       _channelName(channelId),
@@ -348,6 +391,9 @@ class NotificationsService {
       importance: Importance.high,
       priority: Priority.high,
       icon: 'ic_stat_ic_notification',
+      playSound: true,
+      enableVibration: true,
+      sound: soundUri != null ? UriAndroidNotificationSound(soundUri) : null,
     );
     final details = NotificationDetails(android: android);
     final payload =
@@ -366,6 +412,7 @@ class NotificationsService {
   String _channelName(String id) {
     switch (id) {
       case 'goal_reminder':
+      case 'goal_reminder_v2':
         return 'Напоминания по целям';
       case 'chat_messages':
         return 'Сообщения чатов';
@@ -377,6 +424,7 @@ class NotificationsService {
   String _channelDesc(String id) {
     switch (id) {
       case 'goal_reminder':
+      case 'goal_reminder_v2':
         return 'План недели и чекины';
       case 'chat_messages':
         return 'Ответы ИИ‑тренеров';
@@ -391,12 +439,40 @@ class NotificationsService {
         AndroidFlutterLocalNotificationsPlugin>();
     if (android == null) return;
     try {
-      await android.createNotificationChannel(const AndroidNotificationChannel(
-        'goal_reminder',
-        'Напоминания по целям',
-        description: 'План недели, середина недели и чекин',
-        importance: Importance.high,
-      ));
+      // Получаем звук из настроек или системный по умолчанию
+      final soundUri = await _getDefaultNotificationSoundUri();
+      if (soundUri != null && soundUri.isNotEmpty) {
+        try {
+          // Удаляем старый канал и создаем новый с реальным URI звука через нативный код
+          await _nativeChannel.invokeMethod<bool>('updateChannelSound', {
+            'channelId': 'goal_reminder_v2',
+            'soundUri': soundUri,
+          });
+          _logReminderStage('channel_sound_updated', {'uri': soundUri});
+          // НЕ создаем канал через плагин - он уже создан нативным кодом
+        } catch (e) {
+          _logReminderStage('channel_sound_update_error', {'error': e.toString()});
+          // Если нативный код не сработал, создаем через плагин как fallback
+          await android.createNotificationChannel(const AndroidNotificationChannel(
+            'goal_reminder_v2',
+            'Напоминания по целям',
+            description: 'План недели, середина недели и чекин',
+            importance: Importance.high,
+            playSound: true,
+            enableVibration: true,
+          ));
+        }
+      } else {
+        // Если не удалось получить URI звука, создаем через плагин
+        await android.createNotificationChannel(const AndroidNotificationChannel(
+          'goal_reminder_v2',
+          'Напоминания по целям',
+          description: 'План недели, середина недели и чекин',
+          importance: Importance.high,
+          playSound: true,
+          enableVibration: true,
+        ));
+      }
       await android.createNotificationChannel(const AndroidNotificationChannel(
         'education',
         'Обучение',
@@ -426,12 +502,20 @@ class NotificationsService {
     bool requestPermissions = true,
     bool syncToCloud = true,
   }) async {
-    if (kIsWeb) return;
+    if (kIsWeb) {
+      _logReminderStage('schedule_skipped_web', {
+        'weekdays': weekdays.length.toString(),
+        'hour': '$hour',
+        'minute': '$minute',
+      });
+      return;
+    }
     if (!_initialized) await initialize();
     final Set<int> uniqueWeekdays = weekdays.toSet();
 
     // Пустой набор дней = пользователь выключил напоминания.
     if (uniqueWeekdays.isEmpty) {
+      _logReminderStage('schedule_cancelled_empty', {});
       await cancelDailyPracticeReminder();
       await _cacheReminderPrefs(
         <int>{},
@@ -442,57 +526,156 @@ class NotificationsService {
       );
       // Обновим in-memory cache, чтобы UI сразу увидел "выключено".
       ReminderPrefsCache.instance.set(
-        ReminderPrefs(weekdays: const <int>{}, hour: hour, minute: minute),
+        ReminderPrefs(
+          weekdays: const <int>{},
+          hour: hour,
+          minute: minute,
+        ),
       );
       // Важно: не синкаем в Supabase (RPC требует непустые weekdays).
       return;
     }
 
+    _logReminderStage('schedule_start', {
+      'weekdays': uniqueWeekdays.length.toString(),
+      'hour': '$hour',
+      'minute': '$minute',
+    });
+
     if (requestPermissions) {
       final allowed = await ensurePermissionsRequested();
       if (!allowed) {
+        _logReminderStage('schedule_permission_denied', {});
         throw const NotificationsPermissionDenied();
       }
+      _logReminderStage('schedule_permission_granted', {});
     }
+
     await _ensureTimezoneReady();
-    const channelId = 'goal_reminder';
-    const AndroidNotificationDetails android = AndroidNotificationDetails(
+    final timezoneName = tz.local.name;
+    _logReminderStage('schedule_timezone_ready', {'timezone': timezoneName});
+
+    // Проверяем разрешение на точные алармы перед планированием
+    final mode = await _resolveAndroidScheduleMode();
+    if (Platform.isAndroid && mode == AndroidScheduleMode.inexactAllowWhileIdle) {
+      _logReminderStage('schedule_exact_alarm_missing', {
+        'note': 'Точные алармы недоступны - уведомления могут приходить с задержкой. Проверьте настройки: Настройки → Приложения → BizLevel → Разрешения → Точные алармы',
+      });
+    }
+
+    const channelId = 'goal_reminder_v2';
+    // Используем системный звук уведомлений по умолчанию
+    final soundUri = await _getDefaultNotificationSoundUri();
+    final AndroidNotificationDetails android = AndroidNotificationDetails(
       channelId,
       'Напоминания по целям',
       channelDescription: 'План недели, середина недели и чекин',
       importance: Importance.high,
       priority: Priority.high,
       icon: 'ic_stat_ic_notification',
+      playSound: true,
+      enableVibration: true,
+      sound: soundUri != null ? UriAndroidNotificationSound(soundUri) : null,
     );
-    const details = NotificationDetails(android: android);
+    const DarwinNotificationDetails ios = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+    );
+    final details = NotificationDetails(android: android, iOS: ios);
 
     // Для надёжности: удаляем старые practice reminders перед созданием новых,
     // чтобы избежать "залипания" старого расписания.
     await cancelDailyPracticeReminder();
 
-    final mode = await _resolveAndroidScheduleMode();
+    _logReminderStage('schedule_mode', {'mode': mode.toString()});
+
+    int successCount = 0;
+    int errorCount = 0;
+
     for (final wd in uniqueWeekdays) {
-      const idBase = 9000;
-      await _plugin.zonedSchedule(
-        idBase + wd,
-        'Время практики',
-        'Загляни в «Цель» и отметь действие сегодня',
-        _nextInstanceOf(weekday: wd, hour: hour, minute: minute),
-        details,
-        androidScheduleMode: mode,
-        matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
-        payload: '{"route":"/goal"}',
-      );
+      const int idBase = 9000;
+      final int notificationId = idBase + wd;
+      final String weekdayName = _weekdayName(wd);
+      final tz.TZDateTime nextTime =
+          _nextInstanceOf(weekday: wd, hour: hour, minute: minute);
+
+      _logReminderStage('schedule_attempt', {
+        'weekday': weekdayName,
+        'id': '$notificationId',
+        'next':
+            '${nextTime.year}-${nextTime.month.toString().padLeft(2, '0')}-${nextTime.day.toString().padLeft(2, '0')} '
+                '${nextTime.hour.toString().padLeft(2, '0')}:${nextTime.minute.toString().padLeft(2, '0')}',
+      });
+
+      try {
+        await _plugin.zonedSchedule(
+          notificationId,
+          'Время практики',
+          'Загляни в «Цель» и отметь действие сегодня',
+          nextTime,
+          details,
+          androidScheduleMode: mode,
+          matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+          payload: '{"route":"/goal"}',
+        );
+        successCount++;
+        _logReminderStage('schedule_success', {
+          'weekday': weekdayName,
+          'id': '$notificationId',
+        });
+      } catch (error, stackTrace) {
+        errorCount++;
+        _logReminderStage('schedule_error', {
+          'weekday': weekdayName,
+          'id': '$notificationId',
+          'error': error.toString(),
+        });
+        try {
+          await Sentry.captureException(error, stackTrace: stackTrace);
+        } catch (_) {}
+        // Продолжаем планирование остальных дней даже при ошибке.
+      }
     }
+
+    _logReminderStage('schedule_complete', {
+      'success': '$successCount',
+      'errors': '$errorCount',
+      'total': '${uniqueWeekdays.length}',
+    });
+
+    // Проверим, что уведомления действительно попали в pending-список.
+    try {
+      final pending = await _plugin.pendingNotificationRequests();
+      final practiceIds =
+          uniqueWeekdays.map((wd) => 9000 + wd).toSet();
+      final scheduledCount = pending
+          .where((n) => practiceIds.contains(n.id))
+          .length;
+      _logReminderStage('schedule_verify', {
+        'scheduled': '$scheduledCount',
+        'expected': '${uniqueWeekdays.length}',
+        'total_pending': '${pending.length}',
+      });
+    } catch (error) {
+      _logReminderStage('schedule_verify_error', {
+        'error': error.toString(),
+      });
+    }
+
     await _cacheReminderPrefs(
       uniqueWeekdays,
       hour,
       minute,
-      timezone: tz.local.name,
+      timezone: timezoneName,
     );
     // Обновим in-memory cache сразу после успешного расписания.
     ReminderPrefsCache.instance.set(
-      ReminderPrefs(weekdays: uniqueWeekdays, hour: hour, minute: minute),
+      ReminderPrefs(
+        weekdays: uniqueWeekdays,
+        hour: hour,
+        minute: minute,
+      ),
     );
     if (syncToCloud) {
       await _syncReminderPrefsToCloud(uniqueWeekdays, hour, minute);
@@ -558,6 +741,27 @@ class NotificationsService {
       scheduled = scheduled.add(const Duration(days: 1));
     }
     return scheduled;
+  }
+
+  String _weekdayName(int weekday) {
+    switch (weekday) {
+      case DateTime.monday:
+        return 'Пн';
+      case DateTime.tuesday:
+        return 'Вт';
+      case DateTime.wednesday:
+        return 'Ср';
+      case DateTime.thursday:
+        return 'Чт';
+      case DateTime.friday:
+        return 'Пт';
+      case DateTime.saturday:
+        return 'Сб';
+      case DateTime.sunday:
+        return 'Вс';
+      default:
+        return '?';
+    }
   }
 
   Future<bool> _requestPermissionsIfNeeded() async {
@@ -632,7 +836,13 @@ class NotificationsService {
     if (!Platform.isAndroid) return AndroidScheduleMode.exactAllowWhileIdle;
     final android = _plugin.resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin>();
-    if (android == null) return AndroidScheduleMode.exactAllowWhileIdle;
+    if (android == null) {
+      _logReminderStage('schedule_mode_check', {
+        'result': 'android_plugin_null',
+        'mode': 'exactAllowWhileIdle',
+      });
+      return AndroidScheduleMode.exactAllowWhileIdle;
+    }
 
     // Android 12+ может запретить точные алармы. В этом случае выбираем inexact,
     // чтобы напоминания "приходили", пусть и не минута-в-минуту.
@@ -640,11 +850,25 @@ class NotificationsService {
       final dynamic dyn = android;
       final dynamic res = await dyn.canScheduleExactNotifications();
       final bool canExact = res is bool ? res : true;
-      return canExact
+      final mode = canExact
           ? AndroidScheduleMode.exactAllowWhileIdle
           : AndroidScheduleMode.inexactAllowWhileIdle;
-    } catch (_) {
+      _logReminderStage('schedule_mode_check', {
+        'canExact': '$canExact',
+        'result': res.toString(),
+        'mode': mode.toString(),
+        'note': canExact
+            ? 'Точные алармы доступны'
+            : 'Точные алармы недоступны - используется inexact режим. Возможно, нужно разрешение SCHEDULE_EXACT_ALARM',
+      });
+      return mode;
+    } catch (error) {
       // Метод может отсутствовать на старых версиях плагина — используем прежнее поведение.
+      _logReminderStage('schedule_mode_check', {
+        'result': 'error',
+        'error': error.toString(),
+        'mode': 'exactAllowWhileIdle_fallback',
+      });
       return AndroidScheduleMode.exactAllowWhileIdle;
     }
   }
