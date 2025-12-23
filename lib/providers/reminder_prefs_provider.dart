@@ -26,13 +26,7 @@ class ReminderPrefsNotifier extends AsyncNotifier<ReminderPrefs> {
   }
 
   Future<ReminderPrefs> _loadPrefs() async {
-    final prefs =
-        await NotificationsService.instance.getPracticeReminderPrefs();
-    return ReminderPrefs(
-      weekdays: Set<int>.from(prefs.$1),
-      hour: prefs.$2,
-      minute: prefs.$3,
-    );
+    return await NotificationsService.instance.getPracticeReminderPrefs();
   }
 }
 
