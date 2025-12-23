@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
@@ -228,6 +229,8 @@ class _RemindersSettingsContentState
       _error = null;
     });
     try {
+      final prefsAsync = ref.read(reminderPrefsProvider);
+      final currentPrefs = prefsAsync.valueOrNull ?? ReminderPrefsCache.instance.current;
       await NotificationsService.instance.cancelWeeklyPlan();
       await NotificationsService.instance.cancelDailyPracticeReminder();
       await NotificationsService.instance.schedulePracticeReminders(
