@@ -464,14 +464,14 @@ class NotificationsService {
         }
       } else {
         // Если не удалось получить URI звука, создаем через плагин
-        await android.createNotificationChannel(const AndroidNotificationChannel(
+      await android.createNotificationChannel(const AndroidNotificationChannel(
           'goal_reminder_v2',
-          'Напоминания по целям',
-          description: 'План недели, середина недели и чекин',
-          importance: Importance.high,
+        'Напоминания по целям',
+        description: 'План недели, середина недели и чекин',
+        importance: Importance.high,
           playSound: true,
           enableVibration: true,
-        ));
+      ));
       }
       await android.createNotificationChannel(const AndroidNotificationChannel(
         'education',
@@ -609,16 +609,16 @@ class NotificationsService {
       });
 
       try {
-        await _plugin.zonedSchedule(
+      await _plugin.zonedSchedule(
           notificationId,
-          'Время практики',
-          'Загляни в «Цель» и отметь действие сегодня',
+        'Время практики',
+        'Загляни в «Цель» и отметь действие сегодня',
           nextTime,
-          details,
-          androidScheduleMode: mode,
-          matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
-          payload: '{"route":"/goal"}',
-        );
+        details,
+        androidScheduleMode: mode,
+        matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+        payload: '{"route":"/goal"}',
+      );
         successCount++;
         _logReminderStage('schedule_success', {
           'weekday': weekdayName,

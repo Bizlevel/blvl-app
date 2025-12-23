@@ -186,7 +186,7 @@ class _RayDialogScreenState extends ConsumerState<RayDialogScreen>
 
     // If no chat exists yet, show static onboarding (no LLM call until start).
     if (_chatId == null && _messages.isEmpty) {
-      final isFirst = pricing?.isFree ?? false;
+      final isFirst = _pricing?.isFree ?? false;
       _messages.add(const _RayMessage(
         role: 'assistant',
         includeInApi: false,
@@ -389,8 +389,7 @@ class _RayDialogScreenState extends ConsumerState<RayDialogScreen>
     if (!isFree) {
       try {
         // Обновляем баланс перед проверкой
-        final gpProvider = ref.read(gpBalanceProvider);
-        final balanceMap = await gpProvider.future;
+        final balanceMap = await ref.read(gpBalanceProvider.future);
         final balance = (balanceMap['balance'] ?? 0) as int;
         if (balance < price) {
           if (mounted) {
@@ -945,7 +944,8 @@ class _RayDialogScreenState extends ConsumerState<RayDialogScreen>
 
   Widget _buildComposer(String startLabel) {
     final hasStarted = _validationId != null && _currentStep > 0;
-    final showOnboardingActions = _currentStep == 0 && _onboardingMetadata != null;
+    final showOnboardingActions =
+        _currentStep == 0 && _onboardingMetadata != null;
     
     return SafeArea(
       top: false,
@@ -974,7 +974,8 @@ class _RayDialogScreenState extends ConsumerState<RayDialogScreen>
                         minLines: 1,
                         maxLines: 4,
                         textInputAction: TextInputAction.send,
-                        onTapOutside: (_) => FocusScope.of(context).unfocus(),
+                            onTapOutside: (_) =>
+                                FocusScope.of(context).unfocus(),
                         onSubmitted: (_) {
                           if (_controller.text.trim().isNotEmpty &&
                               !_sending &&
@@ -996,7 +997,8 @@ class _RayDialogScreenState extends ConsumerState<RayDialogScreen>
                     child: IconButton(
                       tooltip: 'Скрыть клавиатуру',
                       icon: const Icon(Icons.keyboard_hide),
-                      onPressed: () => FocusScope.of(context).unfocus(),
+                          onPressed: () =>
+                              FocusScope.of(context).unfocus(),
                     ),
                   ),
                   _sending
@@ -1009,7 +1011,8 @@ class _RayDialogScreenState extends ConsumerState<RayDialogScreen>
                           label: 'Отправить ответ',
                           button: true,
                           child: IconButton(
-                            onPressed: (hasStarted && !_sending && !_starting)
+                                onPressed:
+                                    (hasStarted && !_sending && !_starting)
                                 ? _send
                                 : null,
                             icon: const Icon(Icons.send),
@@ -1034,6 +1037,8 @@ class _RayDialogScreenState extends ConsumerState<RayDialogScreen>
             ],
           ],
         ),
+          ),
+        ],
       ),
     );
   }
