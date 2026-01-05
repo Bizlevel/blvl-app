@@ -20,6 +20,8 @@
 	<string>$(FLUTTER_BUILD_NAME)</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Приложение не запрашивает и не использует геолокацию. Некоторые сторонние библиотеки содержат ссылки на API геолокации.</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>CFBundleSignature</key>
 	<string>????</string>
 	<key>CFBundleURLTypes</key>
