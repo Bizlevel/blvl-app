@@ -808,7 +808,9 @@ serve(async (req) => {
     let recentSummaries = '';
     // Метаданные памяти для метрик
     let memMeta = { fallback: false, hitCount: 0, requested: 0 };
-    if (userId) {
+    // В режиме мини‑кейса не используем память/сводки, чтобы не «загрязнять» сценарий
+    // и не тянуть лишний контекст (а также не увеличивать латентность).
+    if (userId && !caseMode) {
       try {
         // Параллельная загрузка памяти (семантический top-k) и сводок чатов
         const [memoriesResult, summariesResult] = await Promise.all([
@@ -1435,68 +1437,73 @@ ${levelContext && levelContext !== 'null' ? `Контекст экрана/ур�
       // --- Сохранение в leo_messages (для включения триггера памяти) ---
       let effectiveChatId = chatId;
       let assistantLeoMessageId = null;
-      try {
-        if (userId) {
-          // 1) Создаём чат при отсутствии chatId
-          if (!effectiveChatId || typeof effectiveChatId !== 'string') {
-            const lastUserText = (Array.isArray(messages) ? [...messages].reverse().find((m) => m?.role === 'user')?.content : '') || 'Диалог';
-            const title = String(lastUserText).slice(0, 40);
-            const { data: insertedChat, error: chatError } = await supabaseAdmin!.from('leo_chats').insert({
-              user_id: userId,
-              title,
-              bot: isMax ? 'max' : 'leo'
-            }).select('id').single();
+      if (!caseMode) {
+        try {
+          if (userId) {
+            // 1) Создаём чат при отсутствии chatId
+            if (!effectiveChatId || typeof effectiveChatId !== 'string') {
+              const lastUserText = (Array.isArray(messages) ? [...messages].reverse().find((m) => m?.role === 'user')?.content : '') || 'Диалог';
+              const title = String(lastUserText).slice(0, 40);
+              const { data: insertedChat, error: chatError } = await supabaseAdmin!.from('leo_chats').insert({
+                user_id: userId,
+                title,
+                bot: isMax ? 'max' : 'leo'
+              }).select('id').single();
 
-            if (chatError) {
-              console.error('ERR leo_chats_insert', { message: chatError.message });
-            } else if (insertedChat) {
-              effectiveChatId = insertedChat.id;
+              if (chatError) {
+                console.error('ERR leo_chats_insert', { message: chatError.message });
+              } else if (insertedChat) {
+                effectiveChatId = insertedChat.id;
+              }
             }
-          }
 
-          if (effectiveChatId) {
-            // 2) Параллельное сохранение сообщений пользователя и ассистента
-            const userText = (Array.isArray(messages) ? [...messages].reverse().find((m) => m?.role === 'user')?.content : '') || '';
-            const savePromises = [];
+            if (effectiveChatId) {
+              // 2) Параллельное сохранение сообщений пользователя и ассистента
+              const userText = (Array.isArray(messages) ? [...messages].reverse().find((m) => m?.role === 'user')?.content : '') || '';
+              const savePromises = [];
 
-            // Пользовательское сообщение (если есть)
-            if (userText) {
+              // Пользовательское сообщение (если есть)
+              if (userText) {
+                savePromises.push(supabaseAdmin!.from('leo_messages').insert({
+                  chat_id: effectiveChatId,
+                  user_id: userId,
+                  role: 'user',
+                  content: String(userText)
+                }).then(result => ({ type: 'user', result })).catch(e => ({ type: 'user', error: e })));
+              }
+
+              // Ответ ассистента
               savePromises.push(supabaseAdmin!.from('leo_messages').insert({
                 chat_id: effectiveChatId,
                 user_id: userId,
-                role: 'user',
-                content: String(userText)
-              }).then(result => ({ type: 'user', result })).catch(e => ({ type: 'user', error: e })));
-            }
+                role: 'assistant',
+                content: String(assistantMessage?.content || '')
+              }).select('id').single().then(result => ({ type: 'assistant', result })).catch(e => ({ type: 'assistant', error: e })));
 
-            // Ответ ассистента
-            savePromises.push(supabaseAdmin!.from('leo_messages').insert({
-              chat_id: effectiveChatId,
-              user_id: userId,
-              role: 'assistant',
-              content: String(assistantMessage?.content || '')
-            }).select('id').single().then(result => ({ type: 'assistant', result })).catch(e => ({ type: 'assistant', error: e })));
+              // Выполняем сохранение сообщений параллельно
+              const saveResults = await Promise.all(savePromises);
 
-            // Выполняем сохранение сообщений параллельно
-            const saveResults = await Promise.all(savePromises);
-
-            // Обрабатываем результаты
-            for (const { type, result, error } of saveResults) {
-              if (error) {
-                console.error(`ERR leo_messages_${type}`, { message: String(error).slice(0, 200) });
-              } else if (type === 'assistant' && result?.data?.id) {
-                assistantLeoMessageId = result.data.id;
+              // Обрабатываем результаты
+              for (const { type, result, error } of saveResults) {
+                if (error) {
+                  console.error(`ERR leo_messages_${type}`, { message: String(error).slice(0, 200) });
+                } else if (type === 'assistant' && result?.data?.id) {
+                  assistantLeoMessageId = result.data.id;
+                }
               }
             }
           }
+        } catch (e) {
+          console.error('ERR leo_messages_insert_exception', { message: String(e).slice(0, 200) });
         }
-      } catch (e) {
-        console.error('ERR leo_messages_insert_exception', { message: String(e).slice(0, 200) });
       }
 
       // Сохраняем данные о стоимости параллельно с другими операциями (если есть userId)
       // Only server decides effective spend mode; user text cannot flip it.
-      const effectiveRequestType = (isMax || (!isMax && caseMode)) && skipSpend ? 'mentor_free' : 'chat';
+      // Тип запроса для аналитики/стоимости:
+      // - caseMode: отдельный поток мини‑кейса (без сохранения в историю)
+      // - max + skipSpend: бесплатные авто‑сообщения/тонкие реакции
+      const effectiveRequestType = caseMode ? 'case' : (isMax && skipSpend ? 'mentor_free' : 'chat');
       console.log('INFO spend_decision', { requestedSkipSpend: skipSpend, effectiveRequestType });
       await saveAIMessageData(userId, effectiveChatId || chatId || null, assistantLeoMessageId, usage, cost, model, bot, effectiveRequestType, supabaseAdmin!);
       

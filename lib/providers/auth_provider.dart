@@ -39,15 +39,19 @@ final authStateProvider = StreamProvider<AuthState>((ref) {
 
 /// Loads current user profile from `users` table or returns null if not signed in.
 /// 
-/// ВАЖНО: Не используем authStateProvider.future или .watch(), так как это StreamProvider,
-/// и он может блокировать при холодном старте.
-/// Вместо этого используем currentSession напрямую.
+/// ВАЖНО: Не используем `authStateProvider.future` (ожидание первого события стрима),
+/// так как это может "заморозить" холодный старт, если стрим не эмитит сразу.
+/// Вместо этого берём currentSession синхронно, а `authStateProvider` используем
+/// только как "триггер" пересчёта при login/logout.
 /// 
-/// Инвалидация при логине/логауте происходит через onAuthStateChange callback
-/// в login_controller и auth_service, которые invalidate providers.
 final currentUserProvider = FutureProvider<UserModel?>((ref) async {
+  // НЕ ждём первое событие стрима (это могло "заморозить" холодный старт),
+  // но создаём зависимость, чтобы при login/logout провайдер пересчитался автоматически.
+  // Это критично для корректного редиректа GoRouter после signOut.
+  ref.watch(authStateProvider);
+
   // Получаем текущую сессию СИНХРОННО — она уже кэширована в Supabase SDK.
-  // НЕ подписываемся на authStateProvider — это может блокировать!
+  // Важно: не ждём stream-события; полагаемся на cached session.
   final client = ref.read(supabaseClientProvider);
   final session = client.auth.currentSession;
   final supabaseUser = session?.user;

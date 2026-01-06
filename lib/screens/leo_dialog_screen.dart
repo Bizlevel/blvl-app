@@ -111,6 +111,11 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
   Timer? _chipsDebounceTimer;
   static const Duration _chipsDebounceDelay = Duration(milliseconds: 1000);
 
+  /// Защита от "случайного" закрытия экрана на iOS при попытке сфокусировать TextField
+  /// (наблюдалось как резкий pop → возврат на /tower).
+  /// Для mini-case запрещаем системный pop, оставляем только явную кнопку закрытия.
+  bool _allowPop = true;
+
   @override
   void initState() {
     super.initState();
@@ -121,6 +126,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
     if (_serverRecommendedChips.isEmpty && _defaultGoalChips.isEmpty) {
       _showSuggestions = false;
     }
+    _allowPop = !widget.caseMode;
     // Следим за позицией скролла для показа FAB «вниз»
     _scrollController.addListener(() {
       if (!_scrollController.hasClients) return;
@@ -199,6 +205,11 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
   void dispose() {
     _debounceTimer?.cancel();
     _chipsDebounceTimer?.cancel();
+    assert(() {
+      debugPrint(
+          'LEO_DIALOG dispose caseMode=${widget.caseMode} chatId=$_chatId');
+      return true;
+    }());
     _inputFocus.dispose();
     super.dispose();
   }
@@ -351,6 +362,9 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
           : (widget.levelContext ?? '');
 
       // Единый вызов: сервер выполнит RAG + персонализацию при необходимости
+      // В режиме мини‑кейса ВСЕ сообщения должны быть бесплатными (без списания GP),
+      // даже если вызывающий код забыл выставить skipSpend.
+      final bool effectiveSkipSpend = widget.skipSpend || widget.caseMode;
       final response = await _leo.sendMessageWithRAG(
         messages: _buildChatContext(),
         userContext: cleanUserContext,
@@ -359,7 +373,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
         chatId: _chatId,
         // GP‑политика: в mentor-mode все сообщения бесплатные,
         // в обычном режиме только авто‑сообщения бесплатные
-        skipSpend: widget.skipSpend,
+        skipSpend: effectiveSkipSpend,
         caseMode: widget.caseMode, // Add caseMode parameter
       );
 
@@ -406,7 +420,31 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
       });
       // Реакция на маркеры сценария (после отображения очищенного текста)
       if (widget.caseMode && widget.casePrompts != null) {
-        if (assistantMsg.contains('[CASE:NEXT]')) {
+        final bool hasNext = assistantMsg.contains('[CASE:NEXT]');
+        final bool hasFinal = assistantMsg.contains('[CASE:FINAL]');
+        final int totalPrompts = widget.casePrompts!.length;
+        final int lastIndex = totalPrompts > 0 ? totalPrompts - 1 : 0;
+        final bool isLastStep = totalPrompts > 0 && _caseStepIndex >= lastIndex;
+
+        // Иногда модель ошибочно возвращает [CASE:FINAL] уже на ранних шагах.
+        // Это приводит к неожиданному завершению кейса и "вылету" в Башню.
+        // Защита: финал разрешён только на последнем задании.
+        final bool earlyFinal = hasFinal && !isLastStep;
+        if (earlyFinal) {
+          try {
+            Sentry.addBreadcrumb(Breadcrumb(
+              category: 'case',
+              message: 'case_final_early_guard',
+              level: SentryLevel.warning,
+              data: {
+                'stepIndex': _caseStepIndex,
+                'totalPrompts': totalPrompts,
+              },
+            ));
+          } catch (_) {}
+        }
+
+        if (hasNext || earlyFinal) {
           // Перейти к следующему заданию
           final nextIndex = (_caseStepIndex >= 0) ? _caseStepIndex + 1 : 1;
           if (nextIndex < (widget.casePrompts!.length)) {
@@ -430,7 +468,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
               _scrollToBottom();
             }
           }
-        } else if (assistantMsg.contains('[CASE:FINAL]')) {
+        } else if (hasFinal && isLastStep) {
           // Показать финальную историю (если задана), затем предложить кнопку возврата
           final fs = widget.finalStory?.trim();
           if (fs != null && fs.isNotEmpty) {
@@ -461,6 +499,9 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
                     ElevatedButton(
                       onPressed: () {
                         Navigator.of(ctx).pop();
+                        if (mounted) {
+                          setState(() => _allowPop = true);
+                        }
                         Navigator.of(context).pop('case_final');
                       },
                       child: const Text('Вернуться в Башню'),
@@ -524,45 +565,83 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
         ],
       );
     }
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: AppColor.primary,
-        title: Row(
-          children: [
-            _FloatAvatar(
-              radius: 14,
-              asset: widget.bot == 'max'
-                  ? 'assets/images/avatars/avatar_max.png'
-                  : 'assets/images/avatars/avatar_leo.png',
-            ),
-            const SizedBox(width: 8),
-            Text(widget.bot == 'max' ? 'Макс' : 'Лео'),
-          ],
-        ),
-      ),
-      body: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () => FocusScope.of(context).unfocus(),
-        child: Stack(
-          children: [
-            Column(
-              children: [
-                Expanded(child: _buildMessageList()),
-                _buildInput(),
-              ],
-            ),
-            // FAB «Вниз»
-            if (_showScrollToBottom)
-              Positioned(
-                right: 12,
-                bottom: 90,
-                child: FloatingActionButton.small(
-                  heroTag: 'chat_scroll_down',
-                  onPressed: _scrollToBottom,
-                  child: const Icon(Icons.arrow_downward),
-                ),
+    return PopScope(
+      canPop: _allowPop,
+      onPopInvokedWithResult: (didPop, result) {
+        // Важно: фиксируем, когда система пытается закрыть экран.
+        // В кейс‑режиме это должно происходить только по явной кнопке.
+        assert(() {
+          debugPrint(
+              'LEO_DIALOG popInvoked didPop=$didPop result=$result allowPop=$_allowPop caseMode=${widget.caseMode}');
+          return true;
+        }());
+        try {
+          Sentry.addBreadcrumb(Breadcrumb(
+            category: 'nav',
+            level: didPop ? SentryLevel.info : SentryLevel.warning,
+            message: 'leo_dialog_pop_invoked',
+            data: {
+              'didPop': didPop,
+              'result': result?.toString(),
+              'allowPop': _allowPop,
+              'caseMode': widget.caseMode,
+              'chatId': _chatId,
+            },
+          ));
+        } catch (_) {}
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          backgroundColor: AppColor.primary,
+          automaticallyImplyLeading: !widget.caseMode,
+          leading: widget.caseMode
+              ? IconButton(
+                  tooltip: 'Закрыть',
+                  icon: const Icon(Icons.close),
+                  onPressed: () {
+                    FocusScope.of(context).unfocus();
+                    setState(() => _allowPop = true);
+                    Navigator.of(context).pop();
+                  },
+                )
+              : null,
+          title: Row(
+            children: [
+              _FloatAvatar(
+                radius: 14,
+                asset: widget.bot == 'max'
+                    ? 'assets/images/avatars/avatar_max.png'
+                    : 'assets/images/avatars/avatar_leo.png',
               ),
-          ],
+              const SizedBox(width: 8),
+              Text(widget.bot == 'max' ? 'Макс' : 'Лео'),
+            ],
+          ),
+        ),
+        body: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => FocusScope.of(context).unfocus(),
+          child: Stack(
+            children: [
+              Column(
+                children: [
+                  Expanded(child: _buildMessageList()),
+                  _buildInput(),
+                ],
+              ),
+              // FAB «Вниз»
+              if (_showScrollToBottom)
+                Positioned(
+                  right: 12,
+                  bottom: 90,
+                  child: FloatingActionButton.small(
+                    heroTag: 'chat_scroll_down',
+                    onPressed: _scrollToBottom,
+                    child: const Icon(Icons.arrow_downward),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );

@@ -78,6 +78,19 @@ class RayService {
     return null;
   }
 
+  String _humanizeServerError(String raw) {
+    if (raw.contains('insufficient_gp')) {
+      return 'Недостаточно GP для валидации. Нужно $kValidationCostGp GP.';
+    }
+    if (raw.contains('openai_config_error') || raw.contains('xai')) {
+      return 'Сервис ИИ не настроен. Обратитесь к поддержке.';
+    }
+    if (raw.contains('openai_error')) {
+      return 'Проблема на стороне ИИ‑провайдера. Попробуйте ещё раз позже.';
+    }
+    return raw;
+  }
+
   void _addBreadcrumb(String category, String message,
       [Map<String, dynamic>? data]) {
     try {
@@ -163,24 +176,69 @@ class RayService {
 
   /// Creates a new validation linked to a chat. Minimal insert is enough
   /// because table has defaults (status=in_progress, current_step=0, gp_spent=0).
-  Future<String> createValidation({required String chatId}) async {
+  Future<String> createValidation({
+    required String chatId,
+    String? ideaSummary,
+  }) async {
     final user = _client.auth.currentUser;
     if (user == null) throw RayFailure('Пользователь не авторизован');
 
     try {
+      _addBreadcrumb('ray', 'create_validation_start', {
+        'chatId': chatId,
+        'hasIdeaSummary': ideaSummary != null,
+      });
+
       final inserted = await _client
           .from('idea_validations')
           .insert({
             'user_id': user.id,
             'chat_id': chatId,
+            if (ideaSummary != null) 'idea_summary': ideaSummary,
           })
           .select('id')
           .single();
-      return inserted['id'] as String;
+
+      final validationId = inserted['id'] as String;
+
+      _addBreadcrumb('ray', 'create_validation_success', {
+        'validationId': validationId,
+        'chatId': chatId,
+      });
+
+      return validationId;
     } on PostgrestException catch (e) {
       throw RayFailure(e.message);
     } catch (_) {
       throw RayFailure('Не удалось создать проверку идеи');
+    }
+  }
+
+  /// Получает валидацию по chatId.
+  /// Возвращает данные валидации или null, если не найдена.
+  Future<Map<String, dynamic>?> getValidationByChatId(String chatId) async {
+    final user = _client.auth.currentUser;
+    if (user == null) return null;
+
+    try {
+      final result = await _client
+          .from('idea_validations')
+          .select()
+          .eq('chat_id', chatId)
+          .eq('user_id', user.id)
+          .order('created_at', ascending: false)
+          .limit(1)
+          .maybeSingle();
+
+      if (result == null) return null;
+      return Map<String, dynamic>.from(result);
+    } on PostgrestException catch (e) {
+      _addBreadcrumb('ray', 'get_validation_by_chat_id_error', {
+        'error': e.message,
+      });
+      return null;
+    } catch (_) {
+      return null;
     }
   }
 
@@ -324,7 +382,7 @@ class RayService {
           );
         }
         if (parsed != null) {
-          throw RayFailure(parsed, statusCode: status);
+          throw RayFailure(_humanizeServerError(parsed), statusCode: status);
         }
         if ((status ?? 0) >= 500) {
           throw RayFailure('Сервер Ray временно недоступен. Попробуйте позже.');
@@ -374,7 +432,7 @@ class RayService {
         final status = e.response?.statusCode;
         final parsed = _parseServerMessage(e.response?.data);
         if (parsed != null) {
-          throw RayFailure(parsed, statusCode: status);
+          throw RayFailure(_humanizeServerError(parsed), statusCode: status);
         }
         if ((status ?? 0) >= 500) {
           throw RayFailure(

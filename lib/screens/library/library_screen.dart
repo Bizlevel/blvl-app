@@ -15,6 +15,7 @@ import 'package:bizlevel/widgets/common/bizlevel_button.dart';
 import 'package:bizlevel/widgets/common/bizlevel_empty.dart';
 import 'package:bizlevel/widgets/common/bizlevel_error.dart';
 import 'package:bizlevel/widgets/common/bizlevel_loading.dart';
+import 'package:bizlevel/screens/ray_dialog_screen.dart';
 
 class LibraryScreen extends ConsumerWidget {
   const LibraryScreen({super.key});
@@ -125,6 +126,30 @@ class _SectionsTab extends ConsumerWidget {
             onTap: () {
               try {
                 context.go('/library/accelerators');
+              } catch (e, st) {
+                Sentry.captureException(e, stackTrace: st);
+              }
+            },
+          ),
+          AppSpacing.gapH(AppSpacing.sectionSpacing),
+          _SectionCard(
+            icon: Icons.psychology,
+            title: 'Проверить идею',
+            subtitle: 'Валидация бизнес-идеи (Ray)',
+            onTap: () {
+              try {
+                Sentry.addBreadcrumb(
+                  Breadcrumb(
+                    category: 'ui.tap',
+                    message: 'library_section_tap:ray',
+                    level: SentryLevel.info,
+                  ),
+                );
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const RayDialogScreen(),
+                  ),
+                );
               } catch (e, st) {
                 Sentry.captureException(e, stackTrace: st);
               }

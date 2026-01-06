@@ -20,8 +20,16 @@ import 'package:bizlevel/theme/typography.dart';
 class LessonWidget extends ConsumerStatefulWidget {
   final LessonModel lesson;
   final VoidCallback onWatched;
+  /// Автовход в fullscreen после первого play на mobile.
+  ///
+  /// В mini-case лучше держать выключенным: fullscreen-переход + AVAudioSession могут
+  /// коррелировать с iOS hang/gesture-timeout и Impeller "no drawable" в логах.
+  final bool autoFullscreenOnPlay;
   const LessonWidget(
-      {super.key, required this.lesson, required this.onWatched});
+      {super.key,
+      required this.lesson,
+      required this.onWatched,
+      this.autoFullscreenOnPlay = true});
 
   @override
   ConsumerState<LessonWidget> createState() => _LessonWidgetState();
@@ -87,6 +95,15 @@ class _LessonWidgetState extends ConsumerState<LessonWidget> {
   }
 
   void _disposeControllersBestEffort() {
+    try {
+      // На iOS/AVFoundation лучше явно выйти из fullscreen перед dispose,
+      // чтобы уменьшить шанс PlayerRemoteXPC/Fig* ошибок при резком уходе со страницы.
+      _chewieController?.exitFullScreen();
+    } catch (_) {}
+    try {
+      // Best-effort: остановим воспроизведение перед dispose.
+      _videoController?.pause();
+    } catch (_) {}
     try {
       // Chewie holds listeners/timers; dispose it first.
       _chewieController?.dispose();
@@ -202,6 +219,7 @@ class _LessonWidgetState extends ConsumerState<LessonWidget> {
     // (fullscreen route pushes + AndroidView/texture rebuilds) and correlates with
     // 'No active player with ID ...' crashes in production.
     if (!_enteredFullscreen &&
+        widget.autoFullscreenOnPlay &&
         !kIsWeb &&
         defaultTargetPlatform == TargetPlatform.iOS) {
       if (controller.value.isPlaying) {

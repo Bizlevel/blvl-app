@@ -105,6 +105,25 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
     }
   }
 
+  /// Нормализует значения из mini_cases.script в читаемый многострочный текст.
+  /// В данных встречаются строки, списки строк (List) и Map с полем `text`.
+  String _asMultilineText(dynamic value) {
+    if (value == null) return '';
+    if (value is String) return value.trim();
+    if (value is List) {
+      return value
+          .map((e) => e?.toString() ?? '')
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty)
+          .join('\n');
+    }
+    if (value is Map) {
+      final t = value['text']?.toString();
+      if (t != null && t.trim().isNotEmpty) return t.trim();
+    }
+    return value.toString().trim();
+  }
+
   @override
   Widget build(BuildContext context) {
     final title = _caseMeta?['title'] as String? ?? 'Мини‑кейс';
@@ -220,6 +239,9 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
           child: LessonWidget(
             lesson: mockLesson,
             onWatched: () {},
+            // В mini-case избегаем автоперехода в fullscreen на iOS:
+            // это уменьшает шанс hang/gesture-timeout и Impeller "no drawable".
+            autoFullscreenOnPlay: false,
           ),
         ),
 
@@ -289,19 +311,25 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
       } catch (_) {}
       final List<String> contexts = [
         '',
-        (_script?['q2_context']?.toString() ?? ''),
-        (_script?['q3_context']?.toString() ?? ''),
-        (_script?['q4_context']?.toString() ?? ''),
+        _asMultilineText(_script?['q2_context']),
+        _asMultilineText(_script?['q3_context']),
+        _asMultilineText(_script?['q4_context']),
       ];
-      final result = await Navigator.of(context).push(MaterialPageRoute(
+      final String finalStory = _asMultilineText(_script?['final_story']);
+      // Важно: открываем диалог через rootNavigator, чтобы он был поверх ShellRoute
+      // (и не конфликтовал с таб-навбаром/вложенным навигатором).
+      final result =
+          await Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(
         builder: (_) => LeoDialogScreen(
           caseMode: true,
+          // Мини‑кейс должен быть бесплатным: не списываем GP за сообщения.
+          skipSpend: true,
           systemPrompt: systemPrompt,
           firstPrompt: firstPrompt,
           casePrompts: prompts,
           caseContexts: contexts,
           casePreface: _buildChecklistPreface(),
-          finalStory: _script?['final_story']?.toString(),
+          finalStory: finalStory.isEmpty ? null : finalStory,
         ),
         fullscreenDialog: true,
       ));
@@ -378,25 +406,25 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
     final contextText = _script?['context'] is Map
         ? ((_script?['context'] as Map)['text']?.toString() ?? '')
         : '';
-    final user = Supabase.instance.client.auth.currentUser;
-
-    final hasProfile = user != null;
-    if (!hasProfile) {
-      return 'Режим: case_facilitатор. Ты — Лео, фасилитатор мини‑кейса. '
-          'Кейс: "$title" (после уровня $afterLevel, навык: $skill). '
-          '${contextText.isNotEmpty ? 'Текст кейса: $contextText ' : ''}'
-          '⚠️ ВАЖНО: Профиль пользователя не заполнен или заполнен неполностью. '
-          'Сначала помоги пользователю заполнить профиль (имя, сфера деятельности, цель, опыт), '
-          'а затем переходи к кейсу. Объясни, что качество ответов зависит от полноты профиля. '
-          'Правила: отвечай ТОЛЬКО на основе «Текста кейса», игнорируй внешние источники/память/RAG. '
-          'Задавай чёткие вопросы и оценивай ответы по 5‑уровневой шкале качества. '
-          'Формат ответов короткий (2–3 предложения). Поддерживай мотивацию и давай мягкие подсказки.';
-    }
+    final int totalTasks = (() {
+      try {
+        final qs = _script?['questions'];
+        if (qs is List) return qs.length;
+      } catch (_) {}
+      return 0;
+    })();
 
     return 'Режим: case_facilitатор. Ты — Лео, фасилитатор мини‑кейса. '
         'Кейс: "$title" (после уровня $afterLevel, навык: $skill). '
         '${contextText.isNotEmpty ? 'Текст кейса: $contextText ' : ''}'
         'Правила: отвечай ТОЛЬКО на основе «Текста кейса», игнорируй внешние источники/память/RAG. '
+        '${totalTasks > 0 ? 'В кейсе $totalTasks задания(й). ' : ''}'
+        'ВАЖНО: не завершай кейс раньше времени. '
+        'Используй маркеры в конце ответа отдельной строкой: '
+        '[CASE:NEXT] — перейти к следующему заданию; '
+        '[CASE:RETRY] — попросить доработать; '
+        '[CASE:FINAL] — только после последнего задания. '
+        'Не вставляй текст следующего задания — его покажет приложение. '
         'Алгоритм: дай «Задание 1» как ассистент; оцени ответ (EXCELLENT/GOOD/ACCEPTABLE/WEAK/INVALID). '
         'При EXCELLENT/GOOD — переход к следующему заданию (верни маркер [CASE:NEXT]); '
         'при ACCEPTABLE — мягкая подсказка и переход (верни [CASE:NEXT]); '

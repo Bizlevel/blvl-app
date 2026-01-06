@@ -25,6 +25,7 @@ import 'package:bizlevel/widgets/level/blocks/quiz_block.dart';
 import 'package:bizlevel/widgets/level/blocks/goal_v1_block.dart';
 import 'package:bizlevel/widgets/level/blocks/artifact_block.dart';
 import 'package:bizlevel/widgets/level/blocks/profile_form_block.dart';
+import 'package:bizlevel/screens/ray_dialog_screen.dart';
 
 /// Shows a level as full-screen blocks (Intro → Lesson → Quiz → …).
 class LevelDetailScreen extends ConsumerStatefulWidget {
@@ -156,6 +157,56 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
                             ),
                           );
                           ref.invalidate(gpBalanceProvider);
+
+                          // Предложение проверить идею после завершения Уровня 5 (Ray)
+                          final isLevel5 = (widget.levelNumber ?? -1) == 5;
+                          if (isLevel5 && context.mounted) {
+                            final shouldOpenRay =
+                                await showDialog<bool>(
+                                      context: context,
+                                      barrierDismissible: false,
+                                      builder: (dialogCtx) => AlertDialog(
+                                        title: const Text('Проверь свою идею'),
+                                        content: const Text(
+                                          'Ты прошёл Уровень 5. Готов проверить свою бизнес‑идею с Ray?',
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () {
+                                              Navigator.of(dialogCtx).pop(false);
+                                            },
+                                            child: const Text('Позже'),
+                                          ),
+                                          ElevatedButton(
+                                            onPressed: () {
+                                              Navigator.of(dialogCtx).pop(true);
+                                            },
+                                            child: const Text('Проверить идею'),
+                                          ),
+                                        ],
+                                      ),
+                                    ) ??
+                                    false;
+
+                            if (shouldOpenRay && context.mounted) {
+                              try {
+                                sentry.Sentry.addBreadcrumb(
+                                  sentry.Breadcrumb(
+                                    category: 'ui.tap',
+                                    message: 'level_5_cta_tap:ray',
+                                    level: sentry.SentryLevel.info,
+                                  ),
+                                );
+                              } catch (_) {}
+
+                              await Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => const RayDialogScreen(),
+                                ),
+                              );
+                            }
+                          }
+
                           if ((widget.levelNumber ?? -1) == 1) {
                             if (context.mounted) {
                               context.go('/goal');

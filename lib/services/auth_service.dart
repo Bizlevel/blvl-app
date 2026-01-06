@@ -115,10 +115,14 @@ class AuthService {
       // Отменяем локальные уведомления пользователя
       try {
         final notif = NotificationsService.instance;
-        await notif.initialize();
-        await notif.cancelWeeklyPlan();
-        await notif.cancelDailyPracticeReminder();
-        await notif.cancelDailySprint();
+        // ВАЖНО: не блокируем UX выхода.
+        // Отмена уведомлений на iOS может быть дорогой (много cancel(id) → фризы/таймауты жестов),
+        // поэтому делаем best-effort в фоне.
+        unawaited(() async {
+          try {
+            await notif.cancelAllNotifications();
+          } catch (_) {}
+        }());
       } catch (_) {}
     }, unknownErrorMessage: 'Неизвестная ошибка выхода');
   }

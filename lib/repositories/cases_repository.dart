@@ -23,14 +23,10 @@ class CasesRepository {
           .from('user_case_progress')
           .select(
               'user_id, case_id, status, steps_completed, hints_used, started_at, updated_at, completed_at')
+          .eq('user_id', userId)
           .eq('case_id', caseId)
-          .order('updated_at', ascending: false)
-          .limit(1);
-
-      final rows = (response as List<dynamic>)
-          .map((e) => Map<String, dynamic>.from(e as Map))
-          .toList();
-      final result = rows.isEmpty ? null : rows.first;
+          .maybeSingle();
+      final result = response == null ? null : Map<String, dynamic>.from(response as Map);
 
       await cache.put(cacheKey, result);
       return result;
@@ -58,7 +54,45 @@ class CasesRepository {
   }
 
   Future<void> startCase(int caseId) async {
-    await _upsertStatus(caseId, 'started', startedNow: true);
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) {
+      throw Exception('Пользователь не авторизован');
+    }
+
+    final Box cache = await Hive.openBox('cases_progress');
+    final String cacheKey = 'user_${userId}_case_$caseId';
+
+    // Защита: не сбрасываем completed/skipped обратно в started.
+    // Используем сначала кеш (работает и оффлайн), затем сверяем с сервером.
+    try {
+      final cached = cache.get(cacheKey);
+      if (cached is Map) {
+        final s = (cached['status'] as String?)?.toLowerCase();
+        if (s == 'completed' || s == 'skipped') {
+          return;
+        }
+      }
+    } catch (_) {}
+
+    try {
+      final current = await _client
+          .from('user_case_progress')
+          .select('status')
+          .eq('user_id', userId)
+          .eq('case_id', caseId)
+          .maybeSingle();
+      final status = (current?['status'] as String?)?.toLowerCase();
+      if (status == 'completed' || status == 'skipped') {
+        // Обновим кеш полной записью (на случай, если он устарел)
+        await getCaseStatus(caseId);
+        return;
+      }
+    } on PostgrestException catch (e, st) {
+      // Если нет сети/ошибка — просто продолжаем best-effort (upsert всё равно упадёт оффлайн).
+      await Sentry.captureException(e, stackTrace: st);
+    } catch (_) {}
+
+    await _upsertStatus(caseId, 'started', startedNow: true, clearCompletedAt: true);
   }
 
   Future<void> skipCase(int caseId) async {
@@ -99,8 +133,13 @@ class CasesRepository {
     }
   }
 
-  Future<void> _upsertStatus(int caseId, String status,
-      {bool startedNow = false, bool completeNow = false}) async {
+  Future<void> _upsertStatus(
+    int caseId,
+    String status, {
+    bool startedNow = false,
+    bool completeNow = false,
+    bool clearCompletedAt = false,
+  }) async {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) {
       throw Exception('Пользователь не авторизован');
@@ -115,6 +154,9 @@ class CasesRepository {
       };
       if (startedNow) {
         payload['started_at'] = DateTime.now().toIso8601String();
+      }
+      if (clearCompletedAt) {
+        payload['completed_at'] = null;
       }
       if (completeNow) {
         payload['completed_at'] = DateTime.now().toIso8601String();

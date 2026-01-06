@@ -1,5 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- Разрешение для точных алармов на Android 12+ (API 31+) -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
     <!-- Нужен для восстановления scheduled notifications после перезагрузки устройства.
          Receiver обычно поставляется самим flutter_local_notifications через manifest merge. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
@@ -46,6 +48,26 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <!-- Явная регистрация receiver'ов для scheduled notifications -->
+        <!-- 1) Receiver, который показывает уведомление по сработавшему аларму -->
+        <receiver
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver"
+            android:exported="false"
+            android:enabled="true" />
+
+        <!-- 2) Отдельный receiver, который ловит BOOT_COMPLETED и перепланирует уведомления после перезагрузки -->
+        <!-- Плагин flutter_local_notifications должен добавлять это через manifest merge,
+             но на некоторых устройствах (особенно Samsung) это может не работать -->
+        <receiver
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver"
+            android:exported="true"
+            android:enabled="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.QUICKBOOT_POWERON"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+            </intent-filter>
+        </receiver>
     </application>
 
     <!-- Required to query activities that can process text, see:

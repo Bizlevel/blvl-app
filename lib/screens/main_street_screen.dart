@@ -19,6 +19,7 @@ import 'package:bizlevel/widgets/home/home_continue_card.dart';
 import 'package:bizlevel/widgets/home/home_quote_card.dart';
 import 'package:bizlevel/widgets/common/notification_center.dart';
 import 'package:bizlevel/theme/animations.dart';
+import 'package:bizlevel/screens/ray_dialog_screen.dart';
 
 class MainStreetScreen extends ConsumerStatefulWidget {
   const MainStreetScreen({super.key});
@@ -409,6 +410,25 @@ class _QuickAccessSection extends ConsumerWidget {
                   ),
                 );
                 context.go('/artifacts');
+              },
+            ),
+            _QuickTile(
+              icon: Icons.psychology,
+              title: 'Лаборатория идей',
+              subtitle: 'Проверь идею на прочность',
+              onTap: () {
+                Sentry.addBreadcrumb(
+                  Breadcrumb(
+                    category: 'ui.tap',
+                    message: 'home_quick_action_tap:ray',
+                    level: SentryLevel.info,
+                  ),
+                );
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const RayDialogScreen(),
+                  ),
+                );
               },
             ),
           ],

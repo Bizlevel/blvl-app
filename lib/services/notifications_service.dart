@@ -549,6 +549,19 @@ class NotificationsService {
     }
   }
 
+  /// Быстро отменяет **все** локальные уведомления приложения (pending + delivered).
+  ///
+  /// Используем на logout, чтобы не делать 1000+ `cancel(id)` в цикле и не подвешивать UI.
+  Future<void> cancelAllNotifications() async {
+    if (kIsWeb) return;
+    if (!_initialized) await initialize();
+    try {
+      await _plugin.cancelAll();
+    } catch (_) {
+      // Best-effort: не ломаем UX логаута из-за локальных уведомлений.
+    }
+  }
+
   tz.TZDateTime _nextInstanceOf(
       {required int weekday, required int hour, required int minute}) {
     final now = tz.TZDateTime.now(tz.local);
