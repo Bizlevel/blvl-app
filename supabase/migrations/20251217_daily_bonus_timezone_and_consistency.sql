@@ -208,3 +208,5 @@ for each row execute function public._gp_bonus_rules_sync_active_flags();
 
 
 
+
+

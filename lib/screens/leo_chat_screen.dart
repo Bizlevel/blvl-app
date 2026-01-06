@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bizlevel/providers/leo_service_provider.dart';
 import 'package:bizlevel/widgets/chat_item.dart';
 import 'package:bizlevel/screens/leo_dialog_screen.dart';
+import 'package:bizlevel/screens/ray_dialog_screen.dart';
 import 'package:bizlevel/widgets/common/bizlevel_card.dart';
 
 import 'package:bizlevel/theme/color.dart' show AppColor;
@@ -103,12 +104,19 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
         final formattedDate =
             '${dt.day.toString().padLeft(2, '0')}.${dt.month.toString().padLeft(2, '0')}';
 
-        final String bot =
-            (chat['bot'] as String?)?.toLowerCase() == 'max' ? 'max' : 'leo';
-        final String botLabel = bot == 'max' ? 'Max AI' : 'Leo AI';
+        final String botRaw = (chat['bot'] as String?)?.toLowerCase() ?? 'leo';
+        final String bot = ['leo', 'max', 'ray'].contains(botRaw) ? botRaw : 'leo';
+        final String botLabel =
+            bot == 'max'
+                ? 'Max AI'
+                : bot == 'ray'
+                    ? 'Ray AI'
+                    : 'Leo AI';
         final String avatarPath = bot == 'max'
             ? 'assets/images/avatars/avatar_max.png'
-            : 'assets/images/avatars/avatar_leo.png';
+            : bot == 'ray'
+                ? 'assets/images/avatars/avatar_12.png'
+                : 'assets/images/avatars/avatar_leo.png';
 
         final chatData = {
           'name': chat['title'] ?? 'Диалог',
@@ -122,6 +130,15 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
           chatData,
           isNotified: false,
           onTap: () {
+            if (bot == 'ray') {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => RayDialogScreen(chatId: chat['id'] as String?),
+                ),
+              );
+              return;
+            }
+
             Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (_) => FutureBuilder<List<String?>>(
@@ -147,6 +164,15 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
   }
 
   void _onNewChat(String bot) {
+    if (bot == 'ray') {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => const RayDialogScreen(),
+        ),
+      );
+      return;
+    }
+
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => FutureBuilder<List<String?>>(
@@ -171,72 +197,66 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
         required String name,
         required String subtitle,
         required String avatar}) {
-      return Expanded(
-        child: Padding(
-          padding: AppSpacing.insetsSymmetric(h: AppSpacing.s6),
-          child: BizLevelCard(
-            onTap: () => _onNewChat(bot),
-            outlined: true,
-            tonal: true,
-            padding: AppSpacing.insetsAll(AppSpacing.md),
-            semanticsLabel: 'Начать чат с $name',
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(minHeight: 128),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircleAvatar(
-                    radius: 32,
-                    backgroundImage: AssetImage(avatar),
-                    backgroundColor: AppColor.surface.withValues(alpha: 0.0),
+      return Padding(
+        padding: AppSpacing.insetsSymmetric(v: AppSpacing.s6),
+        child: BizLevelCard(
+          onTap: () => _onNewChat(bot),
+          outlined: true,
+          tonal: true,
+          padding: AppSpacing.insetsAll(AppSpacing.md),
+          semanticsLabel: 'Начать чат с $name',
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 112),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 32,
+                  backgroundImage: AssetImage(avatar),
+                  backgroundColor: AppColor.surface.withValues(alpha: 0.0),
+                ),
+                AppSpacing.gapW(AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        name,
+                        style: Theme.of(context)
+                            .textTheme
+                            .headlineSmall
+                            ?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                      AppSpacing.gapH(AppSpacing.xxs),
+                      Text(
+                        subtitle,
+                        maxLines: 2,
+                        softWrap: true,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context)
+                            .textTheme
+                            .labelMedium
+                            ?.copyWith(color: AppColor.labelColor),
+                      ),
+                      AppSpacing.gapH(AppSpacing.sm),
+                      Text(
+                        'Начать чат',
+                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: AppColor.primary,
+                            ),
+                      ),
+                    ],
                   ),
-                  AppSpacing.gapW(AppSpacing.md),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          name,
-                          style: Theme.of(context)
-                              .textTheme
-                              .headlineSmall
-                              ?.copyWith(fontWeight: FontWeight.w600),
-                        ),
-                        AppSpacing.gapH(AppSpacing.xxs),
-                        Text(
-                          subtitle,
-                          maxLines: 2,
-                          softWrap: true,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context)
-                              .textTheme
-                              .labelMedium
-                              ?.copyWith(color: AppColor.labelColor),
-                        ),
-                        AppSpacing.gapH(AppSpacing.sm),
-                        Text(
-                          'Начать чат',
-                          style: Theme.of(context)
-                              .textTheme
-                              .labelLarge
-                              ?.copyWith(
-                                fontWeight: FontWeight.w600,
-                                color: AppColor.primary,
-                              ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
       );
     }
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+    return Column(
       children: [
         buildCard(
           bot: 'leo',
@@ -249,6 +269,12 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
           name: 'Max AI',
           subtitle: 'Твой помощник в достижении цели',
           avatar: 'assets/images/avatars/avatar_max.png',
+        ),
+        buildCard(
+          bot: 'ray',
+          name: 'Ray AI',
+          subtitle: 'Проверь идею на прочность',
+          avatar: 'assets/images/avatars/avatar_12.png',
         ),
       ],
     );

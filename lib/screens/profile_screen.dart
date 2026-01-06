@@ -209,6 +209,14 @@ class ProfileScreen extends ConsumerWidget {
                         break;
                       case 'logout':
                         await ref.read(authServiceProvider).signOut();
+                        // ВАЖНО: не трогаем `ref` после await.
+                        // SignOut может триггерить редирект на /login → этот виджет уже disposed,
+                        // и любое обращение к ref вызовет:
+                        // "Bad state: Cannot use \"ref\" after the widget was disposed."
+                        //
+                        // Актуальная модель: `currentUserProvider` пересчитывается при auth changes
+                        // (см. `ref.watch(authStateProvider)` внутри провайдера), поэтому ручная
+                        // инвалидация здесь не нужна.
                         break;
                     }
                   },

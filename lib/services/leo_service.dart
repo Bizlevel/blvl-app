@@ -237,6 +237,10 @@ class LeoService {
     // JWT/PII не логируем
     debugPrint('🔧 DEBUG: chatId = $chatId'); // Добавляем логирование chatId
 
+    // В режиме мини‑кейса сообщения всегда должны быть бесплатными:
+    // даже если вызывающий код забыл выставить skipSpend.
+    final bool effectiveSkipSpend = skipSpend || caseMode;
+
     // Списываем 1 GP за сообщение (идемпотентно), если не включён аварийный флаг
     final gp = GpService(_client);
     final String idempotencyKey = _generateIdempotencyKey(
@@ -253,7 +257,7 @@ class LeoService {
             gp: gp,
             idempotencyKey: idempotencyKey,
             chatId: chatId,
-            skipSpend: skipSpend,
+            skipSpend: effectiveSkipSpend,
           );
         } on GpFailure catch (ge) {
           if (ge.message.contains('Недостаточно GP')) {
@@ -278,6 +282,8 @@ class LeoService {
           'levelContext': cleanLevelContext,
           'bot': bot,
           'chatId': chatId,
+          'caseMode': caseMode,
+          'skipSpend': effectiveSkipSpend,
         });
         final response = await _postLeoChat(payload);
 
