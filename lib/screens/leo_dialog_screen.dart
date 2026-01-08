@@ -127,6 +127,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
       _showSuggestions = false;
     }
     _allowPop = !widget.caseMode;
+    
     // Следим за позицией скролла для показа FAB «вниз»
     _scrollController.addListener(() {
       if (!_scrollController.hasClients) return;
@@ -210,6 +211,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
           'LEO_DIALOG dispose caseMode=${widget.caseMode} chatId=$_chatId');
       return true;
     }());
+    
     _inputFocus.dispose();
     super.dispose();
   }
@@ -502,7 +504,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
                         if (mounted) {
                           setState(() => _allowPop = true);
                         }
-                        Navigator.of(context).pop('case_final');
+                        Navigator.of(context, rootNavigator: true).pop('case_final');
                       },
                       child: const Text('Вернуться в Башню'),
                     ),
@@ -558,11 +560,26 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
   Widget build(BuildContext context) {
     if (widget.embedded) {
       // Встраиваемый режим: без Scaffold/AppBar, только тело
-      return Column(
-        children: [
-          Expanded(child: _buildMessageList()),
-          _buildInput(),
-        ],
+      // ВАЖНО: Добавляем PopScope для контроля закрытия даже в embedded режиме
+      return PopScope(
+        canPop: _allowPop,
+        onPopInvokedWithResult: (didPop, result) {
+          // Логируем попытки закрытия для отладки
+          assert(() {
+            debugPrint(
+                'LEO_DIALOG embedded popInvoked didPop=$didPop result=$result allowPop=$_allowPop');
+            return true;
+          }());
+          
+          // В embedded режиме разрешаем закрытие по умолчанию
+          // (контроль закрытия осуществляется на уровне родительского Scaffold)
+        },
+        child: Column(
+          children: [
+            Expanded(child: _buildMessageList()),
+            _buildInput(),
+          ],
+        ),
       );
     }
     return PopScope(
@@ -575,6 +592,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
               'LEO_DIALOG popInvoked didPop=$didPop result=$result allowPop=$_allowPop caseMode=${widget.caseMode}');
           return true;
         }());
+        
         try {
           Sentry.addBreadcrumb(Breadcrumb(
             category: 'nav',
@@ -594,14 +612,14 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
         appBar: AppBar(
           backgroundColor: AppColor.primary,
           automaticallyImplyLeading: !widget.caseMode,
-          leading: widget.caseMode
+              leading: widget.caseMode
               ? IconButton(
                   tooltip: 'Закрыть',
                   icon: const Icon(Icons.close),
                   onPressed: () {
                     FocusScope.of(context).unfocus();
                     setState(() => _allowPop = true);
-                    Navigator.of(context).pop();
+                    Navigator.of(context, rootNavigator: true).pop();
                   },
                 )
               : null,
@@ -761,7 +779,10 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
   }
 
   Widget _buildInput() {
+    // SafeArea(bottom: false) - Flutter сам обработает отступы снизу при adjustResize
+    // Оставляем только боковые отступы для системных элементов (notch)
     return SafeArea(
+      bottom: false, // Flutter автоматически поднимет контент при появлении клавиатуры
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
         child: Column(
@@ -784,7 +805,10 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
                         hintText: 'Введите сообщение...',
                         border: OutlineInputBorder(),
                       ),
-                      onTapOutside: (_) => FocusScope.of(context).unfocus(),
+                      onTap: () {},
+                      onTapOutside: (_) {
+                        FocusScope.of(context).unfocus();
+                      },
                       // Отправка по Enter
                       onSubmitted: (text) {
                         if (text.trim().isNotEmpty && !_isSending) {
