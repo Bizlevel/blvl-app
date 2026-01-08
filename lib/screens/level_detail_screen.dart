@@ -26,6 +26,7 @@ import 'package:bizlevel/widgets/level/blocks/goal_v1_block.dart';
 import 'package:bizlevel/widgets/level/blocks/artifact_block.dart';
 import 'package:bizlevel/widgets/level/blocks/profile_form_block.dart';
 import 'package:bizlevel/screens/ray_dialog_screen.dart';
+import 'package:bizlevel/utils/custom_modal_route.dart';
 
 /// Shows a level as full-screen blocks (Intro → Lesson → Quiz → …).
 class LevelDetailScreen extends ConsumerStatefulWidget {
@@ -94,14 +95,98 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
               onBack: _goBack,
               onNext: _goNext,
               onDiscuss: () {
-                showModalBottomSheet(
-                  context: context,
-                  isScrollControlled: true,
-                  backgroundColor: AppColor.surface,
-                  barrierColor: Colors.black.withValues(alpha: 0.54),
-                  builder: (_) => FractionallySizedBox(
-                    heightFactor: 0.9,
-                    child: LeoDialogScreen(chatId: _chatId),
+                // ВАЖНО: Получаем ProviderContainer из текущего контекста,
+                // чтобы передать его в UncontrolledProviderScope для диалога
+                // Это гарантирует, что провайдеры будут доступны даже если родитель умрет
+                final container = ProviderScope.containerOf(context);
+                
+                Navigator.of(context, rootNavigator: true).push(
+                  CustomModalBottomSheetRoute(
+                    child: UncontrolledProviderScope(
+                      container: container,
+                      child: Scaffold(
+                        backgroundColor: Colors.transparent,
+                        // ВАЖНО: resizeToAvoidBottomInset: true, чтобы Flutter поднимал контент при появлении клавиатуры
+                        resizeToAvoidBottomInset: true,
+                        body: Stack(
+                          children: [
+                            Positioned.fill(
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: () => Navigator.of(context, rootNavigator: true).pop(),
+                                child: Container(color: Colors.transparent),
+                              ),
+                            ),
+                            Align(
+                              alignment: Alignment.bottomCenter,
+                              child: Material(
+                                color: Colors.transparent,
+                                child: ConstrainedBox(
+                                  constraints: BoxConstraints(
+                                    maxHeight: MediaQuery.of(context).size.height * 0.9,
+                                  ),
+                                  child: Container(
+                                    decoration: const BoxDecoration(
+                                      color: AppColor.surface,
+                                      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                                    ),
+                                    clipBehavior: Clip.hardEdge,
+                                  child: Column(
+                                    children: [
+                                      Container(
+                                        color: AppColor.primary,
+                                        child: SafeArea(
+                                          bottom: false,
+                                          child: AppBar(
+                                            backgroundColor: AppColor.primary,
+                                            automaticallyImplyLeading: false,
+                                            leading: Builder(
+                                              builder: (context) => IconButton(
+                                                tooltip: 'Закрыть',
+                                                icon: const Icon(Icons.close),
+                                                onPressed: () {
+                                                  // Скрываем клавиатуру перед закрытием диалога
+                                                  FocusManager.instance.primaryFocus?.unfocus();
+                                                  // Закрываем диалог с небольшой задержкой для закрытия клавиатуры
+                                                  Future.microtask(() {
+                                                    final navigator = Navigator.of(context, rootNavigator: true);
+                                                    if (navigator.canPop()) {
+                                                      navigator.pop();
+                                                    }
+                                                  });
+                                                },
+                                              ),
+                                            ),
+                                            title: const Row(
+                                              children: [
+                                                CircleAvatar(
+                                                  radius: 14,
+                                                  backgroundImage: AssetImage('assets/images/avatars/avatar_leo.png'),
+                                                  backgroundColor: Colors.transparent,
+                                                ),
+                                                SizedBox(width: 8),
+                                                Text('Лео'),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      Expanded(
+                                        child: LeoDialogScreen(
+                                          chatId: _chatId,
+                                          embedded: true,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
                 );
               },
@@ -199,7 +284,9 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
                                 );
                               } catch (_) {}
 
-                              await Navigator.of(context).push(
+                              // ВАЖНО: Используем rootNavigator: true, чтобы диалог не уничтожался
+                              // при пересоздании вложенного навигатора
+                              await Navigator.of(context, rootNavigator: true).push(
                                 MaterialPageRoute(
                                   builder: (_) => const RayDialogScreen(),
                                 ),

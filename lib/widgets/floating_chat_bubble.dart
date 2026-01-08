@@ -4,6 +4,7 @@ import 'package:bizlevel/screens/leo_dialog_screen.dart';
 import 'package:bizlevel/providers/leo_unread_provider.dart';
 import 'package:bizlevel/providers/leo_service_provider.dart';
 import 'package:bizlevel/theme/color.dart';
+import 'package:bizlevel/utils/custom_modal_route.dart';
 
 /// Floating chat bubble that opens the LeoDialogScreen.
 /// Place this widget inside a [Stack] so that it can be positioned
@@ -70,28 +71,124 @@ class _FloatingChatBubbleState extends ConsumerState<FloatingChatBubble>
   }
 
   Future<void> _openDialog() async {
+    // ВАЖНО: Получаем все нужные данные ДО открытия диалога,
+    // чтобы они не зависели от жизненного цикла FloatingChatBubble
+    final leoService = ref.read(leoServiceProvider);
+    
     // Сбрасываем счётчик непрочитанных, только если диалог уже создан
     if (widget.chatId != null) {
       try {
-        final service = ref.read(leoServiceProvider);
-        await service.resetUnread(widget.chatId!);
+        await leoService.resetUnread(widget.chatId!);
       } catch (_) {}
     }
 
     if (!mounted) return;
 
-    await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      barrierColor: Colors.black54,
-      builder: (_) => FractionallySizedBox(
-        heightFactor: 0.9,
-        child: LeoDialogScreen(
-          chatId: widget.chatId,
-          userContext: widget.userContext,
-          levelContext: widget.levelContext,
-          bot: widget.bot,
+    // ВАЖНО: Используем rootNavigator: true, чтобы диалог не уничтожался
+    // при пересоздании вложенного навигатора (например, при открытии клавиатуры)
+    
+    // ВАЖНО: Получаем ProviderContainer из текущего контекста,
+    // чтобы передать его в UncontrolledProviderScope для диалога
+    // Это гарантирует, что провайдеры будут доступны даже если FloatingChatBubble умрет
+    final container = ProviderScope.containerOf(context);
+    
+    await Navigator.of(context, rootNavigator: true).push(
+      CustomModalBottomSheetRoute(
+        child: UncontrolledProviderScope(
+          container: container,
+          child: Scaffold(
+            backgroundColor: Colors.transparent,
+            // ВАЖНО: resizeToAvoidBottomInset: true, чтобы Flutter поднимал контент при появлении клавиатуры
+            resizeToAvoidBottomInset: true,
+            body: Stack(
+              children: [
+                // 1. Прозрачный слой для закрытия по тапу мимо окна
+                Positioned.fill(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () {
+                      Navigator.of(context, rootNavigator: true).pop();
+                    },
+                    child: Container(color: Colors.transparent),
+                  ),
+                ),
+                // 2. Контент диалога - должен перехватывать тапы и не пропускать их к прозрачному слою
+                Align(
+                  alignment: Alignment.bottomCenter,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxHeight: MediaQuery.of(context).size.height * 0.9,
+                      ),
+                      child: Container(
+                        decoration: const BoxDecoration(
+                          color: AppColor.surface,
+                          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                        ),
+                        clipBehavior: Clip.hardEdge,
+                      child: Column(
+                        children: [
+                          // Заголовок
+                          Container(
+                            color: AppColor.primary,
+                            child: SafeArea(
+                              bottom: false,
+                              child: AppBar(
+                                backgroundColor: AppColor.primary,
+                                automaticallyImplyLeading: false,
+                                leading: Builder(
+                                  builder: (context) => IconButton(
+                                    tooltip: 'Закрыть',
+                                    icon: const Icon(Icons.close),
+                                    onPressed: () {
+                                      // Скрываем клавиатуру перед закрытием диалога
+                                      FocusManager.instance.primaryFocus?.unfocus();
+                                      // Закрываем диалог с небольшой задержкой для закрытия клавиатуры
+                                      Future.microtask(() {
+                                        final navigator = Navigator.of(context, rootNavigator: true);
+                                        if (navigator.canPop()) {
+                                          navigator.pop();
+                                        }
+                                      });
+                                    },
+                                  ),
+                                ),
+                                title: Row(
+                                  children: [
+                                    CircleAvatar(
+                                      radius: 14,
+                                      backgroundImage: AssetImage(widget.bot == 'max'
+                                          ? 'assets/images/avatars/avatar_max.png'
+                                          : 'assets/images/avatars/avatar_leo.png'),
+                                      backgroundColor: Colors.transparent,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(widget.bot == 'max' ? 'Макс' : 'Лео'),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          // Тело диалога
+                          Expanded(
+                            child: LeoDialogScreen(
+                              chatId: widget.chatId,
+                              userContext: widget.userContext,
+                              levelContext: widget.levelContext,
+                              bot: widget.bot,
+                              embedded: true, // Встроенный режим без собственного Scaffold
+                            ),
+                          ),
+                        ],
+                      ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
