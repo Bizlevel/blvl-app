@@ -146,7 +146,17 @@ class ProfileFormBlock extends LevelPageBlock {
                 alignment: Alignment.topRight,
                 child: IconButton(
                   icon: const Icon(Icons.edit, color: AppColor.onSurfaceSubtle),
-                  onPressed: isEditing ? null : onEdit,
+                  onPressed: isEditing
+                      ? null
+                      : () {
+                          // Сбрасываем возможный "скрытый" фокус с readOnly-полей,
+                          // чтобы включение режима редактирования не приводило к
+                          // внезапному появлению клавиатуры/route-pop на некоторых устройствах.
+                          try {
+                            FocusScope.of(context).unfocus();
+                          } catch (_) {}
+                          onEdit();
+                        },
                   tooltip: 'Редактировать',
                 ),
               ),

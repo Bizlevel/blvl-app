@@ -13,6 +13,6 @@ class UIS {
   static const pleaseFillAllFields = 'Пожалуйста, заполните все поля';
   static const confirmEmailFirst = 'Подтвердите e-mail, прежде чем продолжить';
   static const saveErrorGeneric = 'Ошибка сохранения профиля';
-  static const notEnoughGp = 'Недостаточно GP';
+  static const notEnoughGp = 'Не хватает GP';
   static const floorOpenFailed = 'Не удалось открыть этаж';
 }

@@ -71,6 +71,13 @@ class CustomTextBox extends StatelessWidget {
       ),
       child: TextField(
         readOnly: readOnly,
+        // Важно: readOnly TextField по умолчанию всё ещё может получать фокус.
+        // В нашем приложении это приводило к редким device-specific кейсам,
+        // когда при переключении readOnly→editable (или при попытке сфокусировать поле)
+        // срабатывал неожиданный pop на маршруте уровня (/levels → /tower).
+        // Для readOnly-полей фокус запрещаем — они предназначены для просмотра,
+        // а интерактив (например, выбор даты) делается через отдельные кнопки.
+        canRequestFocus: !readOnly,
         controller: controller,
         obscureText: obscureText,
         keyboardType: keyboardType,

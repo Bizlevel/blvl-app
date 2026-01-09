@@ -6,7 +6,7 @@ const int _kFloorUnlockCost = 1000;
 const int _kTargetFloorNumber = 1;
 
 Future<void> _unlockFloor(BuildContext context,
-    {required int floorNumber}) async {
+    {required int floorNumber, int? priceGp}) async {
   try {
     final gp = GpService(Supabase.instance.client);
     final userId = Supabase.instance.client.auth.currentUser?.id ?? 'anon';
@@ -36,11 +36,37 @@ Future<void> _unlockFloor(BuildContext context,
   } on GpFailure catch (e) {
     if (!context.mounted) return;
     if (e.message.contains('Недостаточно GP')) {
-      NotificationCenter.showWarn(
-        context,
-        UIS.notEnoughGp,
-        onAction: () => context.push('/gp-store'),
-        actionLabel: 'Купить GP',
+      // Важно: показываем диалог и навигацию через "outer" context (экран башни),
+      // а не контекст модалки покупки. Иначе после pop() контекст становится unmounted
+      // и UX выглядит как "ничего не произошло".
+      final cached = GpService.readBalanceCache();
+      final balance = cached?['balance'] ?? 0;
+      final price = priceGp ?? _kFloorUnlockCost;
+      final missing = (price - balance);
+      final String content = (missing > 0)
+          ? 'Сейчас не хватает $missing GP, чтобы открыть этаж и продолжить обучение.\n\n'
+              'Пополните баланс — и доступ откроется сразу.'
+          : 'Сейчас не хватает GP, чтобы открыть этаж и продолжить обучение.\n\n'
+              'Пополните баланс — и доступ откроется сразу.';
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(UIS.notEnoughGp),
+          content: Text(content),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Позже'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                if (context.mounted) context.push('/gp-store');
+              },
+              child: const Text('Пополнить GP'),
+            ),
+          ],
+        ),
       );
       try {
         await NotificationLogService.instance.record(
@@ -75,8 +101,12 @@ Future<void> _unlockFloor(BuildContext context,
 }
 
 void _showUnlockFloorDialog(BuildContext context, {required int floorNumber}) {
+  // Важно: в BizLevelModal нажатие сначала закрывает dialog (pop), и только потом вызывает callback.
+  // Поэтому здесь сохраняем внешний context (экран башни), чтобы последующие баннеры/диалоги/навигация
+  // работали корректно.
+  final outerContext = context;
   showDialog(
-    context: context,
+    context: outerContext,
     builder: (ctx) {
       return FutureBuilder<int>(
         future: GpService(Supabase.instance.client)
@@ -89,7 +119,8 @@ void _showUnlockFloorDialog(BuildContext context, {required int floorNumber}) {
             primaryLabel: '$price GP',
             icon: Icons.lock_open,
             onPrimary: () async {
-              await _unlockFloor(context, floorNumber: floorNumber);
+              await _unlockFloor(outerContext,
+                  floorNumber: floorNumber, priceGp: price);
             },
           );
         },
