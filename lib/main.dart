@@ -96,6 +96,7 @@ final appBootstrapProvider = FutureProvider<void>((ref) async {
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   _startupLog('main.ensure_initialized');
+  
 
   // Чистые URL без # — только для Web
   if (kIsWeb) {
