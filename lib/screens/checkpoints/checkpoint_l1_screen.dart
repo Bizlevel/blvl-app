@@ -82,7 +82,10 @@ class _CheckpointL1ScreenState extends ConsumerState<CheckpointL1Screen> {
       ref.invalidate(userGoalProvider);
       if (!mounted) return;
       NotificationCenter.showSuccess(context, 'Цель сохранена');
-      GoRouter.of(context).push('/goal');
+      // Возвращаемся назад вместо перехода на /goal (который недоступен до завершения уровня)
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop(true); // Возвращаем true как признак успешного сохранения
+      }
     } catch (e) {
       if (!mounted) return;
       NotificationCenter.showError(context, 'Ошибка: $e');
@@ -99,7 +102,11 @@ class _CheckpointL1ScreenState extends ConsumerState<CheckpointL1Screen> {
   Widget build(BuildContext context) {
     final bool canSave = _goalTextCtrl.text.trim().isNotEmpty;
     return Scaffold(
-      appBar: AppBar(title: const Text('Чекпоинт: Первая цель')),
+      appBar: AppBar(
+        title: const Text('Чекпоинт: Первая цель'),
+      ),
+      // ВАЖНО: resizeToAvoidBottomInset: true, чтобы Flutter поднимал контент при появлении клавиатуры
+      resizeToAvoidBottomInset: true,
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(AppSpacing.lg),
         child: BizLevelCard(
