@@ -27,6 +27,7 @@ import 'package:bizlevel/widgets/level/blocks/artifact_block.dart';
 import 'package:bizlevel/widgets/level/blocks/profile_form_block.dart';
 import 'package:bizlevel/screens/ray_dialog_screen.dart';
 import 'package:bizlevel/utils/custom_modal_route.dart';
+import 'package:bizlevel/providers/goals_providers.dart';
 
 /// Shows a level as full-screen blocks (Intro → Lesson → Quiz → …).
 class LevelDetailScreen extends ConsumerStatefulWidget {
@@ -74,6 +75,27 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
     _pageController.addListener(() {
       if (mounted) setState(() {});
     });
+    
+    // Для уровня 1: проверка наличия цели будет выполнена в build через watch
+  }
+  
+  /// Проверяет наличие сохраненной цели v1 в БД и устанавливает флаг
+  Future<void> _checkGoalV1Saved() async {
+    try {
+      // Используем ref.read чтобы не создавать подписку, только одноразовая проверка
+      final goal = await ref.read(userGoalProvider.future);
+      if (goal != null) {
+        final goalText = (goal['goal_text'] as String? ?? '').trim();
+        // Если цель сохранена (непустой goal_text), считаем что v1 сохранена
+        if (goalText.isNotEmpty && mounted) {
+          setState(() {
+            _goalV1Saved = true;
+          });
+        }
+      }
+    } catch (_) {
+      // Игнорируем ошибки при проверке - не критично
+    }
   }
 
   Widget _buildMainColumn(BuildContext context, List<LessonModel> lessons,
@@ -203,6 +225,22 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
               onPressed: _isLevelCompleted(lessons)
                   ? () async {
                       try {
+                        // Для уровня 1: дополнительная проверка наличия цели в БД перед завершением
+                        if ((widget.levelNumber ?? -1) == 1 && !_goalV1Saved) {
+                          await _checkGoalV1Saved();
+                          // Если после проверки цель все еще не найдена, не завершаем уровень
+                          if (!_goalV1Saved) {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Сначала сохраните цель в чекпоинте L1'),
+                                ),
+                              );
+                            }
+                            return;
+                          }
+                        }
+                        
                         try {
                           sentry.Sentry.addBreadcrumb(sentry.Breadcrumb(
                             category: 'level',
@@ -413,6 +451,29 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
                   : false;
               _profileInitialized = true;
             }
+          }
+          
+          // Для уровня 1: отслеживаем изменения цели и обновляем флаг
+          if ((widget.levelNumber ?? -1) == 1) {
+            final goalAsync = ref.watch(userGoalProvider);
+            goalAsync.when(
+              data: (goal) {
+                if (goal != null) {
+                  final goalText = (goal['goal_text'] as String? ?? '').trim();
+                  if (goalText.isNotEmpty && !_goalV1Saved && mounted) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted) {
+                        setState(() {
+                          _goalV1Saved = true;
+                        });
+                      }
+                    });
+                  }
+                }
+              },
+              loading: () {},
+              error: (_, __) {},
+            );
           }
 
           final mainContent =

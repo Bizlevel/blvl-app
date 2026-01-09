@@ -5,6 +5,7 @@ import 'package:bizlevel/widgets/common/bizlevel_card.dart';
 import 'package:go_router/go_router.dart';
 import 'package:bizlevel/widgets/common/bizlevel_button.dart';
 import 'package:bizlevel/widgets/level/blocks/level_page_block.dart';
+import 'package:bizlevel/providers/goals_providers.dart';
 
 class GoalV1Block extends LevelPageBlock {
   final VoidCallback onSaved;
@@ -16,23 +17,16 @@ class GoalV1Block extends LevelPageBlock {
     final TextEditingController mainObstacleCtrl = TextEditingController();
 
     return Consumer(builder: (context, ref, _) {
-      const versionsAsync =
-          AsyncValue<List<Map<String, dynamic>>>.data(<Map<String, dynamic>>[]);
-      return versionsAsync.when(
+      // Проверяем наличие сохраненной цели через userGoalProvider
+      final goalAsync = ref.watch(userGoalProvider);
+      
+      return goalAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, __) => Center(child: Text('Ошибка загрузки цели: $e')),
-        data: (all) {
-          final byVersion = {
-            for (final m in all)
-              m['version'] as int: Map<String, dynamic>.from(m)
-          };
-          final v1 = byVersion[1]?['version_data'];
-          if (v1 is Map) {
-            final data = Map<String, dynamic>.from(v1);
-            goalInitialCtrl.text = (data['goal_initial'] ?? '') as String;
-            goalWhyCtrl.text = (data['goal_why'] ?? '') as String;
-            mainObstacleCtrl.text = (data['main_obstacle'] ?? '') as String;
-          }
+        data: (goal) {
+          // Проверяем, есть ли сохраненная цель
+          final bool hasGoal = goal != null && 
+              (goal['goal_text'] as String? ?? '').trim().isNotEmpty;
 
           return SingleChildScrollView(
             padding:
@@ -59,13 +53,40 @@ class GoalV1Block extends LevelPageBlock {
                       SizedBox(
                         width: double.infinity,
                         child: BizLevelButton(
-                          label: 'Открыть страницу «Цель»',
-                          onPressed: () {
-                            GoRouter.of(context).push('/goal');
-                            onSaved();
+                          label: hasGoal ? 'Цель сохранена ✓' : 'Сохранить цель',
+                          onPressed: () async {
+                            // Используем /checkpoint/l1 для сохранения цели во время прохождения Уровня 1
+                            // (так как /goal недоступен до завершения уровня из-за гейтинга)
+                            final result = await GoRouter.of(context).push('/checkpoint/l1');
+                            // После возврата проверяем, была ли сохранена цель
+                            // result будет true если цель была сохранена, или проверяем БД
+                            // Инвалидируем провайдер для обновления данных
+                            ref.invalidate(userGoalProvider);
+                            // Проверяем цель снова после обновления
+                            try {
+                              final updatedGoal = await ref.read(userGoalProvider.future);
+                              if (updatedGoal != null) {
+                                final goalText = (updatedGoal['goal_text'] as String? ?? '').trim();
+                                if (goalText.isNotEmpty) {
+                                  onSaved();
+                                }
+                              }
+                            } catch (_) {
+                              // Игнорируем ошибки при проверке
+                            }
                           },
                         ),
                       ),
+                      if (hasGoal)
+                        Padding(
+                          padding: const EdgeInsets.only(top: AppSpacing.sm),
+                          child: Text(
+                            'Цель сохранена. Вы можете завершить уровень.',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                          ),
+                        ),
                       AppSpacing.gapH(AppSpacing.md),
                       const Divider(height: AppSpacing.xl),
                       Text(
