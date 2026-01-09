@@ -51,7 +51,7 @@ Future<void> _unlockFloor(BuildContext context,
       await showDialog<void>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: Text(UIS.notEnoughGp),
+          title: const Text(UIS.notEnoughGp),
           content: Text(content),
           actions: [
             TextButton(

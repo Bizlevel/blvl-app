@@ -391,8 +391,6 @@ class NotificationsService {
       importance: Importance.high,
       priority: Priority.high,
       icon: 'ic_stat_ic_notification',
-      playSound: true,
-      enableVibration: true,
       sound: soundUri != null ? UriAndroidNotificationSound(soundUri) : null,
     );
     final details = NotificationDetails(android: android);
@@ -458,8 +456,6 @@ class NotificationsService {
             'Напоминания по целям',
             description: 'План недели, середина недели и чекин',
             importance: Importance.high,
-            playSound: true,
-            enableVibration: true,
           ));
         }
       } else {
@@ -469,8 +465,6 @@ class NotificationsService {
           'Напоминания по целям',
           description: 'План недели, середина недели и чекин',
           importance: Importance.high,
-          playSound: true,
-          enableVibration: true,
         ));
       }
       await android.createNotificationChannel(const AndroidNotificationChannel(
@@ -573,8 +567,6 @@ class NotificationsService {
       importance: Importance.high,
       priority: Priority.high,
       icon: 'ic_stat_ic_notification',
-      playSound: true,
-      enableVibration: true,
       sound: soundUri != null ? UriAndroidNotificationSound(soundUri) : null,
     );
     const DarwinNotificationDetails ios = DarwinNotificationDetails(
