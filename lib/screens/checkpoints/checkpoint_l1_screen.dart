@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:bizlevel/providers/goals_repository_provider.dart';
 import 'package:bizlevel/providers/goals_providers.dart';
-import 'package:go_router/go_router.dart';
 import 'package:bizlevel/utils/date_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bizlevel/models/goal_update.dart';
@@ -10,7 +9,6 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:bizlevel/widgets/common/bizlevel_button.dart';
 import 'package:bizlevel/widgets/common/bizlevel_card.dart';
 import 'package:bizlevel/widgets/common/notification_center.dart';
-import 'package:bizlevel/widgets/common/bizlevel_text_field.dart';
 import 'package:bizlevel/theme/spacing.dart';
 
 class CheckpointL1Screen extends ConsumerStatefulWidget {
@@ -22,6 +20,7 @@ class CheckpointL1Screen extends ConsumerStatefulWidget {
 
 class _CheckpointL1ScreenState extends ConsumerState<CheckpointL1Screen> {
   final TextEditingController _goalTextCtrl = TextEditingController();
+  final FocusNode _goalFocusNode = FocusNode();
   DateTime? _deadline;
   final TextEditingController _metricCurrentCtrl = TextEditingController();
   final TextEditingController _metricTargetCtrl = TextEditingController();
@@ -37,6 +36,7 @@ class _CheckpointL1ScreenState extends ConsumerState<CheckpointL1Screen> {
   @override
   void dispose() {
     _goalTextCtrl.dispose();
+    _goalFocusNode.dispose();
     _metricCurrentCtrl.dispose();
     _metricTargetCtrl.dispose();
     super.dispose();
@@ -144,11 +144,16 @@ class _CheckpointL1ScreenState extends ConsumerState<CheckpointL1Screen> {
                       .titleMedium
                       ?.copyWith(fontWeight: FontWeight.w600)),
               const SizedBox(height: AppSpacing.sm),
-              BizLevelTextField(
-                label: 'Цель',
-                hint:
-                    'Коротко и измеримо: например, 5 клиентов в неделю или ₸100 000 в день',
+              TextField(
                 controller: _goalTextCtrl,
+                focusNode: _goalFocusNode,
+                decoration: const InputDecoration(
+                  labelText: 'Цель',
+                  hintText:
+                      'Коротко и измеримо: например, 5 клиентов в неделю или ₸100 000 в день',
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 2,
               ),
               const SizedBox(height: AppSpacing.lg),
               Text('Шаг 2: Укажите метрики',
@@ -157,20 +162,26 @@ class _CheckpointL1ScreenState extends ConsumerState<CheckpointL1Screen> {
               Row(
                 children: [
                   Expanded(
-                    child: BizLevelTextField(
-                      label: 'Текущая',
-                      hint: 'например, 1',
+                    child: TextField(
                       controller: _metricCurrentCtrl,
                       keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Текущая',
+                        hintText: 'например, 1',
+                        border: OutlineInputBorder(),
+                      ),
                     ),
                   ),
                   const SizedBox(width: AppSpacing.md),
                   Expanded(
-                    child: BizLevelTextField(
-                      label: 'Цель',
-                      hint: 'например, 5',
+                    child: TextField(
                       controller: _metricTargetCtrl,
                       keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Цель',
+                        hintText: 'например, 5',
+                        border: OutlineInputBorder(),
+                      ),
                     ),
                   ),
                 ],

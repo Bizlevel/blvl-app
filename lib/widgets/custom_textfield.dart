@@ -11,6 +11,8 @@ class CustomTextBox extends StatelessWidget {
     this.prefix,
     this.suffix,
     this.controller,
+    this.focusNode,
+    this.autofocus = false,
     this.readOnly = false,
     this.obscureText = false,
     this.keyboardType,
@@ -32,6 +34,8 @@ class CustomTextBox extends StatelessWidget {
   final bool readOnly;
   final bool obscureText;
   final TextEditingController? controller;
+  final FocusNode? focusNode;
+  final bool autofocus;
   final TextInputType? keyboardType;
   final bool readOnlySoftBackground;
   final int maxLines;
@@ -79,6 +83,8 @@ class CustomTextBox extends StatelessWidget {
         // а интерактив (например, выбор даты) делается через отдельные кнопки.
         canRequestFocus: !readOnly,
         controller: controller,
+        focusNode: focusNode,
+        autofocus: autofocus && !readOnly,
         obscureText: obscureText,
         keyboardType: keyboardType,
         maxLines: maxLines,

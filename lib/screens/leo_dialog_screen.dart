@@ -805,7 +805,6 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
                         hintText: 'Введите сообщение...',
                         border: OutlineInputBorder(),
                       ),
-                      onTap: () {},
                       onTapOutside: (_) {
                         FocusScope.of(context).unfocus();
                       },

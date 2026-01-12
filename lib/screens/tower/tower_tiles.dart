@@ -151,10 +151,25 @@ void _handleCheckpointTap(BuildContext context, Map<String, dynamic> node) {
     } else if (type == 'goal_checkpoint') {
       if (!context.mounted) return;
       final int after = node.afterLevel;
-      final String route = after == 1
-          ? '/checkpoint/l1'
-          : (after == 4 ? '/checkpoint/l4' : '/checkpoint/l7');
-      context.push(route);
+      
+      // ВАЖНО: используем showModalBottomSheet вместо context.push для чекпоинтов,
+      // чтобы избежать проблем с клавиатурой (GoRouter закрывает клавиатуру при навигации)
+      Widget checkpointScreen;
+      if (after == 1) {
+        checkpointScreen = const CheckpointL1Screen();
+      } else if (after == 4) {
+        checkpointScreen = const CheckpointL4Screen();
+      } else {
+        checkpointScreen = const CheckpointL7Screen();
+      }
+      
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        showDragHandle: false,
+        builder: (ctx) => checkpointScreen,
+      );
     }
   } catch (e, st) {
     _captureError(e, st);
