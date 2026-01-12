@@ -39,7 +39,17 @@ final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
   // Сначала сортируем по номеру на случай, если order потерян
   rows.sort((a, b) => (a['number'] as int).compareTo(b['number'] as int));
 
-  bool previousCompleted = false;
+  // Собираем информацию о завершенности всех уровней из user_progress
+  // Ключ: номер уровня, значение: завершен ли уровень (только из user_progress.is_completed)
+  final Map<int, bool> levelCompletionStatus = {};
+  for (final json in rows) {
+    final levelNumber = (json['number'] as int? ?? -1);
+    final progressArr = json['user_progress'] as List?;
+    final bool isCompleted = progressArr != null && progressArr.isNotEmpty
+        ? (progressArr.first['is_completed'] as bool? ?? false)
+        : false;
+    levelCompletionStatus[levelNumber] = isCompleted;
+  }
 
   int floorForLevelJson(Map<String, dynamic> json, LevelModel level) {
     // При активном флаге используем floor_number из API, иначе считаем, что все уровни на этаже 1
@@ -57,15 +67,38 @@ final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
     return false;
   }
 
+  // Проверяет, завершены ли все предыдущие уровни (с меньшим номером)
+  bool areAllPreviousLevelsCompleted(int currentLevelNumber) {
+    if (currentLevelNumber <= 0) return true; // Уровень 0 всегда доступен
+    
+    // Проверяем все уровни с номером меньше текущего
+    for (int i = 0; i < currentLevelNumber; i++) {
+      // Если уровень существует в данных, проверяем его статус
+      if (levelCompletionStatus.containsKey(i)) {
+        if (levelCompletionStatus[i] != true) {
+          return false; // Найден незавершенный предыдущий уровень
+        }
+      } else {
+        // Если уровня нет в данных, считаем его незавершенным
+        return false;
+      }
+    }
+    return true; // Все предыдущие уровни завершены
+  }
+
   return rows.map((json) {
     final level = LevelModel.fromJson(json);
     final floor = floorForLevelJson(json, level);
 
     // Определяем, завершён ли текущий уровень пользователем
+    // Используем только user_progress.is_completed, без учёта current_level
     final progressArr = json['user_progress'] as List?;
     final bool isCompleted = progressArr != null && progressArr.isNotEmpty
         ? (progressArr.first['is_completed'] as bool? ?? false)
         : false;
+
+    // Проверяем, завершены ли все предыдущие уровни
+    final bool previousCompleted = areAllPreviousLevelsCompleted(level.number);
 
     // Доступность уровня
     bool isAccessible;
@@ -78,11 +111,6 @@ final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
           isFreeOnFloor(floor, level.number) || unlockedFloors.contains(floor);
       isAccessible = hasAccess && previousCompleted;
     }
-
-    // Обновляем previousCompleted для следующего уровня:
-    // - уровень считается «пройденным» если user_progress.is_completed = true
-    // - или если текущий уровень пользователя больше номера этого уровня
-    previousCompleted = isCompleted || (userCurrentLevelNumber > level.number);
 
     final bool isLocked = !isAccessible;
 
@@ -310,17 +338,30 @@ final towerNodesProvider =
 
     // Добавляем goal_checkpoint после 1, 4, 7
     if (num == 1 || num == 4 || num == 7) {
+      // Сначала проверяем, завершен ли уровень
+      final bool levelCompleted = (l['isCompleted'] as bool? ?? false);
+      
       bool completed = false;
       if (num == 1) {
-        completed =
+        // Чекпоинт L1 считается завершенным только если:
+        // 1. Уровень 1 завершен
+        // 2. И есть goal_text в user_goal
+        final hasGoalText =
             ((userGoal?['goal_text'] ?? '').toString().trim().isNotEmpty);
+        completed = levelCompleted && hasGoalText;
       } else if (num == 4) {
+        // Чекпоинт L4 считается завершенным только если:
+        // 1. Уровень 4 завершен
+        // 2. И есть metric_type и metric_target в user_goal
         final hasMetricType =
             ((userGoal?['metric_type'] ?? '').toString().trim().isNotEmpty);
         final hasMetricTarget = (userGoal?['metric_target'] != null);
-        completed = hasMetricType && hasMetricTarget;
+        completed = levelCompleted && hasMetricType && hasMetricTarget;
       } else if (num == 7) {
-        completed = hasAnyPractice;
+        // Чекпоинт L7 считается завершенным только если:
+        // 1. Уровень 7 завершен
+        // 2. И есть записи в practice_log
+        completed = levelCompleted && hasAnyPractice;
       }
 
       nodes.add({
