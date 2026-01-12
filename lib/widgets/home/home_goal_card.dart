@@ -13,6 +13,7 @@ import 'package:bizlevel/widgets/common/donut_progress.dart';
 import 'package:intl/intl.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:bizlevel/utils/max_context_helper.dart';
+import 'package:bizlevel/utils/custom_modal_route.dart';
 
 class HomeGoalCard extends ConsumerWidget {
   const HomeGoalCard({super.key});
@@ -158,14 +159,101 @@ class HomeGoalCard extends ConsumerWidget {
                                   ),
                                 );
                               } catch (_) {}
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => LeoDialogScreen(
-                                    bot: 'max',
-                                    userContext: buildMaxUserContext(
-                                      goal: goal,
+                              
+                              // ВАЖНО: Получаем ProviderContainer из текущего контекста,
+                              // чтобы передать его в UncontrolledProviderScope для диалога
+                              // Это гарантирует, что провайдеры будут доступны даже если родитель умрет
+                              final container = ProviderScope.containerOf(context);
+                              
+                              Navigator.of(context, rootNavigator: true).push(
+                                CustomModalBottomSheetRoute(
+                                  child: UncontrolledProviderScope(
+                                    container: container,
+                                    child: Scaffold(
+                                      backgroundColor: Colors.transparent,
+                                      resizeToAvoidBottomInset: true,
+                                      body: Stack(
+                                        children: [
+                                          Positioned.fill(
+                                            child: GestureDetector(
+                                              behavior: HitTestBehavior.opaque,
+                                              onTap: () {
+                                                Navigator.of(context, rootNavigator: true).pop();
+                                              },
+                                              child: Container(color: Colors.transparent),
+                                            ),
+                                          ),
+                                          Align(
+                                            alignment: Alignment.bottomCenter,
+                                            child: Material(
+                                              color: Colors.transparent,
+                                              child: ConstrainedBox(
+                                                constraints: BoxConstraints(
+                                                  maxHeight: MediaQuery.of(context).size.height * 0.9,
+                                                ),
+                                                child: Container(
+                                                  decoration: const BoxDecoration(
+                                                    color: AppColor.surface,
+                                                    borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                                                  ),
+                                                  clipBehavior: Clip.hardEdge,
+                                                  child: Column(
+                                                    children: [
+                                                      Container(
+                                                        color: AppColor.primary,
+                                                        child: SafeArea(
+                                                          bottom: false,
+                                                          child: AppBar(
+                                                            backgroundColor: AppColor.primary,
+                                                            automaticallyImplyLeading: false,
+                                                            leading: Builder(
+                                                              builder: (context) => IconButton(
+                                                                tooltip: 'Закрыть',
+                                                                icon: const Icon(Icons.close),
+                                                                onPressed: () {
+                                                                  FocusManager.instance.primaryFocus?.unfocus();
+                                                                  Future.microtask(() {
+                                                                    final navigator = Navigator.of(context, rootNavigator: true);
+                                                                    if (navigator.canPop()) {
+                                                                      navigator.pop();
+                                                                    }
+                                                                  });
+                                                                },
+                                                              ),
+                                                            ),
+                                                            title: Row(
+                                                              children: [
+                                                                CircleAvatar(
+                                                                  radius: 14,
+                                                                  backgroundImage: const AssetImage('assets/images/avatars/avatar_max.png'),
+                                                                  backgroundColor: Colors.transparent,
+                                                                ),
+                                                                const SizedBox(width: 8),
+                                                                const Text('Макс'),
+                                                              ],
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      Expanded(
+                                                        child: LeoDialogScreen(
+                                                          bot: 'max',
+                                                          userContext: buildMaxUserContext(
+                                                            goal: goal,
+                                                          ),
+                                                          levelContext: '',
+                                                          embedded: true,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
-                                    levelContext: '',
                                   ),
                                 ),
                               );

@@ -12,6 +12,8 @@ class BizLevelTextField extends StatelessWidget {
     this.prefix,
     this.suffix,
     this.controller,
+    this.focusNode,
+    this.autofocus = false,
     this.readOnly = false,
     this.obscureText = false,
     this.keyboardType,
@@ -25,6 +27,8 @@ class BizLevelTextField extends StatelessWidget {
   final Widget? prefix;
   final Widget? suffix;
   final TextEditingController? controller;
+  final FocusNode? focusNode;
+  final bool autofocus;
   final bool readOnly;
   final bool obscureText;
   final TextInputType? keyboardType;
@@ -52,6 +56,8 @@ class BizLevelTextField extends StatelessWidget {
         prefix: prefix,
         suffix: suffix,
         controller: controller,
+        focusNode: focusNode,
+        autofocus: autofocus,
         readOnly: readOnly,
         obscureText: obscureText,
         keyboardType: keyboardType,
