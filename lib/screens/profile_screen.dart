@@ -354,6 +354,24 @@ class _Body extends ConsumerStatefulWidget {
 
 class _BodyState extends ConsumerState<_Body> {
   Uint8List? _avatarPreviewBytes;
+  int? _localAvatarId; // Локальное состояние для аватара
+
+  @override
+  void initState() {
+    super.initState();
+    // Инициализируем локальное состояние значением из widget
+    _localAvatarId = widget.avatarId;
+  }
+
+  @override
+  void didUpdateWidget(_Body oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Обновляем локальное состояние, если widget.avatarId изменился извне
+    // (например, при обновлении провайдера из другого места)
+    if (widget.avatarId != oldWidget.avatarId && _localAvatarId == oldWidget.avatarId) {
+      _localAvatarId = widget.avatarId;
+    }
+  }
 
   Future<void> _pickAvatarFromGallery() async {
     if (!mounted) return;
@@ -479,8 +497,19 @@ class _BodyState extends ConsumerState<_Body> {
     if (selectedId != null && selectedId != widget.avatarId) {
       // Обновляем аватар в Supabase
       await ref.read(authServiceProvider).updateAvatar(selectedId);
-      // Инвалидируем профиль
-      ref.invalidate(currentUserProvider);
+      // Обновляем локальное состояние сразу для мгновенного отображения
+      setState(() {
+        _localAvatarId = selectedId;
+      });
+      // Обновляем провайдер после завершения текущего фрейма, чтобы избежать редиректа
+      // во время закрытия модального окна. Используем addPostFrameCallback для гарантии,
+      // что обновление произойдет после завершения навигации.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          // Используем refresh вместо invalidate для более мягкого обновления
+          ref.refresh(currentUserProvider);
+        }
+      });
     }
   }
 
@@ -540,8 +569,10 @@ class _BodyState extends ConsumerState<_Body> {
   }
 
   Widget _buildProfile() {
-    final String localAsset = widget.avatarId != null
-        ? 'assets/images/avatars/avatar_${widget.avatarId}.png'
+    // Используем локальное состояние, если оно есть, иначе widget.avatarId
+    final int? effectiveAvatarId = _localAvatarId ?? widget.avatarId;
+    final String localAsset = effectiveAvatarId != null
+        ? 'assets/images/avatars/avatar_$effectiveAvatarId.png'
         : '';
 
     final Widget avatarImage = _avatarPreviewBytes != null
@@ -846,7 +877,8 @@ class _AboutMeCardState extends ConsumerState<_AboutMeCard> {
           );
         }
       } catch (_) {}
-      ref.invalidate(currentUserProvider);
+      // Обновляем профиль без полной инвалидации, чтобы избежать редиректа
+      ref.refresh(currentUserProvider);
       setState(() => _editing = false);
     } catch (e) {
       if (!mounted) return;
