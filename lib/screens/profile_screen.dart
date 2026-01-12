@@ -501,15 +501,9 @@ class _BodyState extends ConsumerState<_Body> {
       setState(() {
         _localAvatarId = selectedId;
       });
-      // Обновляем провайдер после завершения текущего фрейма, чтобы избежать редиректа
-      // во время закрытия модального окна. Используем addPostFrameCallback для гарантии,
-      // что обновление произойдет после завершения навигации.
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          // Используем refresh вместо invalidate для более мягкого обновления
-          ref.refresh(currentUserProvider);
-        }
-      });
+      // НЕ обновляем провайдер здесь - это вызывает редирект на главную
+      // Провайдер обновится автоматически при следующем обращении или через authStateProvider
+      // Локальное состояние (_localAvatarId) уже обновлено, поэтому UI отображает правильный аватар
     }
   }
 
