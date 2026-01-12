@@ -136,7 +136,9 @@ class AuthService {
 
   /// Updates profile fields in `users` table for the current user.
   /// All parameters are optional for partial updates.
-  Future<void> updateProfile({
+  /// Returns true if profile completion bonus was granted for the first time,
+  /// false if it was already granted, null if profile is not fully completed.
+  Future<bool?> updateProfile({
     String? name,
     String? about,
     String? goal,
@@ -161,7 +163,7 @@ class AuthService {
       throw AuthFailure('Подтвердите e-mail, прежде чем продолжить');
     }
 
-    await _handleAuthCall(() async {
+    return await _handleAuthCall(() async {
       // Формируем payload динамически, добавляя только переданные поля
       // Для избегания 23502 (NOT NULL name) используем UPDATE по id вместо UPSERT.
       final Map<String, dynamic> payload = {
@@ -205,15 +207,47 @@ class AuthService {
             ((row['about'] as String?)?.trim().isNotEmpty ?? false);
         final hasAvatar = (row['avatar_id'] as int?) != null;
         if (hasName && hasGoal && hasAbout && hasAvatar) {
+          // Проверяем, был ли бонус уже выдан ДО вызова claimBonus
+          Map<String, dynamic>? before;
+          if (user.id.isNotEmpty) {
+            before = await _client
+                .from('gp_bonus_grants')
+                .select('rule_key')
+                .eq('user_id', user.id)
+                .eq('rule_key', 'profile_completed')
+                .maybeSingle();
+          }
+
           final gp = GpService(_client);
           await gp.claimBonus(ruleKey: 'profile_completed');
+
+          // Небольшая задержка для обеспечения консистентности БД после RPC
+          await Future.delayed(const Duration(milliseconds: 200));
+
+          // Проверяем, был ли бонус выдан ПОСЛЕ вызова
+          // Используем .select() без кеширования для получения свежих данных
+          Map<String, dynamic>? after;
+          if (user.id.isNotEmpty) {
+            after = await _client
+                .from('gp_bonus_grants')
+                .select('rule_key')
+                .eq('user_id', user.id)
+                .eq('rule_key', 'profile_completed')
+                .maybeSingle();
+          }
+
+          // Бонус был выдан впервые, если до вызова записи не было, а после - есть
+          final newlyGranted = before == null && after != null;
+
           try {
             final fresh = await gp.getBalance();
             await GpService.saveBalanceCache(fresh);
           } catch (_) {}
-          // Показать уведомление о бонусе профиля (UI ответственность — экран профиля)
+
+          return newlyGranted;
         }
       } catch (_) {}
+      return null; // Профиль не заполнен полностью
     }, unknownErrorMessage: 'Не удалось сохранить профиль');
   }
 
