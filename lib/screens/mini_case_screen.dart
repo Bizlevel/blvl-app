@@ -626,6 +626,50 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
         // Sentry не настроен, игнорируем
       }
       await ref.read(caseActionsProvider).skip(widget.caseId);
+
+      // Обновляем current_level пользователя после пропуска кейса (аналогично завершению)
+      try {
+        final after = _caseMeta?['after_level'] as int?;
+        if (after != null) {
+          // Находим level_id для следующего уровня (after + 1)
+          final nextLevelNumber = after + 1;
+          // Получаем level_id для следующего уровня
+          final levelId =
+              await SupabaseService.levelIdFromNumber(nextLevelNumber);
+          // Guard: повышаем уровень только если текущий уровень пользователя
+          // строго меньше целевого nextLevelNumber (число уровней уже пройденных + 1)
+          try {
+            final user = await ref.read(currentUserProvider.future);
+            final currNum = await SupabaseService.resolveCurrentLevelNumber(
+                user?.currentLevel);
+            if (levelId != null && currNum < nextLevelNumber) {
+              await SupabaseService.completeLevel(levelId);
+            }
+          } catch (_) {}
+        }
+      } catch (_) {
+        // Игнорируем ошибки обновления уровня
+      }
+
+      // СНАЧАЛА обновляем данные башни и уровней, ПОТОМ переходим
+      try {
+        // ignore: unused_result
+        ref.invalidate(towerNodesProvider);
+        // ignore: unused_result
+        ref.invalidate(levelsProvider);
+        // ignore: unused_result
+        ref.invalidate(nextLevelToContinueProvider);
+        // ignore: unused_result
+        ref.invalidate(currentUserProvider);
+        // ignore: unused_result
+        ref.invalidate(userSkillsProvider);
+        // ignore: unused_result
+        ref.invalidate(caseStatusProvider(widget.caseId));
+      } catch (_) {}
+
+      // Небольшая задержка для обновления UI
+      await Future.delayed(const Duration(milliseconds: 100));
+
       final after = _caseMeta?['after_level'] as int?;
       final target = after != null ? after + 1 : null;
       if (!mounted) return;
