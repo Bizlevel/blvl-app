@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:bizlevel/providers/goals_providers.dart';
+import 'package:bizlevel/providers/goals_repository_provider.dart';
+import 'package:bizlevel/providers/levels_provider.dart';
+import 'package:bizlevel/models/goal_update.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:bizlevel/screens/leo_dialog_screen.dart';
 import 'package:go_router/go_router.dart';
@@ -9,6 +12,7 @@ import 'package:bizlevel/widgets/common/bizlevel_button.dart';
 import 'package:bizlevel/theme/spacing.dart';
 import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/theme/dimensions.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class CheckpointL4Screen extends ConsumerStatefulWidget {
   const CheckpointL4Screen({super.key});
@@ -18,6 +22,7 @@ class CheckpointL4Screen extends ConsumerStatefulWidget {
 }
 
 class _CheckpointL4ScreenState extends ConsumerState<CheckpointL4Screen> {
+  String? _lastUserMessage;
   String _buildGoalLine(Map<String, dynamic>? goal) {
     final String goalText = (goal?['goal_text'] ?? '').toString().trim();
     final String tdStr = (goal?['target_date'] ?? '').toString();
@@ -140,6 +145,12 @@ class _CheckpointL4ScreenState extends ConsumerState<CheckpointL4Screen> {
                                 ));
                               } catch (_) {}
                             },
+                            onUserMessage: (msg) {
+                              // Сохраняем последнее сообщение пользователя для сохранения в financial_focus
+                              setState(() {
+                                _lastUserMessage = msg.trim();
+                              });
+                            },
                           ),
                         ),
                       ],
@@ -160,8 +171,49 @@ class _CheckpointL4ScreenState extends ConsumerState<CheckpointL4Screen> {
                           level: SentryLevel.info,
                         ));
                       } catch (_) {}
+
+                      // Сохраняем financial_focus в user_goal
+                      try {
+                        final userId =
+                            Supabase.instance.client.auth.currentUser?.id;
+                        if (userId != null && goal != null) {
+                          final repo = ref.read(goalsRepositoryProvider);
+                          final goalText =
+                              (goal['goal_text'] ?? '').toString().trim();
+                          // Используем последнее сообщение пользователя или дефолтное значение
+                          final financialFocus = _lastUserMessage?.trim() ??
+                              'Чекпоинт L4 пройден';
+                          await repo.upsertUserGoalRequest(GoalUpsertRequest(
+                            userId: userId,
+                            goalText: goalText.isNotEmpty
+                                ? goalText
+                                : 'Цель не задана',
+                            financialFocus: financialFocus,
+                          ));
+                          // Обновляем провайдеры для обновления UI
+                          try {
+                            await Future.wait([
+                              ref.refresh(userGoalProvider.future),
+                              ref.refresh(towerNodesProvider.future),
+                              ref.refresh(goalStateProvider.future),
+                            ]);
+                          } catch (e) {
+                            // Fallback на invalidate
+                            ref.invalidate(userGoalProvider);
+                            ref.invalidate(towerNodesProvider);
+                            ref.invalidate(goalStateProvider);
+                          }
+                          // Небольшая задержка для обновления UI
+                          await Future.delayed(const Duration(milliseconds: 100));
+                        }
+                      } catch (e, st) {
+                        // Логируем только критические ошибки
+                        debugPrint('L4: Ошибка сохранения financial_focus: $e');
+                        // Продолжаем выполнение даже при ошибке сохранения
+                      }
+
                       if (!context.mounted) return;
-                      GoRouter.of(context).push('/tower');
+                      context.go('/tower');
                     },
                   ),
                 ),

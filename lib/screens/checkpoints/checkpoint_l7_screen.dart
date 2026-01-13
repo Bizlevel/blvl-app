@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:bizlevel/providers/goals_providers.dart';
+import 'package:bizlevel/providers/goals_repository_provider.dart';
+import 'package:bizlevel/providers/levels_provider.dart';
+import 'package:bizlevel/models/goal_update.dart';
 import 'package:bizlevel/screens/leo_dialog_screen.dart';
 import 'package:go_router/go_router.dart';
 import 'package:bizlevel/widgets/reminders_settings_sheet.dart';
@@ -10,9 +13,17 @@ import 'package:bizlevel/widgets/common/bizlevel_button.dart';
 import 'package:bizlevel/theme/spacing.dart';
 import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/theme/dimensions.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-class CheckpointL7Screen extends ConsumerWidget {
+class CheckpointL7Screen extends ConsumerStatefulWidget {
   const CheckpointL7Screen({super.key});
+
+  @override
+  ConsumerState<CheckpointL7Screen> createState() => _CheckpointL7ScreenState();
+}
+
+class _CheckpointL7ScreenState extends ConsumerState<CheckpointL7Screen> {
+  String? _lastUserMessage;
 
   String _pluralDays(int d) {
     if (d % 10 == 1 && d % 100 != 11) return 'день';
@@ -72,7 +83,7 @@ class CheckpointL7Screen extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final goalAsync = ref.watch(userGoalProvider);
     final practiceAsync = ref.watch(practiceLogProvider);
     return Scaffold(
@@ -121,6 +132,12 @@ class CheckpointL7Screen extends ConsumerWidget {
                             userContext: userCtx,
                             levelContext: '',
                             initialAssistantMessages: initialMsgs,
+                            onUserMessage: (msg) {
+                              // Сохраняем последнее сообщение пользователя для сохранения в action_plan_note
+                              setState(() {
+                                _lastUserMessage = msg.trim();
+                              });
+                            },
                           ),
                         ),
                       ],
@@ -142,15 +159,57 @@ class CheckpointL7Screen extends ConsumerWidget {
                       child: BizLevelButton(
                         variant: BizLevelButtonVariant.outline,
                         label: 'Завершить чекпоинт →',
-                        onPressed: () {
+                        onPressed: () async {
                           try {
-                            Sentry.addBreadcrumb(Breadcrumb(
+                            await Sentry.addBreadcrumb(Breadcrumb(
                               category: 'checkpoint',
                               message: 'l7_completed',
                               level: SentryLevel.info,
                             ));
                           } catch (_) {}
-                          GoRouter.of(context).push('/tower');
+
+                          // Сохраняем action_plan_note в user_goal
+                          try {
+                            final userId =
+                                Supabase.instance.client.auth.currentUser?.id;
+                            if (userId != null && goal != null) {
+                              final repo = ref.read(goalsRepositoryProvider);
+                              final goalText =
+                                  (goal['goal_text'] ?? '').toString().trim();
+                              // Используем последнее сообщение пользователя или дефолтное значение
+                              final actionPlanNote = _lastUserMessage?.trim() ??
+                                  'Чекпоинт L7 пройден';
+                              await repo.upsertUserGoalRequest(GoalUpsertRequest(
+                                userId: userId,
+                                goalText: goalText.isNotEmpty
+                                    ? goalText
+                                    : 'Цель не задана',
+                                actionPlanNote: actionPlanNote,
+                              ));
+                              // Обновляем провайдеры для обновления UI
+                              try {
+                                await Future.wait([
+                                  ref.refresh(userGoalProvider.future),
+                                  ref.refresh(towerNodesProvider.future),
+                                  ref.refresh(goalStateProvider.future),
+                                ]);
+                              } catch (e) {
+                                debugPrint('L7: Ошибка обновления провайдеров: $e');
+                                // Fallback на invalidate
+                                ref.invalidate(userGoalProvider);
+                                ref.invalidate(towerNodesProvider);
+                                ref.invalidate(goalStateProvider);
+                              }
+                              // Небольшая задержка для обновления UI
+                              await Future.delayed(const Duration(milliseconds: 100));
+                            }
+                          } catch (e) {
+                            debugPrint('Ошибка сохранения action_plan_note: $e');
+                            // Продолжаем выполнение даже при ошибке сохранения
+                          }
+
+                          if (!context.mounted) return;
+                          context.go('/tower');
                         },
                       ),
                     ),

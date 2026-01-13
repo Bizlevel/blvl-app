@@ -260,27 +260,17 @@ final towerNodesProvider =
     }
   }
 
-  // Лёгкие признаки для чекпоинтов цели (новая модель user_goal + practice_log)
+  // Лёгкие признаки для чекпоинтов цели (новая модель user_goal)
   final String uid = Supabase.instance.client.auth.currentUser?.id ?? '';
   Map<String, dynamic>? userGoal;
-  bool hasAnyPractice = false;
   if (uid.isNotEmpty) {
     try {
       userGoal = await supa
           .from('user_goal')
-          .select('goal_text, metric_type, metric_target')
+          .select('goal_text, financial_focus, action_plan_note')
           .eq('user_id', uid)
           .limit(1)
           .maybeSingle();
-    } catch (_) {}
-    try {
-      final List pr = await supa
-          .from('practice_log')
-          .select('id')
-          .eq('user_id', uid)
-          .order('applied_at', ascending: false)
-          .limit(1);
-      hasAnyPractice = pr.isNotEmpty;
     } catch (_) {}
   }
 
@@ -352,16 +342,17 @@ final towerNodesProvider =
       } else if (num == 4) {
         // Чекпоинт L4 считается завершенным только если:
         // 1. Уровень 4 завершен
-        // 2. И есть metric_type и metric_target в user_goal
-        final hasMetricType =
-            ((userGoal?['metric_type'] ?? '').toString().trim().isNotEmpty);
-        final hasMetricTarget = (userGoal?['metric_target'] != null);
-        completed = levelCompleted && hasMetricType && hasMetricTarget;
+        // 2. И есть financial_focus в user_goal
+        final hasFinancialFocus =
+            ((userGoal?['financial_focus'] ?? '').toString().trim().isNotEmpty);
+        completed = levelCompleted && hasFinancialFocus;
       } else if (num == 7) {
         // Чекпоинт L7 считается завершенным только если:
         // 1. Уровень 7 завершен
-        // 2. И есть записи в practice_log
-        completed = levelCompleted && hasAnyPractice;
+        // 2. И есть action_plan_note в user_goal
+        final hasActionPlanNote =
+            ((userGoal?['action_plan_note'] ?? '').toString().trim().isNotEmpty);
+        completed = levelCompleted && hasActionPlanNote;
       }
 
       nodes.add({

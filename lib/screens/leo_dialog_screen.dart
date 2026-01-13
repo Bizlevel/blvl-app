@@ -35,6 +35,8 @@ class LeoDialogScreen extends ConsumerStatefulWidget {
       embedded; // когда true — рендер без Scaffold/AppBar (встраиваемый вид)
   final ValueChanged<String>?
       onAssistantMessage; // колбэк для получения ответа ассистента
+  final ValueChanged<String>?
+      onUserMessage; // колбэк для получения сообщения пользователя
   final List<String>?
       recommendedChips; // опц. серверные подсказки (fallback на клиенте)
   final String?
@@ -58,6 +60,7 @@ class LeoDialogScreen extends ConsumerStatefulWidget {
     this.caseContexts,
     this.embedded = false,
     this.onAssistantMessage,
+    this.onUserMessage,
     this.recommendedChips,
     this.casePreface,
     this.finalStory,
@@ -337,6 +340,11 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
     });
     _inputController.clear();
     _scrollToBottom();
+
+    // Вызываем callback для сообщения пользователя
+    try {
+      widget.onUserMessage?.call(text);
+    } catch (_) {}
 
     try {
       // В режиме кейса не создаём чат
