@@ -501,9 +501,14 @@ class _BodyState extends ConsumerState<_Body> {
       setState(() {
         _localAvatarId = selectedId;
       });
-      // НЕ обновляем провайдер здесь - это вызывает редирект на главную
-      // Провайдер обновится автоматически при следующем обращении или через authStateProvider
-      // Локальное состояние (_localAvatarId) уже обновлено, поэтому UI отображает правильный аватар
+      // Обновляем провайдер с задержкой, чтобы избежать редиректа во время обновления
+      // Задержка 1.5 секунды дает время навигации завершиться, но провайдер все равно обновится
+      // для отображения нового аватара на других страницах
+      Future.delayed(const Duration(milliseconds: 1500), () {
+        if (mounted) {
+          ref.refresh(currentUserProvider);
+        }
+      });
     }
   }
 
@@ -831,7 +836,7 @@ class _AboutMeCardState extends ConsumerState<_AboutMeCard> {
 
   Future<void> _save() async {
     try {
-      await ref.read(authServiceProvider).updateProfile(
+      final bonusGranted = await ref.read(authServiceProvider).updateProfile(
             name: _nameCtrl.text.trim().isEmpty ? null : _nameCtrl.text.trim(),
             about:
                 _aboutCtrl.text.trim().isEmpty ? null : _aboutCtrl.text.trim(),
@@ -858,19 +863,12 @@ class _AboutMeCardState extends ConsumerState<_AboutMeCard> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Профиль обновлён')),
       );
-      // Подсказка о возможном бонусе за полный профиль (если все поля заполнены)
-      try {
-        final nameOk = _nameCtrl.text.trim().isNotEmpty;
-        final aboutOk = _aboutCtrl.text.trim().isNotEmpty;
-        final goalOk = _goalCtrl.text.trim().isNotEmpty;
-        final hasAvatar =
-            (ref.read(currentUserProvider).value?.avatarId ?? 0) > 0;
-        if (nameOk && aboutOk && goalOk && hasAvatar) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('+50 GP за полный профиль')),
-          );
-        }
-      } catch (_) {}
+      // Показываем тост о бонусе только если он был выдан впервые
+      if (bonusGranted == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('+50 GP за полный профиль')),
+        );
+      }
       // Обновляем профиль без полной инвалидации, чтобы избежать редиректа
       ref.refresh(currentUserProvider);
       setState(() => _editing = false);
