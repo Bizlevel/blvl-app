@@ -195,6 +195,55 @@ function _b64UrlEncodeJson(obj: unknown): string {
   return _b64UrlEncodeBytes(new TextEncoder().encode(JSON.stringify(obj)));
 }
 
+function _readDerLen(bytes: Uint8Array, offset: number): { len: number; next: number } {
+  const first = bytes[offset];
+  if (first < 0x80) return { len: first, next: offset + 1 };
+  const num = first & 0x7f;
+  if (num === 0 || num > 2) throw new Error("ecdsa_der_len_invalid");
+  let len = 0;
+  for (let i = 0; i < num; i++) len = (len << 8) | bytes[offset + 1 + i];
+  return { len, next: offset + 1 + num };
+}
+
+function _trimLeadingZeros(b: Uint8Array): Uint8Array {
+  let i = 0;
+  while (i < b.length - 1 && b[i] === 0x00) i++;
+  return b.slice(i);
+}
+
+function _leftPad(b: Uint8Array, size: number): Uint8Array {
+  if (b.length === size) return b;
+  if (b.length > size) return b.slice(b.length - size);
+  const out = new Uint8Array(size);
+  out.set(b, size - b.length);
+  return out;
+}
+
+function _ecdsaDerToJose(sigDer: Uint8Array, size = 32): Uint8Array {
+  // If already raw (r||s), just return.
+  if (sigDer.length === size * 2) return sigDer;
+  if (sigDer.length < 8 || sigDer[0] !== 0x30) throw new Error("ecdsa_der_invalid");
+  const { len: seqLen, next: p0 } = _readDerLen(sigDer, 1);
+  if (p0 + seqLen !== sigDer.length) {
+    // tolerate, but keep parsing
+  }
+  let p = p0;
+  if (sigDer[p] !== 0x02) throw new Error("ecdsa_der_invalid_r");
+  const { len: rLen, next: pR0 } = _readDerLen(sigDer, p + 1);
+  const r = sigDer.slice(pR0, pR0 + rLen);
+  p = pR0 + rLen;
+  if (sigDer[p] !== 0x02) throw new Error("ecdsa_der_invalid_s");
+  const { len: sLen, next: pS0 } = _readDerLen(sigDer, p + 1);
+  const s = sigDer.slice(pS0, pS0 + sLen);
+
+  const rFixed = _leftPad(_trimLeadingZeros(r), size);
+  const sFixed = _leftPad(_trimLeadingZeros(s), size);
+  const out = new Uint8Array(size * 2);
+  out.set(rFixed, 0);
+  out.set(sFixed, size);
+  return out;
+}
+
 function _b64UrlDecodeToBytes(b64url: string): Uint8Array {
   const s = (b64url || "").trim().replace(/-/g, "+").replace(/_/g, "/");
   const padLen = (4 - (s.length % 4)) % 4;
@@ -290,7 +339,9 @@ async function _buildAppleServerJwt(): Promise<string> {
     key,
     new TextEncoder().encode(unsigned),
   );
-  const sig = _b64UrlEncodeBytes(new Uint8Array(sigBuf));
+  // WebCrypto returns DER encoded ECDSA signature, but JWT ES256 expects raw (r||s).
+  const sigRaw = _ecdsaDerToJose(new Uint8Array(sigBuf), 32);
+  const sig = _b64UrlEncodeBytes(sigRaw);
   const token = `${unsigned}.${sig}`;
   _appleJwtCache = { token, exp: payload.exp };
   return token;
