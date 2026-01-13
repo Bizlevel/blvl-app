@@ -524,6 +524,7 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
       productId:
           transaction.productId.isNotEmpty ? transaction.productId : product.id,
       token: receipt,
+      transactionId: transaction.transactionId,
     );
 
     try {

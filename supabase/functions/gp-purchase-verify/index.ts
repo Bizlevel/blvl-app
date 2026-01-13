@@ -4,13 +4,15 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 // (в рантайме Supabase Edge переменная Deno доступна)
 declare const Deno: any;
 
-// Env: SUPABASE_URL, SUPABASE_ANON_KEY, APPLE_ISSUER_ID, APPLE_KEY_ID, APPLE_PRIVATE_KEY, GOOGLE_SERVICE_ACCOUNT_JSON
+// Env: SUPABASE_URL, SUPABASE_ANON_KEY, APPLE_ISSUER_ID, APPLE_KEY_ID, APPLE_PRIVATE_KEY, APPLE_BUNDLE_ID, GOOGLE_SERVICE_ACCOUNT_JSON
 
 type VerifyRequest = {
   // IAP (mobile)
   platform?: "ios" | "android";
   product_id?: string;
   token?: string; // iOS: base64 receipt-data; Android: purchaseToken
+  // iOS StoreKit2: allow passing transaction id directly (preferred)
+  transaction_id?: string;
   // Android package name (optional, overrides env ANDROID_PACKAGE_NAME)
   package_name?: string;
   // Web
@@ -175,6 +177,197 @@ async function insertLog(data: Record<string, unknown>, userJwt: string) {
     }
   } catch {
     // swallow any diagnostics errors
+  }
+}
+
+// -------- Apple Server API (StoreKit2) --------
+type AppleServerEnv = "prod" | "sandbox";
+
+function _b64UrlEncodeBytes(bytes: Uint8Array): string {
+  // btoa expects binary string (latin1)
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  const b64 = btoa(binary);
+  return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+function _b64UrlEncodeJson(obj: unknown): string {
+  return _b64UrlEncodeBytes(new TextEncoder().encode(JSON.stringify(obj)));
+}
+
+function _b64UrlDecodeToBytes(b64url: string): Uint8Array {
+  const s = (b64url || "").trim().replace(/-/g, "+").replace(/_/g, "/");
+  const padLen = (4 - (s.length % 4)) % 4;
+  const padded = s + "=".repeat(padLen);
+  const bin = atob(padded);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+function _looksLikeJws(token: string): boolean {
+  const t = (token || "").trim();
+  if (t.length < 20) return false;
+  // JWS has 3 dot-separated parts and commonly starts with "eyJ" (base64url of {"alg":...})
+  return t.split(".").length === 3 && t.startsWith("eyJ");
+}
+
+function _decodeJwsPayload(token: string): Record<string, unknown> | null {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+    const payloadBytes = _b64UrlDecodeToBytes(parts[1]);
+    const json = new TextDecoder().decode(payloadBytes);
+    const parsed = JSON.parse(json);
+    return parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
+function _normalizePemToDerBytes(pemOrB64: string): Uint8Array {
+  const raw = (pemOrB64 || "").trim();
+  if (!raw) throw new Error("apple_key_missing");
+
+  // If it's a PEM with headers, strip them. If it's base64-only, keep as is.
+  const cleaned = raw
+    .replace("-----BEGIN PRIVATE KEY-----", "")
+    .replace("-----END PRIVATE KEY-----", "")
+    .replace(/\r?\n/g, "")
+    .replace(/\\n/g, "")
+    .trim();
+  if (!cleaned) throw new Error("apple_key_missing");
+  // At this point cleaned is base64 of PKCS8 DER.
+  const bin = atob(cleaned);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+let _appleJwtCache: { token: string; exp: number } | null = null;
+let _appleKeyCache: CryptoKey | null = null;
+
+async function _getAppleKey(): Promise<CryptoKey> {
+  if (_appleKeyCache) return _appleKeyCache;
+  const pem = Deno.env.get("APPLE_PRIVATE_KEY") || "";
+  const keyBytes = _normalizePemToDerBytes(pem);
+  const key = await crypto.subtle.importKey(
+    "pkcs8",
+    keyBytes,
+    { name: "ECDSA", namedCurve: "P-256" },
+    false,
+    ["sign"],
+  );
+  _appleKeyCache = key;
+  return key;
+}
+
+async function _buildAppleServerJwt(): Promise<string> {
+  const now = Math.floor(Date.now() / 1000);
+  // Cache token for ~4 minutes to reduce crypto/sign overhead.
+  if (_appleJwtCache && _appleJwtCache.exp > now + 30) return _appleJwtCache.token;
+
+  const issuerId = (Deno.env.get("APPLE_ISSUER_ID") || "").trim();
+  const keyId = (Deno.env.get("APPLE_KEY_ID") || "").trim();
+  const bundleId = (Deno.env.get("APPLE_BUNDLE_ID") || "bizlevel.kz").trim();
+  if (!issuerId) throw new Error("apple_issuer_missing");
+  if (!keyId) throw new Error("apple_key_id_missing");
+  if (!bundleId) throw new Error("apple_bundle_missing");
+
+  const header = { alg: "ES256", kid: keyId, typ: "JWT" };
+  const payload = {
+    iss: issuerId,
+    iat: now,
+    exp: now + 300, // 5 minutes
+    aud: "appstoreconnect-v1",
+    bid: bundleId,
+  };
+
+  const unsigned = `${_b64UrlEncodeJson(header)}.${_b64UrlEncodeJson(payload)}`;
+  const key = await _getAppleKey();
+  const sigBuf = await crypto.subtle.sign(
+    { name: "ECDSA", hash: "SHA-256" },
+    key,
+    new TextEncoder().encode(unsigned),
+  );
+  const sig = _b64UrlEncodeBytes(new Uint8Array(sigBuf));
+  const token = `${unsigned}.${sig}`;
+  _appleJwtCache = { token, exp: payload.exp };
+  return token;
+}
+
+async function _appleGetTransactionInfo(
+  transactionId: string,
+  env: AppleServerEnv,
+): Promise<Record<string, unknown>> {
+  const jwt = await _buildAppleServerJwt();
+  const base =
+    env === "sandbox"
+      ? "https://api.storekit-sandbox.itunes.apple.com"
+      : "https://api.storekit.itunes.apple.com";
+  const url = `${base}/inApps/v1/transactions/${encodeURIComponent(transactionId)}`;
+  const resp = await fetch(url, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${jwt}` },
+  });
+  const text = await resp.text();
+  let data: any = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = null;
+  }
+  if (!resp.ok) {
+    // Preserve useful info for caller (but don't log secrets).
+    const code = data?.errorCode || data?.error || resp.status;
+    throw new Error(`apple_server_api_failed:${env}:${resp.status}:${code}`);
+  }
+  if (!data || typeof data !== "object") {
+    throw new Error(`apple_server_api_malformed:${env}`);
+  }
+  return data as Record<string, unknown>;
+}
+
+function _decodeAppleSignedInfo(jws: string): Record<string, unknown> | null {
+  // For Apple Server API response, we trust the HTTPS response + signed request.
+  // We decode payload for field checks; cryptographic verification can be added later if needed.
+  return _decodeJwsPayload(jws);
+}
+
+async function verifyAppleTransactionViaServerApi(
+  productId: string,
+  transactionId: string,
+  dbgLogStep?: (step: string, error?: string | null) => Promise<void>,
+): Promise<{ transactionId: string }> {
+  const tryEnv = async (env: AppleServerEnv) => {
+    await dbgLogStep?.(`apple_server_api_start:${env}`);
+    const info = await _appleGetTransactionInfo(transactionId, env);
+    const signed = String((info as any)?.signedTransactionInfo || "");
+    if (!signed) throw new Error(`apple_server_api_no_signed_info:${env}`);
+    const payload = _decodeAppleSignedInfo(signed);
+    if (!payload) throw new Error(`apple_server_api_bad_signed_info:${env}`);
+
+    const pId = String((payload as any)?.productId || "");
+    if (pId && pId !== productId) throw new Error("apple_product_mismatch");
+
+    const txId = String((payload as any)?.transactionId || (payload as any)?.originalTransactionId || "");
+    if (txId && txId !== transactionId) throw new Error("apple_transaction_mismatch");
+
+    const bundleId = (Deno.env.get("APPLE_BUNDLE_ID") || "bizlevel.kz").trim();
+    const bid = String((payload as any)?.bundleId || "");
+    if (bundleId && bid && bid !== bundleId) throw new Error("apple_bundle_mismatch");
+
+    await dbgLogStep?.(`apple_server_api_ok:${env}`);
+    return { transactionId };
+  };
+
+  try {
+    return await tryEnv("prod");
+  } catch (e) {
+    const msg = String((e as any)?.message || e);
+    // retry sandbox on any server-api failure; keeps behavior robust in review/sandbox.
+    await dbgLogStep?.("apple_server_api_retry_sandbox", msg);
+    return await tryEnv("sandbox");
   }
 }
 
@@ -371,8 +564,33 @@ Deno.serve(async (req: Request) => {
 
     let transactionId = "";
     if (body.platform === "ios") {
-      const r = await verifyAppleReceipt(body.product_id, body.token);
-      transactionId = r.transactionId;
+      // StoreKit2 часто возвращает JWS (eyJ...) вместо base64 receipt.
+      // Поддерживаем:
+      // 1) transaction_id (если клиент передал)
+      // 2) token=JWS -> decode payload to get transactionId
+      // 3) token=base64 receipt -> legacy verifyReceipt
+      const directTx = String(body.transaction_id || "").trim();
+      if (directTx) {
+        const r = await verifyAppleTransactionViaServerApi(
+          body.product_id,
+          directTx,
+          logStep,
+        );
+        transactionId = r.transactionId;
+      } else if (_looksLikeJws(body.token)) {
+        const payload = _decodeJwsPayload(body.token);
+        const txFromJws = String((payload as any)?.transactionId || (payload as any)?.originalTransactionId || "").trim();
+        if (!txFromJws) throw new Error("apple_no_transaction_id");
+        const r = await verifyAppleTransactionViaServerApi(
+          body.product_id,
+          txFromJws,
+          logStep,
+        );
+        transactionId = r.transactionId;
+      } else {
+        const r = await verifyAppleReceipt(body.product_id, body.token);
+        transactionId = r.transactionId;
+      }
     } else if (body.platform === "android") {
       const r = await verifyGooglePurchase(body.product_id, body.token, body.package_name);
       transactionId = r.transactionId;
