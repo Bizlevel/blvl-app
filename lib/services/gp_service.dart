@@ -389,6 +389,7 @@ class GpService {
     required String productId,
     required String token,
     String? packageName,
+    String? transactionId,
   }) async {
     final session = _client.auth.currentSession;
     if (session == null) throw GpFailure('Не авторизован');
@@ -398,6 +399,11 @@ class GpService {
         'product_id': productId,
         'token': token,
       };
+      // iOS StoreKit2: передаём transaction_id (если есть), чтобы сервер мог валидировать
+      // покупку через App Store Server API даже когда receipt отсутствует.
+      if (platform == 'ios' && transactionId != null && transactionId.isNotEmpty) {
+        body['transaction_id'] = transactionId;
+      }
       // Для Android передаём фактическое имя пакета, чтобы исключить рассинхрон с env
       if (platform == 'android' &&
           packageName != null &&
