@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/providers/levels_provider.dart';
+import 'package:bizlevel/providers/auth_provider.dart';
+import 'package:bizlevel/services/supabase_service.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:bizlevel/utils/hive_box_helper.dart';
@@ -43,70 +45,87 @@ class ArtifactsScreen extends ConsumerWidget {
           ),
         ),
         data: (levels) {
-          // Маппинг локальных ассетов: front/back по номеру уровня
-          final Map<int, (String front, String back)> assets = {
-            1: (
-              'assets/images/artefacts/art-1-1.png',
-              'assets/images/artefacts/art-1-2.png'
-            ),
-            2: (
-              'assets/images/artefacts/art-2-1.png',
-              'assets/images/artefacts/art-2-2.png'
-            ),
-            3: (
-              'assets/images/artefacts/art-3-1.png',
-              'assets/images/artefacts/art-3-2.png'
-            ),
-            4: (
-              'assets/images/artefacts/art-4-1.png',
-              'assets/images/artefacts/art-4-2.png'
-            ),
-            5: (
-              'assets/images/artefacts/art-5-1.png',
-              'assets/images/artefacts/art-5-2.png'
-            ),
-            6: (
-              'assets/images/artefacts/art-6-1.png',
-              'assets/images/artefacts/art-6-2.png'
-            ),
-            7: (
-              'assets/images/artefacts/art-7-1.png',
-              'assets/images/artefacts/art-7-2.png'
-            ),
-            8: (
-              'assets/images/artefacts/art-8-1.png',
-              'assets/images/artefacts/art-8-2.png'
-            ),
-            9: (
-              'assets/images/artefacts/art-9-1.png',
-              'assets/images/artefacts/art-9-2.png'
-            ),
-            10: (
-              'assets/images/artefacts/art-10-1.png',
-              'assets/images/artefacts/art-10-2.png'
-            ),
-          };
+          // Получаем нормализованный номер текущего уровня пользователя
+          final currentLevelAsync = ref.watch(currentLevelNumberProvider);
+          return currentLevelAsync.when(
+            loading: () => const _ArtifactsSkeletonGrid(),
+            error: (_, __) => const _ArtifactsSkeletonGrid(),
+            data: (userCurrentLevelNumber) {
+              // Маппинг локальных ассетов: front/back по номеру уровня
+              final Map<int, (String front, String back)> assets = {
+                1: (
+                  'assets/images/artefacts/art-1-1.png',
+                  'assets/images/artefacts/art-1-2.png'
+                ),
+                2: (
+                  'assets/images/artefacts/art-2-1.png',
+                  'assets/images/artefacts/art-2-2.png'
+                ),
+                3: (
+                  'assets/images/artefacts/art-3-1.png',
+                  'assets/images/artefacts/art-3-2.png'
+                ),
+                4: (
+                  'assets/images/artefacts/art-4-1.png',
+                  'assets/images/artefacts/art-4-2.png'
+                ),
+                5: (
+                  'assets/images/artefacts/art-5-1.png',
+                  'assets/images/artefacts/art-5-2.png'
+                ),
+                6: (
+                  'assets/images/artefacts/art-6-1.png',
+                  'assets/images/artefacts/art-6-2.png'
+                ),
+                7: (
+                  'assets/images/artefacts/art-7-1.png',
+                  'assets/images/artefacts/art-7-2.png'
+                ),
+                8: (
+                  'assets/images/artefacts/art-8-1.png',
+                  'assets/images/artefacts/art-8-2.png'
+                ),
+                9: (
+                  'assets/images/artefacts/art-9-1.png',
+                  'assets/images/artefacts/art-9-2.png'
+                ),
+                10: (
+                  'assets/images/artefacts/art-10-1.png',
+                  'assets/images/artefacts/art-10-2.png'
+                ),
+              };
 
-          // Составим карточки только для уровней 1..10
-          final items =
-              levels.where((l) => (l['level'] as int? ?? 0) > 0).map((l) {
-            final num = l['level'] as int? ?? 0;
-            final title = (l['artifact_title'] as String?) ?? 'Артефакт';
-            final desc = (l['artifact_description'] as String?) ?? '';
-            final completed = (l['isCompleted'] as bool? ?? false);
-            final pair = assets[num];
-            return (
-              level: num,
-              title: title,
-              description: desc,
-              isUnlocked: completed,
-              front: pair?.$1,
-              back: pair?.$2,
-            );
-          }).toList();
+              // Составим карточки только для уровней 1..10
+              // Артефакт разблокирован, если уровень завершен ИЛИ номер уровня меньше currentLevel
+              // Используем нормализованный номер уровня через currentLevelNumberProvider
+              debugPrint('ARTIFACTS: userCurrentLevelNumber = $userCurrentLevelNumber');
+              final items =
+                  levels.where((l) => (l['level'] as int? ?? 0) > 0).map((l) {
+                final num = l['level'] as int? ?? 0;
+                final title = (l['artifact_title'] as String?) ?? 'Артефакт';
+                final desc = (l['artifact_description'] as String?) ?? '';
+                final completed = (l['isCompleted'] as bool? ?? false);
+                debugPrint('ARTIFACTS: Level $num - isCompleted=$completed, title=$title');
+                // Артефакт разблокирован, если уровень завершен ИЛИ номер уровня меньше currentLevel
+                // Используем нормализованный номер уровня (уже обработан через resolveCurrentLevelNumber)
+                final bool unlockedByLevel = num < userCurrentLevelNumber;
+                final isUnlocked = completed || unlockedByLevel;
+                if (num <= 2) {
+                  debugPrint('ARTIFACTS: Level $num - completed=$completed, unlockedByLevel=$unlockedByLevel (userCurrentLevelNumber=$userCurrentLevelNumber, num=$num), isUnlocked=$isUnlocked');
+                }
+                final pair = assets[num];
+                return (
+                  level: num,
+                  title: title,
+                  description: desc,
+                  isUnlocked: isUnlocked,
+                  front: pair?.$1,
+                  back: pair?.$2,
+                );
+              }).toList();
 
-          final allLocked = items.every((e) => e.isUnlocked != true);
-          return Padding(
+              final allLocked = items.every((e) => e.isUnlocked != true);
+              return Padding(
             padding: AppSpacing.insetsAll(AppSpacing.lg),
             child: Column(
               children: [
@@ -144,6 +163,8 @@ class ArtifactsScreen extends ConsumerWidget {
                 ),
               ],
             ),
+          );
+            },
           );
         },
       ),

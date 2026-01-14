@@ -28,6 +28,8 @@ import 'package:bizlevel/widgets/level/blocks/profile_form_block.dart';
 import 'package:bizlevel/screens/ray_dialog_screen.dart';
 import 'package:bizlevel/utils/custom_modal_route.dart';
 import 'package:bizlevel/providers/goals_providers.dart';
+import 'package:bizlevel/utils/hive_box_helper.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Shows a level as full-screen blocks (Intro → Lesson → Quiz → …).
 class LevelDetailScreen extends ConsumerStatefulWidget {
@@ -253,9 +255,31 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
                           ));
                         } catch (_) {}
                         await SupabaseService.completeLevel(widget.levelId);
-                        ref.invalidate(levelsProvider);
-                        ref.invalidate(currentUserProvider);
+                        // Очищаем кеш Hive для уровней, чтобы гарантировать обновление данных
+                        try {
+                          final userId = Supabase.instance.client.auth.currentUser?.id;
+                          if (userId != null) {
+                            final box = await HiveBoxHelper.openBox('levels');
+                            await box.delete('user_$userId');
+                          }
+                        } catch (_) {}
+                        // Небольшая задержка для того, чтобы БД успела обновиться
+                        await Future.delayed(const Duration(milliseconds: 200));
+                        // Используем refresh вместо invalidate для более надежного обновления
+                        try {
+                          await Future.wait([
+                            ref.refresh(levelsProvider.future),
+                            ref.refresh(currentUserProvider.future),
+                          ]);
+                          // Дополнительная задержка для обновления UI
+                          await Future.delayed(const Duration(milliseconds: 100));
+                        } catch (_) {
+                          // Fallback на invalidate
+                          ref.invalidate(levelsProvider);
+                          ref.invalidate(currentUserProvider);
+                        }
                         ref.invalidate(userSkillsProvider);
+                        debugPrint('LEVEL_COMPLETE: Level ${widget.levelNumber} completed, providers refreshed');
                         try {
                           sentry.Sentry.addBreadcrumb(sentry.Breadcrumb(
                             category: 'level',
