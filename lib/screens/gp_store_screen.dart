@@ -527,6 +527,21 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
       transactionId: transaction.transactionId,
     );
 
+    // Важно: завершаем StoreKit2 транзакцию только ПОСЛЕ успешной доставки (начисления GP).
+    // Иначе при сетевых сбоях можно потерять возможность повторно обработать покупку.
+    try {
+      final finished =
+          await iap.finishStoreKitTransaction(transaction.transactionId);
+      await Sentry.addBreadcrumb(Breadcrumb(
+        message: 'gp_storekit_finish_attempt',
+        data: {
+          'productId': product.id,
+          'transactionId': transaction.transactionId,
+          'finished': finished,
+        },
+      ));
+    } catch (_) {}
+
     try {
       await Sentry.addBreadcrumb(Breadcrumb(
         message: 'gp_storekit_verify_success',

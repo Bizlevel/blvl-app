@@ -142,6 +142,40 @@ import os.log
           result(FlutterError(code: "restore_failed", message: error.localizedDescription, details: nil))
         }
       }
+    case "finishTransaction":
+      guard
+        let args = call.arguments as? [String: Any],
+        let transactionId = args["transactionId"] as? String,
+        !transactionId.isEmpty
+      else {
+        result(FlutterError(code: "invalid_argument", message: "transactionId required", details: nil))
+        return
+      }
+      Task {
+        do {
+          var finished = false
+          for await verification in Transaction.unfinished {
+            do {
+              let (transaction, _) = try self.unpackVerification(verification)
+              if transaction.id.description == transactionId {
+                await transaction.finish()
+                finished = true
+                break
+              }
+            } catch {
+              // Игнорируем отдельные ошибки верификации, продолжаем поиск нужной транзакции.
+              os_log("StoreKit2Bridge: finishTransaction verification failed %{public}@", type: .error, error.localizedDescription)
+            }
+          }
+          result([
+            "status": finished ? "finished" : "not_found",
+            "transactionId": transactionId
+          ])
+        } catch {
+          os_log("StoreKit2Bridge: finishTransaction failed %{public}@", type: .error, error.localizedDescription)
+          result(FlutterError(code: "finish_failed", message: error.localizedDescription, details: nil))
+        }
+      }
     default:
       result(FlutterMethodNotImplemented)
     }
