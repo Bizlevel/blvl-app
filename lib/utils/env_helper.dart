@@ -20,6 +20,8 @@ String envOrDefine(String key, {String defaultValue = ''}) {
       return const String.fromEnvironment('SUPABASE_ANON_KEY');
     case 'GOOGLE_WEB_CLIENT_ID':
       return const String.fromEnvironment('GOOGLE_WEB_CLIENT_ID');
+    case 'IOS_GOOGLE_CLIENT_ID':
+      return const String.fromEnvironment('IOS_GOOGLE_CLIENT_ID');
     case 'WEB_REDIRECT_ORIGIN':
       return const String.fromEnvironment('WEB_REDIRECT_ORIGIN');
     case 'SENTRY_DSN':

@@ -54,7 +54,14 @@ class AuthService {
     } catch (e, st) {
       log('Unknown error caught in AuthService', error: e, stackTrace: st);
       await Sentry.captureException(e, stackTrace: st);
-      throw AuthFailure(unknownErrorMessage);
+      // Включаем детальную информацию об ошибке для отладки
+      final errorMessage = e.toString();
+      final detailedMessage = errorMessage.contains('Bad ID token') ||
+              errorMessage.contains('invalid_grant') ||
+              errorMessage.contains('access_denied')
+          ? '$unknownErrorMessage: $errorMessage'
+          : unknownErrorMessage;
+      throw AuthFailure(detailedMessage);
     }
   }
 
@@ -282,26 +289,63 @@ class AuthService {
           _googleSdkInitialized = true;
         }
 
+        // На iOS используем scopeHint в authenticate() чтобы получить токены за один раз
+        // и избежать двойного диалога. На Android это тоже работает нормально.
         final account = await googleSignIn.authenticate(
           scopeHint: const <String>['email', 'profile'],
         );
 
+        // Получаем idToken из authentication
         final auth = account.authentication;
-        final authorization = await account.authorizationClient.authorizeScopes(
-          const <String>['email', 'profile'],
-        );
+        if (auth.idToken == null || auth.idToken!.isEmpty) {
+          throw AuthFailure('Не удалось получить ID токен от Google');
+        }
 
-        final idToken = auth.idToken;
-        final accessToken = authorization.accessToken;
-        if (idToken == null || accessToken.isEmpty) {
+        final idToken = auth.idToken!;
+        
+        // Для Supabase нужен idToken и accessToken
+        // На iOS: если serverClientId настроен правильно, accessToken может быть доступен
+        // через authorizationClient без дополнительного диалога
+        // На Android: authorizeScopes обычно не вызывает дополнительный диалог
+        String accessToken;
+        try {
+          // Пытаемся получить accessToken через authorizationClient
+          // На iOS это может не вызвать диалог, если scopes уже были запрошены в authenticate()
+          final authorization = await account.authorizationClient.authorizeScopes(
+            const <String>['email', 'profile'],
+          );
+          accessToken = authorization.accessToken;
+          if (accessToken.isEmpty) {
+            log('Google Sign-In: accessToken пустой после authorizeScopes');
+            throw AuthFailure('Не удалось получить access token от Google. Проверьте конфигурацию GOOGLE_WEB_CLIENT_ID.');
+          }
+        } catch (e, st) {
+          // Логируем детали ошибки для отладки
+          log('Google Sign-In: ошибка при получении accessToken', error: e, stackTrace: st);
+          final errorMsg = e.toString();
+          if (errorMsg.contains('Bad ID token') || errorMsg.contains('invalid_grant')) {
+            throw AuthFailure('Ошибка авторизации Google: неверный токен. Проверьте SHA-1/SHA-256 в Google Cloud Console и убедитесь, что GOOGLE_WEB_CLIENT_ID настроен правильно.');
+          }
+          throw AuthFailure('Не удалось получить access token от Google: $errorMsg. Убедитесь, что GOOGLE_WEB_CLIENT_ID настроен правильно.');
+        }
+
+        if (idToken.isEmpty || accessToken.isEmpty) {
           throw AuthFailure('Не удалось получить токены Google');
         }
 
+        // Логируем успешное получение токенов (без самих токенов для безопасности)
+        log('Google Sign-In: токены получены успешно, idToken length: ${idToken.length}, accessToken length: ${accessToken.length}');
+        
         final response = await _client.auth.signInWithIdToken(
           provider: OAuthProvider.google,
           idToken: idToken,
           accessToken: accessToken,
         );
+        
+        if (response.user == null) {
+          log('Google Sign-In: Supabase вернул null user');
+          throw AuthFailure('Не удалось создать сессию в Supabase. Проверьте конфигурацию Supabase и Google OAuth.');
+        }
 
         final user = response.user;
         if (user != null) {
