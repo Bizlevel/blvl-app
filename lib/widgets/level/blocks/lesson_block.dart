@@ -9,10 +9,14 @@ class LessonBlock extends LevelPageBlock {
   LessonBlock({required this.lesson, required this.onWatched});
   @override
   Widget build(BuildContext context, int index) {
+    final bool isTablet =
+        MediaQuery.of(context).size.shortestSide >= 600;
     return LessonWidget(
       key: ValueKey('lesson_${lesson.id}'),
       lesson: lesson,
       onWatched: () => onWatched(index),
+      // На iPad авто‑fullscreen может зависать в landscape, выключаем на планшетах.
+      autoFullscreenOnPlay: !isTablet,
     );
   }
 }

@@ -46,6 +46,9 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
   LessonProgressState get _progress =>
       ref.watch(lessonProgressProvider(widget.levelId));
 
+  bool _autoCompletingLevel = false;
+  bool _autoCompletedLevel = false;
+
   // Флаг сохранения профиля (для уровня 0)
   bool _profileSaved = false;
 
@@ -252,10 +255,14 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
                             },
                           ));
                         } catch (_) {}
-                        await SupabaseService.completeLevel(widget.levelId);
-                        ref.invalidate(levelsProvider);
-                        ref.invalidate(currentUserProvider);
-                        ref.invalidate(userSkillsProvider);
+                        if (!_autoCompletedLevel) {
+                          await SupabaseService.completeLevel(widget.levelId);
+                          ref.invalidate(levelsProvider);
+                          ref.invalidate(towerNodesProvider);
+                          ref.invalidate(currentUserProvider);
+                          ref.invalidate(userSkillsProvider);
+                          ref.invalidate(gpBalanceProvider);
+                        }
                         try {
                           sentry.Sentry.addBreadcrumb(sentry.Breadcrumb(
                             category: 'level',
@@ -268,18 +275,20 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
                           ));
                         } catch (_) {}
                         if (context.mounted) {
-                          await showDialog(
-                            context: context,
-                            builder: (_) => Dialog(
-                              backgroundColor: Colors.transparent,
-                              insetPadding: AppSpacing.insetsAll(AppSpacing.lg),
-                              child: MilestoneCelebration(
-                                  gpGain: 20,
-                                  onClose: () =>
-                                      Navigator.of(context).maybePop()),
-                            ),
-                          );
-                          ref.invalidate(gpBalanceProvider);
+                          if (!_autoCompletedLevel) {
+                            await showDialog(
+                              context: context,
+                              builder: (_) => Dialog(
+                                backgroundColor: Colors.transparent,
+                                insetPadding: AppSpacing.insetsAll(AppSpacing.lg),
+                                child: MilestoneCelebration(
+                                    gpGain: 20,
+                                    onClose: () =>
+                                        Navigator.of(context).maybePop()),
+                              ),
+                            );
+                            ref.invalidate(gpBalanceProvider);
+                          }
 
                           // Предложение проверить идею после завершения Уровня 5 (Ray)
                           final isLevel5 = (widget.levelNumber ?? -1) == 5;
@@ -422,6 +431,31 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
     });
   }
 
+  Future<void> _maybeAutoCompleteLevel1(List<LessonModel> lessons) async {
+    if ((widget.levelNumber ?? -1) != 1) return;
+    if (_autoCompletingLevel || _autoCompletedLevel) return;
+    if (!_isLevelCompleted(lessons)) return;
+    _autoCompletingLevel = true;
+    try {
+      await SupabaseService.completeLevel(widget.levelId);
+      ref.invalidate(levelsProvider);
+      ref.invalidate(towerNodesProvider);
+      ref.invalidate(currentUserProvider);
+      ref.invalidate(userSkillsProvider);
+      ref.invalidate(gpBalanceProvider);
+      _autoCompletedLevel = true;
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Уровень завершён')),
+        );
+      }
+    } catch (_) {
+      // Ошибка автозавершения не должна блокировать прохождение.
+    } finally {
+      _autoCompletingLevel = false;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final lessonsAsync = ref.watch(lessonsProvider(widget.levelId));
@@ -466,6 +500,8 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
                         setState(() {
                           _goalV1Saved = true;
                         });
+                        // Авто-завершение уровня после сохранения цели.
+                        _maybeAutoCompleteLevel1(lessons);
                       }
                     });
                   }
@@ -621,6 +657,7 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
               setState(() => _goalV1Saved = true);
               // Инвалидация провайдеров целей для синхронизации страницы «Цель»
               // legacy invalidates removed
+              _maybeAutoCompleteLevel1(lessons);
             }
           },
         ),
