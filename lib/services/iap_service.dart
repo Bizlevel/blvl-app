@@ -104,6 +104,12 @@ class IapService {
     return StoreKit2Service.instance.purchase(productId);
   }
 
+  /// Завершает (finish) транзакцию StoreKit2 по id. Возвращает true если finish выполнен.
+  Future<bool> finishStoreKitTransaction(String transactionId) async {
+    if (!_isIos) return false;
+    return StoreKit2Service.instance.finishTransaction(transactionId);
+  }
+
   Future<List<StoreKitTransaction>> restoreStoreKitPurchases() async {
     if (!_isIos) return const [];
     return StoreKit2Service.instance.restorePurchases();

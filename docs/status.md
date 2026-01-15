@@ -2,6 +2,8 @@
 
 Задача iap-ios-2026-01-13 fix: iOS StoreKit2 verify переведён на App Store Server API (transaction_id/JWS) с fallback на verifyReceipt; Android ветка не затронута.
 
+Задача iap-ios-2026-01-14-finish fix: iOS StoreKit2 — добавлен явный `finishTransaction(transactionId)` и вызов `finish` после успешного начисления GP, чтобы consumable продукты можно было покупать повторно; Android ветка не затронута.
+
 Задача merge-main-notif+ray-nail fix: подтянуты Android/iOS notification‑конфиги из `origin/main` (Manifest/Gradle/MainActivity/Info.plist), перенесены Ray‑улучшения из `origin/nail/feature` (Edge `ray-chat`, обновлённые `RayService`/`RayDialogScreen`, без Vali) + добавлены точки входа Ray (главная/библиотека/после Уровня 5).
 Задача mini-case-flow fix: мини‑кейсы — защита от раннего `[CASE:FINAL]` (финал только на последнем шаге), caseMode всегда бесплатный (`skipSpend`), `LeoService` отправляет `caseMode/skipSpend`, `startCase` идемпотентный + нормализация скрипта; Supabase: миграция консистентности `user_case_progress`; добавлен widget‑тест `leo_dialog_screen_test`.
 Задача ios-case-chat-pop+logout fix: mini‑case “Решить с Лео” открывает `LeoDialogScreen` через `rootNavigator` + `PopScope` в caseMode (защита от неожиданных pop при фокусе TextField); выход из профиля инвалидирует `currentUserProvider`; `currentUserProvider` теперь пересчитывается при auth‑сменах (без ожидания Stream), чтобы редирект на `/login` работал после любого signOut.

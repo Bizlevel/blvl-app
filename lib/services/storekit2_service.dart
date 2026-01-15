@@ -97,6 +97,26 @@ class StoreKit2Service {
     }
   }
 
+  /// Завершает (finish) конкретную транзакцию StoreKit2 по её id.
+  /// Важно: вызывать только после успешной "доставки" (начисления GP на сервере),
+  /// иначе можно потерять возможность повторно обработать покупку при сбоях сети.
+  Future<bool> finishTransaction(String transactionId) async {
+    if (!_isIos) return false;
+    if (transactionId.isEmpty) return false;
+    await _ensureNativeBridgeInstalled('finishTransaction');
+    try {
+      final payload = await _methodChannel.invokeMapMethod<String, dynamic>(
+        'finishTransaction',
+        {'transactionId': transactionId},
+      );
+      final status = payload?['status'] as String? ?? 'unknown';
+      return status == 'finished';
+    } catch (error) {
+      debugPrint('[StoreKit2Service] finishTransaction failed: $error');
+      return false;
+    }
+  }
+
   Future<List<StoreKitTransaction>> restorePurchases() async {
     await _ensureNativeBridgeInstalled('restorePurchases');
     try {
