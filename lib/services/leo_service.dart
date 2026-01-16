@@ -567,10 +567,6 @@ class LeoService {
         });
         
         final response = await _postLeoChat(payload);
-        debugPrint('CHIPS http_status=${response.statusCode}');
-        try {
-          debugPrint('CHIPS http_body=${response.data}');
-        } catch (_) {}
 
         if (response.statusCode == 200 && response.data is Map<String, dynamic>) {
           final responseData = Map<String, dynamic>.from(response.data);
