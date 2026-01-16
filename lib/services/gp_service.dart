@@ -285,6 +285,8 @@ class GpService {
         final parsed = _parseBalanceAfter(data);
         if (parsed != null) {
           _bcSpent(type, amount);
+          // Обновляем кэш баланса после успешного списания
+          await saveBalanceCache(await getBalance());
           return parsed;
         }
         throw GpFailure('Не удалось списать GP');
@@ -368,7 +370,10 @@ class GpService {
     final session = _client.auth.currentSession;
     if (session == null) throw GpFailure('Не авторизован');
     try {
-      return await _postVerify(session, body: {'purchase_id': purchaseId});
+      final balanceAfter = await _postVerify(session, body: {'purchase_id': purchaseId});
+      // Обновляем кэш баланса после подтверждения покупки
+      await saveBalanceCache(await getBalance());
+      return balanceAfter;
     } on DioException catch (e) {
       if (e.error is SocketException) {
         throw GpFailure('Нет соединения с интернетом');
@@ -410,7 +415,10 @@ class GpService {
           packageName.isNotEmpty) {
         body['package_name'] = packageName;
       }
-      return await _postVerify(session, body: body);
+      final balanceAfter = await _postVerify(session, body: body);
+      // Обновляем кэш баланса после подтверждения IAP покупки
+      await saveBalanceCache(await getBalance());
+      return balanceAfter;
     } on DioException catch (e) {
       if (e.error is SocketException) {
         throw GpFailure('Нет соединения с интернетом');
@@ -469,6 +477,8 @@ class GpService {
       final parsed = _parseBalanceAfter(data);
       if (parsed != null) {
         _bcFloorUnlocked(floorNumber);
+        // Обновляем кэш баланса после успешной покупки этажа
+        await saveBalanceCache(await getBalance());
         return parsed;
       }
       throw GpFailure('Не удалось открыть этаж');
@@ -509,6 +519,8 @@ class GpService {
       final parsed = _parseBalanceAfter(data);
       if (parsed != null) {
         _bcBonusGranted(ruleKey);
+        // Обновляем кэш баланса после получения бонуса
+        await saveBalanceCache(await getBalance());
         return parsed;
       }
       throw GpFailure('Не удалось получить бонус');
