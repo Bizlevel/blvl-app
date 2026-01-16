@@ -74,6 +74,8 @@ class LeoDialogScreen extends ConsumerStatefulWidget {
 class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
   static const _pageSize = 30;
 
+  int _showNextCaseQuestionCallCount = 0;
+  DateTime? _lastShowNextCaseQuestionTime;
   String? _chatId;
 
   final _scrollController = ScrollController();
@@ -292,7 +294,6 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
           userContext: widget.userContext,
           levelContext: widget.levelContext,
         );
-        debugPrint('CHIPS server=$chips');
         if (mounted) {
           setState(() {
             _serverRecommendedChips = chips;
@@ -301,7 +302,6 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
               _showSuggestions = true;
             }
           });
-          debugPrint('CHIPS merged=${_resolveRecommendedChips()}');
         }
       } catch (e) {
         // Тихо фейлимся — останется локальный фолбэк
@@ -327,9 +327,64 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
     });
   }
 
+  void _showNextCaseQuestion(int nextStepIndex) {
+    final now = DateTime.now();
+    if (_lastShowNextCaseQuestionTime != null &&
+        now.difference(_lastShowNextCaseQuestionTime!).inMilliseconds < 200) {
+      return;
+    }
+    _lastShowNextCaseQuestionTime = now;
+
+    if (!widget.caseMode || widget.casePrompts == null ||
+        nextStepIndex >= widget.casePrompts!.length) {
+      return;
+    }
+
+    // Проверяем корректность индекса
+    if (nextStepIndex < _caseStepIndex) {
+      // Если индекс меньше текущего, это может быть ошибка - используем текущий caseStepIndex
+      nextStepIndex = _caseStepIndex;
+    } else if (nextStepIndex > _caseStepIndex) {
+      _caseStepIndex = nextStepIndex;
+    }
+    // Если nextStepIndex == _caseStepIndex, это нормально - показываем задание для текущего шага
+
+    // Показать контекст следующего вопроса, если имеется
+    // Помечаем как служебное сообщение, чтобы оно не попало в историю для сервера
+    final ctx = (widget.caseContexts != null &&
+                nextStepIndex < widget.caseContexts!.length)
+            ? widget.caseContexts![nextStepIndex]
+            : '';
+    if (ctx.trim().isNotEmpty) {
+      setState(() {
+        _messages.add({
+          'role': 'assistant',
+          'content': ctx.trim(),
+          'isDisplayOnly': true, // Флаг для исключения из истории
+        });
+      });
+    }
+
+    // Показать следующий вопрос как ассистентское сообщение
+    // НЕ помечаем как isDisplayOnly, чтобы вопрос отображался пользователю
+    final q = widget.casePrompts![nextStepIndex].trim();
+    if (q.isNotEmpty) {
+      setState(() {
+        _messages.add({
+          'role': 'assistant',
+          'content': q,
+          // НЕ устанавливаем isDisplayOnly - вопрос должен быть видимым
+        });
+      });
+      _scrollToBottom();
+    }
+  }
+
   Future<void> _sendMessageInternal(String text, {bool isAuto = false}) async {
     // Дополнительная проверка на случай, если состояние изменилось
-    if (_isSending || !mounted) return;
+    if (_isSending || !mounted) {
+      return;
+    }
 
     setState(() {
       _isSending = true;
@@ -403,27 +458,22 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
       }
 
       if (!mounted) return;
-      // Скрываем служебные маркеры и префикс "Оценка:" для пользователя
+      // Скрываем служебные маркеры для пользователя
       final String displayMsg = assistantMsg
           .replaceAll(RegExp(r"\[CASE:(NEXT|RETRY|FINAL)\]"), '')
           .replaceFirst(RegExp(r"^\s*Оценка\s*:\s*", caseSensitive: false), '')
-          .replaceFirst(
-              RegExp(
-                  r"^(EXCELLENT|GOOD|ACCEPTABLE|WEAK|INVALID)\s*[\.|\-–:]?\s*"),
-              '')
-          .replaceFirst(
-              RegExp(
-                  r"^(Excellent|Good|Acceptable|Weak|Invalid)\s*[\.|\-–:]?\s*",
-                  caseSensitive: false),
-              '')
           .trim();
-      setState(() {
-        _messages.add({'role': 'assistant', 'content': displayMsg});
-      });
+
+      if (displayMsg.isNotEmpty) {
+        setState(() {
+          _messages.add({'role': 'assistant', 'content': displayMsg});
+        });
+      }
       // Реакция на маркеры сценария (после отображения очищенного текста)
       if (widget.caseMode && widget.casePrompts != null) {
         final bool hasNext = assistantMsg.contains('[CASE:NEXT]');
         final bool hasFinal = assistantMsg.contains('[CASE:FINAL]');
+
         final int totalPrompts = widget.casePrompts!.length;
         final int lastIndex = totalPrompts > 0 ? totalPrompts - 1 : 0;
         final bool isLastStep = totalPrompts > 0 && _caseStepIndex >= lastIndex;
@@ -447,28 +497,24 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
         }
 
         if (hasNext || earlyFinal) {
-          // Перейти к следующему заданию
+          if (widget.caseMode) {
+            debugPrint('🔧 DEBUG: Обнаружен маркер NEXT или ранний FINAL, увеличиваем caseStepIndex');
+          }
+          // НЕ добавляем следующий вопрос автоматически - это создает путаницу
+          // Вместо этого увеличиваем индекс шага, но вопрос покажем только по кнопке "Далее"
           final nextIndex = (_caseStepIndex >= 0) ? _caseStepIndex + 1 : 1;
           if (nextIndex < (widget.casePrompts!.length)) {
             _caseStepIndex = nextIndex;
-            // Показать контекст следующего вопроса, если имеется
-            final ctx = (widget.caseContexts != null &&
-                    nextIndex < widget.caseContexts!.length)
-                ? widget.caseContexts![nextIndex]
-                : '';
-            if (ctx.trim().isNotEmpty) {
-              setState(() {
-                _messages.add({'role': 'assistant', 'content': ctx.trim()});
+            // Добавляем сообщение с кнопкой "Далее" вместо автоматического показа вопроса
+            setState(() {
+              _messages.add({
+                'role': 'assistant',
+                'content': 'Отлично! Переходим к следующему заданию.',
+                'hasNextButton': true,
+                'nextStepIndex': nextIndex
               });
-            }
-            // Показать следующий вопрос как ассистентское сообщение
-            final q = widget.casePrompts![nextIndex].trim();
-            if (q.isNotEmpty) {
-              setState(() {
-                _messages.add({'role': 'assistant', 'content': q});
-              });
-              _scrollToBottom();
-            }
+            });
+            _scrollToBottom();
           }
         } else if (hasFinal && isLastStep) {
           // Показать финальную историю (если задана), затем предложить кнопку возврата
@@ -543,9 +589,17 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
   }
 
   List<Map<String, dynamic>> _buildChatContext() {
+    debugPrint('🔧 DEBUG: _buildChatContext вызван, всего сообщений: ${_messages.length}, caseMode=${widget.caseMode}');
+
+    // Исключаем служебные сообщения (контекст и вопросы кейса) из истории для сервера
     final List<Map<String, dynamic>> ctx = _messages
+        .where((m) {
+          final isDisplayOnly = m['isDisplayOnly'] == true;
+          return !isDisplayOnly;
+        })
         .map((m) => {'role': m['role'], 'content': m['content']})
         .toList();
+
     // В режиме мини‑кейса добавляем системный промпт фасилитатора как первое сообщение
     if (widget.caseMode) {
       final sp = widget.systemPrompt?.trim();
@@ -553,6 +607,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
         ctx.insert(0, {'role': 'system', 'content': sp});
       }
     }
+
     return ctx;
   }
 
@@ -666,6 +721,18 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
   }
 
   Widget _buildMessageList() {
+    // Фильтруем сообщения для отображения (исключаем служебные isDisplayOnly)
+    final displayMessages = _messages.where((msg) => msg['isDisplayOnly'] != true).toList();
+
+    if (widget.caseMode) {
+      debugPrint('🔧 DEBUG: displayMessages.length=${displayMessages.length}, total _messages.length=${_messages.length}');
+      for (int i = 0; i < displayMessages.length; i++) {
+        final msg = displayMessages[i];
+        final content = msg['content']?.toString() ?? '';
+        debugPrint('🔧 DEBUG: displayMessages[$i]: role=${msg['role']}, hasNextButton=${msg['hasNextButton']}, content=${content.length > 50 ? content.substring(0, 50) + "..." : content}');
+      }
+    }
+
     return NotificationListener<ScrollNotification>(
       onNotification: (notif) {
         if (notif.metrics.pixels <= 50 && _hasMore) {
@@ -678,7 +745,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
         controller: _scrollController,
         padding: const EdgeInsets.symmetric(
             horizontal: AppSpacing.lg, vertical: AppSpacing.s10),
-        itemCount: _messages.length + (_hasMore ? 1 : 0) + (_isSending ? 1 : 0),
+        itemCount: displayMessages.length + (_hasMore ? 1 : 0) + (_isSending ? 1 : 0),
         itemBuilder: (context, index) {
           // 1) Плашка загрузки предыдущих сообщений
           if (_hasMore && index == 0) {
@@ -702,7 +769,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
           final offset = _hasMore ? 1 : 0;
           final msgIndex = index - offset;
           // 2) Последний элемент — индикатор набора, если ждём ответ
-          if (_isSending && msgIndex == _messages.length) {
+          if (_isSending && msgIndex == displayMessages.length) {
             return Align(
               alignment: Alignment.centerLeft,
               child: Container(
@@ -724,12 +791,37 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
             );
           }
           // 3) Обычные сообщения
-          final msg = _messages[msgIndex];
+          final msg = displayMessages[msgIndex];
+
           final isUser = msg['role'] == 'user';
           final bubble = LeoMessageBubble(
             text: msg['content'] as String? ?? '',
             isUser: isUser,
           );
+
+          // Кнопка "Далее" для кейсов
+          Widget? nextButton;
+          if (widget.caseMode && msg['hasNextButton'] == true && !isUser) {
+            final nextStepIndex = msg['nextStepIndex'] as int?;
+            if (nextStepIndex != null && nextStepIndex < (widget.casePrompts?.length ?? 0)) {
+              nextButton = Padding(
+                padding: const EdgeInsets.only(top: 8, bottom: 4),
+                child: ElevatedButton(
+                  autofocus: false,
+                  onPressed: () {
+                    debugPrint('🔧 DEBUG: Кнопка "Далее" нажата, nextStepIndex=$nextStepIndex');
+                    _showNextCaseQuestion(nextStepIndex);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    minimumSize: const Size(120, 36),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  ),
+                  child: const Text('Далее'),
+                ),
+              );
+            }
+          }
+
           // Метка времени (компактно)
           final ts = msg['created_at'] as String?;
           final timeWidget = (ts != null)
@@ -744,17 +836,20 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
                   ),
                 )
               : const SizedBox.shrink();
+
+          final messageContent = Column(
+            crossAxisAlignment:
+                isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+            children: [bubble, if (nextButton != null) nextButton, timeWidget],
+          );
+
           // Лёгкая анимация появления только для последних 6 элементов,
           // чтобы избежать нагрузки на длинные списки
           final bool animate = index >=
-              ((_hasMore ? 1 : 0) + (_isSending ? 1 : 0) + _messages.length - 6)
-                  .clamp(0, _messages.length + 2);
+              ((_hasMore ? 1 : 0) + (_isSending ? 1 : 0) + displayMessages.length - 6)
+                  .clamp(0, displayMessages.length + 2);
           if (!animate) {
-            return Column(
-              crossAxisAlignment:
-                  isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-              children: [bubble, timeWidget],
-            );
+            return messageContent;
           }
           return TweenAnimationBuilder<double>(
             tween: Tween(begin: 0.0, end: 1.0),
@@ -767,11 +862,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
                 child: child,
               ),
             ),
-            child: Column(
-              crossAxisAlignment:
-                  isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-              children: [bubble, timeWidget],
-            ),
+            child: messageContent,
           );
         },
       ),
