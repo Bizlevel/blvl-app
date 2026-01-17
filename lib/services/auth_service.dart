@@ -164,10 +164,17 @@ class AuthService {
       throw AuthFailure('Пользователь не авторизован');
     }
 
-    // Если e-mail не подтверждён/отсутствует – блокируем сохранение профиля,
-    // чтобы избежать NOT-NULL нарушения в базе (#21.6.1).
+    // Если e-mail отсутствует, разрешаем обновление только при наличии записи.
+    // Это защищает от NOT-NULL ошибок при попытке создать профиль без email.
     if (user.email == null) {
-      throw AuthFailure('Подтвердите e-mail, прежде чем продолжить');
+      final existing = await _client
+          .from('users')
+          .select('id')
+          .eq('id', user.id)
+          .maybeSingle();
+      if (existing == null) {
+        throw AuthFailure('Подтвердите e-mail, прежде чем продолжить');
+      }
     }
 
     return await _handleAuthCall(() async {
@@ -200,7 +207,34 @@ class AuthService {
       if (learningStyle != null) payload['learning_style'] = learningStyle;
       if (businessRegion != null) payload['business_region'] = businessRegion;
 
-      await _client.from('users').update(payload).eq('id', user.id);
+      final updated = await _client
+          .from('users')
+          .update(payload)
+          .eq('id', user.id)
+          .select('id')
+          .maybeSingle();
+      if (updated == null) {
+        // Запись отсутствует — создаём минимальный профиль (best-effort).
+        final insertPayload = <String, dynamic>{
+          ...payload,
+          'id': user.id,
+        };
+        if (user.email != null && user.email!.isNotEmpty) {
+          insertPayload['email'] = user.email;
+        }
+        if (!insertPayload.containsKey('name')) {
+          final fallbackName = (name ?? '').trim().isNotEmpty
+              ? name!.trim()
+              : (user.userMetadata?['name'] as String?)?.trim();
+          if (fallbackName != null && fallbackName.isNotEmpty) {
+            insertPayload['name'] = fallbackName;
+          }
+        }
+        if (!insertPayload.containsKey('name')) {
+          throw AuthFailure('Не удалось сохранить профиль: отсутствует имя');
+        }
+        await _client.from('users').insert(insertPayload);
+      }
       // Попытка выдать бонус за заполненный профиль (идемпотентно)
       try {
         final row = await _client

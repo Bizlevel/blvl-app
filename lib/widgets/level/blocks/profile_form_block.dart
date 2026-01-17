@@ -22,6 +22,7 @@ class ProfileFormBlock extends LevelPageBlock {
   final TextEditingController goalController;
   final int selectedAvatarId;
   final bool isEditing;
+  final bool Function()? canCompleteLevel;
   final VoidCallback onEdit;
   final VoidCallback onSaved;
   final void Function(int) onAvatarChanged;
@@ -33,6 +34,7 @@ class ProfileFormBlock extends LevelPageBlock {
     required this.goalController,
     required this.selectedAvatarId,
     required this.isEditing,
+    required this.canCompleteLevel,
     required this.onEdit,
     required this.onSaved,
     required this.onAvatarChanged,
@@ -89,15 +91,6 @@ class ProfileFormBlock extends LevelPageBlock {
   Widget build(BuildContext context, int index) {
     return Consumer(builder: (context, ref, _) {
       Future<void> save() async {
-        final svc = ref.read(authServiceProvider);
-        final sessionUser = svc.getCurrentUser();
-        if (sessionUser?.email == null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text(UIS.confirmEmailFirst)),
-          );
-          return;
-        }
-
         final name = nameController.text.trim();
         final about = aboutController.text.trim();
         final goal = goalController.text.trim();
@@ -231,6 +224,18 @@ class ProfileFormBlock extends LevelPageBlock {
                   label: 'Перейти на Уровень 1',
                   onPressed: () async {
                     await save();
+                    final bool canComplete = canCompleteLevel?.call() ?? true;
+                    if (!canComplete) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                                'Сначала посмотрите все видео этого уровня'),
+                          ),
+                        );
+                      }
+                      return;
+                    }
                     if (!context.mounted) return;
                     try {
                       await SupabaseService.completeLevel(levelId);

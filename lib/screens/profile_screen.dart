@@ -22,6 +22,7 @@ import 'package:bizlevel/widgets/common/bizlevel_text_field.dart';
 import 'package:bizlevel/widgets/reminders_settings_sheet.dart';
 import 'package:bizlevel/widgets/common/achievement_badge.dart';
 import 'package:bizlevel/theme/dimensions.dart';
+import 'package:bizlevel/utils/input_bottom_sheet.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -397,54 +398,59 @@ class _BodyState extends ConsumerState<_Body> {
   // Старый модал артефактов убран — вместо этого ведём на экран /artifacts
 
   Future<void> _openAboutMeModal() async {
-    await showModalBottomSheet<void>(
+    await showBizLevelInputBottomSheet<void>(
       context: context,
-      isScrollControlled: true,
       backgroundColor: AppColor.surface,
+      applyKeyboardInset: false,
+      contentPadding: EdgeInsets.zero,
       builder: (ctx) {
-        return DraggableScrollableSheet(
-          expand: false,
-          minChildSize: 0.4,
-          maxChildSize: 0.92,
-          initialChildSize: 0.66,
-          builder: (context, scrollController) {
-            return Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.lg,
-                    vertical: AppSpacing.sm,
+        final media = MediaQuery.of(ctx);
+        return Padding(
+          padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
+          child: DraggableScrollableSheet(
+            expand: false,
+            minChildSize: 0.4,
+            maxChildSize: 0.92,
+            initialChildSize: 0.66,
+            builder: (context, scrollController) {
+              return Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.lg,
+                      vertical: AppSpacing.sm,
+                    ),
+                    child: Row(
+                      children: [
+                        Text(
+                          'Информация обо мне',
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                        const Spacer(),
+                        // fix: добавить tooltip для IconButton (accessibility)
+                        IconButton(
+                          tooltip: 'Закрыть',
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.of(context).pop(),
+                        ),
+                      ],
+                    ),
                   ),
-                  child: Row(
-                    children: [
-                      Text(
-                        'Информация обо мне',
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleMedium
-                            ?.copyWith(fontWeight: FontWeight.w600),
-                      ),
-                      const Spacer(),
-                      // fix: добавить tooltip для IconButton (accessibility)
-                      IconButton(
-                        tooltip: 'Закрыть',
-                        icon: const Icon(Icons.close),
-                        onPressed: () => Navigator.of(context).pop(),
-                      ),
-                    ],
+                  const Divider(height: 1),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      controller: scrollController,
+                      padding: const EdgeInsets.all(AppSpacing.lg),
+                      child: _AboutMeCard(user: widget.user),
+                    ),
                   ),
-                ),
-                const Divider(height: 1),
-                Expanded(
-                  child: SingleChildScrollView(
-                    controller: scrollController,
-                    padding: const EdgeInsets.all(AppSpacing.lg),
-                    child: _AboutMeCard(user: widget.user),
-                  ),
-                ),
-              ],
-            );
-          },
+                ],
+              );
+            },
+          ),
         );
       },
     );
@@ -506,7 +512,7 @@ class _BodyState extends ConsumerState<_Body> {
       // для отображения нового аватара на других страницах
       Future.delayed(const Duration(milliseconds: 1500), () {
         if (mounted) {
-          ref.refresh(currentUserProvider);
+          ref.invalidate(currentUserProvider);
         }
       });
     }
@@ -837,27 +843,15 @@ class _AboutMeCardState extends ConsumerState<_AboutMeCard> {
   Future<void> _save() async {
     try {
       final bonusGranted = await ref.read(authServiceProvider).updateProfile(
-            name: _nameCtrl.text.trim().isEmpty ? null : _nameCtrl.text.trim(),
-            about:
-                _aboutCtrl.text.trim().isEmpty ? null : _aboutCtrl.text.trim(),
-            goal: _goalCtrl.text.trim().isEmpty ? null : _goalCtrl.text.trim(),
-            businessArea: _businessAreaCtrl.text.trim().isEmpty
-                ? null
-                : _businessAreaCtrl.text.trim(),
-            experienceLevel: _experienceLevelCtrl.text.trim().isEmpty
-                ? null
-                : _experienceLevelCtrl.text.trim(),
-            businessSize: _businessSizeCtrl.text.trim().isEmpty
-                ? null
-                : _businessSizeCtrl.text.trim(),
-            keyChallenges:
-                _keyChallenges.isEmpty ? null : _keyChallenges.toList(),
-            learningStyle: _learningStyleCtrl.text.trim().isEmpty
-                ? null
-                : _learningStyleCtrl.text.trim(),
-            businessRegion: _businessRegionCtrl.text.trim().isEmpty
-                ? null
-                : _businessRegionCtrl.text.trim(),
+            name: _nameCtrl.text.trim(),
+            about: _aboutCtrl.text.trim(),
+            goal: _goalCtrl.text.trim(),
+            businessArea: _businessAreaCtrl.text.trim(),
+            experienceLevel: _experienceLevelCtrl.text.trim(),
+            businessSize: _businessSizeCtrl.text.trim(),
+            keyChallenges: _keyChallenges.toList(),
+            learningStyle: _learningStyleCtrl.text.trim(),
+            businessRegion: _businessRegionCtrl.text.trim(),
           );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -870,7 +864,7 @@ class _AboutMeCardState extends ConsumerState<_AboutMeCard> {
         );
       }
       // Обновляем профиль без полной инвалидации, чтобы избежать редиректа
-      ref.refresh(currentUserProvider);
+      ref.invalidate(currentUserProvider);
       setState(() => _editing = false);
     } catch (e) {
       if (!mounted) return;
@@ -1291,7 +1285,7 @@ class _DropdownLabeled extends StatelessWidget {
         ),
         AppSpacing.gapH(AppSpacing.s6),
         DropdownButtonFormField<String>(
-          initialValue: value,
+          value: value,
           items: options
               .map((e) => DropdownMenuItem<String>(
                     value: e,

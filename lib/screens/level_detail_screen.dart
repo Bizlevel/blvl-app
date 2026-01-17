@@ -580,12 +580,7 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
     // Для уровня 0: достаточно просмотра всех видео уроков этого уровня
     // и сохранения профиля в блоке ProfileForm.
     if ((widget.levelNumber ?? -1) == 0) {
-      for (var i = 0; i < lessons.length; i++) {
-        final videoPage = videoPageFor(i);
-        if (!_progress.watchedVideos.contains(videoPage)) {
-          return false;
-        }
-      }
+      if (!_areLevelZeroVideosCompleted(lessons)) return false;
       return _profileSaved;
     }
 
@@ -609,6 +604,16 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
     return true;
   }
 
+  bool _areLevelZeroVideosCompleted(List<LessonModel> lessons) {
+    for (var i = 0; i < lessons.length; i++) {
+      final videoPage = videoPageFor(i);
+      if (!_progress.watchedVideos.contains(videoPage)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   void _buildBlocks(List<LessonModel> lessons) {
     // Уровень 0: Intro → Видео(ы) → Профиль → Финальный блок
     if ((widget.levelNumber ?? -1) == 0) {
@@ -625,6 +630,7 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
           goalController: _profileGoalCtrl,
           selectedAvatarId: _profileAvatarId,
           isEditing: _isProfileEditing,
+          canCompleteLevel: () => _areLevelZeroVideosCompleted(lessons),
           onAvatarChanged: (id) => setState(() => _profileAvatarId = id),
           onEdit: () => setState(() => _isProfileEditing = true),
           onSaved: () => setState(() {
