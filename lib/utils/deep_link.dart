@@ -2,6 +2,8 @@
 /// Преобразует URI deep-link'ов в пути GoRouter:
 /// - `bizlevel://levels/<id>` → `/levels/<id>`
 /// - `bizlevel://auth/confirm` → `/login?registered=true`
+/// - `bizlevel://ref/<code>` → `/profile` (код сохраняется локально)
+/// - `bizlevel://promo/<code>` → `/profile` (код сохраняется локально)
 /// Возвращает null, если ссылка не распознана.
 String? mapBizLevelDeepLink(String link) {
   try {
@@ -27,9 +29,46 @@ String? mapBizLevelDeepLink(String link) {
           return '/login?registered=true';
         }
       }
+
+      // Реферальные и промо ссылки ведём на профиль
+      if (first == 'ref' || first == 'referral' || first == 'promo') {
+        return '/profile';
+      }
     }
   } catch (_) {
     // ignore parse errors
   }
   return null;
+}
+
+String? extractReferralCodeFromDeepLink(Uri uri) {
+  if (uri.scheme != 'bizlevel') return null;
+  final first = uri.host.isNotEmpty
+      ? uri.host
+      : (uri.pathSegments.isNotEmpty ? uri.pathSegments.first : null);
+  final segments = uri.host.isNotEmpty
+      ? uri.pathSegments
+      : uri.pathSegments.skip(1).toList();
+
+  if (first == 'ref' || first == 'referral') {
+    if (segments.isNotEmpty) return segments.first;
+  }
+
+  return uri.queryParameters['ref'] ?? uri.queryParameters['referral'];
+}
+
+String? extractPromoCodeFromDeepLink(Uri uri) {
+  if (uri.scheme != 'bizlevel') return null;
+  final first = uri.host.isNotEmpty
+      ? uri.host
+      : (uri.pathSegments.isNotEmpty ? uri.pathSegments.first : null);
+  final segments = uri.host.isNotEmpty
+      ? uri.pathSegments
+      : uri.pathSegments.skip(1).toList();
+
+  if (first == 'promo') {
+    if (segments.isNotEmpty) return segments.first;
+  }
+
+  return uri.queryParameters['promo'];
 }

@@ -1,6 +1,7 @@
 import 'package:bizlevel/providers/user_skills_provider.dart';
 import 'package:bizlevel/widgets/skills_tree_view.dart';
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/foundation.dart';
 
@@ -23,6 +24,10 @@ import 'package:bizlevel/widgets/reminders_settings_sheet.dart';
 import 'package:bizlevel/widgets/common/achievement_badge.dart';
 import 'package:bizlevel/theme/dimensions.dart';
 import 'package:bizlevel/utils/input_bottom_sheet.dart';
+import 'package:bizlevel/services/referral_service.dart';
+import 'package:bizlevel/services/referral_storage.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -356,12 +361,20 @@ class _Body extends ConsumerStatefulWidget {
 class _BodyState extends ConsumerState<_Body> {
   Uint8List? _avatarPreviewBytes;
   int? _localAvatarId; // Локальное состояние для аватара
+  String? _myReferralCode;
+  bool _referralCodeLoading = false;
+  bool _referralApplying = false;
+  bool _promoApplying = false;
+  final TextEditingController _referralCodeController =
+      TextEditingController();
+  final TextEditingController _promoCodeController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     // Инициализируем локальное состояние значением из widget
     _localAvatarId = widget.avatarId;
+    unawaited(_loadReferralCode());
   }
 
   @override
@@ -372,6 +385,117 @@ class _BodyState extends ConsumerState<_Body> {
     if (widget.avatarId != oldWidget.avatarId && _localAvatarId == oldWidget.avatarId) {
       _localAvatarId = widget.avatarId;
     }
+  }
+
+  Future<void> _loadReferralCode() async {
+    if (_referralCodeLoading) return;
+    setState(() {
+      _referralCodeLoading = true;
+    });
+    try {
+      final service = ReferralService(Supabase.instance.client);
+      final code = await service.getMyReferralCode();
+      if (!mounted) return;
+      setState(() {
+        _myReferralCode = code;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      _showSnackBar('Не удалось получить код приглашения');
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _referralCodeLoading = false;
+      });
+    }
+  }
+
+  Future<void> _applyReferralCode() async {
+    if (_referralApplying) return;
+    final normalized = ReferralStorage.normalizeCode(
+      _referralCodeController.text,
+    );
+    if (normalized == null) {
+      _showSnackBar('Введите код приглашения');
+      return;
+    }
+    setState(() {
+      _referralApplying = true;
+    });
+    try {
+      final service = ReferralService(Supabase.instance.client);
+      await service.applyReferralCode(normalized);
+      if (!mounted) return;
+      _referralCodeController.clear();
+      _showSnackBar('Код приглашения принят. Бонус начислим после уровней 0 и 1');
+    } catch (e) {
+      if (!mounted) return;
+      final message =
+          e is ReferralFailure ? e.message : 'Не удалось применить код';
+      _showSnackBar(message);
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _referralApplying = false;
+      });
+    }
+  }
+
+  Future<void> _redeemPromoCode() async {
+    if (_promoApplying) return;
+    final normalized = ReferralStorage.normalizeCode(
+      _promoCodeController.text,
+    );
+    if (normalized == null) {
+      _showSnackBar('Введите промокод');
+      return;
+    }
+    setState(() {
+      _promoApplying = true;
+    });
+    try {
+      final service = ReferralService(Supabase.instance.client);
+      await service.redeemPromoCode(normalized);
+      if (!mounted) return;
+      _promoCodeController.clear();
+      ref.invalidate(gpBalanceProvider);
+      _showSnackBar('Промокод применён, баланс обновлён');
+    } catch (e) {
+      if (!mounted) return;
+      final message =
+          e is PromoFailure ? e.message : 'Не удалось применить промокод';
+      _showSnackBar(message);
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _promoApplying = false;
+      });
+    }
+  }
+
+  void _shareReferralCode() {
+    final code = _myReferralCode;
+    if (code == null || code.isEmpty) {
+      _showSnackBar('Код приглашения ещё не готов');
+      return;
+    }
+    final text = 'Мой код BizLevel: $code\n'
+        'Пройди уровни 0 и 1, и я получу бонус 100 GP.';
+    Share.share(text);
+  }
+
+  void _showSnackBar(String message) {
+    if (Scaffold.maybeOf(context) == null) return;
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    if (messenger == null) return;
+    messenger.showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  @override
+  void dispose() {
+    _referralCodeController.dispose();
+    _promoCodeController.dispose();
+    super.dispose();
   }
 
   Future<void> _pickAvatarFromGallery() async {
@@ -538,6 +662,8 @@ class _BodyState extends ConsumerState<_Body> {
                 const Center(child: Text('Ошибка загрузки навыков')),
           ),
           const SizedBox(height: AppSpacing.lg),
+          _buildReferralCard(context),
+          const SizedBox(height: AppSpacing.lg),
           Align(
             alignment: Alignment.centerLeft,
             child: Text('Достижения',
@@ -568,6 +694,126 @@ class _BodyState extends ConsumerState<_Body> {
           const SizedBox(height: AppSpacing.lg),
           // Premium отключён — кнопка скрыта
           // Секция артефактов скрыта — используйте карточку статистики выше
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReferralCard(BuildContext context) {
+    final theme = Theme.of(context);
+    final code = _myReferralCode;
+    final codeText = code?.isNotEmpty == true ? code! : 'Генерируем код...';
+
+    return BizLevelCard(
+      padding: AppSpacing.insetsAll(AppSpacing.md),
+      outlined: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Пригласи друга',
+                  style: theme.textTheme.titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w600),
+                ),
+              ),
+              BizLevelButton(
+                label: 'Поделиться',
+                onPressed: _referralCodeLoading ? null : _shareReferralCode,
+                size: BizLevelButtonSize.sm,
+                variant: BizLevelButtonVariant.outline,
+              ),
+            ],
+          ),
+          AppSpacing.gapH(AppSpacing.s6),
+          Text(
+            'Получите 100 GP, когда друг пройдет уровни 0 и 1.',
+            style: theme.textTheme.bodySmall
+                ?.copyWith(color: AppColor.onSurfaceSubtle),
+          ),
+          AppSpacing.gapH(AppSpacing.md),
+          Container(
+            padding: AppSpacing.insetsSymmetric(
+              h: AppSpacing.md,
+              v: AppSpacing.sm,
+            ),
+            decoration: BoxDecoration(
+              color: AppColor.surface,
+              border: Border.all(color: AppColor.borderColor),
+              borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    codeText,
+                    style: theme.textTheme.titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                ),
+                if (_referralCodeLoading)
+                  const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+              ],
+            ),
+          ),
+          AppSpacing.gapH(AppSpacing.md),
+          Text(
+            'Код приглашения',
+            style: theme.textTheme.bodyMedium
+                ?.copyWith(fontWeight: FontWeight.w600),
+          ),
+          AppSpacing.gapH(AppSpacing.s6),
+          Row(
+            children: [
+              Expanded(
+                child: BizLevelTextField(
+                  hint: 'Введите код друга',
+                  controller: _referralCodeController,
+                  textCapitalization: TextCapitalization.characters,
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => _applyReferralCode(),
+                ),
+              ),
+              AppSpacing.gapW(AppSpacing.sm),
+              BizLevelButton(
+                label: 'Применить',
+                onPressed: _referralApplying ? null : _applyReferralCode,
+                size: BizLevelButtonSize.sm,
+              ),
+            ],
+          ),
+          AppSpacing.gapH(AppSpacing.md),
+          Text(
+            'Промокод',
+            style: theme.textTheme.bodyMedium
+                ?.copyWith(fontWeight: FontWeight.w600),
+          ),
+          AppSpacing.gapH(AppSpacing.s6),
+          Row(
+            children: [
+              Expanded(
+                child: BizLevelTextField(
+                  hint: 'Введите промокод',
+                  controller: _promoCodeController,
+                  textCapitalization: TextCapitalization.characters,
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => _redeemPromoCode(),
+                ),
+              ),
+              AppSpacing.gapW(AppSpacing.sm),
+              BizLevelButton(
+                label: 'Активировать',
+                onPressed: _promoApplying ? null : _redeemPromoCode,
+                size: BizLevelButtonSize.sm,
+              ),
+            ],
+          ),
         ],
       ),
     );

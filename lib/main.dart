@@ -29,6 +29,8 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:bizlevel/services/notifications_service.dart';
 import 'services/push_service.dart';
 import 'constants/push_flags.dart';
+import 'package:bizlevel/services/referral_service.dart';
+import 'package:bizlevel/services/referral_storage.dart';
 
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
@@ -722,6 +724,21 @@ class _LinkListenerState extends State<_LinkListener> {
   }
 
   void _handleLinkUri(Uri uri) {
+    final referralCode = extractReferralCodeFromDeepLink(uri);
+    final promoCode = extractPromoCodeFromDeepLink(uri);
+    if (referralCode != null) {
+      unawaited(ReferralStorage.savePendingReferralCode(referralCode));
+    }
+    if (promoCode != null) {
+      unawaited(ReferralStorage.savePendingPromoCode(promoCode));
+    }
+    if (referralCode != null || promoCode != null) {
+      final session = Supabase.instance.client.auth.currentSession;
+      if (session != null) {
+        unawaited(ReferralService(Supabase.instance.client)
+            .applyPendingCodesBestEffort());
+      }
+    }
     final path = mapBizLevelDeepLink(uri.toString());
     if (path != null) {
       widget.router.go(path);

@@ -10,6 +10,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bizlevel/services/gp_service.dart';
 import 'package:bizlevel/services/notifications_service.dart';
 import 'package:bizlevel/services/timezone_gate.dart';
+import 'package:bizlevel/services/referral_service.dart';
 import '../utils/env_helper.dart';
 
 // No longer importing SupabaseService directly to enable dependency injection.
@@ -30,6 +31,38 @@ class AuthService {
     } catch (_) {
       // Best-effort: timezone sync should never break auth UX.
     }
+  }
+
+  void _postSignInSuccess(User user) {
+    // Set Sentry user context
+    Sentry.configureScope((scope) {
+      scope.setUser(SentryUser(id: user.id, email: user.email));
+    });
+
+    // Бонус за первый вход: идемпотентно, ошибки не пробрасываем
+    unawaited(() async {
+      try {
+        final gp = GpService(_client);
+        await gp.claimBonus(ruleKey: 'signup_bonus');
+        try {
+          final fresh = await gp.getBalance();
+          await GpService.saveBalanceCache(fresh);
+        } catch (_) {}
+      } catch (_) {}
+    }());
+
+    // Локальные уведомления: инициализируем ядро (без запроса permissions).
+    unawaited(() async {
+      try {
+        await NotificationsService.instance.initialize();
+      } catch (_) {}
+    }());
+
+    // Синхронизация таймзоны пользователя (IANA)
+    unawaited(_syncUserTimezoneBestEffort());
+
+    // Применяем сохранённые промокоды/рефералки (best-effort)
+    unawaited(ReferralService(_client).applyPendingCodesBestEffort());
   }
 
   /// Generic wrapper to unify error handling for Supabase auth calls.
@@ -75,29 +108,7 @@ class AuthService {
       // Set Sentry user context
       final user = response.user;
       if (user != null) {
-        Sentry.configureScope((scope) {
-          scope.setUser(SentryUser(id: user.id, email: user.email));
-        });
-        // Бонус за первый вход: идемпотентно, ошибки не пробрасываем
-        try {
-          final gp = GpService(_client);
-          await gp.claimBonus(ruleKey: 'signup_bonus');
-          // Обновим кеш баланса в фоне
-          try {
-            final fresh = await gp.getBalance();
-            await GpService.saveBalanceCache(fresh);
-          } catch (_) {}
-        } catch (_) {}
-
-        // Локальные уведомления: инициализируем ядро (без запроса permissions).
-        // Разрешения и расписание напоминаний — только по явному действию пользователя
-        // (экран "Напоминания"), чтобы избежать фризов/неожиданных системных диалогов.
-        try {
-          await NotificationsService.instance.initialize();
-        } catch (_) {}
-
-        // Синхронизация таймзоны пользователя (IANA) для server-side логики (например, daily-бонусов).
-        unawaited(_syncUserTimezoneBestEffort());
+        _postSignInSuccess(user);
       }
       return response;
     }, unknownErrorMessage: 'Неизвестная ошибка входа');
@@ -383,29 +394,7 @@ class AuthService {
 
         final user = response.user;
         if (user != null) {
-          // Set Sentry user context
-          Sentry.configureScope((scope) {
-            scope.setUser(SentryUser(id: user.id, email: user.email));
-          });
-
-          // Бонус за первый вход: идемпотентно, ошибки не пробрасываем
-          try {
-            final gp = GpService(_client);
-            await gp.claimBonus(ruleKey: 'signup_bonus');
-            // Обновим кеш баланса в фоне
-            try {
-              final fresh = await gp.getBalance();
-              await GpService.saveBalanceCache(fresh);
-            } catch (_) {}
-          } catch (_) {}
-
-          // Локальные уведомления: инициализируем ядро (без запроса permissions).
-          try {
-            await NotificationsService.instance.initialize();
-          } catch (_) {}
-
-          // Синхронизация таймзоны пользователя
-          unawaited(_syncUserTimezoneBestEffort());
+          _postSignInSuccess(user);
         }
 
         return response;
@@ -456,11 +445,6 @@ class AuthService {
         // Обработка данных пользователя
         final user = response.user;
         if (user != null) {
-          // Set Sentry user context
-          Sentry.configureScope((scope) {
-            scope.setUser(SentryUser(id: user.id, email: user.email));
-          });
-
           // Apple предоставляет имя только при первом входе — сохраняем в профиль
           if (credential.givenName != null || credential.familyName != null) {
             try {
@@ -474,25 +458,7 @@ class AuthService {
               // Игнорируем ошибки обновления профиля
             }
           }
-
-          // Бонус за первый вход (идемпотентно)
-          try {
-            final gp = GpService(_client);
-            await gp.claimBonus(ruleKey: 'signup_bonus');
-            try {
-              final fresh = await gp.getBalance();
-              await GpService.saveBalanceCache(fresh);
-            } catch (_) {}
-          } catch (_) {}
-
-          // Локальные уведомления: инициализируем ядро (без запроса permissions).
-          // Разрешения и расписание — только по явному действию пользователя.
-          try {
-            await NotificationsService.instance.initialize();
-          } catch (_) {}
-
-          // Синхронизация таймзоны пользователя (IANA) для server-side логики.
-          unawaited(_syncUserTimezoneBestEffort());
+          _postSignInSuccess(user);
         }
 
         return response;
