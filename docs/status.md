@@ -1,3 +1,14 @@
+## Оглавление
+- 2026-01-17 — Унификация клавиатуры и ввода
+- История изменений
+
+## 2026-01-17 — Унификация клавиатуры и ввода
+- Добавлен общий helper для bottom sheet с вводом: `showBizLevelInputBottomSheet` (SafeArea, root navigator, padding под клавиатуру).
+- Чекпоинты L1/L4/L7 и sheet "Новая цель" переведены на общий helper.
+- В формах цели и чекпоинта добавлены единые правила dismiss/submit (`TextInputAction`, `onTapOutside`).
+- Расширен API `BizLevelTextField`/`CustomTextBox` для стандартизации поведения клавиатуры.
+
+## История изменений
 Задача leo-dialog-keyboard-fix: исправлен краш при открытии клавиатуры в модальном диалоге Лео/Макса на Android. Заменён `showModalBottomSheet` на кастомный `CustomModalBottomSheetRoute` с использованием `rootNavigator: true` и `UncontrolledProviderScope` для сохранения контекста провайдеров. Настроена корректная обработка клавиатуры через `adjustResize` и `resizeToAvoidBottomInset: true`. Детали: [`docs/leo-dialog-keyboard-fix.md`](leo-dialog-keyboard-fix.md).
 
 Задача iap-ios-2026-01-13 fix: iOS StoreKit2 verify переведён на App Store Server API (transaction_id/JWS) с fallback на verifyReceipt; Android ветка не затронута.

@@ -163,11 +163,11 @@ void _handleCheckpointTap(BuildContext context, Map<String, dynamic> node) {
         checkpointScreen = const CheckpointL7Screen();
       }
       
-      showModalBottomSheet(
+      showBizLevelInputBottomSheet(
         context: context,
-        isScrollControlled: true,
-        useSafeArea: true,
         showDragHandle: false,
+        applyKeyboardInset: false,
+        contentPadding: EdgeInsets.zero,
         builder: (ctx) => checkpointScreen,
       );
     }

@@ -242,6 +242,9 @@ class _PracticeJournalSectionState
                 decoration: const InputDecoration(
                   hintText: 'Обновить текущее значение метрики',
                 ),
+                textInputAction: TextInputAction.next,
+                onSubmitted: (_) => FocusScope.of(context).nextFocus(),
+                onTapOutside: (_) => FocusScope.of(context).unfocus(),
               ),
               AppSpacing.gapH(AppSpacing.sm),
               TextField(
@@ -249,6 +252,9 @@ class _PracticeJournalSectionState
                 maxLines: 2,
                 decoration: const InputDecoration(
                     labelText: 'Что конкретно сделал(а) сегодня'),
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => FocusScope.of(context).unfocus(),
+                onTapOutside: (_) => FocusScope.of(context).unfocus(),
               ),
               AppSpacing.gapH(AppSpacing.sm),
               Align(
