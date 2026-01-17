@@ -28,6 +28,8 @@ import 'package:bizlevel/widgets/level/blocks/profile_form_block.dart';
 import 'package:bizlevel/screens/ray_dialog_screen.dart';
 import 'package:bizlevel/utils/custom_modal_route.dart';
 import 'package:bizlevel/providers/goals_providers.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:bizlevel/services/context_service.dart';
 
 /// Shows a level as full-screen blocks (Intro → Lesson → Quiz → …).
 class LevelDetailScreen extends ConsumerStatefulWidget {
@@ -67,6 +69,8 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
   // Leo chat (создаётся при первом сообщении пользователя)
   String? _chatId;
 
+  bool _caseGateChecked = false;
+
   @override
   void initState() {
     super.initState();
@@ -80,6 +84,102 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
     });
     
     // Для уровня 1: проверка наличия цели будет выполнена в build через watch
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _maybeGuardCaseAccess();
+    });
+  }
+
+  Future<void> _maybeGuardCaseAccess() async {
+    if (_caseGateChecked || !mounted) return;
+    _caseGateChecked = true;
+
+    int levelNumber = widget.levelNumber ?? 0;
+    if (levelNumber <= 0) {
+      try {
+        levelNumber = await SupabaseService.levelNumberFromId(widget.levelId);
+      } catch (_) {
+        return;
+      }
+    }
+    if (levelNumber <= 0) return;
+
+    final supa = Supabase.instance.client;
+    final int afterLevel = levelNumber - 1;
+    try {
+      final caseRow = await supa
+          .from('mini_cases')
+          .select('id, title, is_required')
+          .eq('active', true)
+          .eq('after_level', afterLevel)
+          .maybeSingle();
+      if (caseRow == null) return;
+
+      final bool isRequired = caseRow['is_required'] as bool? ?? true;
+      if (!isRequired) return;
+
+      final uid = supa.auth.currentUser?.id;
+      if (uid == null || uid.isEmpty) return;
+
+      final progress = await supa
+          .from('user_case_progress')
+          .select('status')
+          .eq('user_id', uid)
+          .eq('case_id', caseRow['id'])
+          .maybeSingle();
+      final status = (progress?['status'] as String?)?.toLowerCase();
+      final bool done = status == 'completed' || status == 'skipped';
+      if (done || !mounted) return;
+
+      final String caseTitle =
+          (caseRow['title'] as String?) ?? 'Мини‑кейс';
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Сначала мини‑кейс'),
+          content: Text(
+            'Для открытия уровня $levelNumber нужно пройти мини‑кейс: $caseTitle.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                if (mounted) context.go('/tower?scrollTo=$levelNumber');
+              },
+              child: const Text('Вернуться в Башню'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                if (mounted) {
+                  final caseId = caseRow['id'] as int;
+                  context.go('/case/$caseId');
+                }
+              },
+              child: const Text('Открыть кейс'),
+            ),
+          ],
+        ),
+      );
+    } catch (_) {
+      // Если не смогли проверить гейтинг, не блокируем доступ
+    }
+  }
+
+  Future<String?> _buildUserContext() async {
+    final user = ref.read(currentUserProvider).value;
+    return ContextService.buildUserContext(user);
+  }
+
+  String _buildLevelContext() {
+    final parts = <String>[];
+    final levelNumber = widget.levelNumber;
+    if (levelNumber != null && levelNumber > 0) {
+      parts.add('level_number: $levelNumber');
+    }
+    parts.add('level_id: ${widget.levelId}');
+    return parts.join(', ');
   }
   
   /// Проверяет наличие сохраненной цели v1 в БД и устанавливает флаг
@@ -119,11 +219,14 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
                   _currentIndex + 1 == _progress.unlockedPage,
               onBack: _goBack,
               onNext: _goNext,
-              onDiscuss: () {
+              onDiscuss: () async {
                 // ВАЖНО: Получаем ProviderContainer из текущего контекста,
                 // чтобы передать его в UncontrolledProviderScope для диалога
                 // Это гарантирует, что провайдеры будут доступны даже если родитель умрет
                 final container = ProviderScope.containerOf(context);
+                final userContext = await _buildUserContext();
+                final levelContext = _buildLevelContext();
+                if (!mounted) return;
                 
                 Navigator.of(context, rootNavigator: true).push(
                   CustomModalBottomSheetRoute(
@@ -136,11 +239,19 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
                         body: Stack(
                           children: [
                             Positioned.fill(
-                              child: GestureDetector(
-                                behavior: HitTestBehavior.opaque,
-                                onTap: () => Navigator.of(context, rootNavigator: true).pop(),
-                                child: Container(color: Colors.transparent),
-                              ),
+                                child: GestureDetector(
+                                  behavior: HitTestBehavior.opaque,
+                                  onTap: () {
+                                    final navigator = Navigator.of(
+                                      context,
+                                      rootNavigator: true,
+                                    );
+                                    if (navigator.canPop()) {
+                                      navigator.pop();
+                                    }
+                                  },
+                                  child: Container(color: Colors.transparent),
+                                ),
                             ),
                             Align(
                               alignment: Alignment.bottomCenter,
@@ -172,13 +283,13 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
                                                 onPressed: () {
                                                   // Скрываем клавиатуру перед закрытием диалога
                                                   FocusManager.instance.primaryFocus?.unfocus();
-                                                  // Закрываем диалог с небольшой задержкой для закрытия клавиатуры
-                                                  Future.microtask(() {
-                                                    final navigator = Navigator.of(context, rootNavigator: true);
-                                                    if (navigator.canPop()) {
-                                                      navigator.pop();
-                                                    }
-                                                  });
+                                                  final navigator = Navigator.of(
+                                                    context,
+                                                    rootNavigator: true,
+                                                  );
+                                                  if (navigator.canPop()) {
+                                                    navigator.pop();
+                                                  }
                                                 },
                                               ),
                                             ),
@@ -199,6 +310,13 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
                                       Expanded(
                                         child: LeoDialogScreen(
                                           chatId: _chatId,
+                                          userContext: userContext,
+                                          levelContext: levelContext,
+                                          onChatIdChanged: (id) {
+                                            if (mounted && id.isNotEmpty) {
+                                              setState(() => _chatId = id);
+                                            }
+                                          },
                                           embedded: true,
                                         ),
                                       ),

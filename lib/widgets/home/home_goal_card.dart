@@ -178,7 +178,13 @@ class HomeGoalCard extends ConsumerWidget {
                                             child: GestureDetector(
                                               behavior: HitTestBehavior.opaque,
                                               onTap: () {
-                                                Navigator.of(context, rootNavigator: true).pop();
+                                                final navigator = Navigator.of(
+                                                  context,
+                                                  rootNavigator: true,
+                                                );
+                                                if (navigator.canPop()) {
+                                                  navigator.pop();
+                                                }
                                               },
                                               child: Container(color: Colors.transparent),
                                             ),
@@ -212,12 +218,13 @@ class HomeGoalCard extends ConsumerWidget {
                                                                 icon: const Icon(Icons.close),
                                                                 onPressed: () {
                                                                   FocusManager.instance.primaryFocus?.unfocus();
-                                                                  Future.microtask(() {
-                                                                    final navigator = Navigator.of(context, rootNavigator: true);
-                                                                    if (navigator.canPop()) {
-                                                                      navigator.pop();
-                                                                    }
-                                                                  });
+                                                                  final navigator = Navigator.of(
+                                                                    context,
+                                                                    rootNavigator: true,
+                                                                  );
+                                                                  if (navigator.canPop()) {
+                                                                    navigator.pop();
+                                                                  }
                                                                 },
                                                               ),
                                                             ),
