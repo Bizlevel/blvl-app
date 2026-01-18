@@ -1,7 +1,7 @@
 import 'package:bizlevel/widgets/common/notification_center.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:sentry_flutter/sentry_flutter.dart' hide Breadcrumb;
+import 'package:sentry_flutter/sentry_flutter.dart' as sentry;
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -23,6 +23,19 @@ class LibrarySectionScreen extends ConsumerStatefulWidget {
 class _LibrarySectionScreenState extends ConsumerState<LibrarySectionScreen> {
   String? _category;
   final Map<String, bool> _expanded = {};
+
+  @override
+  void initState() {
+    super.initState();
+    try {
+      sentry.Sentry.addBreadcrumb(sentry.Breadcrumb(
+        category: 'library',
+        level: sentry.SentryLevel.info,
+        message: 'library_section_opened',
+        data: {'type': widget.type},
+      ));
+    } catch (_) {}
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -48,7 +61,7 @@ class _LibrarySectionScreenState extends ConsumerState<LibrarySectionScreen> {
                 context.go('/library');
               }
             } catch (e, st) {
-              Sentry.captureException(e, stackTrace: st);
+              sentry.Sentry.captureException(e, stackTrace: st);
             }
           },
           tooltip: 'Назад',
@@ -77,7 +90,17 @@ class _LibrarySectionScreenState extends ConsumerState<LibrarySectionScreen> {
           ),
           _CategoryFilter(
             type: widget.type,
-            onSelected: (c) => setState(() => _category = c),
+            onSelected: (c) {
+              try {
+                sentry.Sentry.addBreadcrumb(sentry.Breadcrumb(
+                  category: 'library',
+                  level: sentry.SentryLevel.info,
+                  message: 'library_filter_applied',
+                  data: {'type': widget.type, 'category': c ?? ''},
+                ));
+              } catch (_) {}
+              setState(() => _category = c);
+            },
           ),
           Expanded(
             child: async.when(
@@ -111,6 +134,18 @@ class _LibrarySectionScreenState extends ConsumerState<LibrarySectionScreen> {
                           resourceType: _favoriteType(widget.type),
                           resourceId: r['id']?.toString() ?? '',
                         );
+                        try {
+                          sentry.Sentry.addBreadcrumb(sentry.Breadcrumb(
+                            category: 'library',
+                            level: sentry.SentryLevel.info,
+                            message: 'library_favorite_toggled',
+                            data: {
+                              'type': widget.type,
+                              'resourceId': r['id']?.toString() ?? '',
+                              'action': isFavorite ? 'remove' : 'add',
+                            },
+                          ));
+                        } catch (_) {}
                         // Инвалидация избранного для обновления UI
                         ref.invalidate(favoritesProvider);
                         ref.invalidate(favoritesDetailedProvider);
@@ -119,7 +154,7 @@ class _LibrarySectionScreenState extends ConsumerState<LibrarySectionScreen> {
                               context, 'Избранное обновлено');
                         }
                       } catch (e, st) {
-                        await Sentry.captureException(e, stackTrace: st);
+                        await sentry.Sentry.captureException(e, stackTrace: st);
                         if (context.mounted) {
                           NotificationCenter.showError(
                               context, 'Ошибка обновления избранного');
@@ -144,6 +179,17 @@ class _LibrarySectionScreenState extends ConsumerState<LibrarySectionScreen> {
     if (url.isEmpty) return;
     final uri = Uri.tryParse(url);
     if (uri == null) return;
+    try {
+      sentry.Sentry.addBreadcrumb(sentry.Breadcrumb(
+        category: 'library',
+        level: sentry.SentryLevel.info,
+        message: 'library_link_open',
+        data: {
+          'host': uri.host,
+          'path': uri.path,
+        },
+      ));
+    } catch (_) {}
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
       if (!mounted) return;
       NotificationCenter.showError(context, 'Не удалось открыть ссылку');

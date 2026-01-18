@@ -351,6 +351,18 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
   Future<void> _sendMessageInternal(String text, {bool isAuto = false}) async {
     // Дополнительная проверка на случай, если состояние изменилось
     if (_isSending || !mounted) return;
+    try {
+      Sentry.addBreadcrumb(Breadcrumb(
+        category: 'chat',
+        level: SentryLevel.info,
+        message: 'chat_send_start',
+        data: {
+          'bot': widget.bot,
+          'chatId': _chatId ?? '',
+          'caseMode': widget.caseMode,
+        },
+      ));
+    } catch (_) {}
 
     setState(() {
       _isSending = true;
@@ -406,6 +418,23 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
           widget.onChatIdChanged?.call(responseChatId);
         } catch (_) {}
       }
+
+      final String effectiveChatId =
+          (responseChatId != null && responseChatId.isNotEmpty)
+              ? responseChatId
+              : (_chatId ?? '');
+      try {
+        Sentry.addBreadcrumb(Breadcrumb(
+          category: 'chat',
+          level: SentryLevel.info,
+          message: 'chat_send_success',
+          data: {
+            'bot': widget.bot,
+            'chatId': effectiveChatId,
+            'caseMode': widget.caseMode,
+          },
+        ));
+      } catch (_) {}
 
       assistantMsg = response['message']['content'] as String? ?? '';
       // Обновим серверные чипы, если пришли
@@ -561,6 +590,19 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
       } catch (_) {}
       _scrollToBottom();
     } catch (e) {
+      try {
+        Sentry.addBreadcrumb(Breadcrumb(
+          category: 'chat',
+          level: SentryLevel.warning,
+          message: 'chat_send_fail',
+          data: {
+            'bot': widget.bot,
+            'chatId': _chatId ?? '',
+            'error_type': e.runtimeType.toString(),
+            'caseMode': widget.caseMode,
+          },
+        ));
+      } catch (_) {}
       if (!mounted) return;
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text('Ошибка: $e')));

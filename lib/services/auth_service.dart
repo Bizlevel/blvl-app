@@ -126,23 +126,49 @@ class AuthService {
 
   /// Signs the current user out.
   Future<void> signOut() async {
-    await _handleAuthCall(() async {
-      await _client.auth.signOut();
-      // Clear Sentry user context
-      Sentry.configureScope((scope) => scope.setUser(null));
-      // Отменяем локальные уведомления пользователя
+    try {
+      Sentry.addBreadcrumb(Breadcrumb(
+        category: 'auth',
+        level: SentryLevel.info,
+        message: 'auth_logout_start',
+      ));
+    } catch (_) {}
+    try {
+      await _handleAuthCall(() async {
+        await _client.auth.signOut();
+        // Clear Sentry user context
+        Sentry.configureScope((scope) => scope.setUser(null));
+        // Отменяем локальные уведомления пользователя
+        try {
+          final notif = NotificationsService.instance;
+          // ВАЖНО: не блокируем UX выхода.
+          // Отмена уведомлений на iOS может быть дорогой (много cancel(id) → фризы/таймауты жестов),
+          // поэтому делаем best-effort в фоне.
+          unawaited(() async {
+            try {
+              await notif.cancelAllNotifications();
+            } catch (_) {}
+          }());
+        } catch (_) {}
+      }, unknownErrorMessage: 'Неизвестная ошибка выхода');
       try {
-        final notif = NotificationsService.instance;
-        // ВАЖНО: не блокируем UX выхода.
-        // Отмена уведомлений на iOS может быть дорогой (много cancel(id) → фризы/таймауты жестов),
-        // поэтому делаем best-effort в фоне.
-        unawaited(() async {
-          try {
-            await notif.cancelAllNotifications();
-          } catch (_) {}
-        }());
+        Sentry.addBreadcrumb(Breadcrumb(
+          category: 'auth',
+          level: SentryLevel.info,
+          message: 'auth_logout_success',
+        ));
       } catch (_) {}
-    }, unknownErrorMessage: 'Неизвестная ошибка выхода');
+    } catch (e) {
+      try {
+        Sentry.addBreadcrumb(Breadcrumb(
+          category: 'auth',
+          level: SentryLevel.warning,
+          message: 'auth_logout_fail',
+          data: {'error_type': e.runtimeType.toString()},
+        ));
+      } catch (_) {}
+      rethrow;
+    }
   }
 
   /// Returns the currently authenticated [User] or `null` if not signed in.

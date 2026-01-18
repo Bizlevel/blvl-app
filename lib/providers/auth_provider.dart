@@ -71,6 +71,17 @@ final currentUserProvider = FutureProvider<UserModel?>((ref) async {
     debugPrint('currentUserProvider: repository returned ${profile != null}');
   }
 
+  if (profile != null) {
+    try {
+      sentry.Sentry.configureScope((scope) {
+        scope.setUser(sentry.SentryUser(
+          id: profile.id,
+          email: profile.email,
+        ));
+      });
+    } catch (_) {}
+  }
+
   return profile;
 });
 

@@ -4,7 +4,22 @@
 - 2026-01-17 — Кейсы: гейтинг, UI, GP, деплой
 - 2026-01-17 — Профиль: сохранение, ввод и защита
 - 2026-01-17 — Унификация клавиатуры и ввода
+- 2026-01-17 — Sentry аудит и улучшения (мобайл)
 - История изменений
+
+## 2026-01-17 — Sentry аудит и улучшения (мобайл)
+- Документация: создан план `docs/draft-1.md` и чек‑лист валидации `docs/sentry-validation-checklist.md`.
+- Окружения/релизы: добавлены `SENTRY_ENV`/`SENTRY_ENVIRONMENT` и `SENTRY_RELEASE` для override; `SENTRY_ENABLE_SESSIONS` включает release‑health без performance tracing.
+- Breadcrumbs: покрыты ключевые потоки (auth, mentors/chat, profile, tabs, deep links, library) + чатные send start/success/fail.
+- User context: `Sentry.setUser` при авто‑сессии через `currentUserProvider`, очистка при logout сохранена.
+- PII: добавлен `beforeBreadcrumb` санитайзер для удаления пользовательских текстов из data.
+- Symbols: добавлен скрипт `scripts/sentry_upload_symbols.sh` (dSYM / mapping.txt / Flutter symbols).
+
+Осталось доделать вручную:
+- Согласовать список “noise issues” в Sentry (например, GoogleSignIn canceled) и применить ignore/filters.
+- Проверить настройки PII в Sentry UI.
+- Настроить алерты: New issue / Error spike / High user impact (environment: prod).
+- Прогнать ручную валидацию на iOS/Android и проверить breadcrumbs по чек‑листу.
 
 ## 2026-01-17 — Рефералки и промокоды (GP)
 - Supabase: применена миграция с таблицами промокодов/рефералок, RPC (`get_referral_code`, `apply_referral_code`, `redeem_promo_code`), триггером начисления после уровней 0+1 и настройкой `app_settings.referral_reward_gp`.

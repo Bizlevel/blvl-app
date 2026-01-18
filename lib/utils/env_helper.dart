@@ -26,6 +26,14 @@ String envOrDefine(String key, {String defaultValue = ''}) {
       return const String.fromEnvironment('WEB_REDIRECT_ORIGIN');
     case 'SENTRY_DSN':
       return const String.fromEnvironment('SENTRY_DSN');
+    case 'SENTRY_ENV':
+      return const String.fromEnvironment('SENTRY_ENV');
+    case 'SENTRY_ENVIRONMENT':
+      return const String.fromEnvironment('SENTRY_ENVIRONMENT');
+    case 'SENTRY_ENABLE_SESSIONS':
+      return const String.fromEnvironment('SENTRY_ENABLE_SESSIONS');
+    case 'SENTRY_RELEASE':
+      return const String.fromEnvironment('SENTRY_RELEASE');
     case 'OPENAI_API_KEY':
       return const String.fromEnvironment('OPENAI_API_KEY');
     case 'ONESIGNAL_APP_ID':

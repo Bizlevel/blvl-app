@@ -28,12 +28,20 @@ import 'package:bizlevel/services/referral_service.dart';
 import 'package:bizlevel/services/referral_storage.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 
-class ProfileScreen extends ConsumerWidget {
+class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
+  bool _profileOpenedLogged = false;
+
+  @override
+  Widget build(BuildContext context) {
     // Сначала проверяем состояние аутентификации
     final authStateAsync = ref.watch(authStateProvider);
 
@@ -93,6 +101,17 @@ class ProfileScreen extends ConsumerWidget {
                   ),
                 ),
               );
+            }
+
+            if (!_profileOpenedLogged) {
+              _profileOpenedLogged = true;
+              try {
+                Sentry.addBreadcrumb(Breadcrumb(
+                  category: 'ui.screen',
+                  level: SentryLevel.info,
+                  message: 'profile_opened',
+                ));
+              } catch (_) {}
             }
 
             // Премиум отключён; используем только поле БД (будет удалено позже)
@@ -214,6 +233,13 @@ class ProfileScreen extends ConsumerWidget {
                         context.push('/gp-store');
                         break;
                       case 'logout':
+                        try {
+                          Sentry.addBreadcrumb(Breadcrumb(
+                            category: 'auth',
+                            level: SentryLevel.info,
+                            message: 'auth_logout_tap',
+                          ));
+                        } catch (_) {}
                         await ref.read(authServiceProvider).signOut();
                         // ВАЖНО: не трогаем `ref` после await.
                         // SignOut может триггерить редирект на /login → этот виджет уже disposed,
@@ -627,6 +653,14 @@ class _BodyState extends ConsumerState<_Body> {
     if (selectedId != null && selectedId != widget.avatarId) {
       // Обновляем аватар в Supabase
       await ref.read(authServiceProvider).updateAvatar(selectedId);
+      try {
+        Sentry.addBreadcrumb(Breadcrumb(
+          category: 'profile',
+          level: SentryLevel.info,
+          message: 'avatar_changed',
+          data: {'avatarId': selectedId},
+        ));
+      } catch (_) {}
       // Обновляем локальное состояние сразу для мгновенного отображения
       setState(() {
         _localAvatarId = selectedId;
@@ -1088,6 +1122,13 @@ class _AboutMeCardState extends ConsumerState<_AboutMeCard> {
 
   Future<void> _save() async {
     try {
+      try {
+        Sentry.addBreadcrumb(Breadcrumb(
+          category: 'profile',
+          level: SentryLevel.info,
+          message: 'profile_save_start',
+        ));
+      } catch (_) {}
       final bonusGranted = await ref.read(authServiceProvider).updateProfile(
             name: _nameCtrl.text.trim(),
             about: _aboutCtrl.text.trim(),
@@ -1099,6 +1140,13 @@ class _AboutMeCardState extends ConsumerState<_AboutMeCard> {
             learningStyle: _learningStyleCtrl.text.trim(),
             businessRegion: _businessRegionCtrl.text.trim(),
           );
+      try {
+        Sentry.addBreadcrumb(Breadcrumb(
+          category: 'profile',
+          level: SentryLevel.info,
+          message: 'profile_save_success',
+        ));
+      } catch (_) {}
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Профиль обновлён')),
@@ -1113,6 +1161,14 @@ class _AboutMeCardState extends ConsumerState<_AboutMeCard> {
       ref.invalidate(currentUserProvider);
       setState(() => _editing = false);
     } catch (e) {
+      try {
+        Sentry.addBreadcrumb(Breadcrumb(
+          category: 'profile',
+          level: SentryLevel.warning,
+          message: 'profile_save_fail',
+          data: {'error_type': e.runtimeType.toString()},
+        ));
+      } catch (_) {}
       if (!mounted) return;
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text('Ошибка: $e')));

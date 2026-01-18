@@ -17,11 +17,28 @@ import 'package:bizlevel/widgets/common/bizlevel_error.dart';
 import 'package:bizlevel/widgets/common/bizlevel_loading.dart';
 import 'package:bizlevel/screens/ray_dialog_screen.dart';
 
-class LibraryScreen extends ConsumerWidget {
+class LibraryScreen extends ConsumerStatefulWidget {
   const LibraryScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<LibraryScreen> createState() => _LibraryScreenState();
+}
+
+class _LibraryScreenState extends ConsumerState<LibraryScreen> {
+  @override
+  void initState() {
+    super.initState();
+    try {
+      Sentry.addBreadcrumb(Breadcrumb(
+        category: 'ui.screen',
+        level: SentryLevel.info,
+        message: 'library_opened',
+      ));
+    } catch (_) {}
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return DefaultTabController(
       length: 2,
       child: Scaffold(
