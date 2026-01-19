@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/foundation.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 import 'auth_provider.dart';
 import '../routing/app_router.dart';
 
@@ -11,18 +12,34 @@ class LoginController extends StateNotifier<AsyncValue<void>> {
 
   final Ref ref;
 
+  void _addAuthBreadcrumb(String message, {Map<String, Object?> data = const {}}) {
+    try {
+      Sentry.addBreadcrumb(Breadcrumb(
+        category: 'auth',
+        level: SentryLevel.info,
+        message: message,
+        data: data,
+      ));
+    } catch (_) {}
+  }
+
   Future<void> signIn({required String email, required String password}) async {
     state = const AsyncLoading();
+    _addAuthBreadcrumb('auth_login_submit');
     try {
       await ref
           .read(authServiceProvider)
           .signIn(email: email, password: password);
       state = const AsyncData(null);
+      _addAuthBreadcrumb('auth_login_success');
       // КРИТИЧНО: После успешного логина инвалидируем провайдеры,
       // чтобы GoRouter обновился и перенаправил на /home
       _invalidateAuthDependentProviders();
     } catch (e, st) {
       state = AsyncError(e, st);
+      _addAuthBreadcrumb('auth_login_fail', data: {
+        'error_type': e.runtimeType.toString(),
+      });
     }
   }
   
@@ -38,23 +55,33 @@ class LoginController extends StateNotifier<AsyncValue<void>> {
 
   Future<void> signInWithGoogle() async {
     state = const AsyncLoading();
+    _addAuthBreadcrumb('auth_google_start');
     try {
       await ref.read(authServiceProvider).signInWithGoogle();
       state = const AsyncData(null);
+      _addAuthBreadcrumb('auth_google_success');
       _invalidateAuthDependentProviders();
     } catch (e, st) {
       state = AsyncError(e, st);
+      _addAuthBreadcrumb('auth_google_fail', data: {
+        'error_type': e.runtimeType.toString(),
+      });
     }
   }
 
   Future<void> signInWithApple() async {
     state = const AsyncLoading();
+    _addAuthBreadcrumb('auth_apple_start');
     try {
       await ref.read(authServiceProvider).signInWithApple();
       state = const AsyncData(null);
+      _addAuthBreadcrumb('auth_apple_success');
       _invalidateAuthDependentProviders();
     } catch (e, st) {
       state = AsyncError(e, st);
+      _addAuthBreadcrumb('auth_apple_fail', data: {
+        'error_type': e.runtimeType.toString(),
+      });
     }
   }
 }

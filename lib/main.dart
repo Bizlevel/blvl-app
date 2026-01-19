@@ -29,6 +29,8 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:bizlevel/services/notifications_service.dart';
 import 'services/push_service.dart';
 import 'constants/push_flags.dart';
+import 'package:bizlevel/services/referral_service.dart';
+import 'package:bizlevel/services/referral_storage.dart';
 
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
@@ -64,6 +66,49 @@ bool _isSentryDisabled() {
   final envFlag = envValue != null &&
       const ['true', '1', 'yes'].contains(envValue.toLowerCase());
   return _kDisableSentryDefine || envFlag;
+}
+
+String _resolveSentryEnvironment() {
+  final env = envOrDefine('SENTRY_ENV');
+  if (env.isNotEmpty) return env;
+  final alt = envOrDefine('SENTRY_ENVIRONMENT');
+  if (alt.isNotEmpty) return alt;
+  return kReleaseMode ? 'prod' : 'dev';
+}
+
+bool _isSentrySessionTrackingEnabled() {
+  final env = envOrDefine('SENTRY_ENABLE_SESSIONS').toLowerCase();
+  if (env.isNotEmpty) {
+    return const ['true', '1', 'yes'].contains(env);
+  }
+  return kReleaseMode;
+}
+
+Breadcrumb? _sanitizeBreadcrumb(Breadcrumb? breadcrumb, Hint hint) {
+  if (breadcrumb == null) return null;
+  final raw = breadcrumb.data;
+  if (raw == null || raw.isEmpty) return breadcrumb;
+  final sanitized = <String, dynamic>{};
+  for (final entry in raw.entries) {
+    final key = entry.key.toLowerCase();
+    if (key.contains('message') ||
+        key.contains('text') ||
+        key.contains('content') ||
+        key.contains('prompt') ||
+        key.contains('answer') ||
+        key.contains('question')) {
+      continue;
+    }
+    sanitized[entry.key] = entry.value;
+  }
+  return Breadcrumb(
+    message: breadcrumb.message,
+    type: breadcrumb.type,
+    category: breadcrumb.category,
+    level: breadcrumb.level,
+    data: sanitized.isEmpty ? null : sanitized,
+    timestamp: breadcrumb.timestamp,
+  );
 }
 
 /// Критический bootstrap, который раньше блокировал LaunchScreen из-за await до runApp().
@@ -552,15 +597,18 @@ Future<void> _initializeSentry(String dsn) async {
   }
   try {
     final packageInfo = await PackageInfo.fromPlatform();
+    final releaseOverride = envOrDefine('SENTRY_RELEASE');
+    final releaseName = releaseOverride.isNotEmpty
+        ? releaseOverride
+        : 'bizlevel@${packageInfo.version}+${packageInfo.buildNumber}';
     await SentryFlutter.init(
       (options) {
         options
           ..dsn = dsn
           ..tracesSampleRate = kReleaseMode ? 0.3 : 1.0
-          ..environment = kReleaseMode ? 'prod' : 'dev'
-          ..release =
-              'bizlevel@${packageInfo.version}+${packageInfo.buildNumber}'
-          ..enableAutoSessionTracking = false
+          ..environment = _resolveSentryEnvironment()
+          ..release = releaseName
+          ..enableAutoSessionTracking = _isSentrySessionTrackingEnabled()
           ..attachScreenshot = true
           ..attachViewHierarchy = true
           ..enableAutoPerformanceTracing = false
@@ -573,6 +621,7 @@ Future<void> _initializeSentry(String dsn) async {
           ..enableWindowMetricBreadcrumbs = false
           ..enableUserInteractionBreadcrumbs = false
           ..enableUserInteractionTracing = false
+          ..beforeBreadcrumb = _sanitizeBreadcrumb
           ..addInAppExclude('SentryFileIOTrackingIntegration')
           ..beforeSend = (SentryEvent event, Hint hint) {
             event.request?.headers
@@ -722,9 +771,63 @@ class _LinkListenerState extends State<_LinkListener> {
   }
 
   void _handleLinkUri(Uri uri) {
+    try {
+      Sentry.addBreadcrumb(Breadcrumb(
+        category: 'deeplink',
+        level: SentryLevel.info,
+        message: 'deeplink_received',
+        data: {
+          'scheme': uri.scheme,
+          'host': uri.host,
+          'path': uri.path,
+        },
+      ));
+    } catch (_) {}
+    final referralCode = extractReferralCodeFromDeepLink(uri);
+    final promoCode = extractPromoCodeFromDeepLink(uri);
+    if (referralCode != null) {
+      unawaited(ReferralStorage.savePendingReferralCode(referralCode));
+    }
+    if (promoCode != null) {
+      unawaited(ReferralStorage.savePendingPromoCode(promoCode));
+    }
+    if (referralCode != null || promoCode != null) {
+      try {
+        Sentry.addBreadcrumb(Breadcrumb(
+          category: 'deeplink',
+          level: SentryLevel.info,
+          message: 'deeplink_codes_detected',
+          data: {
+            'has_referral': referralCode != null,
+            'has_promo': promoCode != null,
+          },
+        ));
+      } catch (_) {}
+      final session = Supabase.instance.client.auth.currentSession;
+      if (session != null) {
+        unawaited(ReferralService(Supabase.instance.client)
+            .applyPendingCodesBestEffort());
+      }
+    }
     final path = mapBizLevelDeepLink(uri.toString());
     if (path != null) {
+      try {
+        Sentry.addBreadcrumb(Breadcrumb(
+          category: 'deeplink',
+          level: SentryLevel.info,
+          message: 'deeplink_mapped',
+          data: {'target': path},
+        ));
+      } catch (_) {}
       widget.router.go(path);
+    } else {
+      try {
+        Sentry.addBreadcrumb(Breadcrumb(
+          category: 'deeplink',
+          level: SentryLevel.info,
+          message: 'deeplink_ignored',
+        ));
+      } catch (_) {}
     }
   }
 

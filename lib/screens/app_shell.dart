@@ -10,6 +10,7 @@ import 'package:bizlevel/widgets/bottombar_item.dart';
 import 'package:bizlevel/widgets/desktop_nav_bar.dart';
 import 'package:bizlevel/screens/main_street_screen.dart';
 import 'package:bizlevel/screens/profile_screen.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:bizlevel/screens/biz_tower_screen.dart';
 import 'package:bizlevel/screens/leo_chat_screen.dart';
@@ -51,6 +52,22 @@ class _AppShellState extends ConsumerState<AppShell> {
     final bool isDesktop = width >= 1024;
 
     void goTab(int index) {
+      try {
+        final fromIndex = activeTab;
+        final from = _routes[fromIndex];
+        final to = _routes[index];
+        if (from != to) {
+          Sentry.addBreadcrumb(Breadcrumb(
+            category: 'nav',
+            level: SentryLevel.info,
+            message: 'tab_switch',
+            data: {
+              'from': from,
+              'to': to,
+            },
+          ));
+        }
+      } catch (_) {}
       if (_pageController != null && _pageController!.positions.isNotEmpty) {
         final router = GoRouter.of(context);
         _isSyncing = true;

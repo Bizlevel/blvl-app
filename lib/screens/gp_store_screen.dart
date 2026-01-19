@@ -256,6 +256,31 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
               ),
             ),
             const SizedBox(height: AppSpacing.md),
+            BizLevelCard(
+              padding: AppSpacing.insetsAll(AppSpacing.md),
+              outlined: true,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Пригласи друга — получи 100 GP',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleSmall
+                        ?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                  AppSpacing.gapH(AppSpacing.s6),
+                  Text(
+                    'Бонус начислим после того, как друг пройдет уровни 0 и 1.',
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodySmall
+                        ?.copyWith(color: AppColor.onSurfaceSubtle),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
             // Переключатель планов
             Semantics(
               label: 'Выбор плана',

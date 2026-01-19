@@ -1,6 +1,7 @@
 import 'package:bizlevel/providers/user_skills_provider.dart';
 import 'package:bizlevel/widgets/skills_tree_view.dart';
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/foundation.dart';
 
@@ -22,12 +23,25 @@ import 'package:bizlevel/widgets/common/bizlevel_text_field.dart';
 import 'package:bizlevel/widgets/reminders_settings_sheet.dart';
 import 'package:bizlevel/widgets/common/achievement_badge.dart';
 import 'package:bizlevel/theme/dimensions.dart';
+import 'package:bizlevel/utils/input_bottom_sheet.dart';
+import 'package:bizlevel/services/referral_service.dart';
+import 'package:bizlevel/services/referral_storage.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 
-class ProfileScreen extends ConsumerWidget {
+class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
+  bool _profileOpenedLogged = false;
+
+  @override
+  Widget build(BuildContext context) {
     // Сначала проверяем состояние аутентификации
     final authStateAsync = ref.watch(authStateProvider);
 
@@ -87,6 +101,17 @@ class ProfileScreen extends ConsumerWidget {
                   ),
                 ),
               );
+            }
+
+            if (!_profileOpenedLogged) {
+              _profileOpenedLogged = true;
+              try {
+                Sentry.addBreadcrumb(Breadcrumb(
+                  category: 'ui.screen',
+                  level: SentryLevel.info,
+                  message: 'profile_opened',
+                ));
+              } catch (_) {}
             }
 
             // Премиум отключён; используем только поле БД (будет удалено позже)
@@ -208,6 +233,13 @@ class ProfileScreen extends ConsumerWidget {
                         context.push('/gp-store');
                         break;
                       case 'logout':
+                        try {
+                          Sentry.addBreadcrumb(Breadcrumb(
+                            category: 'auth',
+                            level: SentryLevel.info,
+                            message: 'auth_logout_tap',
+                          ));
+                        } catch (_) {}
                         await ref.read(authServiceProvider).signOut();
                         // ВАЖНО: не трогаем `ref` после await.
                         // SignOut может триггерить редирект на /login → этот виджет уже disposed,
@@ -355,12 +387,20 @@ class _Body extends ConsumerStatefulWidget {
 class _BodyState extends ConsumerState<_Body> {
   Uint8List? _avatarPreviewBytes;
   int? _localAvatarId; // Локальное состояние для аватара
+  String? _myReferralCode;
+  bool _referralCodeLoading = false;
+  bool _referralApplying = false;
+  bool _promoApplying = false;
+  final TextEditingController _referralCodeController =
+      TextEditingController();
+  final TextEditingController _promoCodeController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     // Инициализируем локальное состояние значением из widget
     _localAvatarId = widget.avatarId;
+    unawaited(_loadReferralCode());
   }
 
   @override
@@ -371,6 +411,117 @@ class _BodyState extends ConsumerState<_Body> {
     if (widget.avatarId != oldWidget.avatarId && _localAvatarId == oldWidget.avatarId) {
       _localAvatarId = widget.avatarId;
     }
+  }
+
+  Future<void> _loadReferralCode() async {
+    if (_referralCodeLoading) return;
+    setState(() {
+      _referralCodeLoading = true;
+    });
+    try {
+      final service = ReferralService(Supabase.instance.client);
+      final code = await service.getMyReferralCode();
+      if (!mounted) return;
+      setState(() {
+        _myReferralCode = code;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      _showSnackBar('Не удалось получить код приглашения');
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _referralCodeLoading = false;
+      });
+    }
+  }
+
+  Future<void> _applyReferralCode() async {
+    if (_referralApplying) return;
+    final normalized = ReferralStorage.normalizeCode(
+      _referralCodeController.text,
+    );
+    if (normalized == null) {
+      _showSnackBar('Введите код приглашения');
+      return;
+    }
+    setState(() {
+      _referralApplying = true;
+    });
+    try {
+      final service = ReferralService(Supabase.instance.client);
+      await service.applyReferralCode(normalized);
+      if (!mounted) return;
+      _referralCodeController.clear();
+      _showSnackBar('Код приглашения принят. Бонус начислим после уровней 0 и 1');
+    } catch (e) {
+      if (!mounted) return;
+      final message =
+          e is ReferralFailure ? e.message : 'Не удалось применить код';
+      _showSnackBar(message);
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _referralApplying = false;
+      });
+    }
+  }
+
+  Future<void> _redeemPromoCode() async {
+    if (_promoApplying) return;
+    final normalized = ReferralStorage.normalizeCode(
+      _promoCodeController.text,
+    );
+    if (normalized == null) {
+      _showSnackBar('Введите промокод');
+      return;
+    }
+    setState(() {
+      _promoApplying = true;
+    });
+    try {
+      final service = ReferralService(Supabase.instance.client);
+      await service.redeemPromoCode(normalized);
+      if (!mounted) return;
+      _promoCodeController.clear();
+      ref.invalidate(gpBalanceProvider);
+      _showSnackBar('Промокод применён, баланс обновлён');
+    } catch (e) {
+      if (!mounted) return;
+      final message =
+          e is PromoFailure ? e.message : 'Не удалось применить промокод';
+      _showSnackBar(message);
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _promoApplying = false;
+      });
+    }
+  }
+
+  void _shareReferralCode() {
+    final code = _myReferralCode;
+    if (code == null || code.isEmpty) {
+      _showSnackBar('Код приглашения ещё не готов');
+      return;
+    }
+    final text = 'Мой код BizLevel: $code\n'
+        'Пройди уровни 0 и 1, и я получу бонус 100 GP.';
+    Share.share(text);
+  }
+
+  void _showSnackBar(String message) {
+    if (Scaffold.maybeOf(context) == null) return;
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    if (messenger == null) return;
+    messenger.showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  @override
+  void dispose() {
+    _referralCodeController.dispose();
+    _promoCodeController.dispose();
+    super.dispose();
   }
 
   Future<void> _pickAvatarFromGallery() async {
@@ -397,54 +548,59 @@ class _BodyState extends ConsumerState<_Body> {
   // Старый модал артефактов убран — вместо этого ведём на экран /artifacts
 
   Future<void> _openAboutMeModal() async {
-    await showModalBottomSheet<void>(
+    await showBizLevelInputBottomSheet<void>(
       context: context,
-      isScrollControlled: true,
       backgroundColor: AppColor.surface,
+      applyKeyboardInset: false,
+      contentPadding: EdgeInsets.zero,
       builder: (ctx) {
-        return DraggableScrollableSheet(
-          expand: false,
-          minChildSize: 0.4,
-          maxChildSize: 0.92,
-          initialChildSize: 0.66,
-          builder: (context, scrollController) {
-            return Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.lg,
-                    vertical: AppSpacing.sm,
+        final media = MediaQuery.of(ctx);
+        return Padding(
+          padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
+          child: DraggableScrollableSheet(
+            expand: false,
+            minChildSize: 0.4,
+            maxChildSize: 0.92,
+            initialChildSize: 0.66,
+            builder: (context, scrollController) {
+              return Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.lg,
+                      vertical: AppSpacing.sm,
+                    ),
+                    child: Row(
+                      children: [
+                        Text(
+                          'Информация обо мне',
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                        const Spacer(),
+                        // fix: добавить tooltip для IconButton (accessibility)
+                        IconButton(
+                          tooltip: 'Закрыть',
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.of(context).pop(),
+                        ),
+                      ],
+                    ),
                   ),
-                  child: Row(
-                    children: [
-                      Text(
-                        'Информация обо мне',
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleMedium
-                            ?.copyWith(fontWeight: FontWeight.w600),
-                      ),
-                      const Spacer(),
-                      // fix: добавить tooltip для IconButton (accessibility)
-                      IconButton(
-                        tooltip: 'Закрыть',
-                        icon: const Icon(Icons.close),
-                        onPressed: () => Navigator.of(context).pop(),
-                      ),
-                    ],
+                  const Divider(height: 1),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      controller: scrollController,
+                      padding: const EdgeInsets.all(AppSpacing.lg),
+                      child: _AboutMeCard(user: widget.user),
+                    ),
                   ),
-                ),
-                const Divider(height: 1),
-                Expanded(
-                  child: SingleChildScrollView(
-                    controller: scrollController,
-                    padding: const EdgeInsets.all(AppSpacing.lg),
-                    child: _AboutMeCard(user: widget.user),
-                  ),
-                ),
-              ],
-            );
-          },
+                ],
+              );
+            },
+          ),
         );
       },
     );
@@ -497,6 +653,14 @@ class _BodyState extends ConsumerState<_Body> {
     if (selectedId != null && selectedId != widget.avatarId) {
       // Обновляем аватар в Supabase
       await ref.read(authServiceProvider).updateAvatar(selectedId);
+      try {
+        Sentry.addBreadcrumb(Breadcrumb(
+          category: 'profile',
+          level: SentryLevel.info,
+          message: 'avatar_changed',
+          data: {'avatarId': selectedId},
+        ));
+      } catch (_) {}
       // Обновляем локальное состояние сразу для мгновенного отображения
       setState(() {
         _localAvatarId = selectedId;
@@ -506,7 +670,7 @@ class _BodyState extends ConsumerState<_Body> {
       // для отображения нового аватара на других страницах
       Future.delayed(const Duration(milliseconds: 1500), () {
         if (mounted) {
-          ref.refresh(currentUserProvider);
+          ref.invalidate(currentUserProvider);
         }
       });
     }
@@ -531,6 +695,8 @@ class _BodyState extends ConsumerState<_Body> {
             error: (e, st) =>
                 const Center(child: Text('Ошибка загрузки навыков')),
           ),
+          const SizedBox(height: AppSpacing.lg),
+          _buildReferralCard(context),
           const SizedBox(height: AppSpacing.lg),
           Align(
             alignment: Alignment.centerLeft,
@@ -562,6 +728,126 @@ class _BodyState extends ConsumerState<_Body> {
           const SizedBox(height: AppSpacing.lg),
           // Premium отключён — кнопка скрыта
           // Секция артефактов скрыта — используйте карточку статистики выше
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReferralCard(BuildContext context) {
+    final theme = Theme.of(context);
+    final code = _myReferralCode;
+    final codeText = code?.isNotEmpty == true ? code! : 'Генерируем код...';
+
+    return BizLevelCard(
+      padding: AppSpacing.insetsAll(AppSpacing.md),
+      outlined: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Пригласи друга',
+                  style: theme.textTheme.titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w600),
+                ),
+              ),
+              BizLevelButton(
+                label: 'Поделиться',
+                onPressed: _referralCodeLoading ? null : _shareReferralCode,
+                size: BizLevelButtonSize.sm,
+                variant: BizLevelButtonVariant.outline,
+              ),
+            ],
+          ),
+          AppSpacing.gapH(AppSpacing.s6),
+          Text(
+            'Получите 100 GP, когда друг пройдет уровни 0 и 1.',
+            style: theme.textTheme.bodySmall
+                ?.copyWith(color: AppColor.onSurfaceSubtle),
+          ),
+          AppSpacing.gapH(AppSpacing.md),
+          Container(
+            padding: AppSpacing.insetsSymmetric(
+              h: AppSpacing.md,
+              v: AppSpacing.sm,
+            ),
+            decoration: BoxDecoration(
+              color: AppColor.surface,
+              border: Border.all(color: AppColor.borderColor),
+              borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    codeText,
+                    style: theme.textTheme.titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                ),
+                if (_referralCodeLoading)
+                  const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+              ],
+            ),
+          ),
+          AppSpacing.gapH(AppSpacing.md),
+          Text(
+            'Код приглашения',
+            style: theme.textTheme.bodyMedium
+                ?.copyWith(fontWeight: FontWeight.w600),
+          ),
+          AppSpacing.gapH(AppSpacing.s6),
+          Row(
+            children: [
+              Expanded(
+                child: BizLevelTextField(
+                  hint: 'Введите код друга',
+                  controller: _referralCodeController,
+                  textCapitalization: TextCapitalization.characters,
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => _applyReferralCode(),
+                ),
+              ),
+              AppSpacing.gapW(AppSpacing.sm),
+              BizLevelButton(
+                label: 'Применить',
+                onPressed: _referralApplying ? null : _applyReferralCode,
+                size: BizLevelButtonSize.sm,
+              ),
+            ],
+          ),
+          AppSpacing.gapH(AppSpacing.md),
+          Text(
+            'Промокод',
+            style: theme.textTheme.bodyMedium
+                ?.copyWith(fontWeight: FontWeight.w600),
+          ),
+          AppSpacing.gapH(AppSpacing.s6),
+          Row(
+            children: [
+              Expanded(
+                child: BizLevelTextField(
+                  hint: 'Введите промокод',
+                  controller: _promoCodeController,
+                  textCapitalization: TextCapitalization.characters,
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => _redeemPromoCode(),
+                ),
+              ),
+              AppSpacing.gapW(AppSpacing.sm),
+              BizLevelButton(
+                label: 'Активировать',
+                onPressed: _promoApplying ? null : _redeemPromoCode,
+                size: BizLevelButtonSize.sm,
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -836,29 +1122,31 @@ class _AboutMeCardState extends ConsumerState<_AboutMeCard> {
 
   Future<void> _save() async {
     try {
+      try {
+        Sentry.addBreadcrumb(Breadcrumb(
+          category: 'profile',
+          level: SentryLevel.info,
+          message: 'profile_save_start',
+        ));
+      } catch (_) {}
       final bonusGranted = await ref.read(authServiceProvider).updateProfile(
-            name: _nameCtrl.text.trim().isEmpty ? null : _nameCtrl.text.trim(),
-            about:
-                _aboutCtrl.text.trim().isEmpty ? null : _aboutCtrl.text.trim(),
-            goal: _goalCtrl.text.trim().isEmpty ? null : _goalCtrl.text.trim(),
-            businessArea: _businessAreaCtrl.text.trim().isEmpty
-                ? null
-                : _businessAreaCtrl.text.trim(),
-            experienceLevel: _experienceLevelCtrl.text.trim().isEmpty
-                ? null
-                : _experienceLevelCtrl.text.trim(),
-            businessSize: _businessSizeCtrl.text.trim().isEmpty
-                ? null
-                : _businessSizeCtrl.text.trim(),
-            keyChallenges:
-                _keyChallenges.isEmpty ? null : _keyChallenges.toList(),
-            learningStyle: _learningStyleCtrl.text.trim().isEmpty
-                ? null
-                : _learningStyleCtrl.text.trim(),
-            businessRegion: _businessRegionCtrl.text.trim().isEmpty
-                ? null
-                : _businessRegionCtrl.text.trim(),
+            name: _nameCtrl.text.trim(),
+            about: _aboutCtrl.text.trim(),
+            goal: _goalCtrl.text.trim(),
+            businessArea: _businessAreaCtrl.text.trim(),
+            experienceLevel: _experienceLevelCtrl.text.trim(),
+            businessSize: _businessSizeCtrl.text.trim(),
+            keyChallenges: _keyChallenges.toList(),
+            learningStyle: _learningStyleCtrl.text.trim(),
+            businessRegion: _businessRegionCtrl.text.trim(),
           );
+      try {
+        Sentry.addBreadcrumb(Breadcrumb(
+          category: 'profile',
+          level: SentryLevel.info,
+          message: 'profile_save_success',
+        ));
+      } catch (_) {}
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Профиль обновлён')),
@@ -870,9 +1158,17 @@ class _AboutMeCardState extends ConsumerState<_AboutMeCard> {
         );
       }
       // Обновляем профиль без полной инвалидации, чтобы избежать редиректа
-      ref.refresh(currentUserProvider);
+      ref.invalidate(currentUserProvider);
       setState(() => _editing = false);
     } catch (e) {
+      try {
+        Sentry.addBreadcrumb(Breadcrumb(
+          category: 'profile',
+          level: SentryLevel.warning,
+          message: 'profile_save_fail',
+          data: {'error_type': e.runtimeType.toString()},
+        ));
+      } catch (_) {}
       if (!mounted) return;
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text('Ошибка: $e')));
@@ -1291,7 +1587,7 @@ class _DropdownLabeled extends StatelessWidget {
         ),
         AppSpacing.gapH(AppSpacing.s6),
         DropdownButtonFormField<String>(
-          initialValue: value,
+          value: value,
           items: options
               .map((e) => DropdownMenuItem<String>(
                     value: e,

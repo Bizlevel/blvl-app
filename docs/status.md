@@ -1,3 +1,65 @@
+## Оглавление
+- 2026-01-17 — Рефералки и промокоды (GP)
+- 2026-01-17 — Чат в уровнях: навигация, подсказки, история, безопасность
+- 2026-01-17 — Кейсы: гейтинг, UI, GP, деплой
+- 2026-01-17 — Профиль: сохранение, ввод и защита
+- 2026-01-17 — Унификация клавиатуры и ввода
+- 2026-01-17 — Sentry аудит и улучшения (мобайл)
+- История изменений
+
+## 2026-01-17 — Sentry аудит и улучшения (мобайл)
+- Документация: создан план `docs/draft-1.md` и чек‑лист валидации `docs/sentry-validation-checklist.md`.
+- Окружения/релизы: добавлены `SENTRY_ENV`/`SENTRY_ENVIRONMENT` и `SENTRY_RELEASE` для override; `SENTRY_ENABLE_SESSIONS` включает release‑health без performance tracing.
+- Breadcrumbs: покрыты ключевые потоки (auth, mentors/chat, profile, tabs, deep links, library) + чатные send start/success/fail.
+- User context: `Sentry.setUser` при авто‑сессии через `currentUserProvider`, очистка при logout сохранена.
+- PII: добавлен `beforeBreadcrumb` санитайзер для удаления пользовательских текстов из data.
+- Symbols: добавлен скрипт `scripts/sentry_upload_symbols.sh` (dSYM / mapping.txt / Flutter symbols).
+
+Осталось доделать вручную:
+- Согласовать список “noise issues” в Sentry (например, GoogleSignIn canceled) и применить ignore/filters.
+- Проверить настройки PII в Sentry UI.
+- Настроить алерты: New issue / Error spike / High user impact (environment: prod).
+- Прогнать ручную валидацию на iOS/Android и проверить breadcrumbs по чек‑листу.
+
+## 2026-01-17 — Рефералки и промокоды (GP)
+- Supabase: применена миграция с таблицами промокодов/рефералок, RPC (`get_referral_code`, `apply_referral_code`, `redeem_promo_code`), триггером начисления после уровней 0+1 и настройкой `app_settings.referral_reward_gp`.
+- Клиент: добавлены сервисы `ReferralService/ReferralStorage`, обработка deep links `bizlevel://ref|promo`, автоприменение кодов после логина, блок рефералок в профиле (между навыками и достижениями) и напоминалка в GP‑магазине.
+- UI/UX: кнопка «Поделиться» через `share_plus`, создана документация `docs/referrals-and-promocodes.md`.
+- Тесты: `flutter test` — есть падения в `startup_performance_test` (currentUserProvider > 500ms) и `infrastructure_integration_test` (timeout currentUserProvider).
+
+## 2026-01-17 — Чат в уровнях: навигация, подсказки, история, безопасность
+- Чат в уровнях: передан контекст пользователя и уровня, сохранение `chatId` после первого сообщения для продолжения диалога.
+- Закрытие модального чата: убран `microtask` и защитили `pop`, чтобы не выкидывало на «Башню».
+- Подсказки (chips): добавлен режим `mode=chips` в `leo-chat` и единый генератор чипов для Leo/Max.
+- История чатов: записи и `message_count` ведутся на сервере, клиент больше не пишет `leo_messages`, в ответе возвращается `chat_id`.
+- Безопасность: сервер валидирует принадлежность `chatId` пользователю и игнорирует `skipSpend` от клиента (кроме `caseMode`).
+- Наблюдаемость/UX: убрано логирование текста сообщения (только длина), дедуп сообщений по `id`, dispose для контроллера ввода.
+
+## 2026-01-17 — Кейсы: гейтинг, UI, GP, деплой
+- Мини‑кейсы: убран автозачёт следующего уровня, добавлен гейтинг при прямом открытии уровня.
+- Прогресс кейса: сохранение `steps_completed` в `user_case_progress`, контексты кейса сделаны динамическими.
+- UI мини‑кейса приведён к стилю BizLevel (glass‑карточки/кнопки), добавлен дисклеймер «пропуск без бонусов».
+- Leo caseMode: подсказки‑chips скрыты, серверный системный промпт упрощён для фасилитатора.
+- GP: добавлен флаг серверного списания (`kEnableServerGpSpend` + `SERVER_SPEND_GP`), деплой `leo-chat` выполнен.
+- Supabase: миграция для уникального активного кейса на `after_level` и удаления дубля индекса `gp_ledger_idempotency_key_idx`.
+- Тесты: `leo_dialog_screen_test`, `leo_service_gp_spend_test`, `gp_bonus_flow_test` пройдены; `provider_smoke_test` стабилизирован и пройден.
+
+## 2026-01-17 — Профиль: сохранение, ввод и защита
+- Уровень 0: завершение теперь блокируется, если видео не просмотрены; профиль можно сохранить, но уровень не закроется.
+- Сохранение профиля: добавлен best‑effort insert при отсутствии строки пользователя, чтобы избежать «профиль не найден».
+- Уровень 0: снят ранний блок сохранения по отсутствию email — решение теперь принимает `updateProfile`.
+- Редактирование профиля: пустые значения теперь сохраняются как пустые строки/списки (можно очистить данные).
+- Модалка «Информация обо мне» переведена на общий `showBizLevelInputBottomSheet` для корректной работы клавиатуры.
+- Контекст для Лео/Макса: добавлена санитизация текста и ограничение длины/списков.
+- Профиль: исправлен `DropdownButtonFormField` на `value` (совместимость с актуальным Flutter).
+
+## 2026-01-17 — Унификация клавиатуры и ввода
+- Добавлен общий helper для bottom sheet с вводом: `showBizLevelInputBottomSheet` (SafeArea, root navigator, padding под клавиатуру).
+- Чекпоинты L1/L4/L7 и sheet "Новая цель" переведены на общий helper.
+- В формах цели и чекпоинта добавлены единые правила dismiss/submit (`TextInputAction`, `onTapOutside`).
+- Расширен API `BizLevelTextField`/`CustomTextBox` для стандартизации поведения клавиатуры.
+
+## История изменений
 Задача leo-dialog-keyboard-fix: исправлен краш при открытии клавиатуры в модальном диалоге Лео/Макса на Android. Заменён `showModalBottomSheet` на кастомный `CustomModalBottomSheetRoute` с использованием `rootNavigator: true` и `UncontrolledProviderScope` для сохранения контекста провайдеров. Настроена корректная обработка клавиатуры через `adjustResize` и `resizeToAvoidBottomInset: true`. Детали: [`docs/leo-dialog-keyboard-fix.md`](leo-dialog-keyboard-fix.md).
 
 Задача iap-ios-2026-01-13 fix: iOS StoreKit2 verify переведён на App Store Server API (transaction_id/JWS) с fallback на verifyReceipt; Android ветка не затронута.

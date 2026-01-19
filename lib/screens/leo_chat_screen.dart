@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 
 import 'package:bizlevel/providers/leo_service_provider.dart';
 import 'package:bizlevel/widgets/chat_item.dart';
@@ -28,6 +29,13 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
   @override
   void initState() {
     super.initState();
+    try {
+      Sentry.addBreadcrumb(Breadcrumb(
+        category: 'ui.screen',
+        level: SentryLevel.info,
+        message: 'mentors_opened',
+      ));
+    } catch (_) {}
     _loadFuture = _loadData();
   }
 
@@ -130,6 +138,17 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
           chatData,
           isNotified: false,
           onTap: () {
+            try {
+              Sentry.addBreadcrumb(Breadcrumb(
+                category: 'chat',
+                level: SentryLevel.info,
+                message: 'chat_opened',
+                data: {
+                  'bot': bot,
+                  'chatId': chat['id']?.toString() ?? '',
+                },
+              ));
+            } catch (_) {}
             if (bot == 'ray') {
               Navigator.of(context).push(
                 MaterialPageRoute(
@@ -164,6 +183,14 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
   }
 
   void _onNewChat(String bot) {
+    try {
+      Sentry.addBreadcrumb(Breadcrumb(
+        category: 'chat',
+        level: SentryLevel.info,
+        message: 'chat_new_started',
+        data: {'bot': bot},
+      ));
+    } catch (_) {}
     if (bot == 'ray') {
       Navigator.of(context).push(
         MaterialPageRoute(

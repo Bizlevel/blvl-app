@@ -75,6 +75,78 @@ function getChipConfig() {
   };
 }
 
+function buildRecommendedChips({
+  bot,
+  checkpoint,
+  finalLevel,
+  levelContext,
+  userId
+}) {
+  const cfg = getChipConfig();
+  if (bot === 'max') {
+    if (!cfg.enableMaxV2) return undefined;
+    let recommended = undefined;
+    if (checkpoint === 'l1') {
+      recommended = ['Сформулировать цель', 'Выбрать метрику', 'Задать срок'];
+    } else if (checkpoint === 'l4') {
+      recommended = ['Добавить финансовую метрику', 'Посчитать эффект', 'Оставить как есть'];
+    } else if (checkpoint === 'l7') {
+      recommended = ['Оценить текущий темп', 'Скорректировать цель', 'Усилить применение'];
+    }
+    const base = recommended || [];
+    if (!base.includes('Открыть артефакты')) base.push('Открыть артефакты');
+    let chips = base;
+    chips = dedupChipsForUser(userId, 'max', chips, cfg.sessionTtlMin);
+    chips = limitChips(chips, cfg.maxCount);
+    return chips.length ? chips : undefined;
+  }
+
+  if (!cfg.enableLeoV1) return undefined;
+  let lvl = finalLevel || 0;
+  try {
+    if (levelContext && typeof levelContext === 'string') {
+      const m = levelContext.match(/level[_ ]?id\s*[:=]\s*(\d+)/i);
+      if (m) {
+        const parsed = parseInt(m[1]);
+        if (Number.isFinite(parsed)) lvl = Math.min(parsed, finalLevel || parsed);
+      }
+    } else if (levelContext && typeof levelContext === 'object') {
+      const lid = levelContext.level_id ?? levelContext.levelId;
+      if (lid != null) {
+        const parsed = parseInt(String(lid));
+        if (Number.isFinite(parsed)) lvl = Math.min(parsed, finalLevel || parsed);
+      }
+    }
+  } catch (_) {}
+
+  let chips = [];
+  if (!lvl || lvl <= 0) {
+    chips = [
+      'С чего начать (ур.1)',
+      'Объясни SMART просто',
+      'Пример из моей сферы',
+      'Дай микро‑шаг',
+      'Ошибки и риски'
+    ];
+  } else {
+    chips = [
+      `Объясни тему ур.${lvl}`,
+      'Как применить на практике',
+      'Пример из моей сферы',
+      'Разобрать мою задачу',
+      'Дай микро‑шаг',
+      'Типичные ошибки'
+    ];
+  }
+  chips = dedupChipsForUser(userId, 'leo', chips, cfg.sessionTtlMin);
+  chips = limitChips(chips, cfg.maxCount);
+  return chips.length ? chips : undefined;
+}
+
+function shouldSpendServerGp() {
+  return getBoolEnv('SERVER_SPEND_GP', false);
+}
+
 function limitChips(chips, maxCount) {
   const list = Array.isArray(chips) ? chips.filter(Boolean) : [];
   return list.slice(0, Math.max(0, maxCount));
@@ -485,6 +557,7 @@ serve(async (req) => {
     // Предварительное объявление userId и profile
     let userId = null;
     let profile = null;
+    let effectiveChatId = null;
 
     // ==============================
     // GOAL_COMMENT MODE (short reply to field save, no RAG, no GP spend)
@@ -576,7 +649,7 @@ serve(async (req) => {
       }
     }
 
-    if (!Array.isArray(messages)) {
+    if (mode !== 'chips' && !Array.isArray(messages)) {
       return new Response(JSON.stringify({ error: "invalid_messages" }), {
           status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
@@ -742,6 +815,31 @@ serve(async (req) => {
         console.log('ERR auth_process', { message: String(authErr).slice(0, 200) });
       }
 
+    // Нормализуем chatId и проверяем принадлежность чата пользователю
+    try {
+      const rawChatId = typeof chatId === 'string' ? chatId.trim() : '';
+      if (rawChatId) {
+        effectiveChatId = rawChatId;
+        if (userId) {
+          const { data: chatRow, error: chatErr } = await supabaseAdmin!
+            .from('leo_chats')
+            .select('id, user_id')
+            .eq('id', rawChatId)
+            .maybeSingle();
+          if (chatErr || !chatRow || chatRow.user_id !== userId) {
+            console.warn('WARN chat_owner_mismatch', {
+              chatId: rawChatId,
+              hasRow: Boolean(chatRow),
+              userMatches: chatRow?.user_id === userId
+            });
+            effectiveChatId = null;
+          }
+        }
+      }
+    } catch (_) {
+      effectiveChatId = null;
+    }
+
     // Объединяем профиль и клиентский контекст независимо от авторизации
     // Фильтруем строки "null" и пустые значения
     if (typeof userContext === 'string' && userContext.trim().length > 0 && userContext !== 'null') {
@@ -757,8 +855,62 @@ serve(async (req) => {
       if (m && m[1]) checkpoint = m[1].toLowerCase() as any;
     } catch (_) {}
 
+    // ==============================
+    // CHIPS MODE (recommended prompts for UI)
+    // ==============================
+    if (mode === 'chips') {
+      const chipsFinalLevel = maxCompletedLevel || 0;
+      const chips = buildRecommendedChips({
+        bot: isMax ? 'max' : 'leo',
+        checkpoint,
+        finalLevel: chipsFinalLevel,
+        levelContext,
+        userId
+      });
+      return new Response(JSON.stringify({
+        chips: chips || []
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+
     // Извлекаем последний запрос пользователя
     const lastUserMessage = Array.isArray(messages) ? [...messages].reverse().find((m) => m?.role === 'user')?.content ?? '' : '';
+    const allowSkipSpend = false;
+
+    if (userId && shouldSpendServerGp() && !caseMode && !allowSkipSpend) {
+      try {
+        const spendKey = `msg:${userId}:${effectiveChatId || 'new'}:${hashQuery(String(lastUserMessage || ''))}`;
+        const { error: spendError } = await (supabaseAdmin as any).rpc('gp_spend', {
+          p_type: 'spend_message',
+          p_amount: 1,
+          p_reference_id: effectiveChatId || '',
+          p_idempotency_key: spendKey
+        });
+        if (spendError) {
+          const msg = spendError.message || 'gp_spend_error';
+          if (msg.toLowerCase().includes('insufficient') || msg.includes('Недостаточно')) {
+            return new Response(JSON.stringify({ error: 'gp_insufficient_balance' }), {
+              status: 402,
+              headers: { ...corsHeaders, "Content-Type": "application/json" }
+            });
+          }
+          console.error('ERR gp_spend', { message: msg });
+          return new Response(JSON.stringify({ error: 'gp_spend_error', details: msg }), {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
+          });
+        }
+      } catch (e) {
+        const msg = String(e?.message || e).slice(0, 240);
+        console.error('ERR gp_spend_exception', { message: msg });
+        return new Response(JSON.stringify({ error: 'gp_spend_error', details: msg }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
+    }
 
     // Встроенный RAG: эмбеддинг + match_documents (с кешем)
     // RAG context (только для Leo, не для Max, не для case-mode)
@@ -943,14 +1095,14 @@ serve(async (req) => {
       }
     } catch (_) {}
 
-    console.log('INFO request_meta', {
-      messages_count: Array.isArray(messages) ? messages.length : 0,
-      userContext_present: Boolean(userContext),
-      levelContext_present: Boolean(levelContext),
-      ragContext_present: Boolean(ragContext),
-      bot: isMax ? 'max' : 'leo',
-      lastUserMessage: Array.isArray(messages) ? [...messages].reverse().find((m) => m?.role === 'user')?.content?.substring(0, 100) : 'none'
-    });
+      console.log('INFO request_meta', {
+        messages_count: Array.isArray(messages) ? messages.length : 0,
+        userContext_present: Boolean(userContext),
+        levelContext_present: Boolean(levelContext),
+        ragContext_present: Boolean(ragContext),
+        bot: isMax ? 'max' : 'leo',
+        lastUserMessage_len: String(lastUserMessage || '').length
+      });
 
     // Кэш для контекстных блоков (TTL 5 минут)
     const contextCache = new Map();
@@ -1325,6 +1477,9 @@ ${levelContext && levelContext !== 'null' ? `Контекст экрана/ур�
       }
       systemPrompt = systemPromptAlex + checkpointModule + errorNotice;
     }
+    if (caseMode) {
+      systemPrompt = 'Ты — фасилитатор мини‑кейса. Строго следуй системной инструкции, переданной в сообщениях. Не добавляй дополнительных правил, персонализации или RAG.';
+    }
 
     // --- Безопасный вызов OpenAI с валидацией конфигурации ---
     // XAI_API_KEY уже проверен в начале функции
@@ -1356,86 +1511,18 @@ ${levelContext && levelContext !== 'null' ? `Контекст экрана/ур�
         }
       }
 
-      // Рекомендованные chips (опционально) — только для Макса
-      let recommended_chips = undefined as string[] | undefined;
-      if (isMax) {
-        // Рекомендованные чипы для Макса по чекпоинтам
-        if (checkpoint === 'l1') {
-          recommended_chips = ['Сформулировать цель', 'Выбрать метрику', 'Задать срок'];
-        } else if (checkpoint === 'l4') {
-          recommended_chips = ['Добавить финансовую метрику', 'Посчитать эффект', 'Оставить как есть'];
-        } else if (checkpoint === 'l7') {
-          recommended_chips = ['Оценить текущий темп', 'Скорректировать цель', 'Усилить применение'];
-        }
-        // Всегда добавляем ссылочную подсказку на артефакты
-        try {
-          const base = recommended_chips || [];
-          if (!base.includes('Открыть артефакты')) base.push('Открыть артефакты');
-          recommended_chips = base;
-        } catch (_) {}
-        try {
-          const cfg = getChipConfig();
-          if (recommended_chips) {
-            let chips = recommended_chips || [];
-            chips = dedupChipsForUser(userId, 'max', chips, cfg.sessionTtlMin);
-            chips = limitChips(chips, cfg.maxCount);
-            recommended_chips = chips.length ? chips : undefined;
-            if (recommended_chips) logChipsRendered('max', recommended_chips);
-          }
-        } catch (_) {}
-      } else {
-        // Лео: простые чипы по уровню/контексту (включаются фичефлагом)
-        try {
-          const cfg = getChipConfig();
-          if (cfg.enableLeoV1) {
-            let lvl = finalLevel || 0;
-            try {
-              if (levelContext && typeof levelContext === 'string') {
-                const m = levelContext.match(/level[_ ]?id\s*[:=]\s*(\d+)/i);
-                if (m) {
-                  const parsed = parseInt(m[1]);
-                  if (Number.isFinite(parsed)) lvl = Math.min(parsed, finalLevel || parsed);
-                }
-              } else if (levelContext && typeof levelContext === 'object') {
-                const lid = levelContext.level_id ?? levelContext.levelId;
-                if (lid != null) {
-                  const parsed = parseInt(String(lid));
-                  if (Number.isFinite(parsed)) lvl = Math.min(parsed, finalLevel || parsed);
-                }
-              }
-            } catch (_) {}
-
-            let chips = [] as string[];
-            if (!lvl || lvl <= 0) {
-              // Общий старт до определения уровня
-              chips = [
-                'С чего начать (ур.1)',
-                'Объясни SMART просто',
-                'Пример из моей сферы',
-                'Дай микро‑шаг',
-                'Ошибки и риски'
-              ];
-            } else {
-              // Таргетированные подсказки под пройденный/текущий уровень
-              chips = [
-                `Объясни тему ур.${lvl}`,
-                'Как применить на практике',
-                'Пример из моей сферы',
-                'Разобрать мою задачу',
-                'Дай микро‑шаг',
-                'Типичные ошибки'
-              ];
-            }
-            chips = dedupChipsForUser(userId, 'leo', chips, cfg.sessionTtlMin);
-            chips = limitChips(chips, cfg.maxCount);
-            recommended_chips = chips.length ? chips : undefined;
-            if (recommended_chips) logChipsRendered('leo', recommended_chips);
-          }
-        } catch (_) {}
+      let recommended_chips = buildRecommendedChips({
+        bot: isMax ? 'max' : 'leo',
+        checkpoint,
+        finalLevel,
+        levelContext,
+        userId
+      });
+      if (recommended_chips) {
+        logChipsRendered(isMax ? 'max' : 'leo', recommended_chips);
       }
 
       // --- Сохранение в leo_messages (для включения триггера памяти) ---
-      let effectiveChatId = chatId;
       let assistantLeoMessageId = null;
       if (!caseMode) {
         try {
@@ -1482,6 +1569,7 @@ ${levelContext && levelContext !== 'null' ? `Контекст экрана/ур�
 
               // Выполняем сохранение сообщений параллельно
               const saveResults = await Promise.all(savePromises);
+              const insertedCount = (userText ? 1 : 0) + 1;
 
               // Обрабатываем результаты
               for (const { type, result, error } of saveResults) {
@@ -1490,6 +1578,22 @@ ${levelContext && levelContext !== 'null' ? `Контекст экрана/ур�
                 } else if (type === 'assistant' && result?.data?.id) {
                   assistantLeoMessageId = result.data.id;
                 }
+              }
+
+              // 3) Обновляем счетчик сообщений чата
+              try {
+                const { data: chatRow } = await supabaseAdmin!
+                  .from('leo_chats')
+                  .select('message_count')
+                  .eq('id', effectiveChatId)
+                  .single();
+                const currentCount = chatRow?.message_count ?? 0;
+                await supabaseAdmin!.from('leo_chats').update({
+                  message_count: currentCount + insertedCount,
+                  updated_at: new Date().toISOString()
+                }).eq('id', effectiveChatId);
+              } catch (e) {
+                console.error('ERR leo_chats_update_count', { message: String(e).slice(0, 200) });
               }
             }
           }
@@ -1503,13 +1607,14 @@ ${levelContext && levelContext !== 'null' ? `Контекст экрана/ур�
       // Тип запроса для аналитики/стоимости:
       // - caseMode: отдельный поток мини‑кейса (без сохранения в историю)
       // - max + skipSpend: бесплатные авто‑сообщения/тонкие реакции
-      const effectiveRequestType = caseMode ? 'case' : (isMax && skipSpend ? 'mentor_free' : 'chat');
+      const effectiveRequestType = caseMode ? 'case' : 'chat';
       console.log('INFO spend_decision', { requestedSkipSpend: skipSpend, effectiveRequestType });
       await saveAIMessageData(userId, effectiveChatId || chatId || null, assistantLeoMessageId, usage, cost, model, bot, effectiveRequestType, supabaseAdmin!);
       
       return new Response(JSON.stringify({
         message: assistantMessage,
         usage,
+        chat_id: effectiveChatId || null,
         ...(recommended_chips ? { recommended_chips } : {})
       }), {
           status: 200,

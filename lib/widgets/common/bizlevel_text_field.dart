@@ -20,6 +20,18 @@ class BizLevelTextField extends StatelessWidget {
     this.isInvalid = false,
     this.errorText,
     this.readOnlySoftBackground = true,
+    this.minLines,
+    this.maxLines = 1,
+    this.textInputAction,
+    this.autofillHints,
+    this.textCapitalization = TextCapitalization.none,
+    this.smartDashesType,
+    this.smartQuotesType,
+    this.autocorrect,
+    this.enableSuggestions,
+    this.enableIMEPersonalizedLearning,
+    this.onSubmitted,
+    this.onTapOutside,
   });
 
   final String? label;
@@ -35,6 +47,18 @@ class BizLevelTextField extends StatelessWidget {
   final bool isInvalid;
   final String? errorText;
   final bool readOnlySoftBackground;
+  final int? minLines;
+  final int maxLines;
+  final TextInputAction? textInputAction;
+  final Iterable<String>? autofillHints;
+  final TextCapitalization textCapitalization;
+  final SmartDashesType? smartDashesType;
+  final SmartQuotesType? smartQuotesType;
+  final bool? autocorrect;
+  final bool? enableSuggestions;
+  final bool? enableIMEPersonalizedLearning;
+  final ValueChanged<String>? onSubmitted;
+  final TapRegionCallback? onTapOutside;
 
   @override
   Widget build(BuildContext context) {
@@ -62,6 +86,18 @@ class BizLevelTextField extends StatelessWidget {
         obscureText: obscureText,
         keyboardType: keyboardType,
         readOnlySoftBackground: readOnly && readOnlySoftBackground,
+        minLines: minLines,
+        maxLines: maxLines,
+        textInputAction: textInputAction,
+        autofillHints: autofillHints,
+        textCapitalization: textCapitalization,
+        smartDashesType: smartDashesType,
+        smartQuotesType: smartQuotesType,
+        autocorrect: autocorrect,
+        enableSuggestions: enableSuggestions,
+        enableIMEPersonalizedLearning: enableIMEPersonalizedLearning,
+        onSubmitted: onSubmitted,
+        onTapOutside: onTapOutside,
       ),
     );
 

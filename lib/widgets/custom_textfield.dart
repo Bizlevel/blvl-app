@@ -26,6 +26,9 @@ class CustomTextBox extends StatelessWidget {
     this.textCapitalization = TextCapitalization.none,
     this.smartDashesType,
     this.smartQuotesType,
+    this.minLines,
+    this.onSubmitted,
+    this.onTapOutside,
   });
 
   final String hint;
@@ -47,6 +50,9 @@ class CustomTextBox extends StatelessWidget {
   final TextCapitalization textCapitalization;
   final SmartDashesType? smartDashesType;
   final SmartQuotesType? smartQuotesType;
+  final int? minLines;
+  final ValueChanged<String>? onSubmitted;
+  final TapRegionCallback? onTapOutside;
 
   @override
   Widget build(BuildContext context) {
@@ -87,6 +93,7 @@ class CustomTextBox extends StatelessWidget {
         autofocus: autofocus && !readOnly,
         obscureText: obscureText,
         keyboardType: keyboardType,
+        minLines: minLines,
         maxLines: maxLines,
         // Для большинства полей оставляем системные значения по умолчанию,
         // а на чувствительных экранах (login/password) можем явно отключать подсказки/автокоррекцию.
@@ -98,6 +105,8 @@ class CustomTextBox extends StatelessWidget {
         textCapitalization: textCapitalization,
         smartDashesType: smartDashesType,
         smartQuotesType: smartQuotesType,
+        onSubmitted: onSubmitted,
+        onTapOutside: onTapOutside,
         textAlignVertical: TextAlignVertical.center,
         decoration: InputDecoration(
           prefixIcon: prefix,

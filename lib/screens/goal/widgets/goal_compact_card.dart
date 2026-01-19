@@ -13,6 +13,7 @@ import 'package:bizlevel/utils/max_context_helper.dart';
 import 'package:bizlevel/utils/date_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bizlevel/models/goal_update.dart';
+import 'package:bizlevel/utils/input_bottom_sheet.dart';
 
 class GoalCompactCard extends ConsumerStatefulWidget {
   const GoalCompactCard({super.key});
@@ -176,6 +177,9 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                   controller: _goalCtrl,
                   decoration: const InputDecoration(
                       labelText: 'Короткое описание цели'),
+                  textInputAction: TextInputAction.next,
+                  onSubmitted: (_) => FocusScope.of(context).nextFocus(),
+                  onTapOutside: (_) => FocusScope.of(context).unfocus(),
                 ),
                 AppSpacing.gapH(AppSpacing.sm),
                 Row(children: [
@@ -185,6 +189,9 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                       keyboardType: TextInputType.number,
                       decoration:
                           const InputDecoration(labelText: 'Текущее значение'),
+                      textInputAction: TextInputAction.next,
+                      onSubmitted: (_) => FocusScope.of(context).nextFocus(),
+                      onTapOutside: (_) => FocusScope.of(context).unfocus(),
                     ),
                   ),
                   const SizedBox(width: AppSpacing.md),
@@ -194,6 +201,9 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                       keyboardType: TextInputType.number,
                       decoration:
                           const InputDecoration(labelText: 'Целевое значение'),
+                      textInputAction: TextInputAction.next,
+                      onSubmitted: (_) => FocusScope.of(context).nextFocus(),
+                      onTapOutside: (_) => FocusScope.of(context).unfocus(),
                     ),
                   ),
                 ]),
@@ -360,16 +370,13 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
     DateTime? newTarget;
     final TextEditingController currentCtrl = TextEditingController();
     final TextEditingController targetCtrl = TextEditingController();
-    await showModalBottomSheet(
+    await showBizLevelInputBottomSheet(
       context: context,
       showDragHandle: true,
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: AppSpacing.insetsAll(AppSpacing.lg),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
+      builder: (ctx) => Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
               Text('Новая цель',
                   style: Theme.of(ctx)
                       .textTheme
@@ -380,6 +387,9 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                 controller: textCtrl,
                 decoration:
                     const InputDecoration(labelText: 'Опишите новую цель'),
+                textInputAction: TextInputAction.next,
+                onSubmitted: (_) => FocusScope.of(ctx).nextFocus(),
+                onTapOutside: (_) => FocusScope.of(ctx).unfocus(),
               ),
               AppSpacing.gapH(AppSpacing.sm),
               Row(
@@ -390,6 +400,9 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                       keyboardType: TextInputType.number,
                       decoration:
                           const InputDecoration(labelText: 'Текущая метрика'),
+                      textInputAction: TextInputAction.next,
+                      onSubmitted: (_) => FocusScope.of(ctx).nextFocus(),
+                      onTapOutside: (_) => FocusScope.of(ctx).unfocus(),
                     ),
                   ),
                   const SizedBox(width: AppSpacing.md),
@@ -399,6 +412,9 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                       keyboardType: TextInputType.number,
                       decoration:
                           const InputDecoration(labelText: 'Целевая метрика'),
+                      textInputAction: TextInputAction.next,
+                      onSubmitted: (_) => FocusScope.of(ctx).nextFocus(),
+                      onTapOutside: (_) => FocusScope.of(ctx).unfocus(),
                     ),
                   ),
                 ],
@@ -485,9 +501,7 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                 },
                 child: const Text('Сохранить новую цель'),
               ),
-            ],
-          ),
-        ),
+        ],
       ),
     );
   }

@@ -13,6 +13,7 @@ import 'package:bizlevel/widgets/leo_message_bubble.dart';
 import 'package:bizlevel/widgets/typing_indicator.dart';
 import 'package:bizlevel/services/leo_service.dart';
 import 'package:bizlevel/providers/gp_providers.dart';
+import 'package:bizlevel/providers/cases_provider.dart';
 import 'package:go_router/go_router.dart';
 
 /// Dialog screen for chatting with Leo assistant.
@@ -31,10 +32,12 @@ class LeoDialogScreen extends ConsumerStatefulWidget {
   final String?
       casePreface; // вступление перед первым заданием (например, список дел)
   final String? finalStory; // развёрнутый финальный текст кейса
+  final int? caseId; // id мини‑кейса для фиксации прогресса
   final bool
       embedded; // когда true — рендер без Scaffold/AppBar (встраиваемый вид)
   final ValueChanged<String>?
       onAssistantMessage; // колбэк для получения ответа ассистента
+  final ValueChanged<String>? onChatIdChanged; // возвращает chatId после первого сообщения
   final List<String>?
       recommendedChips; // опц. серверные подсказки (fallback на клиенте)
   final String?
@@ -58,6 +61,7 @@ class LeoDialogScreen extends ConsumerStatefulWidget {
     this.caseContexts,
     this.embedded = false,
     this.onAssistantMessage,
+    this.onChatIdChanged,
     this.recommendedChips,
     this.casePreface,
     this.finalStory,
@@ -65,6 +69,7 @@ class LeoDialogScreen extends ConsumerStatefulWidget {
     this.skipSpend = false,
     this.initialAssistantMessage,
     this.initialAssistantMessages,
+    this.caseId,
   });
 
   @override
@@ -212,6 +217,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
       return true;
     }());
     
+    _inputController.dispose();
     _inputFocus.dispose();
     super.dispose();
   }
@@ -225,7 +231,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
 
     final data = await Supabase.instance.client
         .from('leo_messages')
-        .select('role, content, created_at')
+        .select('id, role, content, created_at')
         .eq('chat_id', _chatId!)
         .order('created_at', ascending: false)
         .range(rangeStart, rangeEnd);
@@ -240,16 +246,22 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
       // Reverse to chronological order и добавить только новые (по роли+контенту), чтобы не дублировать
       final chronological = fetched.reversed
           .map((e) => {
+                'id': e['id'],
                 'role': e['role'],
                 'content': e['content'],
                 'created_at': e['created_at'],
               })
           .toList();
-      final existingKeys =
-          _messages.map((m) => '${m['role']}::${m['content']}').toSet();
+      final existingKeys = _messages
+          .map((m) => (m['id'] != null)
+              ? 'id:${m['id']}'
+              : 'msg:${m['role']}::${m['content']}::${m['created_at']}')
+          .toSet();
       final toAdd = <Map<String, dynamic>>[];
       for (final m in chronological) {
-        final key = '${m['role']}::${m['content']}';
+        final key = (m['id'] != null)
+            ? 'id:${m['id']}'
+            : 'msg:${m['role']}::${m['content']}::${m['created_at']}';
         if (!existingKeys.contains(key)) {
           toAdd.add(m);
           existingKeys.add(key);
@@ -280,6 +292,15 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
           );
         }
       });
+
+  void _setCaseStepsCompleted(int stepsCompleted) {
+    if (!widget.caseMode) return;
+    final caseId = widget.caseId;
+    if (caseId == null) return;
+    try {
+      ref.read(caseActionsProvider).setStepsCompleted(caseId, stepsCompleted);
+    } catch (_) {}
+  }
 
   /// Обновляет чипсы с сервера с дебаунсом
   void _refreshChipsDebounced() {
@@ -330,26 +351,31 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
   Future<void> _sendMessageInternal(String text, {bool isAuto = false}) async {
     // Дополнительная проверка на случай, если состояние изменилось
     if (_isSending || !mounted) return;
+    try {
+      Sentry.addBreadcrumb(Breadcrumb(
+        category: 'chat',
+        level: SentryLevel.info,
+        message: 'chat_send_start',
+        data: {
+          'bot': widget.bot,
+          'chatId': _chatId ?? '',
+          'caseMode': widget.caseMode,
+        },
+      ));
+    } catch (_) {}
 
     setState(() {
       _isSending = true;
-      _messages.add({'role': 'user', 'content': text});
+      _messages.add({
+        'role': 'user',
+        'content': text,
+        'created_at': DateTime.now().toIso8601String(),
+      });
     });
     _inputController.clear();
     _scrollToBottom();
 
     try {
-      // В режиме кейса не создаём чат
-      if (!widget.caseMode) {
-        if (_chatId == null) {
-          _chatId = await _leo.saveConversation(
-              role: 'user', content: text, bot: widget.bot);
-        } else {
-          await _leo.saveConversation(
-              chatId: _chatId, role: 'user', content: text);
-        }
-      }
-
       // Get assistant response with RAG if context is available
       String assistantMsg;
 
@@ -379,6 +405,37 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
         caseMode: widget.caseMode, // Add caseMode parameter
       );
 
+      final String? responseChatId = response['chat_id']?.toString();
+      if (responseChatId != null &&
+          responseChatId.isNotEmpty &&
+          responseChatId != _chatId) {
+        if (mounted) {
+          setState(() => _chatId = responseChatId);
+        } else {
+          _chatId = responseChatId;
+        }
+        try {
+          widget.onChatIdChanged?.call(responseChatId);
+        } catch (_) {}
+      }
+
+      final String effectiveChatId =
+          (responseChatId != null && responseChatId.isNotEmpty)
+              ? responseChatId
+              : (_chatId ?? '');
+      try {
+        Sentry.addBreadcrumb(Breadcrumb(
+          category: 'chat',
+          level: SentryLevel.info,
+          message: 'chat_send_success',
+          data: {
+            'bot': widget.bot,
+            'chatId': effectiveChatId,
+            'caseMode': widget.caseMode,
+          },
+        ));
+      } catch (_) {}
+
       assistantMsg = response['message']['content'] as String? ?? '';
       // Обновим серверные чипы, если пришли
       try {
@@ -397,11 +454,6 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
         }
       } catch (_) {}
 
-      if (!widget.caseMode) {
-        await _leo.saveConversation(
-            chatId: _chatId, role: 'assistant', content: assistantMsg);
-      }
-
       if (!mounted) return;
       // Скрываем служебные маркеры и префикс "Оценка:" для пользователя
       final String displayMsg = assistantMsg
@@ -418,7 +470,11 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
               '')
           .trim();
       setState(() {
-        _messages.add({'role': 'assistant', 'content': displayMsg});
+        _messages.add({
+          'role': 'assistant',
+          'content': displayMsg,
+          'created_at': DateTime.now().toIso8601String(),
+        });
       });
       // Реакция на маркеры сценария (после отображения очищенного текста)
       if (widget.caseMode && widget.casePrompts != null) {
@@ -451,6 +507,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
           final nextIndex = (_caseStepIndex >= 0) ? _caseStepIndex + 1 : 1;
           if (nextIndex < (widget.casePrompts!.length)) {
             _caseStepIndex = nextIndex;
+            _setCaseStepsCompleted(nextIndex);
             // Показать контекст следующего вопроса, если имеется
             final ctx = (widget.caseContexts != null &&
                     nextIndex < widget.caseContexts!.length)
@@ -471,6 +528,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
             }
           }
         } else if (hasFinal && isLastStep) {
+          _setCaseStepsCompleted(totalPrompts);
           // Показать финальную историю (если задана), затем предложить кнопку возврата
           final fs = widget.finalStory?.trim();
           if (fs != null && fs.isNotEmpty) {
@@ -532,6 +590,19 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
       } catch (_) {}
       _scrollToBottom();
     } catch (e) {
+      try {
+        Sentry.addBreadcrumb(Breadcrumb(
+          category: 'chat',
+          level: SentryLevel.warning,
+          message: 'chat_send_fail',
+          data: {
+            'bot': widget.bot,
+            'chatId': _chatId ?? '',
+            'error_type': e.runtimeType.toString(),
+            'caseMode': widget.caseMode,
+          },
+        ));
+      } catch (_) {}
       if (!mounted) return;
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text('Ошибка: $e')));
@@ -852,6 +923,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
   }
 
   Widget _buildChipsRow() {
+    if (widget.caseMode) return const SizedBox.shrink();
     // Скрываем при наборе текста или если пользователь свернул подсказки
     if ((_inputFocus.hasFocus && _inputController.text.trim().isNotEmpty) ||
         !_showSuggestions) {
