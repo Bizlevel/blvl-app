@@ -4,6 +4,9 @@ const bool kUseLeoQuiz =
 // Фича-флаг аварийного отключения списаний GP в чате (rollback режим)
 // При true: отправка сообщений не списывает GP, показываем «Временно бесплатно»
 const bool kDisableGpSpendInChat = false;
+// Фича-флаг: списание GP выполняется на сервере (leo-chat)
+// При true: клиент НЕ вызывает gp_spend
+const bool kEnableServerGpSpend = true;
 // Удалены фиче‑флаги weekly/daily/chips — концепция упрощена до единой цели и журнала
 
 // Фичефлаги страницы Цель/чекпоинтов

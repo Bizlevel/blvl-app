@@ -469,13 +469,15 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
                   caseSensitive: false),
               '')
           .trim();
-      setState(() {
-        _messages.add({
-          'role': 'assistant',
-          'content': displayMsg,
-          'created_at': DateTime.now().toIso8601String(),
+      if (displayMsg.isNotEmpty) {
+        setState(() {
+          _messages.add({
+            'role': 'assistant',
+            'content': displayMsg,
+            'created_at': DateTime.now().toIso8601String(),
+          });
         });
-      });
+      }
       // Реакция на маркеры сценария (после отображения очищенного текста)
       if (widget.caseMode && widget.casePrompts != null) {
         final bool hasNext = assistantMsg.contains('[CASE:NEXT]');
@@ -515,7 +517,11 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
                 : '';
             if (ctx.trim().isNotEmpty) {
               setState(() {
-                _messages.add({'role': 'assistant', 'content': ctx.trim()});
+                _messages.add({
+                  'role': 'assistant',
+                  'content': ctx.trim(),
+                  'hidden': true,
+                });
               });
             }
             // Показать следующий вопрос как ассистентское сообщение
@@ -737,6 +743,8 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
   }
 
   Widget _buildMessageList() {
+    final visibleMessages =
+        _messages.where((m) => m['hidden'] != true).toList();
     return NotificationListener<ScrollNotification>(
       onNotification: (notif) {
         if (notif.metrics.pixels <= 50 && _hasMore) {
@@ -749,7 +757,9 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
         controller: _scrollController,
         padding: const EdgeInsets.symmetric(
             horizontal: AppSpacing.lg, vertical: AppSpacing.s10),
-        itemCount: _messages.length + (_hasMore ? 1 : 0) + (_isSending ? 1 : 0),
+        itemCount: visibleMessages.length +
+            (_hasMore ? 1 : 0) +
+            (_isSending ? 1 : 0),
         itemBuilder: (context, index) {
           // 1) Плашка загрузки предыдущих сообщений
           if (_hasMore && index == 0) {
@@ -773,7 +783,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
           final offset = _hasMore ? 1 : 0;
           final msgIndex = index - offset;
           // 2) Последний элемент — индикатор набора, если ждём ответ
-          if (_isSending && msgIndex == _messages.length) {
+          if (_isSending && msgIndex == visibleMessages.length) {
             return Align(
               alignment: Alignment.centerLeft,
               child: Container(
@@ -795,7 +805,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
             );
           }
           // 3) Обычные сообщения
-          final msg = _messages[msgIndex];
+          final msg = visibleMessages[msgIndex];
           final isUser = msg['role'] == 'user';
           final bubble = LeoMessageBubble(
             text: msg['content'] as String? ?? '',

@@ -228,15 +228,15 @@ class HomeGoalCard extends ConsumerWidget {
                                                                 },
                                                               ),
                                                             ),
-                                                            title: Row(
+                                                            title: const Row(
                                                               children: [
                                                                 CircleAvatar(
                                                                   radius: 14,
-                                                                  backgroundImage: const AssetImage('assets/images/avatars/avatar_max.png'),
+                                                                  backgroundImage: AssetImage('assets/images/avatars/avatar_max.png'),
                                                                   backgroundColor: Colors.transparent,
                                                                 ),
-                                                                const SizedBox(width: 8),
-                                                                const Text('Макс'),
+                                                                SizedBox(width: 8),
+                                                                Text('Макс'),
                                                               ],
                                                             ),
                                                           ),

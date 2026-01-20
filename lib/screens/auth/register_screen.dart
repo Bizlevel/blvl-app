@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 
 import '../../theme/color.dart' show AppColor;
 import '../../services/auth_service.dart';
@@ -60,6 +61,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     }
 
     setState(() => _isLoading = true);
+    try {
+      Sentry.addBreadcrumb(Breadcrumb(
+        category: 'auth',
+        level: SentryLevel.info,
+        message: 'auth_register_submit',
+      ));
+    } catch (_) {}
     log('Attempting to sign up with email: $email');
     try {
       await ref.read(authServiceProvider).signUp(
@@ -67,14 +75,37 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             password: password,
           );
       log('Sign up successful for email: $email');
+      try {
+        Sentry.addBreadcrumb(Breadcrumb(
+          category: 'auth',
+          level: SentryLevel.info,
+          message: 'auth_register_success',
+        ));
+      } catch (_) {}
       if (!mounted) return;
       // Устанавливаем состояние успешной регистрации для показа экрана подтверждения
       setState(() => _registrationSuccess = true);
     } on AuthFailure catch (e) {
       log('AuthFailure during sign up for $email', error: e);
+      try {
+        Sentry.addBreadcrumb(Breadcrumb(
+          category: 'auth',
+          level: SentryLevel.warning,
+          message: 'auth_register_fail',
+          data: {'error_type': e.runtimeType.toString()},
+        ));
+      } catch (_) {}
       _showSnackBar(e.message);
     } catch (e, st) {
       log('Unknown error during sign up for $email', error: e, stackTrace: st);
+      try {
+        Sentry.addBreadcrumb(Breadcrumb(
+          category: 'auth',
+          level: SentryLevel.warning,
+          message: 'auth_register_fail',
+          data: {'error_type': e.runtimeType.toString()},
+        ));
+      } catch (_) {}
       _showSnackBar('Неизвестная ошибка регистрации');
     } finally {
       if (mounted) setState(() => _isLoading = false);

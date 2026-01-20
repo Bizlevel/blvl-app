@@ -133,6 +133,46 @@ class CasesRepository {
     }
   }
 
+  Future<void> setStepsCompleted(int caseId, int stepsCompleted) async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) {
+      throw Exception('Пользователь не авторизован');
+    }
+    if (stepsCompleted < 0) return;
+
+    try {
+      final current = await _client
+          .from('user_case_progress')
+          .select('steps_completed, status')
+          .eq('user_id', userId)
+          .eq('case_id', caseId)
+          .maybeSingle();
+
+      final int existingSteps =
+          (current?['steps_completed'] as int? ?? 0);
+      final int nextSteps =
+          stepsCompleted > existingSteps ? stepsCompleted : existingSteps;
+      final String status = (current?['status'] as String?) ?? 'started';
+
+      await _client.from('user_case_progress').upsert({
+        'user_id': userId,
+        'case_id': caseId,
+        'status': status,
+        'steps_completed': nextSteps,
+        'updated_at': DateTime.now().toIso8601String(),
+        if (current == null) 'started_at': DateTime.now().toIso8601String(),
+      }, onConflict: 'user_id,case_id');
+
+      final Box cache = await Hive.openBox('cases_progress');
+      final String cacheKey = 'user_${userId}_case_$caseId';
+      final cached = await getCaseStatus(caseId);
+      await cache.put(cacheKey, cached);
+    } on PostgrestException catch (e, st) {
+      await Sentry.captureException(e, stackTrace: st);
+      rethrow;
+    }
+  }
+
   Future<void> _upsertStatus(
     int caseId,
     String status, {

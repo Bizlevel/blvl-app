@@ -165,7 +165,6 @@ void _handleCheckpointTap(BuildContext context, Map<String, dynamic> node) {
       
       showBizLevelInputBottomSheet(
         context: context,
-        showDragHandle: false,
         applyKeyboardInset: false,
         contentPadding: EdgeInsets.zero,
         builder: (ctx) => checkpointScreen,

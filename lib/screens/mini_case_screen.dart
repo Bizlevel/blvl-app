@@ -10,7 +10,6 @@ import 'package:bizlevel/widgets/common/milestone_celebration.dart';
 
 import 'package:bizlevel/providers/cases_provider.dart';
 import 'package:bizlevel/providers/levels_provider.dart';
-import 'package:bizlevel/services/supabase_service.dart';
 import 'package:bizlevel/providers/auth_provider.dart';
 import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/screens/leo_dialog_screen.dart';
@@ -20,6 +19,8 @@ import 'package:bizlevel/models/lesson_model.dart'; // 🆕 Для создан�
 import 'package:bizlevel/theme/spacing.dart';
 import 'package:bizlevel/theme/typography.dart';
 import 'package:bizlevel/theme/dimensions.dart';
+import 'package:bizlevel/widgets/common/bizlevel_button.dart';
+import 'package:bizlevel/widgets/common/bizlevel_card.dart';
 
 class MiniCaseScreen extends ConsumerStatefulWidget {
   final int caseId;
@@ -128,38 +129,41 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
   Widget build(BuildContext context) {
     final title = _caseMeta?['title'] as String? ?? 'Мини‑кейс';
     return Scaffold(
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: Text(title),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         actions: [
-          TextButton(
-            onPressed: _onSkip,
-            child: const Text('Пропустить'),
-          ),
+          TextButton(onPressed: _onSkip, child: const Text('Пропустить')),
         ],
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : PageView(
-              controller: _pageController,
-              physics:
-                  const NeverScrollableScrollPhysics(), // 🔒 Запретить свайпы
-              onPageChanged: (index) {
-                // Breadcrumb для аналитики
-                try {
-                  Sentry.addBreadcrumb(Breadcrumb(
-                    category: 'case',
-                    message: index == 0
-                        ? 'case_intro_block_opened'
-                        : 'case_video_block_opened',
-                    data: {'caseId': widget.caseId, 'blockIndex': index},
-                  ));
-                } catch (_) {}
-              },
-              children: [
-                _buildIntroBlock(), // Блок 1: Картинка + Описание + "Далее"
-                _buildVideoBlock(), // Блок 2: Видео + "Решить с Лео"
-              ],
-            ),
+      body: Container(
+        decoration: const BoxDecoration(gradient: AppColor.bgGradient),
+        child: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : PageView(
+                controller: _pageController,
+                physics:
+                    const NeverScrollableScrollPhysics(), // 🔒 Запретить свайпы
+                onPageChanged: (index) {
+                  // Breadcrumb для аналитики
+                  try {
+                    Sentry.addBreadcrumb(Breadcrumb(
+                      category: 'case',
+                      message: index == 0
+                          ? 'case_intro_block_opened'
+                          : 'case_video_block_opened',
+                      data: {'caseId': widget.caseId, 'blockIndex': index},
+                    ));
+                  } catch (_) {}
+                },
+                children: [
+                  _buildIntroBlock(), // Блок 1: Картинка + Описание + "Далее"
+                  _buildVideoBlock(), // Блок 2: Видео + "Решить с Лео"
+                ],
+              ),
+      ),
     );
   }
 
@@ -176,38 +180,46 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
         children: [
           AppSpacing.gapH(AppSpacing.md),
 
-          // Картинка
-          _buildCaseImage(slot: 2),
-
-          AppSpacing.gapH(AppSpacing.lg),
-
-          // Короткое описание (только intro, без context)
-          if (introText.isNotEmpty)
-            Text(
-              introText,
-              style: AppTypography.textTheme.titleMedium,
+          BizLevelCard(
+            padding: AppSpacing.insetsAll(AppSpacing.lg),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildCaseImage(slot: 2),
+                AppSpacing.gapH(AppSpacing.lg),
+                if (introText.isNotEmpty)
+                  Text(
+                    introText,
+                    style: AppTypography.textTheme.titleMedium,
+                  ),
+                if (introText.isEmpty)
+                  Text(
+                    'Прочитайте описание кейса и приготовьтесь к решению.',
+                    style: AppTypography.textTheme.bodyLarge,
+                  ),
+              ],
             ),
-          if (introText.isEmpty)
-            Text(
-              'Прочитайте описание кейса и приготовьтесь к решению.',
-              style: AppTypography.textTheme.bodyLarge,
-            ),
+          ),
 
           AppSpacing.gapH(AppSpacing.xl),
 
-          // Кнопка "Далее" → переход на Блок 2
-          ElevatedButton.icon(
+          BizLevelButton(
+            label: 'Далее',
+            icon: const Icon(Icons.arrow_forward, size: 20),
+            fullWidth: true,
             onPressed: () {
               _pageController.nextPage(
                 duration: const Duration(milliseconds: 300),
                 curve: Curves.easeInOut,
               );
             },
-            icon: const Icon(Icons.arrow_forward),
-            label: const Text('Далее'),
-            style: ElevatedButton.styleFrom(
-              minimumSize: const Size(double.infinity, 48),
-            ),
+          ),
+          AppSpacing.gapH(AppSpacing.sm),
+          Text(
+            'Если пропустить кейс, бонусы за него не начисляются.',
+            textAlign: TextAlign.center,
+            style: AppTypography.textTheme.bodySmall
+                ?.copyWith(color: AppColor.labelColor),
           ),
         ],
       ),
@@ -236,12 +248,21 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
       children: [
         // Видео (занимает большую часть экрана)
         Expanded(
-          child: LessonWidget(
-            lesson: mockLesson,
-            onWatched: () {},
-            // В mini-case избегаем автоперехода в fullscreen на iOS:
-            // это уменьшает шанс hang/gesture-timeout и Impeller "no drawable".
-            autoFullscreenOnPlay: false,
+          child: Padding(
+            padding: AppSpacing.insetsSymmetric(
+              h: AppSpacing.lg,
+              v: AppSpacing.md,
+            ),
+            child: BizLevelCard(
+              padding: EdgeInsets.zero,
+              child: LessonWidget(
+                lesson: mockLesson,
+                onWatched: () {},
+                // В mini-case избегаем автоперехода в fullscreen на iOS:
+                // это уменьшает шанс hang/gesture-timeout и Impeller "no drawable".
+                autoFullscreenOnPlay: false,
+              ),
+            ),
           ),
         ),
 
@@ -253,27 +274,33 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 // Кнопка "Решить с Лео"
-                ElevatedButton.icon(
+                BizLevelButton(
+                  label: 'Решить с Лео',
+                  icon: const Icon(Icons.psychology_alt_outlined, size: 20),
+                  fullWidth: true,
                   onPressed: _openDialog,
-                  icon: const Icon(Icons.psychology_alt_outlined),
-                  label: const Text('Решить с Лео'),
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 48),
-                  ),
                 ),
 
                 AppSpacing.gapH(AppSpacing.sm),
 
                 // Кнопка "Назад" (опционально, чтобы вернуться к описанию)
-                TextButton.icon(
+                BizLevelButton(
+                  label: 'Назад к описанию',
+                  icon: const Icon(Icons.arrow_back, size: 20),
+                  variant: BizLevelButtonVariant.text,
                   onPressed: () {
                     _pageController.previousPage(
                       duration: const Duration(milliseconds: 300),
                       curve: Curves.easeInOut,
                     );
                   },
-                  icon: const Icon(Icons.arrow_back),
-                  label: const Text('Назад к описанию'),
+                ),
+                AppSpacing.gapH(AppSpacing.xs),
+                Text(
+                  'Если пропустить кейс, бонусы за него не начисляются.',
+                  textAlign: TextAlign.center,
+                  style: AppTypography.textTheme.bodySmall
+                      ?.copyWith(color: AppColor.labelColor),
                 ),
               ],
             ),
@@ -309,12 +336,7 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
           }
         }
       } catch (_) {}
-      final List<String> contexts = [
-        '',
-        _asMultilineText(_script?['q2_context']),
-        _asMultilineText(_script?['q3_context']),
-        _asMultilineText(_script?['q4_context']),
-      ];
+      final List<String> contexts = _buildCaseContexts(prompts.length);
       final String finalStory = _asMultilineText(_script?['final_story']);
       // Важно: открываем диалог через rootNavigator, чтобы он был поверх ShellRoute
       // (и не конфликтовал с таб-навбаром/вложенным навигатором).
@@ -322,6 +344,7 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
           await Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(
         builder: (_) => LeoDialogScreen(
           caseMode: true,
+          caseId: widget.caseId,
           // Мини‑кейс должен быть бесплатным: не списываем GP за сообщения.
           skipSpend: true,
           systemPrompt: systemPrompt,
@@ -459,21 +482,47 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
     }
   }
 
+  List<String> _buildCaseContexts(int promptCount) {
+    if (promptCount <= 0) return const <String>[];
+    final List<String> contexts = [];
+    final qs = _script?['questions'];
+    if (qs is List) {
+      for (int i = 0; i < qs.length; i++) {
+        final q = qs[i];
+        String ctx = '';
+        if (q is Map && q['context'] != null) {
+          ctx = _asMultilineText(q['context']);
+        }
+        if (ctx.trim().isEmpty) {
+          final legacyKey = 'q${i + 1}_context';
+          ctx = _asMultilineText(_script?[legacyKey]);
+        }
+        contexts.add(ctx);
+      }
+    }
+    if (contexts.isEmpty) {
+      contexts.addAll([
+        '',
+        _asMultilineText(_script?['q2_context']),
+        _asMultilineText(_script?['q3_context']),
+        _asMultilineText(_script?['q4_context']),
+      ]);
+    }
+    while (contexts.length < promptCount) {
+      contexts.add('');
+    }
+    if (contexts.length > promptCount) {
+      return contexts.sublist(0, promptCount);
+    }
+    return contexts;
+  }
+
   Widget _buildCaseImage({required int slot}) {
     final path = 'assets/images/cases/case_${widget.caseId}_$slot.png';
     return ClipRRect(
       borderRadius: BorderRadius.circular(AppDimensions.radiusXl),
-      child: Container(
+      child: SizedBox(
         height: 180,
-        decoration: const BoxDecoration(
-          color: AppColor.card,
-          boxShadow: [
-            BoxShadow(
-                color: AppColor.shadowColor,
-                blurRadius: 10,
-                offset: Offset(0, 6)),
-          ],
-        ),
         child: Image.asset(
           path,
           fit: BoxFit.cover,
@@ -549,30 +598,6 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
         }
       } catch (_) {}
 
-      // Обновляем current_level пользователя после завершения кейса
-      try {
-        final after = _caseMeta?['after_level'] as int?;
-        if (after != null) {
-          // Находим level_id для следующего уровня (after + 1)
-          final nextLevelNumber = after + 1;
-          // Получаем level_id для следующего уровня
-          final levelId =
-              await SupabaseService.levelIdFromNumber(nextLevelNumber);
-          // Guard: повышаем уровень только если текущий уровень пользователя
-          // строго меньше целевого nextLevelNumber (число уровней уже пройденных + 1)
-          try {
-            final user = await ref.read(currentUserProvider.future);
-            final currNum = await SupabaseService.resolveCurrentLevelNumber(
-                user?.currentLevel);
-            if (levelId != null && currNum < nextLevelNumber) {
-              await SupabaseService.completeLevel(levelId);
-            }
-          } catch (_) {}
-        }
-      } catch (_) {
-        // Игнорируем ошибки обновления уровня
-      }
-
       // СНАЧАЛА обновляем данные башни и уровней, ПОТОМ переходим
       try {
         // ignore: unused_result
@@ -626,30 +651,6 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
         // Sentry не настроен, игнорируем
       }
       await ref.read(caseActionsProvider).skip(widget.caseId);
-
-      // Обновляем current_level пользователя после пропуска кейса (аналогично завершению)
-      try {
-        final after = _caseMeta?['after_level'] as int?;
-        if (after != null) {
-          // Находим level_id для следующего уровня (after + 1)
-          final nextLevelNumber = after + 1;
-          // Получаем level_id для следующего уровня
-          final levelId =
-              await SupabaseService.levelIdFromNumber(nextLevelNumber);
-          // Guard: повышаем уровень только если текущий уровень пользователя
-          // строго меньше целевого nextLevelNumber (число уровней уже пройденных + 1)
-          try {
-            final user = await ref.read(currentUserProvider.future);
-            final currNum = await SupabaseService.resolveCurrentLevelNumber(
-                user?.currentLevel);
-            if (levelId != null && currNum < nextLevelNumber) {
-              await SupabaseService.completeLevel(levelId);
-            }
-          } catch (_) {}
-        }
-      } catch (_) {
-        // Игнорируем ошибки обновления уровня
-      }
 
       // СНАЧАЛА обновляем данные башни и уровней, ПОТОМ переходим
       try {
