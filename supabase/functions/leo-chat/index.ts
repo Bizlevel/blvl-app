@@ -889,8 +889,16 @@ serve(async (req) => {
 
     if (userId && shouldSpendServerGp() && !caseMode && !allowSkipSpend) {
       try {
+        // gp_spend relies on auth.uid(), so call with user JWT
+        const spendClient = createClient(supabaseUrl, supabaseAnonKey, {
+          global: {
+            headers: {
+              Authorization: `Bearer ${jwt}`
+            }
+          }
+        });
         const spendKey = `msg:${userId}:${effectiveChatId || 'new'}:${hashQuery(String(lastUserMessage || ''))}`;
-        const { error: spendError } = await (supabaseAdmin as any).rpc('gp_spend', {
+        const { error: spendError } = await (spendClient as any).rpc('gp_spend', {
           p_type: 'spend_message',
           p_amount: 1,
           p_reference_id: effectiveChatId || '',
