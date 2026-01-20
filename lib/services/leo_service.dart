@@ -160,18 +160,24 @@ class LeoService {
 
     return _withRetry(() async {
       try {
-        try {
-          await _spendMessageAndRefresh(
-            gp: gp,
-            idempotencyKey: idempotencyKey,
-          );
-        } on GpFailure catch (ge) {
-          if (ge.message.contains('Недостаточно GP')) {
-            _addBreadcrumb(
-                'gp', 'gp_insufficient', {'where': 'leo_sendMessage'});
-            throw LeoFailure('Недостаточно GP');
+        if (!kEnableServerGpSpend) {
+          try {
+            await _spendMessageAndRefresh(
+              gp: gp,
+              idempotencyKey: idempotencyKey,
+            );
+          } on GpFailure catch (ge) {
+            if (ge.message.contains('Недостаточно GP')) {
+              _addBreadcrumb(
+                  'gp', 'gp_insufficient', {'where': 'leo_sendMessage'});
+              throw LeoFailure('Недостаточно GP');
+            }
+            rethrow;
           }
-          rethrow;
+        } else {
+          _addBreadcrumb('gp', 'gp_spend_server_enabled', {
+            'where': 'leo_sendMessage',
+          });
         }
         final response = await _postLeoChat(
           jsonEncode({'messages': messages, 'bot': bot}),
@@ -252,22 +258,29 @@ class LeoService {
     // Отправляем сообщения в Edge Function. Встроенный RAG выполняется на сервере.
     return _withRetry(() async {
       try {
-        try {
-          await _spendMessageAndRefresh(
-            gp: gp,
-            idempotencyKey: idempotencyKey,
-            chatId: chatId,
-            skipSpend: effectiveSkipSpend,
-          );
-        } on GpFailure catch (ge) {
-          if (ge.message.contains('Недостаточно GP')) {
-            _addBreadcrumb('gp', 'gp_insufficient', {
-              'where': 'leo_sendMessageWithRAG',
-              'chatId': chatId ?? 'new',
-            });
-            throw LeoFailure('Недостаточно GP');
+        if (!kEnableServerGpSpend) {
+          try {
+            await _spendMessageAndRefresh(
+              gp: gp,
+              idempotencyKey: idempotencyKey,
+              chatId: chatId,
+              skipSpend: effectiveSkipSpend,
+            );
+          } on GpFailure catch (ge) {
+            if (ge.message.contains('Недостаточно GP')) {
+              _addBreadcrumb('gp', 'gp_insufficient', {
+                'where': 'leo_sendMessageWithRAG',
+                'chatId': chatId ?? 'new',
+              });
+              throw LeoFailure('Недостаточно GP');
+            }
+            rethrow;
           }
-          rethrow;
+        } else {
+          _addBreadcrumb('gp', 'gp_spend_server_enabled', {
+            'where': 'leo_sendMessageWithRAG',
+            'chatId': chatId ?? 'new',
+          });
         }
 
         // Фильтруем строки "null" и пустые значения

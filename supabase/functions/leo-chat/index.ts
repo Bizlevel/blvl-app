@@ -355,7 +355,15 @@ async function performRAGQuery(lastUserMessage, levelContext, userId, ragCache, 
 
 // Функция для сохранения данных о стоимости AI запроса
 async function saveAIMessageData(userId, chatId, leoMessageId, usage, cost, model, bot, requestType = 'chat', supabaseAdminInstance) {
-  if (!userId) return; // Пропускаем, если пользователь не авторизован
+  if (!userId || !chatId) {
+    console.warn('WARN save_ai_message_skipped_missing_ids', {
+      userId,
+      chatId,
+      requestType,
+      bot
+    });
+    return;
+  }
 
   // Безопасное преобразование к integer
   const safeInt = (v) => {

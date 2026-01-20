@@ -14,12 +14,14 @@ class CaseActions {
   final Future<void> Function(int caseId) skip;
   final Future<void> Function(int caseId) complete;
   final Future<void> Function(int caseId) incrementHint;
+  final Future<void> Function(int caseId, int stepsCompleted) setStepsCompleted;
 
   CaseActions(
       {required this.start,
       required this.skip,
       required this.complete,
-      required this.incrementHint});
+      required this.incrementHint,
+      required this.setStepsCompleted});
 }
 
 final caseActionsProvider = Provider<CaseActions>((ref) {
@@ -41,6 +43,10 @@ final caseActionsProvider = Provider<CaseActions>((ref) {
     },
     incrementHint: (id) async {
       await repo.incrementHint(id);
+      ref.invalidate(caseStatusProvider(id));
+    },
+    setStepsCompleted: (id, stepsCompleted) async {
+      await repo.setStepsCompleted(id, stepsCompleted);
       ref.invalidate(caseStatusProvider(id));
     },
   );

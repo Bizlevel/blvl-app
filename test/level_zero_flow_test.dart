@@ -39,7 +39,9 @@ void main() {
           goal: any(named: 'goal'),
           avatarId: any(named: 'avatarId'),
           onboardingCompleted: any(named: 'onboardingCompleted'),
-        )).thenAnswer((_) async {});
+        )).thenAnswer((_) async {
+          return null;
+        });
 
     await tester.pumpWidget(
       ProviderScope(

@@ -19,13 +19,13 @@ class GoalV1Block extends LevelPageBlock {
     return Consumer(builder: (context, ref, _) {
       // Проверяем наличие сохраненной цели через userGoalProvider
       final goalAsync = ref.watch(userGoalProvider);
-      
+
       return goalAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, __) => Center(child: Text('Ошибка загрузки цели: $e')),
         data: (goal) {
           // Проверяем, есть ли сохраненная цель
-          final bool hasGoal = goal != null && 
+          final bool hasGoal = goal != null &&
               (goal['goal_text'] as String? ?? '').trim().isNotEmpty;
 
           return SingleChildScrollView(
@@ -53,20 +53,25 @@ class GoalV1Block extends LevelPageBlock {
                       SizedBox(
                         width: double.infinity,
                         child: BizLevelButton(
-                          label: hasGoal ? 'Цель сохранена ✓' : 'Сохранить цель',
+                          label:
+                              hasGoal ? 'Цель сохранена ✓' : 'Сохранить цель',
                           onPressed: () async {
                             // Используем /checkpoint/l1 для сохранения цели во время прохождения Уровня 1
                             // (так как /goal недоступен до завершения уровня из-за гейтинга)
-                            final result = await GoRouter.of(context).push('/checkpoint/l1');
+                            final result = await GoRouter.of(context)
+                                .push('/checkpoint/l1');
                             // После возврата проверяем, была ли сохранена цель
                             // result будет true если цель была сохранена, или проверяем БД
                             // Инвалидируем провайдер для обновления данных
                             ref.invalidate(userGoalProvider);
                             // Проверяем цель снова после обновления
                             try {
-                              final updatedGoal = await ref.read(userGoalProvider.future);
+                              final updatedGoal =
+                                  await ref.read(userGoalProvider.future);
                               if (updatedGoal != null) {
-                                final goalText = (updatedGoal['goal_text'] as String? ?? '').trim();
+                                final goalText =
+                                    (updatedGoal['goal_text'] as String? ?? '')
+                                        .trim();
                                 if (goalText.isNotEmpty) {
                                   onSaved();
                                 }
@@ -82,9 +87,12 @@ class GoalV1Block extends LevelPageBlock {
                           padding: const EdgeInsets.only(top: AppSpacing.sm),
                           child: Text(
                             'Цель сохранена. Вы можете завершить уровень.',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
                           ),
                         ),
                       AppSpacing.gapH(AppSpacing.md),
