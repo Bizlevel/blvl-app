@@ -360,44 +360,29 @@ class AuthService {
           _googleSdkInitialized = true;
         }
 
-        // На iOS используем scopeHint в authenticate() чтобы получить токены за один раз
-        // и избежать двойного диалога. На Android это тоже работает нормально.
         final account = await googleSignIn.authenticate(
           scopeHint: const <String>['email', 'profile'],
         );
 
         // Получаем idToken из authentication
-        final auth = account.authentication;
+        final auth = await account.authentication;
         if (auth.idToken == null || auth.idToken!.isEmpty) {
           throw AuthFailure('Не удалось получить ID токен от Google');
         }
 
         final idToken = auth.idToken!;
         
-        // Для Supabase нужен idToken и accessToken
-        // На iOS: если serverClientId настроен правильно, accessToken может быть доступен
-        // через authorizationClient без дополнительного диалога
-        // На Android: authorizeScopes обычно не вызывает дополнительный диалог
-        String accessToken;
-        try {
-          // Пытаемся получить accessToken через authorizationClient
-          // На iOS это может не вызвать диалог, если scopes уже были запрошены в authenticate()
-          final authorization = await account.authorizationClient.authorizeScopes(
-            const <String>['email', 'profile'],
+        const scopes = <String>['email', 'profile'];
+        GoogleSignInClientAuthorization? authorization =
+            await account.authorizationClient.authorizationForScopes(scopes);
+        authorization ??=
+            await account.authorizationClient.authorizeScopes(scopes);
+        final accessToken = authorization.accessToken;
+        if (accessToken.isEmpty) {
+          log('Google Sign-In: accessToken отсутствует');
+          throw AuthFailure(
+            'Не удалось получить access token от Google. Проверьте конфигурацию GOOGLE_WEB_CLIENT_ID.',
           );
-          accessToken = authorization.accessToken;
-          if (accessToken.isEmpty) {
-            log('Google Sign-In: accessToken пустой после authorizeScopes');
-            throw AuthFailure('Не удалось получить access token от Google. Проверьте конфигурацию GOOGLE_WEB_CLIENT_ID.');
-          }
-        } catch (e, st) {
-          // Логируем детали ошибки для отладки
-          log('Google Sign-In: ошибка при получении accessToken', error: e, stackTrace: st);
-          final errorMsg = e.toString();
-          if (errorMsg.contains('Bad ID token') || errorMsg.contains('invalid_grant')) {
-            throw AuthFailure('Ошибка авторизации Google: неверный токен. Проверьте SHA-1/SHA-256 в Google Cloud Console и убедитесь, что GOOGLE_WEB_CLIENT_ID настроен правильно.');
-          }
-          throw AuthFailure('Не удалось получить access token от Google: $errorMsg. Убедитесь, что GOOGLE_WEB_CLIENT_ID настроен правильно.');
         }
 
         if (idToken.isEmpty || accessToken.isEmpty) {

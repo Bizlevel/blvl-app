@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:bizlevel/theme/color.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:bizlevel/services/notification_log_service.dart';
+import 'package:bizlevel/utils/app_scaffold_messenger.dart';
 
 enum _BannerType { success, info, warn, error }
 
@@ -62,7 +63,8 @@ class NotificationCenter {
     _BannerType type,
     _BannerOptions opts,
   ) {
-    final messenger = ScaffoldMessenger.of(context);
+    final messenger =
+        rootScaffoldMessengerKey.currentState ?? ScaffoldMessenger.of(context);
     messenger.hideCurrentMaterialBanner();
 
     final _BannerStyle style = _resolveStyle(type);

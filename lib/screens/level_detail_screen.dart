@@ -228,8 +228,24 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
                 final levelContext = _buildLevelContext();
                 if (!mounted) return;
                 
-                Navigator.of(context, rootNavigator: true).push(
+                final router = GoRouter.of(context);
+                final origin =
+                    router.routeInformationProvider.value.uri.toString();
+                try {
+                  sentry.Sentry.addBreadcrumb(
+                    sentry.Breadcrumb(
+                      category: 'chat',
+                      level: sentry.SentryLevel.info,
+                      message: 'leo_dialog_open_requested',
+                      data: {'origin': origin},
+                    ),
+                  );
+                } catch (_) {}
+                
+                final result = await Navigator.of(context, rootNavigator: true)
+                    .push(
                   CustomModalBottomSheetRoute(
+                    barrierDismissible: false,
                     child: UncontrolledProviderScope(
                       container: container,
                       child: Scaffold(
@@ -332,6 +348,17 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
                     ),
                   ),
                 );
+                if (!mounted) return;
+                final current =
+                    router.routeInformationProvider.value.uri.toString();
+                if (origin.startsWith('/tower') && current != origin) {
+                  router.go(origin);
+                }
+                assert(() {
+                  debugPrint(
+                      'leo_dialog_closed origin=$origin current=$current result=$result');
+                  return true;
+                }());
               },
             ),
           AppSpacing.gapH(AppSpacing.s6),

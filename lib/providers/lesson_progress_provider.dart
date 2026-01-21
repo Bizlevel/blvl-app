@@ -102,6 +102,12 @@ class LessonProgressNotifier extends StateNotifier<LessonProgressState> {
       _scheduleSave();
     }
   }
+
+  Future<void> reset() async {
+    _debounce?.cancel();
+    state = LessonProgressState.empty;
+    await _save();
+  }
 }
 
 final lessonProgressProvider = StateNotifierProvider.family<

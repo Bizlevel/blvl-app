@@ -13,74 +13,79 @@ class HomeQuoteCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final quoteAsync = ref.watch(dailyQuoteProvider);
-    return quoteAsync.when(
-      data: (q) {
-        if (q == null) return const SizedBox.shrink();
-        final text = (q['quote_text'] as String?) ?? '';
-        final String? author = q['author'] as String?;
-        return Semantics(
-          label: 'Цитата дня',
-          child: InkWell(
+    final quoteValue = quoteAsync.value;
+    if (quoteValue == null) {
+      return quoteAsync.when(
+        data: (q) => q == null ? const SizedBox.shrink() : _buildQuote(context, q),
+        loading: () => const SizedBox.shrink(),
+        error: (_, __) => const SizedBox.shrink(),
+      );
+    }
+    return _buildQuote(context, quoteValue);
+  }
+
+  Widget _buildQuote(BuildContext context, Map<String, dynamic> q) {
+    final text = (q['quote_text'] as String?) ?? '';
+    final String? author = q['author'] as String?;
+    return Semantics(
+      label: 'Цитата дня',
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
+        onTap: () {
+          try {
+            Sentry.addBreadcrumb(Breadcrumb(
+              category: 'ui.tap',
+              message: 'home_quote_tap',
+              level: SentryLevel.info,
+            ));
+          } catch (_) {}
+        },
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, AppSpacing.s14),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [AppColor.appBgColor, AppColor.appBarColor],
+            ),
             borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
-            onTap: () {
-              try {
-                Sentry.addBreadcrumb(Breadcrumb(
-                  category: 'ui.tap',
-                  message: 'home_quote_tap',
-                  level: SentryLevel.info,
-                ));
-              } catch (_) {}
-            },
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, AppSpacing.s14),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [AppColor.appBgColor, AppColor.appBarColor],
-                ),
-                borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
-                border: Border.all(color: AppColor.border),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColor.shadow.withValues(alpha: 0.06),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
+            border: Border.all(color: AppColor.border),
+            boxShadow: [
+              BoxShadow(
+                color: AppColor.shadow.withValues(alpha: 0.06),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '«$text»',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          height: 1.4,
-                          fontStyle: FontStyle.italic,
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '«$text»',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      height: 1.4,
+                      fontStyle: FontStyle.italic,
+                    ),
+              ),
+              if (author != null && author.isNotEmpty) ...[
+                AppSpacing.gapH(6),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    author,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColor.onSurfaceSubtle,
                         ),
                   ),
-                  if (author != null && author.isNotEmpty) ...[
-                    AppSpacing.gapH(6),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: Text(
-                        author,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: AppColor.onSurfaceSubtle,
-                            ),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
+                ),
+              ],
+            ],
           ),
-        );
-      },
-      loading: () => const SizedBox.shrink(),
-      error: (_, __) => const SizedBox.shrink(),
+        ),
+      ),
     );
   }
 }
