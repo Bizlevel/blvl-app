@@ -74,8 +74,12 @@ dev_dependencies:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path_android: assets/icon/app_icon.png
-  image_path_ios: assets/icon/app_icon.png
+  # Одна и та же картинка для iOS (и для старых android-иконок тоже)
+  image_path: assets/icon/app_icon.png
+  # Adaptive (Android 8+) — используем тот же файл как foreground
+  adaptive_icon_foreground: assets/icon/app_icon.png
+  # Фон без “разных цветов”: можно белый (самый нейтральный)
+  adaptive_icon_background: "#FFFFFF"
   remove_alpha_ios: true
 
 flutter:
