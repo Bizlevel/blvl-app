@@ -127,11 +127,24 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
     _leo = ref.read(leoServiceProvider);
     // Лимиты сообщений отключены (этап 39.1)
     _chatId = widget.chatId;
+    try {
+      Sentry.addBreadcrumb(Breadcrumb(
+        category: 'chat',
+        level: SentryLevel.info,
+        message: 'leo_dialog_opened',
+        data: {
+          'bot': widget.bot,
+          'embedded': widget.embedded,
+          'caseMode': widget.caseMode,
+          'chatId': _chatId ?? '',
+        },
+      ));
+    } catch (_) {}
     // если подсказок нет, скрываем ленту
     if (_serverRecommendedChips.isEmpty && _defaultGoalChips.isEmpty) {
       _showSuggestions = false;
     }
-    _allowPop = !widget.caseMode;
+    _allowPop = !(widget.caseMode || widget.embedded);
     
     // Следим за позицией скролла для показа FAB «вниз»
     _scrollController.addListener(() {

@@ -21,6 +21,7 @@ class HomeGoalCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final goalAsync = ref.watch(userGoalProvider);
+    final goalValue = goalAsync.value;
     return BizLevelCard(
       semanticsLabel: 'Моя цель',
       onTap: () => context.go('/goal'),
@@ -30,232 +31,263 @@ class HomeGoalCard extends ConsumerWidget {
         constraints: const BoxConstraints(
           minHeight: AppDimensions.homeGoalMinHeight,
         ),
-        child: goalAsync.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (_, __) => const Text('Не удалось загрузить цель'),
-          data: (goal) {
-            final repo = ref.read(goalsRepositoryProvider);
-            final double? progress = repo.computeGoalProgressPercent(goal);
-            final String goalText = (goal?['goal_text'] ?? '').toString();
+        child: goalValue != null
+            ? _buildGoalContent(context, ref, goalValue)
+            : goalAsync.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (_, __) => const Text('Не удалось загрузить цель'),
+                data: (goal) => _buildGoalContent(context, ref, goal),
+              ),
+      ),
+    );
+  }
 
-            DateTime? targetDate;
-            try {
-              final td = (goal?['target_date']?.toString());
-              targetDate =
-                  td == null ? null : DateTime.tryParse(td)?.toLocal();
-            } catch (_) {}
+  Widget _buildGoalContent(
+    BuildContext context,
+    WidgetRef ref,
+    Map<String, dynamic>? goal,
+  ) {
+    final repo = ref.read(goalsRepositoryProvider);
+    final double? progress = repo.computeGoalProgressPercent(goal);
+    final String goalText = (goal?['goal_text'] ?? '').toString();
 
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                    // Верхняя часть: текст цели + прогресс справа
+    DateTime? targetDate;
+    try {
+      final td = (goal?['target_date']?.toString());
+      targetDate = td == null ? null : DateTime.tryParse(td)?.toLocal();
+    } catch (_) {}
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Верхняя часть: текст цели + прогресс справа
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Моя цель',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                  AppSpacing.gapH(AppSpacing.sm),
+                  Text(
+                    goalText.isEmpty ? 'Цель не задана' : goalText,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  AppSpacing.gapH(AppSpacing.sm),
+                  if (targetDate != null)
                     Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Моя цель',
-                                style: Theme.of(context).textTheme.titleMedium
-                                    ?.copyWith(fontWeight: FontWeight.w600),
-                              ),
-                              AppSpacing.gapH(AppSpacing.sm),
-                              Text(
-                                goalText.isEmpty ? 'Цель не задана' : goalText,
-                                maxLines: 3,
-                                overflow: TextOverflow.ellipsis,
-                                style: Theme.of(context).textTheme.bodyMedium,
-                              ),
-                              AppSpacing.gapH(AppSpacing.sm),
-                              if (targetDate != null)
-                                Row(
-                                  children: [
-                                    const Text('⏱ '),
-                                    Flexible(
-                                      child: Text(
-                                        targetDate.isBefore(DateTime.now())
-                                            ? 'Поставить новый дедлайн'
-                                            : 'до ${DateFormat('dd.MM.yyyy').format(targetDate)}',
-                                        style: Theme.of(context).textTheme.bodySmall
-                                            ?.copyWith(
-                                              color: targetDate.isBefore(DateTime.now())
-                                                  ? AppColor.error
-                                                  : AppColor.onSurfaceSubtle,
-                                            ),
-                                      ),
-                                    ),
-                                  ],
+                        const Text('⏱ '),
+                        Flexible(
+                          child: Text(
+                            targetDate.isBefore(DateTime.now())
+                                ? 'Поставить новый дедлайн'
+                                : 'до ${DateFormat('dd.MM.yyyy').format(targetDate)}',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: targetDate.isBefore(DateTime.now())
+                                      ? AppColor.error
+                                      : AppColor.onSurfaceSubtle,
                                 ),
-                            ],
                           ),
                         ),
-                        if (progress != null) ...[
-                          const SizedBox(width: AppSpacing.md),
-                          DonutProgress(
-                            value: progress.clamp(0.0, 1.0),
-                            size: 80,
-                            strokeWidth: 6,
-                          ),
-                        ],
                       ],
                     ),
-                    if (progress == null) ...[
-                      AppSpacing.gapH(AppSpacing.sm),
-                      Text(
-                        'Добавьте метрику, чтобы видеть прогресс.',
-                        style: Theme.of(context).textTheme.labelSmall
-                            ?.copyWith(color: AppColor.onSurfaceSubtle),
+                ],
+              ),
+            ),
+            if (progress != null) ...[
+              const SizedBox(width: AppSpacing.md),
+              DonutProgress(
+                value: progress.clamp(0.0, 1.0),
+                size: 80,
+                strokeWidth: 6,
+              ),
+            ],
+          ],
+        ),
+        if (progress == null) ...[
+          AppSpacing.gapH(AppSpacing.sm),
+          Text(
+            'Добавьте метрику, чтобы видеть прогресс.',
+            style: Theme.of(context)
+                .textTheme
+                .labelSmall
+                ?.copyWith(color: AppColor.onSurfaceSubtle),
+          ),
+        ],
+        AppSpacing.gapH(AppSpacing.md),
+        // Кнопки в отдельном ряду на всю ширину
+        Row(
+          children: [
+            Expanded(
+              child: BizLevelButton(
+                icon: const Icon(Icons.track_changes, size: 16),
+                label: 'Действие',
+                onPressed: () async {
+                  try {
+                    Sentry.addBreadcrumb(
+                      Breadcrumb(
+                        category: 'ui.tap',
+                        message: 'home_goal_action_tap',
+                        level: SentryLevel.info,
                       ),
-                    ],
-                    AppSpacing.gapH(AppSpacing.md),
-                    // Кнопки в отдельном ряду на всю ширину
-                    Row(
-                      children: [
-                        Expanded(
-                          child: BizLevelButton(
-                            icon: const Icon(Icons.track_changes, size: 16),
-                            label: 'Действие',
-                            onPressed: () {
-                              try {
-                                Sentry.addBreadcrumb(
-                                  Breadcrumb(
-                                    category: 'ui.tap',
-                                    message: 'home_goal_action_tap',
-                                    level: SentryLevel.info,
-                                  ),
-                                );
-                              } catch (_) {}
-                              context.go('/goal?scroll=journal');
-                            },
-                            variant: BizLevelButtonVariant.secondary,
-                            size: BizLevelButtonSize.sm,
-                          ),
-                        ),
-                        const SizedBox(width: AppSpacing.sm),
-                        Expanded(
-                          child: BizLevelButton(
-                            icon: Container(
-                              width: 18,
-                              height: 18,
-                              decoration: const BoxDecoration(
-                                shape: BoxShape.circle,
-                                image: DecorationImage(
-                                  image: AssetImage(
-                                      'assets/images/avatars/avatar_max.png'),
-                                  fit: BoxFit.cover,
+                    );
+                  } catch (_) {}
+                  context.go('/goal?scroll=journal');
+                },
+                variant: BizLevelButtonVariant.secondary,
+                size: BizLevelButtonSize.sm,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: BizLevelButton(
+                icon: Container(
+                  width: 18,
+                  height: 18,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    image: DecorationImage(
+                      image: AssetImage('assets/images/avatars/avatar_max.png'),
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ),
+                label: 'Обсудить',
+                onPressed: () async {
+                  try {
+                    Sentry.addBreadcrumb(
+                      Breadcrumb(
+                        category: 'ui.tap',
+                        message: 'home_goal_max_tap',
+                        level: SentryLevel.info,
+                      ),
+                    );
+                  } catch (_) {}
+
+                  // ВАЖНО: Получаем ProviderContainer из текущего контекста,
+                  // чтобы передать его в UncontrolledProviderScope для диалога
+                  // Это гарантирует, что провайдеры будут доступны даже если родитель умрет
+                  final container = ProviderScope.containerOf(context);
+
+                  final router = GoRouter.of(context);
+                  final origin =
+                      router.routeInformationProvider.value.uri.toString();
+                  try {
+                    Sentry.addBreadcrumb(
+                      Breadcrumb(
+                        category: 'chat',
+                        level: SentryLevel.info,
+                        message: 'leo_dialog_open_requested',
+                        data: {'origin': origin, 'bot': 'max'},
+                      ),
+                    );
+                  } catch (_) {}
+
+                  final result = await Navigator.of(context, rootNavigator: true)
+                      .push(
+                    CustomModalBottomSheetRoute(
+                      barrierDismissible: false,
+                      child: UncontrolledProviderScope(
+                        container: container,
+                        child: Scaffold(
+                          backgroundColor: Colors.transparent,
+                          resizeToAvoidBottomInset: true,
+                          body: Stack(
+                            children: [
+                              Positioned.fill(
+                                child: GestureDetector(
+                                  behavior: HitTestBehavior.opaque,
+                                  onTap: () {
+                                    final navigator = Navigator.of(
+                                      context,
+                                      rootNavigator: true,
+                                    );
+                                    if (navigator.canPop()) {
+                                      navigator.pop();
+                                    }
+                                  },
+                                  child: Container(color: Colors.transparent),
                                 ),
                               ),
-                            ),
-                            label: 'Обсудить',
-                            onPressed: () {
-                              try {
-                                Sentry.addBreadcrumb(
-                                  Breadcrumb(
-                                    category: 'ui.tap',
-                                    message: 'home_goal_max_tap',
-                                    level: SentryLevel.info,
-                                  ),
-                                );
-                              } catch (_) {}
-                              
-                              // ВАЖНО: Получаем ProviderContainer из текущего контекста,
-                              // чтобы передать его в UncontrolledProviderScope для диалога
-                              // Это гарантирует, что провайдеры будут доступны даже если родитель умрет
-                              final container = ProviderScope.containerOf(context);
-                              
-                              Navigator.of(context, rootNavigator: true).push(
-                                CustomModalBottomSheetRoute(
-                                  child: UncontrolledProviderScope(
-                                    container: container,
-                                    child: Scaffold(
-                                      backgroundColor: Colors.transparent,
-                                      resizeToAvoidBottomInset: true,
-                                      body: Stack(
+                              Align(
+                                alignment: Alignment.bottomCenter,
+                                child: Material(
+                                  color: Colors.transparent,
+                                  child: ConstrainedBox(
+                                    constraints: BoxConstraints(
+                                      maxHeight:
+                                          MediaQuery.of(context).size.height * 0.9,
+                                    ),
+                                    child: Container(
+                                      decoration: const BoxDecoration(
+                                        color: AppColor.surface,
+                                        borderRadius: BorderRadius.vertical(
+                                          top: Radius.circular(20),
+                                        ),
+                                      ),
+                                      clipBehavior: Clip.hardEdge,
+                                      child: Column(
                                         children: [
-                                          Positioned.fill(
-                                            child: GestureDetector(
-                                              behavior: HitTestBehavior.opaque,
-                                              onTap: () {
-                                                final navigator = Navigator.of(
-                                                  context,
-                                                  rootNavigator: true,
-                                                );
-                                                if (navigator.canPop()) {
-                                                  navigator.pop();
-                                                }
-                                              },
-                                              child: Container(color: Colors.transparent),
-                                            ),
-                                          ),
-                                          Align(
-                                            alignment: Alignment.bottomCenter,
-                                            child: Material(
-                                              color: Colors.transparent,
-                                              child: ConstrainedBox(
-                                                constraints: BoxConstraints(
-                                                  maxHeight: MediaQuery.of(context).size.height * 0.9,
+                                          Container(
+                                            color: AppColor.primary,
+                                            child: SafeArea(
+                                              bottom: false,
+                                              child: AppBar(
+                                                backgroundColor: AppColor.primary,
+                                                automaticallyImplyLeading: false,
+                                                leading: Builder(
+                                                  builder: (context) => IconButton(
+                                                    tooltip: 'Закрыть',
+                                                    icon: const Icon(Icons.close),
+                                                    onPressed: () {
+                                                      FocusManager.instance
+                                                          .primaryFocus
+                                                          ?.unfocus();
+                                                      final navigator = Navigator.of(
+                                                        context,
+                                                        rootNavigator: true,
+                                                      );
+                                                      if (navigator.canPop()) {
+                                                        navigator.pop();
+                                                      }
+                                                    },
+                                                  ),
                                                 ),
-                                                child: Container(
-                                                  decoration: const BoxDecoration(
-                                                    color: AppColor.surface,
-                                                    borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-                                                  ),
-                                                  clipBehavior: Clip.hardEdge,
-                                                  child: Column(
-                                                    children: [
-                                                      Container(
-                                                        color: AppColor.primary,
-                                                        child: SafeArea(
-                                                          bottom: false,
-                                                          child: AppBar(
-                                                            backgroundColor: AppColor.primary,
-                                                            automaticallyImplyLeading: false,
-                                                            leading: Builder(
-                                                              builder: (context) => IconButton(
-                                                                tooltip: 'Закрыть',
-                                                                icon: const Icon(Icons.close),
-                                                                onPressed: () {
-                                                                  FocusManager.instance.primaryFocus?.unfocus();
-                                                                  final navigator = Navigator.of(
-                                                                    context,
-                                                                    rootNavigator: true,
-                                                                  );
-                                                                  if (navigator.canPop()) {
-                                                                    navigator.pop();
-                                                                  }
-                                                                },
-                                                              ),
-                                                            ),
-                                                            title: const Row(
-                                                              children: [
-                                                                CircleAvatar(
-                                                                  radius: 14,
-                                                                  backgroundImage: AssetImage('assets/images/avatars/avatar_max.png'),
-                                                                  backgroundColor: Colors.transparent,
-                                                                ),
-                                                                SizedBox(width: 8),
-                                                                Text('Макс'),
-                                                              ],
-                                                            ),
-                                                          ),
-                                                        ),
+                                                title: const Row(
+                                                  children: [
+                                                    CircleAvatar(
+                                                      radius: 14,
+                                                      backgroundImage: AssetImage(
+                                                        'assets/images/avatars/avatar_max.png',
                                                       ),
-                                                      Expanded(
-                                                        child: LeoDialogScreen(
-                                                          bot: 'max',
-                                                          userContext: buildMaxUserContext(
-                                                            goal: goal,
-                                                          ),
-                                                          levelContext: '',
-                                                          embedded: true,
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
+                                                      backgroundColor:
+                                                          Colors.transparent,
+                                                    ),
+                                                    SizedBox(width: 8),
+                                                    Text('Макс'),
+                                                  ],
                                                 ),
                                               ),
+                                            ),
+                                          ),
+                                          Expanded(
+                                            child: LeoDialogScreen(
+                                              bot: 'max',
+                                              userContext: buildMaxUserContext(
+                                                goal: goal,
+                                              ),
+                                              levelContext: '',
+                                              embedded: true,
                                             ),
                                           ),
                                         ],
@@ -263,18 +295,31 @@ class HomeGoalCard extends ConsumerWidget {
                                     ),
                                   ),
                                 ),
-                              );
-                            },
-                            size: BizLevelButtonSize.sm,
+                              ),
+                            ],
                           ),
                         ),
-                      ],
+                      ),
                     ),
-                  ],
-                );
-          },
+                  );
+                  if (!context.mounted) return;
+                  final current =
+                      router.routeInformationProvider.value.uri.toString();
+                  if (origin.startsWith('/tower') && current != origin) {
+                    router.go(origin);
+                  }
+                  assert(() {
+                    debugPrint(
+                        'leo_dialog_closed origin=$origin current=$current result=$result');
+                    return true;
+                  }());
+                },
+                size: BizLevelButtonSize.sm,
+              ),
+            ),
+          ],
         ),
-      ),
+      ],
     );
   }
 }

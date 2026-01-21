@@ -135,26 +135,8 @@ class ProfileFormBlock extends LevelPageBlock {
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
           child: Column(
             children: [
-              Align(
-                alignment: Alignment.topRight,
-                child: IconButton(
-                  icon: const Icon(Icons.edit, color: AppColor.onSurfaceSubtle),
-                  onPressed: isEditing
-                      ? null
-                      : () {
-                          // Сбрасываем возможный "скрытый" фокус с readOnly-полей,
-                          // чтобы включение режима редактирования не приводило к
-                          // внезапному появлению клавиатуры/route-pop на некоторых устройствах.
-                          try {
-                            FocusScope.of(context).unfocus();
-                          } catch (_) {}
-                          onEdit();
-                        },
-                  tooltip: 'Редактировать',
-                ),
-              ),
               GestureDetector(
-                onTap: () => _showAvatarPicker(context),
+                onTap: isEditing ? () => _showAvatarPicker(context) : null,
                 child: Stack(
                   children: [
                     ClipRRect(
@@ -169,25 +151,29 @@ class ProfileFormBlock extends LevelPageBlock {
                     Positioned(
                       bottom: 0,
                       right: 0,
-                      child: Container(
-                        width: 28,
-                        height: 28,
-                        decoration: BoxDecoration(
-                          color: AppColor.surface,
-                          borderRadius: BorderRadius.circular(AppDimensions.radius14),
-                          boxShadow: const [
-                            BoxShadow(
-                              color: AppColor.shadow,
-                              blurRadius: 2,
-                            ),
-                          ],
-                        ),
-                        child: const Icon(
-                          Icons.camera_alt,
-                          size: 16,
-                          color: AppColor.primary,
-                        ),
-                      ),
+                      child: isEditing
+                          ? Container(
+                              width: 28,
+                              height: 28,
+                              decoration: BoxDecoration(
+                                color: AppColor.surface,
+                                borderRadius: BorderRadius.circular(
+                                  AppDimensions.radius14,
+                                ),
+                                boxShadow: const [
+                                  BoxShadow(
+                                    color: AppColor.shadow,
+                                    blurRadius: 2,
+                                  ),
+                                ],
+                              ),
+                              child: const Icon(
+                                Icons.camera_alt,
+                                size: 16,
+                                color: AppColor.primary,
+                              ),
+                            )
+                          : const SizedBox.shrink(),
                     ),
                   ],
                 ),

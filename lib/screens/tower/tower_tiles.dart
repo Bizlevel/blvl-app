@@ -5,6 +5,11 @@ part of '../biz_tower_screen.dart';
 const int _kFloorUnlockCost = 1000;
 const int _kTargetFloorNumber = 1;
 
+bool _isLockedByGp(Map<String, dynamic> data) {
+  final reason = data['lockReason'] as String?;
+  return reason != null && reason.contains('GP');
+}
+
 Future<void> _unlockFloor(BuildContext context,
     {required int floorNumber, int? priceGp}) async {
   try {
@@ -130,8 +135,8 @@ void _showUnlockFloorDialog(BuildContext context, {required int floorNumber}) {
 }
 
 bool _shouldShowUnlockButton(
-    int levelNumber, bool isLocked, bool blockedByCheckpoint) {
-  return levelNumber == 4 && isLocked && !blockedByCheckpoint;
+    {required bool isLockedByGp, required bool blockedByCheckpoint}) {
+  return isLockedByGp && !blockedByCheckpoint;
 }
 
 void _handleCheckpointTap(BuildContext context, Map<String, dynamic> node) {
@@ -189,8 +194,11 @@ void _handleLevelTap(
     if (!canOpen) {
       if (blockedByCheckpoint) {
         _showBlockedSnackBar(context);
+      } else if (_isLockedByGp(data)) {
+        final floorNumber = data['floor'] as int? ?? _kTargetFloorNumber;
+        _showUnlockFloorDialog(context, floorNumber: floorNumber);
       } else {
-        _showUnlockFloorDialog(context, floorNumber: _kTargetFloorNumber);
+        _showBlockedSnackBar(context);
       }
       return;
     }
@@ -348,9 +356,12 @@ class _LevelNodeTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final int levelNumber = data['level'] as int? ?? 0;
+    final int floorNumber = data['floor'] as int? ?? _kTargetFloorNumber;
+    final int levelId = data['id'] as int? ?? 0;
     final bool isCurrent = data['isCurrent'] == true;
     final bool isLockedBase = data['isLocked'] == true;
     final bool isLocked = isLockedBase || blockedByCheckpoint;
+    final bool isLockedByGp = isLockedBase && _isLockedByGp(data);
     final bool isCompleted = data['isCompleted'] == true;
 
     return Material(
@@ -382,7 +393,8 @@ class _LevelNodeTile extends StatelessWidget {
                 isLocked: isLocked,
               ),
               if (_shouldShowUnlockButton(
-                  levelNumber, isLocked, blockedByCheckpoint))
+                  isLockedByGp: isLockedByGp,
+                  blockedByCheckpoint: blockedByCheckpoint))
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
                   child: OutlinedButton(
@@ -398,12 +410,41 @@ class _LevelNodeTile extends StatelessWidget {
                     onPressed: () {
                       try {
                         _showUnlockFloorDialog(context,
-                            floorNumber: _kTargetFloorNumber);
+                            floorNumber: floorNumber);
                       } catch (e, st) {
                         _captureError(e, st);
                       }
                     },
                     child: const Text('Получить полный доступ к этажу'),
+                  ),
+                ),
+              if (isCompleted)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: AppColor.border, width: 1),
+                      shape: RoundedRectangleBorder(
+                        borderRadius:
+                            BorderRadius.circular(AppDimensions.radiusMd),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                    ),
+                    onPressed: () async {
+                      if (levelId <= 0) return;
+                      try {
+                        final container = ProviderScope.containerOf(context);
+                        await container
+                            .read(lessonProgressProvider(levelId).notifier)
+                            .reset();
+                        if (!context.mounted) return;
+                        context.push('/levels/$levelId?num=$levelNumber');
+                      } catch (e, st) {
+                        _captureError(e, st);
+                      }
+                    },
+                    child: const Text('Повторить уровень'),
                   ),
                 ),
             ],

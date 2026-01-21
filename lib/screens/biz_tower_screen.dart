@@ -19,6 +19,7 @@ import 'package:bizlevel/screens/checkpoints/checkpoint_l1_screen.dart';
 import 'package:bizlevel/screens/checkpoints/checkpoint_l4_screen.dart';
 import 'package:bizlevel/screens/checkpoints/checkpoint_l7_screen.dart';
 import 'package:bizlevel/utils/input_bottom_sheet.dart';
+import 'package:bizlevel/providers/lesson_progress_provider.dart';
 
 part 'tower/tower_constants.dart';
 part 'tower/tower_helpers.dart';

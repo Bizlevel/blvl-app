@@ -2,14 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:bizlevel/providers/goals_providers.dart';
+import 'package:bizlevel/providers/goals_repository_provider.dart';
+import 'package:bizlevel/providers/levels_provider.dart';
 import 'package:bizlevel/screens/leo_dialog_screen.dart';
 import 'package:go_router/go_router.dart';
 import 'package:bizlevel/widgets/reminders_settings_sheet.dart';
 import 'package:bizlevel/widgets/common/bizlevel_card.dart';
 import 'package:bizlevel/widgets/common/bizlevel_button.dart';
+import 'package:bizlevel/widgets/common/notification_center.dart';
 import 'package:bizlevel/theme/spacing.dart';
 import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/theme/dimensions.dart';
+import 'package:bizlevel/models/goal_update.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class CheckpointL7Screen extends ConsumerWidget {
   const CheckpointL7Screen({super.key});
@@ -142,7 +147,7 @@ class CheckpointL7Screen extends ConsumerWidget {
                       child: BizLevelButton(
                         variant: BizLevelButtonVariant.outline,
                         label: 'Завершить чекпоинт →',
-                        onPressed: () {
+                        onPressed: () async {
                           try {
                             Sentry.addBreadcrumb(Breadcrumb(
                               category: 'checkpoint',
@@ -150,7 +155,41 @@ class CheckpointL7Screen extends ConsumerWidget {
                               level: SentryLevel.info,
                             ));
                           } catch (_) {}
-                          GoRouter.of(context).push('/tower');
+                          final String goalText =
+                              (goal?['goal_text'] ?? '').toString().trim();
+                          if (goalText.isEmpty) {
+                            NotificationCenter.showError(
+                                context, 'Сначала задайте цель');
+                            return;
+                          }
+                          final String existingNote =
+                              (goal?['action_plan_note'] ?? '')
+                                  .toString()
+                                  .trim();
+                          final String? noteUpdate = existingNote.isEmpty
+                              ? 'Система поддержки подтверждена'
+                              : null;
+                          try {
+                            final repo = ref.read(goalsRepositoryProvider);
+                            final userId = Supabase
+                                    .instance.client.auth.currentUser?.id ??
+                                '';
+                            await repo.upsertUserGoalRequest(GoalUpsertRequest(
+                              userId: userId,
+                              goalText: goalText,
+                              actionPlanNote: noteUpdate,
+                            ));
+                            ref.invalidate(userGoalProvider);
+                            ref.invalidate(towerNodesProvider);
+                            if (!context.mounted) return;
+                            NotificationCenter.showSuccess(
+                                context, 'Чекпоинт L7 завершён');
+                            GoRouter.of(context).push('/tower');
+                          } catch (e) {
+                            if (!context.mounted) return;
+                            NotificationCenter.showError(
+                                context, 'Не удалось завершить чекпоинт: $e');
+                          }
                         },
                       ),
                     ),

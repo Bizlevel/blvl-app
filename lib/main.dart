@@ -16,6 +16,7 @@ import 'dart:async';
 import 'dart:developer' as dev;
 import 'dart:math' as math;
 import 'utils/deep_link.dart';
+import 'utils/app_scaffold_messenger.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/scheduler.dart';
 
@@ -437,6 +438,7 @@ class _RouterApp extends StatelessWidget {
 
     return MaterialApp.router(
       routerConfig: router,
+      scaffoldMessengerKey: rootScaffoldMessengerKey,
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,

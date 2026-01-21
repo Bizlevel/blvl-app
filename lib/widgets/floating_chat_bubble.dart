@@ -5,6 +5,8 @@ import 'package:bizlevel/providers/leo_unread_provider.dart';
 import 'package:bizlevel/providers/leo_service_provider.dart';
 import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/utils/custom_modal_route.dart';
+import 'package:go_router/go_router.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 
 /// Floating chat bubble that opens the LeoDialogScreen.
 /// Place this widget inside a [Stack] so that it can be positioned
@@ -92,8 +94,21 @@ class _FloatingChatBubbleState extends ConsumerState<FloatingChatBubble>
     // Это гарантирует, что провайдеры будут доступны даже если FloatingChatBubble умрет
     final container = ProviderScope.containerOf(context);
     
-    await Navigator.of(context, rootNavigator: true).push(
+    final router = GoRouter.of(context);
+    final origin = router.routeInformationProvider.value.uri.toString();
+    try {
+      Sentry.addBreadcrumb(
+        Breadcrumb(
+          category: 'chat',
+          level: SentryLevel.info,
+          message: 'leo_dialog_open_requested',
+          data: {'origin': origin},
+        ),
+      );
+    } catch (_) {}
+    final result = await Navigator.of(context, rootNavigator: true).push(
       CustomModalBottomSheetRoute(
+        barrierDismissible: false,
         child: UncontrolledProviderScope(
           container: container,
           child: Scaffold(
@@ -192,6 +207,16 @@ class _FloatingChatBubbleState extends ConsumerState<FloatingChatBubble>
         ),
       ),
     );
+    if (!context.mounted) return;
+    final current = router.routeInformationProvider.value.uri.toString();
+    if (origin.startsWith('/tower') && current != origin) {
+      router.go(origin);
+    }
+    assert(() {
+      debugPrint(
+          'leo_dialog_closed origin=$origin current=$current result=$result');
+      return true;
+    }());
   }
 
   @override

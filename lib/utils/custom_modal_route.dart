@@ -10,12 +10,16 @@ import 'package:flutter/material.dart';
 /// - Работает с adjustPan в манифесте (окно не меняет размер)
 class CustomModalBottomSheetRoute<T> extends PageRouteBuilder<T> {
   final Widget child;
+  final bool barrierDismissible;
 
-  CustomModalBottomSheetRoute({required this.child})
+  CustomModalBottomSheetRoute({
+    required this.child,
+    this.barrierDismissible = true,
+  })
       : super(
           pageBuilder: (context, animation, secondaryAnimation) => child,
           opaque: false, // Прозрачный фон
-          barrierDismissible: true, // Закрытие по тапу мимо окна
+          barrierDismissible: barrierDismissible, // Закрытие по тапу мимо окна
           barrierColor: Colors.black54,
           // ВАЖНО: fullscreenDialog: false - не используем полноэкранный режим,
           // чтобы избежать конфликтов с обработкой клавиатуры

@@ -113,88 +113,95 @@ class _MainStreetScreenState extends ConsumerState<MainStreetScreen> {
                                   final nextAsync = ref.watch(
                                     nextLevelToContinueProvider,
                                   );
-                                  return nextAsync.when(
-                                    data: (next) {
-                                      final String label =
-                                          (next['label'] as String?) ?? 'Далее';
-                                      final bool isLocked =
-                                          next['isLocked'] as bool? ?? false;
-                                      final int targetScroll =
-                                          next['targetScroll'] as int? ?? 0;
-                                      final int levelNum =
-                                          next['levelNumber'] as int? ?? 0;
-                                      final levelTitle =
-                                          (next['levelTitle'] as String?)
-                                              ?.trim();
-                                      // Подзаголовок: только название уровня без префикса «Уровень N»
-                                      String subtitle;
-                                      if (levelTitle != null &&
-                                          levelTitle.isNotEmpty) {
-                                        // Удаляем возможный префикс «Уровень X: »
-                                        final cleaned = levelTitle.replaceFirst(
-                                          RegExp(
-                                            r'^\s*Уровень\s*\d*\s*:?\s*',
-                                            caseSensitive: false,
-                                          ),
-                                          '',
-                                        );
-                                        subtitle = cleaned.isNotEmpty
-                                            ? cleaned
-                                            : levelTitle;
-                                      } else {
-                                        subtitle = label;
-                                      }
-                                      return HomeContinueCard(
-                                        subtitle: subtitle,
-                                        levelNumber: levelNum,
-                                        onTap: () {
-                                          try {
-                                            Sentry.addBreadcrumb(
-                                              Breadcrumb(
-                                                category: 'ui.tap',
-                                                message:
-                                                    'home_cta_continue_tap',
-                                                level: SentryLevel.info,
-                                              ),
-                                            );
-                                            final int? miniCaseId =
-                                                next['miniCaseId'] as int?;
-                                            if (miniCaseId != null) {
-                                              context.go('/case/$miniCaseId');
-                                              return;
-                                            }
-                                            if (isLocked) {
-                                              context.go(
-                                                '/tower?scrollTo=$targetScroll',
-                                              );
-                                              return;
-                                            }
-                                            final levelNumber =
-                                                next['levelNumber'] as int? ??
-                                                0;
-                                            final levelId =
-                                                next['levelId'] as int? ?? 0;
-                                            context.go(
-                                              '/levels/$levelId?num=$levelNumber',
-                                            );
-                                          } catch (e, st) {
-                                            Sentry.captureException(
-                                              e,
-                                              stackTrace: st,
-                                            );
-                                            ScaffoldMessenger.of(
-                                              context,
-                                            ).showSnackBar(
-                                              const SnackBar(
-                                                content: Text(
-                                                  'Не удалось открыть уровень',
-                                                ),
-                                              ),
-                                            );
-                                          }
-                                        },
+                                  final nextValue = nextAsync.value;
+
+                                  Widget buildCard(Map<String, dynamic> next) {
+                                    final String label =
+                                        (next['label'] as String?) ?? 'Далее';
+                                    final bool isLocked =
+                                        next['isLocked'] as bool? ?? false;
+                                    final int targetScroll =
+                                        next['targetScroll'] as int? ?? 0;
+                                    final int levelNum =
+                                        next['levelNumber'] as int? ?? 0;
+                                    final levelTitle =
+                                        (next['levelTitle'] as String?)
+                                            ?.trim();
+                                    // Подзаголовок: только название уровня без префикса «Уровень N»
+                                    String subtitle;
+                                    if (levelTitle != null &&
+                                        levelTitle.isNotEmpty) {
+                                      // Удаляем возможный префикс «Уровень X: »
+                                      final cleaned = levelTitle.replaceFirst(
+                                        RegExp(
+                                          r'^\s*Уровень\s*\d*\s*:?\s*',
+                                          caseSensitive: false,
+                                        ),
+                                        '',
                                       );
-                                    },
+                                      subtitle = cleaned.isNotEmpty
+                                          ? cleaned
+                                          : levelTitle;
+                                    } else {
+                                      subtitle = label;
+                                    }
+                                    return HomeContinueCard(
+                                      subtitle: subtitle,
+                                      levelNumber: levelNum,
+                                      onTap: () {
+                                        try {
+                                          Sentry.addBreadcrumb(
+                                            Breadcrumb(
+                                              category: 'ui.tap',
+                                              message:
+                                                  'home_cta_continue_tap',
+                                              level: SentryLevel.info,
+                                            ),
+                                          );
+                                          final int? miniCaseId =
+                                              next['miniCaseId'] as int?;
+                                          if (miniCaseId != null) {
+                                            context.go('/case/$miniCaseId');
+                                            return;
+                                          }
+                                          if (isLocked) {
+                                            context.go(
+                                              '/tower?scrollTo=$targetScroll',
+                                            );
+                                            return;
+                                          }
+                                          final levelNumber =
+                                              next['levelNumber'] as int? ?? 0;
+                                          final levelId =
+                                              next['levelId'] as int? ?? 0;
+                                          context.go(
+                                            '/levels/$levelId?num=$levelNumber',
+                                          );
+                                        } catch (e, st) {
+                                          Sentry.captureException(
+                                            e,
+                                            stackTrace: st,
+                                          );
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                'Не удалось открыть уровень',
+                                              ),
+                                            ),
+                                          );
+                                        }
+                                      },
+                                    );
+                                  }
+
+                                  if (nextValue != null) {
+                                    return buildCard(nextValue);
+                                  }
+
+                                  return nextAsync.when(
+                                    data: buildCard,
                                     loading: () => const Center(
                                       child: CircularProgressIndicator(),
                                     ),

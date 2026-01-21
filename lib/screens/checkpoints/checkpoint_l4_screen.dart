@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:bizlevel/providers/goals_providers.dart';
+import 'package:bizlevel/providers/goals_repository_provider.dart';
+import 'package:bizlevel/providers/levels_provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
+import 'package:bizlevel/models/goal_update.dart';
 import 'package:bizlevel/screens/leo_dialog_screen.dart';
 import 'package:go_router/go_router.dart';
 import 'package:bizlevel/widgets/common/bizlevel_card.dart';
 import 'package:bizlevel/widgets/common/bizlevel_button.dart';
+import 'package:bizlevel/widgets/common/notification_center.dart';
 import 'package:bizlevel/theme/spacing.dart';
 import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/theme/dimensions.dart';
@@ -160,8 +165,38 @@ class _CheckpointL4ScreenState extends ConsumerState<CheckpointL4Screen> {
                           level: SentryLevel.info,
                         ));
                       } catch (_) {}
-                      if (!context.mounted) return;
-                      GoRouter.of(context).push('/tower');
+                      final String goalText =
+                          (goal?['goal_text'] ?? '').toString().trim();
+                      if (goalText.isEmpty) {
+                        NotificationCenter.showError(
+                            context, 'Сначала задайте цель');
+                        return;
+                      }
+                      final String existingFocus =
+                          (goal?['financial_focus'] ?? '').toString().trim();
+                      final String? focusUpdate = existingFocus.isEmpty
+                          ? 'Финансовый фокус подтверждён'
+                          : null;
+                      try {
+                        final repo = ref.read(goalsRepositoryProvider);
+                        final userId =
+                            Supabase.instance.client.auth.currentUser?.id ?? '';
+                        await repo.upsertUserGoalRequest(GoalUpsertRequest(
+                          userId: userId,
+                          goalText: goalText,
+                          financialFocus: focusUpdate,
+                        ));
+                        ref.invalidate(userGoalProvider);
+                        ref.invalidate(towerNodesProvider);
+                        if (!context.mounted) return;
+                        NotificationCenter.showSuccess(
+                            context, 'Чекпоинт L4 завершён');
+                        GoRouter.of(context).push('/tower');
+                      } catch (e) {
+                        if (!context.mounted) return;
+                        NotificationCenter.showError(
+                            context, 'Не удалось завершить чекпоинт: $e');
+                      }
                     },
                   ),
                 ),
