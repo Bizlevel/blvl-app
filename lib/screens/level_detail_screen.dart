@@ -22,14 +22,13 @@ import 'package:bizlevel/widgets/level/blocks/level_page_block.dart';
 import 'package:bizlevel/widgets/level/blocks/intro_block.dart';
 import 'package:bizlevel/widgets/level/blocks/lesson_block.dart';
 import 'package:bizlevel/widgets/level/blocks/quiz_block.dart';
-import 'package:bizlevel/widgets/level/blocks/goal_v1_block.dart';
 import 'package:bizlevel/widgets/level/blocks/artifact_block.dart';
 import 'package:bizlevel/widgets/level/blocks/profile_form_block.dart';
 import 'package:bizlevel/screens/ray_dialog_screen.dart';
 import 'package:bizlevel/utils/custom_modal_route.dart';
-import 'package:bizlevel/providers/goals_providers.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bizlevel/services/context_service.dart';
+import 'package:bizlevel/services/level_input_guard.dart';
 
 /// Shows a level as full-screen blocks (Intro → Lesson → Quiz → …).
 class LevelDetailScreen extends ConsumerStatefulWidget {
@@ -48,23 +47,21 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
   LessonProgressState get _progress =>
       ref.watch(lessonProgressProvider(widget.levelId));
 
-  bool _autoCompletingLevel = false;
-  bool _autoCompletedLevel = false;
-
   // Флаг сохранения профиля (для уровня 0)
   bool _profileSaved = false;
-
-  // Флаг сохранения v1 «Семя» (для уровня 1)
-  bool _goalV1Saved = false;
 
   // --- Состояние формы профиля уровня 0 (поднято из блока для сохранения ввода) ---
   final TextEditingController _profileNameCtrl = TextEditingController();
   final TextEditingController _profileAboutCtrl = TextEditingController();
   final TextEditingController _profileGoalCtrl = TextEditingController();
+  final FocusNode _profileNameFocus = FocusNode();
+  final FocusNode _profileAboutFocus = FocusNode();
+  final FocusNode _profileGoalFocus = FocusNode();
   int _profileAvatarId = 1;
   bool _isProfileEditing = true; // после сохранения переключим в read-only
   bool _profileInitialized =
       false; // чтобы не переписывать контроллеры на каждом билде
+  bool _blockPopWhileEditing = false;
 
   // Leo chat (создаётся при первом сообщении пользователя)
   String? _chatId;
@@ -87,6 +84,27 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _maybeGuardCaseAccess();
     });
+
+    LevelInputGuard.instance
+        .setCurrentLevelRoute('/levels/${widget.levelId}?num=${widget.levelNumber ?? 0}');
+
+    _profileNameFocus.addListener(_syncInputPopGuard);
+    _profileAboutFocus.addListener(_syncInputPopGuard);
+    _profileGoalFocus.addListener(_syncInputPopGuard);
+  }
+
+  void _syncInputPopGuard() {
+    if (!mounted) return;
+    final bool hasFocus = _profileNameFocus.hasFocus ||
+        _profileAboutFocus.hasFocus ||
+        _profileGoalFocus.hasFocus;
+    if (_blockPopWhileEditing == hasFocus) return;
+    setState(() => _blockPopWhileEditing = hasFocus);
+    if (hasFocus) {
+      LevelInputGuard.instance.activate();
+    } else {
+      LevelInputGuard.instance.deactivate();
+    }
   }
 
   Future<void> _maybeGuardCaseAccess() async {
@@ -179,25 +197,6 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
     }
     parts.add('level_id: ${widget.levelId}');
     return parts.join(', ');
-  }
-
-  /// Проверяет наличие сохраненной цели v1 в БД и устанавливает флаг
-  Future<void> _checkGoalV1Saved() async {
-    try {
-      // Используем ref.read чтобы не создавать подписку, только одноразовая проверка
-      final goal = await ref.read(userGoalProvider.future);
-      if (goal != null) {
-        final goalText = (goal['goal_text'] as String? ?? '').trim();
-        // Если цель сохранена (непустой goal_text), считаем что v1 сохранена
-        if (goalText.isNotEmpty && mounted) {
-          setState(() {
-            _goalV1Saved = true;
-          });
-        }
-      }
-    } catch (_) {
-      // Игнорируем ошибки при проверке - не критично
-    }
   }
 
   Widget _buildMainColumn(BuildContext context, List<LessonModel> lessons,
@@ -373,7 +372,7 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
           if ((widget.levelNumber ?? -1) != 0)
             BizLevelButton(
               label: (widget.levelNumber ?? -1) == 1
-                  ? 'Перейти к Цели'
+                  ? 'Завершить уровень'
                   : 'Завершить уровень',
               icon: const Icon(Icons.check, size: 20),
               backgroundColorOverride: AppColor.warning,
@@ -381,23 +380,6 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
               onPressed: _isLevelCompleted(lessons)
                   ? () async {
                       try {
-                        // Для уровня 1: дополнительная проверка наличия цели в БД перед завершением
-                        if ((widget.levelNumber ?? -1) == 1 && !_goalV1Saved) {
-                          await _checkGoalV1Saved();
-                          // Если после проверки цель все еще не найдена, не завершаем уровень
-                          if (!_goalV1Saved) {
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                      'Сначала сохраните цель в чекпоинте L1'),
-                                ),
-                              );
-                            }
-                            return;
-                          }
-                        }
-
                         try {
                           sentry.Sentry.addBreadcrumb(sentry.Breadcrumb(
                             category: 'level',
@@ -409,14 +391,12 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
                             },
                           ));
                         } catch (_) {}
-                        if (!_autoCompletedLevel) {
-                          await SupabaseService.completeLevel(widget.levelId);
-                          ref.invalidate(levelsProvider);
-                          ref.invalidate(towerNodesProvider);
-                          ref.invalidate(currentUserProvider);
-                          ref.invalidate(userSkillsProvider);
-                          ref.invalidate(gpBalanceProvider);
-                        }
+                        await SupabaseService.completeLevel(widget.levelId);
+                        ref.invalidate(levelsProvider);
+                        ref.invalidate(towerNodesProvider);
+                        ref.invalidate(currentUserProvider);
+                        ref.invalidate(userSkillsProvider);
+                        ref.invalidate(gpBalanceProvider);
                         try {
                           sentry.Sentry.addBreadcrumb(sentry.Breadcrumb(
                             category: 'level',
@@ -429,21 +409,18 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
                           ));
                         } catch (_) {}
                         if (context.mounted) {
-                          if (!_autoCompletedLevel) {
                             await showDialog(
                               context: context,
                               builder: (_) => Dialog(
                                 backgroundColor: Colors.transparent,
-                                insetPadding:
-                                    AppSpacing.insetsAll(AppSpacing.lg),
+                                insetPadding: AppSpacing.insetsAll(AppSpacing.lg),
                                 child: MilestoneCelebration(
-                                    gpGain: 20,
-                                    onClose: () =>
-                                        Navigator.of(context).maybePop()),
+                                  gpGain: 20,
+                                  onClose: () => Navigator.of(context).maybePop(),
+                                ),
                               ),
                             );
                             ref.invalidate(gpBalanceProvider);
-                          }
 
                           // Предложение проверить идею после завершения Уровня 5 (Ray)
                           final isLevel5 = (widget.levelNumber ?? -1) == 5;
@@ -496,14 +473,16 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
                             }
                           }
 
-                          if ((widget.levelNumber ?? -1) == 1) {
-                            if (context.mounted) {
-                              context.go('/goal');
+                            // После завершения уровня 1 возвращаем в Башню,
+                            // чтобы пользователь прошёл чекпоинт L1 перед доступом к Уровню 2.
+                            if ((widget.levelNumber ?? -1) == 1) {
+                              if (context.mounted) {
+                                context.go('/tower?scrollTo=2');
+                              }
+                            } else {
+                              if (!context.mounted) return;
+                              Navigator.of(context).pop();
                             }
-                          } else {
-                            if (!context.mounted) return;
-                            Navigator.of(context).pop();
-                          }
                         }
                       } catch (e) {
                         if (context.mounted) {
@@ -557,6 +536,9 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
     _profileNameCtrl.dispose();
     _profileAboutCtrl.dispose();
     _profileGoalCtrl.dispose();
+    _profileNameFocus.dispose();
+    _profileAboutFocus.dispose();
+    _profileGoalFocus.dispose();
     super.dispose();
   }
 
@@ -586,94 +568,58 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
     });
   }
 
-  Future<void> _maybeAutoCompleteLevel1(List<LessonModel> lessons) async {
-    if ((widget.levelNumber ?? -1) != 1) return;
-    if (_autoCompletingLevel || _autoCompletedLevel) return;
-    if (!_isLevelCompleted(lessons)) return;
-    _autoCompletingLevel = true;
-    try {
-      await SupabaseService.completeLevel(widget.levelId);
-      ref.invalidate(levelsProvider);
-      ref.invalidate(towerNodesProvider);
-      ref.invalidate(currentUserProvider);
-      ref.invalidate(userSkillsProvider);
-      ref.invalidate(gpBalanceProvider);
-      _autoCompletedLevel = true;
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Уровень завершён')),
-        );
-      }
-    } catch (_) {
-      // Ошибка автозавершения не должна блокировать прохождение.
-    } finally {
-      _autoCompletingLevel = false;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final lessonsAsync = ref.watch(lessonsProvider(widget.levelId));
 
-    return Scaffold(
-      body: lessonsAsync.when(
-        data: (lessons) {
-          _buildBlocks(lessons);
+    return PopScope(
+      canPop: !_blockPopWhileEditing,
+      onPopInvoked: (didPop) {
+        if (didPop) return;
+        if (_blockPopWhileEditing) {
+          FocusManager.instance.primaryFocus?.unfocus();
+          assert(() {
+            debugPrint(
+                '[nav] pop_blocked reason=profile_focus level=${widget.levelNumber}');
+            return true;
+          }());
+        }
+      },
+      child: Scaffold(
+        body: lessonsAsync.when(
+          data: (lessons) {
+            _buildBlocks(lessons);
 
-          final bool isLevelZero = (widget.levelNumber ?? -1) == 0;
-          final bool isProfilePage =
-              isLevelZero && _blocks[_currentIndex] is ProfileFormBlock;
+            final bool isLevelZero = (widget.levelNumber ?? -1) == 0;
+            final bool isProfilePage =
+                isLevelZero && _blocks[_currentIndex] is ProfileFormBlock;
 
-          // Одноразовый префилл формы профиля из текущего пользователя
-          if (isLevelZero && !_profileInitialized) {
-            final user = ref.watch(currentUserProvider).value;
-            if (user != null) {
-              _profileNameCtrl.text = user.name;
-              _profileAboutCtrl.text = (user.about ?? '');
-              _profileGoalCtrl.text = (user.goal ?? '');
-              _profileAvatarId = (user.avatarId ?? 1);
-              // Если профиль уже заполнен – открываем в режиме просмотра
-              _isProfileEditing = user.name.isEmpty ||
-                      (user.about ?? '').isEmpty ||
-                      (user.goal ?? '').isEmpty
-                  ? true
-                  : false;
-              _profileInitialized = true;
+            // Одноразовый префилл формы профиля из текущего пользователя
+            if (isLevelZero && !_profileInitialized) {
+              final user = ref.watch(currentUserProvider).value;
+              if (user != null) {
+                _profileNameCtrl.text = user.name;
+                _profileAboutCtrl.text = (user.about ?? '');
+                _profileGoalCtrl.text = (user.goal ?? '');
+                _profileAvatarId = (user.avatarId ?? 1);
+                // Если профиль уже заполнен – открываем в режиме просмотра
+                _isProfileEditing = user.name.isEmpty ||
+                        (user.about ?? '').isEmpty ||
+                        (user.goal ?? '').isEmpty
+                    ? true
+                    : false;
+                _profileInitialized = true;
+              }
             }
-          }
 
-          // Для уровня 1: отслеживаем изменения цели и обновляем флаг
-          if ((widget.levelNumber ?? -1) == 1) {
-            final goalAsync = ref.watch(userGoalProvider);
-            goalAsync.when(
-              data: (goal) {
-                if (goal != null) {
-                  final goalText = (goal['goal_text'] as String? ?? '').trim();
-                  if (goalText.isNotEmpty && !_goalV1Saved && mounted) {
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      if (mounted) {
-                        setState(() {
-                          _goalV1Saved = true;
-                        });
-                        // Авто-завершение уровня после сохранения цели.
-                        _maybeAutoCompleteLevel1(lessons);
-                      }
-                    });
-                  }
-                }
-              },
-              loading: () {},
-              error: (_, __) {},
-            );
-          }
-
-          final mainContent =
-              _buildMainColumn(context, lessons, isLevelZero, isProfilePage);
-          final stack = _buildOverlays(context, mainContent);
-          return stack;
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Ошибка: ${e.toString()}')),
+            final mainContent =
+                _buildMainColumn(context, lessons, isLevelZero, isProfilePage);
+            final stack = _buildOverlays(context, mainContent);
+            return stack;
+          },
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, _) => Center(child: Text('Ошибка: ${e.toString()}')),
+        ),
       ),
     );
   }
@@ -752,10 +698,6 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
         return false;
       }
     }
-    // Для уровня 1 требуется также заполнение v1 «Семя»
-    if ((widget.levelNumber ?? -1) == 1) {
-      return _goalV1Saved;
-    }
     return true;
   }
 
@@ -783,6 +725,9 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
           nameController: _profileNameCtrl,
           aboutController: _profileAboutCtrl,
           goalController: _profileGoalCtrl,
+          nameFocusNode: _profileNameFocus,
+          aboutFocusNode: _profileAboutFocus,
+          goalFocusNode: _profileGoalFocus,
           selectedAvatarId: _profileAvatarId,
           isEditing: _isProfileEditing,
           canCompleteLevel: () => _areLevelZeroVideosCompleted(lessons),
@@ -812,16 +757,9 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
               levelNumber: widget.levelNumber ?? widget.levelId,
             ),
         ],
-        GoalV1Block(
-          onSaved: () {
-            if (mounted) {
-              setState(() => _goalV1Saved = true);
-              // Инвалидация провайдеров целей для синхронизации страницы «Цель»
-              // legacy invalidates removed
-              _maybeAutoCompleteLevel1(lessons);
-            }
-          },
-        ),
+        // Последний блок — артефакт, как в остальных уровнях.
+        // Цель заполняется отдельно в чекпоинте L1 после завершения уровня.
+        ArtifactBlock(levelId: widget.levelId, levelNumber: widget.levelNumber),
       ];
       return;
     }

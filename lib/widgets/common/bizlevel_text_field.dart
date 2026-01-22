@@ -32,6 +32,7 @@ class BizLevelTextField extends StatelessWidget {
     this.enableIMEPersonalizedLearning,
     this.onSubmitted,
     this.onTapOutside,
+    this.onTap,
     this.preset = TextFieldPreset.form,
   });
 
@@ -60,6 +61,7 @@ class BizLevelTextField extends StatelessWidget {
   final bool? enableIMEPersonalizedLearning;
   final ValueChanged<String>? onSubmitted;
   final TapRegionCallback? onTapOutside;
+  final VoidCallback? onTap;
   final TextFieldPreset preset;
 
   @override
@@ -100,6 +102,7 @@ class BizLevelTextField extends StatelessWidget {
         enableIMEPersonalizedLearning: enableIMEPersonalizedLearning,
         onSubmitted: onSubmitted,
         onTapOutside: onTapOutside,
+        onTap: onTap,
         preset: preset,
       ),
     );

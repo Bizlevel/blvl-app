@@ -175,7 +175,34 @@ final nextLevelToContinueProvider =
   final levels = await ref.watch(levelsProvider.future);
   final nodes = await ref.watch(towerNodesProvider.future);
 
-  // Чекпоинты цели больше не используются для гейтинга/навигации
+  // 0) Чекпоинт цели (если предыдущий уровень завершён и пользователь ещё не ушёл дальше)
+  // Важно: чекпоинты L1/L4/L7 блокируют следующий уровень в башне.
+  final Map<String, dynamic> pendingGoalCheckpoint = nodes.firstWhere(
+    (n) =>
+        n['type'] == 'goal_checkpoint' &&
+        (n['isCompleted'] != true) &&
+        (n['prevLevelCompleted'] as bool? ?? false) == true,
+    orElse: () => <String, dynamic>{},
+  );
+  if (pendingGoalCheckpoint.isNotEmpty) {
+    final int afterLevel = pendingGoalCheckpoint['afterLevel'] as int? ?? 0;
+    // Не навязываем чекпоинт тем, кто уже ушёл дальше по прогрессу.
+    if (userCurrentLevelNumber <= afterLevel + 1) {
+      final String label = afterLevel == 1
+          ? 'Чекпоинт L1: Первая цель'
+          : (afterLevel == 4
+              ? 'Чекпоинт L4: Финансовый фокус'
+              : 'Чекпоинт L7: Проверка реальности');
+      return {
+        'floorId': 1,
+        'requiresPremium': false,
+        // Принудительно ведём в Башню, чтобы пользователь открыл чекпоинт в правильном месте.
+        'isLocked': true,
+        'targetScroll': afterLevel + 1,
+        'label': label,
+      };
+    }
+  }
 
   // 1) Мини‑кейс (если предыдущий уровень завершён)
   final Map<String, dynamic> pendingMiniCase = nodes.firstWhere(
@@ -276,7 +303,18 @@ final towerNodesProvider =
     }
   }
 
-    // Лёгкие признаки для чекпоинтов цели (новая модель user_goal)
+  // Текущий номер уровня (нужен, чтобы не "ретро-блокировать" пользователей,
+  // которые уже ушли дальше по прогрессу).
+  int currentLevelNumber = 0;
+  try {
+    final current = levels.firstWhere(
+      (l) => (l['isCurrent'] as bool? ?? false) == true,
+      orElse: () => <String, dynamic>{},
+    );
+    currentLevelNumber = (current['level'] as int?) ?? 0;
+  } catch (_) {}
+
+  // Лёгкие признаки для чекпоинтов цели (новая модель user_goal)
   final String uid = Supabase.instance.client.auth.currentUser?.id ?? '';
   Map<String, dynamic>? userGoal;
   if (uid.isNotEmpty) {
@@ -373,6 +411,18 @@ final towerNodesProvider =
             .trim()
             .isNotEmpty);
         completed = levelCompleted && hasActionPlan;
+      }
+
+      // Важно: чекпоинт должен реально блокировать следующий уровень.
+      // Иначе пользователь может открыть Уровень 2 (или 5/8) сразу после завершения уровня,
+      // не заполнив цель/поля чекпоинта.
+      //
+      // При этом не "ретро-блокируем" тех, кто уже ушёл дальше (currentLevelNumber > num+1).
+      final int nextLevelNumber = num + 1;
+      final bool shouldBlockNext =
+          levelCompleted && !completed && currentLevelNumber <= nextLevelNumber;
+      if (shouldBlockNext) {
+        blockedNextLevels.add(nextLevelNumber);
       }
 
       nodes.add({

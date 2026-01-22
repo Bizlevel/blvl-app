@@ -21,13 +21,13 @@ class ArtifactBlock extends LevelPageBlock {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
-        if (!snapshot.hasData || snapshot.data?['artifact_url'] == null) {
-          return const Center(child: Text('Артефакт отсутствует'));
-        }
-
-        final data = snapshot.data!;
-        final title = (data['artifact_title'] as String?) ?? 'Артефакт';
-        final description = (data['artifact_description'] as String?) ?? '';
+        // Важно: для некоторых уровней (особенно Уровень 1) артефакт может быть
+        // представлен только локальной карточкой (assets/images/artefacts/...)
+        // без `artifact_url` в БД. Поэтому отображаем превью всегда, а метаданные
+        // (title/description) берём из БД, если они есть.
+        final data = snapshot.data;
+        final title = (data?['artifact_title'] as String?) ?? 'Артефакт';
+        final description = (data?['artifact_description'] as String?) ?? '';
 
         return Padding(
           padding: AppSpacing.insetsAll(AppSpacing.xl),

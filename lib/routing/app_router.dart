@@ -24,6 +24,7 @@ import '../screens/artifacts_screen.dart';
 import '../screens/checkpoints/checkpoint_l1_screen.dart';
 import '../screens/checkpoints/checkpoint_l4_screen.dart';
 import '../screens/checkpoints/checkpoint_l7_screen.dart';
+import '../services/level_input_guard.dart';
 
 /// Глобальный ключ для доступа к NavigatorState из GoRouter.
 /// Используется для навигации из _schedulePostFrameBootstraps().
@@ -135,6 +136,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     navigatorKey: rootNavigatorKey,
     initialLocation: initialLocation,
+    debugLogDiagnostics: true,
     observers: [SentryNavigatorObserver()],
     routes: [
       GoRoute(
@@ -152,49 +154,59 @@ final goRouterProvider = Provider<GoRouter>((ref) {
     ],
     redirect: (context, state) {
       try {
-      final loggingIn = state.matchedLocation == '/login' ||
-          state.matchedLocation == '/register';
-      // Onboarding routes deprecated; no special handling
+        final guard = LevelInputGuard.instance;
+        final String location = state.uri.toString();
+        if (guard.isActive &&
+            guard.lastLevelRoute != null &&
+            (location == '/tower' || location.startsWith('/tower?'))) {
+          guard.debugLog(
+              'redirected_tower_to_level from=$location to=${guard.lastLevelRoute}');
+          return guard.lastLevelRoute!;
+        }
 
-      // Используем currentUserProvider для определения статуса логина.
-      // Это надёжнее, чем просто проверять сессию.
-      final currentUser = currentUserAsync.asData?.value;
-      final loggedIn = currentUser != null;
+        final loggingIn = state.matchedLocation == '/login' ||
+            state.matchedLocation == '/register';
+        // Onboarding routes deprecated; no special handling
 
-      // Обработка случая с "зависшей" сессией, когда сессия есть,
-      // а пользователя в базе нет.
-      if (session != null && !currentUserAsync.isLoading && !loggedIn) {
-        // Запускаем signOut в фоне и сразу редиректим на логин
-        ref.read(authServiceProvider).signOut();
-        return '/login';
-      }
+        // Используем currentUserProvider для определения статуса логина.
+        // Это надёжнее, чем просто проверять сессию.
+        final currentUser = currentUserAsync.asData?.value;
+        final loggedIn = currentUser != null;
 
-      // Если не авторизован и не на страницах логина/регистрации - на логин
-      // НО: не редиректим, если провайдер просто обновляется (isLoading)
-      // или мы на странице профиля (где может происходить обновление данных)
-      final isOnProfile = state.matchedLocation == '/profile';
-      // ВАЖНО: Если мы на странице профиля, никогда не редиректим отсюда,
-      // даже если провайдер обновляется - это может быть обновление аватара или других данных
-      if (isOnProfile) {
-        return null; // Не редиректим со страницы профиля
-      }
-      // Для остальных страниц: редиректим, если не авторизован и не на страницах логина
-      if (!loggedIn && !loggingIn && !currentUserAsync.isLoading) {
-        return '/login';
-      }
+        // Обработка случая с "зависшей" сессией, когда сессия есть,
+        // а пользователя в базе нет.
+        if (session != null && !currentUserAsync.isLoading && !loggedIn) {
+          // Запускаем signOut в фоне и сразу редиректим на логин
+          ref.read(authServiceProvider).signOut();
+          return '/login';
+        }
 
-      // Если авторизован и на страницах входа/регистрации - на домашнюю
-      if (loggedIn && loggingIn) {
-        return '/home';
-      }
+        // Если не авторизован и не на страницах логина/регистрации - на логин
+        // НО: не редиректим, если провайдер просто обновляется (isLoading)
+        // или мы на странице профиля (где может происходить обновление данных)
+        final isOnProfile = state.matchedLocation == '/profile';
+        // ВАЖНО: Если мы на странице профиля, никогда не редиректим отсюда,
+        // даже если провайдер обновляется - это может быть обновление аватара или других данных
+        if (isOnProfile) {
+          return null; // Не редиректим со страницы профиля
+        }
+        // Для остальных страниц: редиректим, если не авторизован и не на страницах логина
+        if (!loggedIn && !loggingIn && !currentUserAsync.isLoading) {
+          return '/login';
+        }
 
-      // Гейтинг для /goal: доступно после завершения Уровня 1 (current_level >= 2)
-      if (state.matchedLocation.startsWith('/goal')) {
-        final currentLevel = currentUser?.currentLevel ?? 0;
-        if (currentLevel < 2) {
+        // Если авторизован и на страницах входа/регистрации - на домашнюю
+        if (loggedIn && loggingIn) {
           return '/home';
         }
-      }
+
+        // Гейтинг для /goal: доступно после завершения Уровня 1 (current_level >= 2)
+        if (state.matchedLocation.startsWith('/goal')) {
+          final currentLevel = currentUser?.currentLevel ?? 0;
+          if (currentLevel < 2) {
+            return '/home';
+          }
+        }
 
         // no redirect
         return null;

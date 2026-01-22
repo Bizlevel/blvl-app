@@ -12,6 +12,7 @@ import 'package:bizlevel/services/auth_service.dart';
 import 'package:bizlevel/theme/spacing.dart';
 import 'package:bizlevel/theme/dimensions.dart';
 import 'package:bizlevel/services/supabase_service.dart';
+import 'package:bizlevel/services/level_input_guard.dart';
 
 import 'package:bizlevel/widgets/level/blocks/level_page_block.dart';
 
@@ -20,6 +21,9 @@ class ProfileFormBlock extends LevelPageBlock {
   final TextEditingController nameController;
   final TextEditingController aboutController;
   final TextEditingController goalController;
+  final FocusNode? nameFocusNode;
+  final FocusNode? aboutFocusNode;
+  final FocusNode? goalFocusNode;
   final int selectedAvatarId;
   final bool isEditing;
   final bool Function()? canCompleteLevel;
@@ -32,6 +36,9 @@ class ProfileFormBlock extends LevelPageBlock {
     required this.nameController,
     required this.aboutController,
     required this.goalController,
+    this.nameFocusNode,
+    this.aboutFocusNode,
+    this.goalFocusNode,
     required this.selectedAvatarId,
     required this.isEditing,
     required this.canCompleteLevel,
@@ -90,6 +97,19 @@ class ProfileFormBlock extends LevelPageBlock {
   @override
   Widget build(BuildContext context, int index) {
     return Consumer(builder: (context, ref, _) {
+      void debugFieldTap(String fieldName) {
+        assert(() {
+          final route = GoRouter.of(context)
+              .routeInformationProvider
+              .value
+              .uri
+              .toString();
+          debugPrint('[nav] profile_field_tap field=$fieldName route=$route');
+          return true;
+        }());
+        LevelInputGuard.instance.activate();
+      }
+
       Future<void> save() async {
         final name = nameController.text.trim();
         final about = aboutController.text.trim();
@@ -184,24 +204,42 @@ class ProfileFormBlock extends LevelPageBlock {
                 label: 'Как к вам обращаться?',
                 hint: 'Имя',
                 controller: nameController,
+                focusNode: nameFocusNode,
                 readOnly: !isEditing,
                 prefix: const Icon(Icons.person_outline),
+                onTap: () => debugFieldTap('name'),
+                onTapOutside: (_) {
+                  FocusScope.of(context).unfocus();
+                  LevelInputGuard.instance.deactivate();
+                },
               ),
               const SizedBox(height: 16),
               BizLevelTextField(
                 label: 'Кратко о себе',
                 hint: 'О себе',
                 controller: aboutController,
+                focusNode: aboutFocusNode,
                 readOnly: !isEditing,
                 prefix: const Icon(Icons.info_outline),
+                onTap: () => debugFieldTap('about'),
+                onTapOutside: (_) {
+                  FocusScope.of(context).unfocus();
+                  LevelInputGuard.instance.deactivate();
+                },
               ),
               const SizedBox(height: 16),
               BizLevelTextField(
                 label: 'Ваша цель обучения',
                 hint: 'Цель',
                 controller: goalController,
+                focusNode: goalFocusNode,
                 readOnly: !isEditing,
                 prefix: const Icon(Icons.flag_outlined),
+                onTap: () => debugFieldTap('goal'),
+                onTapOutside: (_) {
+                  FocusScope.of(context).unfocus();
+                  LevelInputGuard.instance.deactivate();
+                },
               ),
               const SizedBox(height: 24),
               SizedBox(
@@ -234,6 +272,7 @@ class ProfileFormBlock extends LevelPageBlock {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text(UIS.firstStepDone)),
                       );
+                      LevelInputGuard.instance.clear();
                       GoRouter.of(context).go('/tower?scrollTo=1');
                     } catch (e) {
                       if (!context.mounted) return;
