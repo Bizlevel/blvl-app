@@ -6,6 +6,7 @@ import 'package:bizlevel/models/reminder_prefs.dart';
 import 'package:bizlevel/providers/reminder_prefs_provider.dart';
 import 'package:bizlevel/services/notifications_service.dart';
 import 'package:bizlevel/services/reminder_prefs_cache.dart';
+import 'package:bizlevel/utils/input_bottom_sheet.dart';
 
 /// Common content for configuring practice reminders (time + weekdays)
 class RemindersSettingsContent extends ConsumerStatefulWidget {
@@ -228,8 +229,6 @@ class _RemindersSettingsContentState
       _error = null;
     });
     try {
-      final prefsAsync = ref.read(reminderPrefsProvider);
-      final currentPrefs = prefsAsync.valueOrNull ?? ReminderPrefsCache.instance.current;
       await NotificationsService.instance.cancelWeeklyPlan();
       await NotificationsService.instance.cancelDailyPracticeReminder();
       await NotificationsService.instance.schedulePracticeReminders(
@@ -283,21 +282,10 @@ Future<void> showRemindersSettingsSheet(BuildContext context) async {
       ),
     );
   } catch (_) {}
-  await showModalBottomSheet(
+  await showBizLevelInputBottomSheet<void>(
     context: context,
-    isScrollControlled: true,
     showDragHandle: true,
-    builder: (ctx) => Padding(
-      padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
-        bottom: MediaQuery.of(ctx).viewInsets.bottom +
-            MediaQuery.of(ctx).padding.bottom +
-            16,
-        top: 8,
-      ),
-      child: const RemindersSettingsContent(),
-    ),
+    builder: (ctx) => const RemindersSettingsContent(),
   );
 }
 

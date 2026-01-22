@@ -79,7 +79,10 @@ final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
           return false; // Найден незавершенный предыдущий уровень
         }
       } else {
-        // Если уровня нет в данных, считаем его незавершенным
+        // Если уровня нет в данных, но пользователь уже дошёл дальше — считаем завершённым
+        if (i < userCurrentLevelNumber) {
+          continue;
+        }
         return false;
       }
     }
@@ -102,12 +105,19 @@ final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
 
     // Доступность уровня
     bool isAccessible;
+    bool isRepeatable = false;
     if (level.number == 0) {
       // «Первый шаг» всегда доступен для просмотра
       isAccessible = true;
+      isRepeatable = false;
     } else if (isCompleted) {
       // Повторное прохождение разрешаем независимо от статуса предыдущих уровней
       isAccessible = true;
+      isRepeatable = true;
+    } else if (level.number < userCurrentLevelNumber) {
+      // Пользователь уже проходил уровень — разрешаем повтор
+      isAccessible = true;
+      isRepeatable = true;
     } else {
       // Доступ по этажу: бесплатные на этаже — всегда; иначе нужен floor_access
       final bool hasAccess =
@@ -138,11 +148,14 @@ final levelsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
       'isCompleted': isCompleted,
       'isCurrent': level.number == userCurrentLevelNumber,
       'lockReason': isLocked
-          ? (!isFreeOnFloor(floor, level.number) &&
-                  !unlockedFloors.contains(floor)
-              ? 'Требуются GP'
-              : 'Завершите предыдущий уровень')
+          ? (!previousCompleted
+              ? 'Завершите предыдущий уровень'
+              : (!isFreeOnFloor(floor, level.number) &&
+                      !unlockedFloors.contains(floor))
+                  ? 'Требуются GP'
+                  : 'Завершите предыдущий уровень')
           : null,
+      'isRepeatable': isRepeatable,
       'artifact_title': json['artifact_title'],
       'artifact_description': json['artifact_description'],
       'artifact_url': json['artifact_url'],

@@ -132,6 +132,7 @@ class ProfileFormBlock extends LevelPageBlock {
 
       return LayoutBuilder(builder: (context, constraints) {
         return SingleChildScrollView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
           child: Column(
             children: [

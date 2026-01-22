@@ -21,6 +21,7 @@ import 'package:bizlevel/widgets/common/bizlevel_button.dart';
 import 'package:bizlevel/widgets/common/gp_balance_widget.dart';
 import 'package:bizlevel/widgets/common/bizlevel_card.dart';
 import 'package:bizlevel/widgets/common/bizlevel_text_field.dart';
+import 'package:bizlevel/widgets/common/notification_center.dart';
 import 'package:bizlevel/widgets/reminders_settings_sheet.dart';
 import 'package:bizlevel/widgets/common/achievement_badge.dart';
 import 'package:bizlevel/theme/dimensions.dart';
@@ -157,6 +158,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           const BizLevelError(title: 'Ошибка уровней', fullscreen: true),
       data: (levelsData) {
         final completedLevels = levelsData.where((lvl) {
+          final int levelNum = (lvl['level'] as int? ?? 0);
+          if (levelNum < 1 || levelNum > 10) return false;
           final progressArr = lvl['user_progress'] as List?;
           return progressArr != null &&
               progressArr.isNotEmpty &&
@@ -184,6 +187,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         final artifactsCount = artifacts.length;
 
         return CustomScrollView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           slivers: [
             SliverAppBar(
               // Единый фон приложения задаётся в main.dart (градиент). AppBar делаем прозрачным,
@@ -568,56 +572,54 @@ class _BodyState extends ConsumerState<_Body> {
     await showBizLevelInputBottomSheet<void>(
       context: context,
       backgroundColor: AppColor.surface,
-      applyKeyboardInset: false,
+      applyKeyboardInset: true,
       contentPadding: EdgeInsets.zero,
       builder: (ctx) {
-        final media = MediaQuery.of(ctx);
-        return Padding(
-          padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
-          child: DraggableScrollableSheet(
-            expand: false,
-            minChildSize: 0.4,
-            maxChildSize: 0.92,
-            initialChildSize: 0.66,
-            builder: (context, scrollController) {
-              return Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.lg,
-                      vertical: AppSpacing.sm,
-                    ),
-                    child: Row(
-                      children: [
-                        Text(
-                          'Информация обо мне',
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleMedium
-                              ?.copyWith(fontWeight: FontWeight.w600),
-                        ),
-                        const Spacer(),
-                        // fix: добавить tooltip для IconButton (accessibility)
-                        IconButton(
-                          tooltip: 'Закрыть',
-                          icon: const Icon(Icons.close),
-                          onPressed: () => Navigator.of(context).pop(),
-                        ),
-                      ],
-                    ),
+        return DraggableScrollableSheet(
+          expand: false,
+          minChildSize: 0.4,
+          maxChildSize: 0.92,
+          initialChildSize: 0.66,
+          builder: (context, scrollController) {
+            return Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.lg,
+                    vertical: AppSpacing.sm,
                   ),
-                  const Divider(height: 1),
-                  Expanded(
-                    child: SingleChildScrollView(
-                      controller: scrollController,
-                      padding: const EdgeInsets.all(AppSpacing.lg),
-                      child: _AboutMeCard(user: widget.user),
-                    ),
+                  child: Row(
+                    children: [
+                      Text(
+                        'Информация обо мне',
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                      const Spacer(),
+                      // fix: добавить tooltip для IconButton (accessibility)
+                      IconButton(
+                        tooltip: 'Закрыть',
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.of(context).pop(),
+                      ),
+                    ],
                   ),
-                ],
-              );
-            },
-          ),
+                ),
+                const Divider(height: 1),
+                Expanded(
+                  child: SingleChildScrollView(
+                    controller: scrollController,
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
+                    padding: const EdgeInsets.all(AppSpacing.lg),
+                    child: _AboutMeCard(user: widget.user),
+                  ),
+                ),
+              ],
+            );
+          },
         );
       },
     );
@@ -1145,14 +1147,10 @@ class _AboutMeCardState extends ConsumerState<_AboutMeCard> {
         ));
       } catch (_) {}
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Профиль обновлён')),
-      );
+      NotificationCenter.showSuccess(context, 'Профиль обновлён');
       // Показываем тост о бонусе только если он был выдан впервые
       if (bonusGranted == true) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('+50 GP за полный профиль')),
-        );
+        NotificationCenter.showSuccess(context, '+50 GP за полный профиль');
       }
       // Обновляем профиль без полной инвалидации, чтобы избежать редиректа
       ref.invalidate(currentUserProvider);
@@ -1167,8 +1165,7 @@ class _AboutMeCardState extends ConsumerState<_AboutMeCard> {
         ));
       } catch (_) {}
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+      NotificationCenter.showError(context, 'Ошибка: $e');
     }
   }
 

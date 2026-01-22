@@ -182,14 +182,9 @@ class _MainStreetScreenState extends ConsumerState<MainStreetScreen> {
                                             e,
                                             stackTrace: st,
                                           );
-                                          ScaffoldMessenger.of(
+                                          NotificationCenter.showError(
                                             context,
-                                          ).showSnackBar(
-                                            const SnackBar(
-                                              content: Text(
-                                                'Не удалось открыть уровень',
-                                              ),
-                                            ),
+                                            'Не удалось открыть уровень',
                                           );
                                         }
                                       },

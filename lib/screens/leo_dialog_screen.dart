@@ -144,7 +144,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
     if (_serverRecommendedChips.isEmpty && _defaultGoalChips.isEmpty) {
       _showSuggestions = false;
     }
-    _allowPop = !(widget.caseMode || widget.embedded);
+    _allowPop = !widget.caseMode;
     
     // Следим за позицией скролла для показа FAB «вниз»
     _scrollController.addListener(() {
@@ -699,6 +699,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
         } catch (_) {}
       },
       child: Scaffold(
+        resizeToAvoidBottomInset: true,
         appBar: AppBar(
           backgroundColor: AppColor.primary,
           automaticallyImplyLeading: !widget.caseMode,
@@ -895,6 +896,10 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
                       minLines: 1,
                       maxLines: 4,
                       textInputAction: TextInputAction.send,
+                      textCapitalization: TextCapitalization.sentences,
+                      autocorrect: true,
+                      enableSuggestions: true,
+                      enableIMEPersonalizedLearning: true,
                       decoration: const InputDecoration(
                         hintText: 'Введите сообщение...',
                         border: OutlineInputBorder(),

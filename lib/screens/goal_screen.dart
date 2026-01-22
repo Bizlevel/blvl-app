@@ -70,10 +70,12 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
         title: const Text('Цель'),
       ),
       // Нижние CTA удалены по новой спецификации
+      resizeToAvoidBottomInset: true,
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 840),
           child: SingleChildScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             padding: AppSpacing.insetsAll(AppSpacing.lg),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
