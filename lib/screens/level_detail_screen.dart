@@ -82,7 +82,7 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
     _pageController.addListener(() {
       if (mounted) setState(() {});
     });
-    
+
     // Для уровня 1: проверка наличия цели будет выполнена в build через watch
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _maybeGuardCaseAccess();
@@ -130,8 +130,7 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
       final bool done = status == 'completed' || status == 'skipped';
       if (done || !mounted) return;
 
-      final String caseTitle =
-          (caseRow['title'] as String?) ?? 'Мини‑кейс';
+      final String caseTitle = (caseRow['title'] as String?) ?? 'Мини‑кейс';
       if (!mounted) return;
       await showDialog<void>(
         context: context,
@@ -181,7 +180,7 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
     parts.add('level_id: ${widget.levelId}');
     return parts.join(', ');
   }
-  
+
   /// Проверяет наличие сохраненной цели v1 в БД и устанавливает флаг
   Future<void> _checkGoalV1Saved() async {
     try {
@@ -227,7 +226,7 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
                 final userContext = await _buildUserContext();
                 final levelContext = _buildLevelContext();
                 if (!mounted) return;
-                
+
                 final router = GoRouter.of(context);
                 final origin =
                     router.routeInformationProvider.value.uri.toString();
@@ -241,9 +240,9 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
                     ),
                   );
                 } catch (_) {}
-                
-                final result = await Navigator.of(context, rootNavigator: true)
-                    .push(
+
+                final result =
+                    await Navigator.of(context, rootNavigator: true).push(
                   CustomModalBottomSheetRoute(
                     barrierDismissible: false,
                     child: UncontrolledProviderScope(
@@ -255,19 +254,19 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
                         body: Stack(
                           children: [
                             Positioned.fill(
-                                child: GestureDetector(
-                                  behavior: HitTestBehavior.opaque,
-                                  onTap: () {
-                                    final navigator = Navigator.of(
-                                      context,
-                                      rootNavigator: true,
-                                    );
-                                    if (navigator.canPop()) {
-                                      navigator.pop();
-                                    }
-                                  },
-                                  child: Container(color: Colors.transparent),
-                                ),
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: () {
+                                  final navigator = Navigator.of(
+                                    context,
+                                    rootNavigator: true,
+                                  );
+                                  if (navigator.canPop()) {
+                                    navigator.pop();
+                                  }
+                                },
+                                child: Container(color: Colors.transparent),
+                              ),
                             ),
                             Align(
                               alignment: Alignment.bottomCenter,
@@ -275,69 +274,78 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
                                 color: Colors.transparent,
                                 child: ConstrainedBox(
                                   constraints: BoxConstraints(
-                                    maxHeight: MediaQuery.of(context).size.height * 0.9,
+                                    maxHeight:
+                                        MediaQuery.of(context).size.height *
+                                            0.9,
                                   ),
                                   child: Container(
                                     decoration: const BoxDecoration(
                                       color: AppColor.surface,
-                                      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                                      borderRadius: BorderRadius.vertical(
+                                          top: Radius.circular(20)),
                                     ),
                                     clipBehavior: Clip.hardEdge,
-                                  child: Column(
-                                    children: [
-                                      Container(
-                                        color: AppColor.primary,
-                                        child: SafeArea(
-                                          bottom: false,
-                                          child: AppBar(
-                                            backgroundColor: AppColor.primary,
-                                            automaticallyImplyLeading: false,
-                                            leading: Builder(
-                                              builder: (context) => IconButton(
-                                                tooltip: 'Закрыть',
-                                                icon: const Icon(Icons.close),
-                                                onPressed: () {
-                                                  // Скрываем клавиатуру перед закрытием диалога
-                                                  FocusManager.instance.primaryFocus?.unfocus();
-                                                  final navigator = Navigator.of(
-                                                    context,
-                                                    rootNavigator: true,
-                                                  );
-                                                  if (navigator.canPop()) {
-                                                    navigator.pop();
-                                                  }
-                                                },
-                                              ),
-                                            ),
-                                            title: const Row(
-                                              children: [
-                                                CircleAvatar(
-                                                  radius: 14,
-                                                  backgroundImage: AssetImage('assets/images/avatars/avatar_leo.png'),
-                                                  backgroundColor: Colors.transparent,
+                                    child: Column(
+                                      children: [
+                                        Container(
+                                          color: AppColor.primary,
+                                          child: SafeArea(
+                                            bottom: false,
+                                            child: AppBar(
+                                              backgroundColor: AppColor.primary,
+                                              automaticallyImplyLeading: false,
+                                              leading: Builder(
+                                                builder: (context) =>
+                                                    IconButton(
+                                                  tooltip: 'Закрыть',
+                                                  icon: const Icon(Icons.close),
+                                                  onPressed: () {
+                                                    // Скрываем клавиатуру перед закрытием диалога
+                                                    FocusManager
+                                                        .instance.primaryFocus
+                                                        ?.unfocus();
+                                                    final navigator =
+                                                        Navigator.of(
+                                                      context,
+                                                      rootNavigator: true,
+                                                    );
+                                                    if (navigator.canPop()) {
+                                                      navigator.pop();
+                                                    }
+                                                  },
                                                 ),
-                                                SizedBox(width: 8),
-                                                Text('Лео'),
-                                              ],
+                                              ),
+                                              title: const Row(
+                                                children: [
+                                                  CircleAvatar(
+                                                    radius: 14,
+                                                    backgroundImage: AssetImage(
+                                                        'assets/images/avatars/avatar_leo.png'),
+                                                    backgroundColor:
+                                                        Colors.transparent,
+                                                  ),
+                                                  SizedBox(width: 8),
+                                                  Text('Лео'),
+                                                ],
+                                              ),
                                             ),
                                           ),
                                         ),
-                                      ),
-                                      Expanded(
-                                        child: LeoDialogScreen(
-                                          chatId: _chatId,
-                                          userContext: userContext,
-                                          levelContext: levelContext,
-                                          onChatIdChanged: (id) {
-                                            if (mounted && id.isNotEmpty) {
-                                              setState(() => _chatId = id);
-                                            }
-                                          },
-                                          embedded: true,
+                                        Expanded(
+                                          child: LeoDialogScreen(
+                                            chatId: _chatId,
+                                            userContext: userContext,
+                                            levelContext: levelContext,
+                                            onChatIdChanged: (id) {
+                                              if (mounted && id.isNotEmpty) {
+                                                setState(() => _chatId = id);
+                                              }
+                                            },
+                                            embedded: true,
+                                          ),
                                         ),
-                                      ),
-                                    ],
-                                  ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ),
@@ -381,14 +389,15 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
                             if (mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
-                                  content: Text('Сначала сохраните цель в чекпоинте L1'),
+                                  content: Text(
+                                      'Сначала сохраните цель в чекпоинте L1'),
                                 ),
                               );
                             }
                             return;
                           }
                         }
-                        
+
                         try {
                           sentry.Sentry.addBreadcrumb(sentry.Breadcrumb(
                             category: 'level',
@@ -425,7 +434,8 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
                               context: context,
                               builder: (_) => Dialog(
                                 backgroundColor: Colors.transparent,
-                                insetPadding: AppSpacing.insetsAll(AppSpacing.lg),
+                                insetPadding:
+                                    AppSpacing.insetsAll(AppSpacing.lg),
                                 child: MilestoneCelebration(
                                     gpGain: 20,
                                     onClose: () =>
@@ -438,32 +448,31 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
                           // Предложение проверить идею после завершения Уровня 5 (Ray)
                           final isLevel5 = (widget.levelNumber ?? -1) == 5;
                           if (isLevel5 && context.mounted) {
-                            final shouldOpenRay =
-                                await showDialog<bool>(
-                                      context: context,
-                                      barrierDismissible: false,
-                                      builder: (dialogCtx) => AlertDialog(
-                                        title: const Text('Проверь свою идею'),
-                                        content: const Text(
-                                          'Ты прошёл Уровень 5. Готов проверить свою бизнес‑идею с Ray?',
-                                        ),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () {
-                                              Navigator.of(dialogCtx).pop(false);
-                                            },
-                                            child: const Text('Позже'),
-                                          ),
-                                          ElevatedButton(
-                                            onPressed: () {
-                                              Navigator.of(dialogCtx).pop(true);
-                                            },
-                                            child: const Text('Проверить идею'),
-                                          ),
-                                        ],
+                            final shouldOpenRay = await showDialog<bool>(
+                                  context: context,
+                                  barrierDismissible: false,
+                                  builder: (dialogCtx) => AlertDialog(
+                                    title: const Text('Проверь свою идею'),
+                                    content: const Text(
+                                      'Ты прошёл Уровень 5. Готов проверить свою бизнес‑идею с Ray?',
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () {
+                                          Navigator.of(dialogCtx).pop(false);
+                                        },
+                                        child: const Text('Позже'),
                                       ),
-                                    ) ??
-                                    false;
+                                      ElevatedButton(
+                                        onPressed: () {
+                                          Navigator.of(dialogCtx).pop(true);
+                                        },
+                                        child: const Text('Проверить идею'),
+                                      ),
+                                    ],
+                                  ),
+                                ) ??
+                                false;
 
                             if (shouldOpenRay && context.mounted) {
                               try {
@@ -478,7 +487,8 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
 
                               // ВАЖНО: Используем rootNavigator: true, чтобы диалог не уничтожался
                               // при пересоздании вложенного навигатора
-                              await Navigator.of(context, rootNavigator: true).push(
+                              await Navigator.of(context, rootNavigator: true)
+                                  .push(
                                 MaterialPageRoute(
                                   builder: (_) => const RayDialogScreen(),
                                 ),
@@ -631,7 +641,7 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
               _profileInitialized = true;
             }
           }
-          
+
           // Для уровня 1: отслеживаем изменения цели и обновляем флаг
           if ((widget.levelNumber ?? -1) == 1) {
             final goalAsync = ref.watch(userGoalProvider);

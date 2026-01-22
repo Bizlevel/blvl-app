@@ -108,6 +108,7 @@ class _CheckpointL1ScreenState extends ConsumerState<CheckpointL1Screen> {
       // ВАЖНО: resizeToAvoidBottomInset: true, чтобы Flutter поднимал контент при появлении клавиатуры
       resizeToAvoidBottomInset: true,
       body: SingleChildScrollView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         padding: const EdgeInsets.all(AppSpacing.lg),
         child: BizLevelCard(
           child: Column(
@@ -155,6 +156,10 @@ class _CheckpointL1ScreenState extends ConsumerState<CheckpointL1Screen> {
                 ),
                 maxLines: 2,
                 textInputAction: TextInputAction.next,
+                textCapitalization: TextCapitalization.sentences,
+                autocorrect: true,
+                enableSuggestions: true,
+                enableIMEPersonalizedLearning: true,
                 onSubmitted: (_) => FocusScope.of(context).nextFocus(),
                 onTapOutside: (_) => FocusScope.of(context).unfocus(),
               ),
@@ -174,6 +179,9 @@ class _CheckpointL1ScreenState extends ConsumerState<CheckpointL1Screen> {
                         border: OutlineInputBorder(),
                       ),
                       textInputAction: TextInputAction.next,
+                      autocorrect: false,
+                      enableSuggestions: false,
+                      enableIMEPersonalizedLearning: false,
                       onSubmitted: (_) => FocusScope.of(context).nextFocus(),
                       onTapOutside: (_) => FocusScope.of(context).unfocus(),
                     ),
@@ -189,6 +197,9 @@ class _CheckpointL1ScreenState extends ConsumerState<CheckpointL1Screen> {
                         border: OutlineInputBorder(),
                       ),
                       textInputAction: TextInputAction.done,
+                      autocorrect: false,
+                      enableSuggestions: false,
+                      enableIMEPersonalizedLearning: false,
                       onSubmitted: (_) => FocusScope.of(context).unfocus(),
                       onTapOutside: (_) => FocusScope.of(context).unfocus(),
                     ),

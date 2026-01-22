@@ -73,12 +73,14 @@ class LoginScreen extends HookConsumerWidget {
 
     return Scaffold(
       backgroundColor: Colors.transparent,
+      resizeToAvoidBottomInset: true,
       body: Stack(
         children: [
           // Анимированный фон (медленная ротация градиента, лёгкая)
           const _AnimatedGradientBackground(),
           Center(
             child: SingleChildScrollView(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               padding: AppSpacing.insetsSymmetric(
                   h: AppSpacing.lg, v: AppSpacing.x3l),
               child: Column(
@@ -167,14 +169,8 @@ class LoginScreen extends HookConsumerWidget {
                           controller: emailController,
                           keyboardType: TextInputType.emailAddress,
                           textInputAction: TextInputAction.next,
-                          // На iOS первая инициализация клавиатуры + генерация подсказок может давать фризы.
-                          // Для email подсказки/автокоррекция не нужны — отключаем.
-                          autocorrect: false,
-                          enableSuggestions: false,
-                          enableIMEPersonalizedLearning: false,
+                          preset: TextFieldPreset.auth,
                           autofillHints: const [AutofillHints.email],
-                          smartDashesType: SmartDashesType.disabled,
-                          smartQuotesType: SmartQuotesType.disabled,
                         ),
                         AppSpacing.gapH(AppSpacing.lg),
                         // поле пароля с глазом
@@ -186,12 +182,8 @@ class LoginScreen extends HookConsumerWidget {
                           obscureText: obscurePassword.value,
                           keyboardType: TextInputType.visiblePassword,
                           textInputAction: TextInputAction.done,
-                          autocorrect: false,
-                          enableSuggestions: false,
-                          enableIMEPersonalizedLearning: false,
+                          preset: TextFieldPreset.auth,
                           autofillHints: const [AutofillHints.password],
-                          smartDashesType: SmartDashesType.disabled,
-                          smartQuotesType: SmartQuotesType.disabled,
                           suffix: IconButton(
                             tooltip: obscurePassword.value
                                 ? 'Показать пароль'

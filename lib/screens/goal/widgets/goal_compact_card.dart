@@ -178,6 +178,10 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                   decoration: const InputDecoration(
                       labelText: 'Короткое описание цели'),
                   textInputAction: TextInputAction.next,
+                  textCapitalization: TextCapitalization.sentences,
+                  autocorrect: true,
+                  enableSuggestions: true,
+                  enableIMEPersonalizedLearning: true,
                   onSubmitted: (_) => FocusScope.of(context).nextFocus(),
                   onTapOutside: (_) => FocusScope.of(context).unfocus(),
                 ),
@@ -190,6 +194,9 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                       decoration:
                           const InputDecoration(labelText: 'Текущее значение'),
                       textInputAction: TextInputAction.next,
+                      autocorrect: false,
+                      enableSuggestions: false,
+                      enableIMEPersonalizedLearning: false,
                       onSubmitted: (_) => FocusScope.of(context).nextFocus(),
                       onTapOutside: (_) => FocusScope.of(context).unfocus(),
                     ),
@@ -202,6 +209,9 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                       decoration:
                           const InputDecoration(labelText: 'Целевое значение'),
                       textInputAction: TextInputAction.next,
+                      autocorrect: false,
+                      enableSuggestions: false,
+                      enableIMEPersonalizedLearning: false,
                       onSubmitted: (_) => FocusScope.of(context).nextFocus(),
                       onTapOutside: (_) => FocusScope.of(context).unfocus(),
                     ),

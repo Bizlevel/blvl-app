@@ -82,6 +82,7 @@ class CheckpointL7Screen extends ConsumerWidget {
     final practiceAsync = ref.watch(practiceLogProvider);
     return Scaffold(
       appBar: AppBar(title: const Text('Чекпоинт: Система поддержки')),
+      resizeToAvoidBottomInset: true,
       body: goalAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (_, __) =>

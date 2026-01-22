@@ -91,6 +91,7 @@ class _CheckpointL4ScreenState extends ConsumerState<CheckpointL4Screen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Чекпоинт: Регулярность')),
+      resizeToAvoidBottomInset: true,
       body: goalAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (_, __) =>

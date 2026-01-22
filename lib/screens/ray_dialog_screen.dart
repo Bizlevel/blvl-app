@@ -628,6 +628,7 @@ class _RayDialogScreenState extends ConsumerState<RayDialogScreen>
             : 'Начать проверку (${pricing.priceGp} GP)');
 
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(
         backgroundColor: AppColor.primary,
         title: const Row(
@@ -947,7 +948,7 @@ class _RayDialogScreenState extends ConsumerState<RayDialogScreen>
     final showOnboardingActions = _currentStep == 0 && _onboardingMetadata != null;
     
     return SafeArea(
-      top: false,
+      bottom: false,
       // Приводим нижнюю панель к паттерну Leo/Max:
       // SafeArea + Padding, без принудительного белого фона, чтобы совпадать с общим градиентом.
       child: Column(
@@ -973,6 +974,10 @@ class _RayDialogScreenState extends ConsumerState<RayDialogScreen>
                         minLines: 1,
                         maxLines: 4,
                         textInputAction: TextInputAction.send,
+                        textCapitalization: TextCapitalization.sentences,
+                        autocorrect: true,
+                        enableSuggestions: true,
+                        enableIMEPersonalizedLearning: true,
                         onTapOutside: (_) => FocusScope.of(context).unfocus(),
                         onSubmitted: (_) {
                           if (_controller.text.trim().isNotEmpty &&

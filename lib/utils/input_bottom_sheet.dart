@@ -18,14 +18,15 @@ Future<T?> showBizLevelInputBottomSheet<T>({
     backgroundColor: backgroundColor,
     builder: (ctx) {
       final media = MediaQuery.of(ctx);
-      final bottomInset = applyKeyboardInset ? media.viewInsets.bottom : 0.0;
-      final padding = contentPadding ??
-          EdgeInsets.only(
-            left: 16,
-            right: 16,
-            top: 8,
-            bottom: bottomInset + media.padding.bottom + 16,
-          );
+      final keyboardInset = applyKeyboardInset ? media.viewInsets.bottom : 0.0;
+      final padding = contentPadding == null
+          ? EdgeInsets.only(
+              left: 16,
+              right: 16,
+              top: 8,
+              bottom: keyboardInset + media.padding.bottom + 16,
+            )
+          : contentPadding.add(EdgeInsets.only(bottom: keyboardInset));
       return AnimatedPadding(
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeOut,

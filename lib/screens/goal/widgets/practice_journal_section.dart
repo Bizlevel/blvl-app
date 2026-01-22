@@ -12,6 +12,7 @@ import 'package:bizlevel/widgets/common/bizlevel_card.dart';
 import 'package:bizlevel/theme/spacing.dart';
 import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/utils/max_context_helper.dart';
+import 'package:bizlevel/widgets/common/notification_center.dart';
 import 'package:bizlevel/theme/dimensions.dart';
 
 class PracticeJournalSection extends ConsumerStatefulWidget {
@@ -243,6 +244,9 @@ class _PracticeJournalSectionState
                   hintText: 'Обновить текущее значение метрики',
                 ),
                 textInputAction: TextInputAction.next,
+                autocorrect: false,
+                enableSuggestions: false,
+                enableIMEPersonalizedLearning: false,
                 onSubmitted: (_) => FocusScope.of(context).nextFocus(),
                 onTapOutside: (_) => FocusScope.of(context).unfocus(),
               ),
@@ -253,6 +257,10 @@ class _PracticeJournalSectionState
                 decoration: const InputDecoration(
                     labelText: 'Что конкретно сделал(а) сегодня'),
                 textInputAction: TextInputAction.done,
+                textCapitalization: TextCapitalization.sentences,
+                autocorrect: true,
+                enableSuggestions: true,
+                enableIMEPersonalizedLearning: true,
                 onSubmitted: (_) => FocusScope.of(context).unfocus(),
                 onTapOutside: (_) => FocusScope.of(context).unfocus(),
               ),
@@ -338,10 +346,9 @@ class _PracticeJournalSectionState
                       // Сигнал о бонусе за практику
                       try {
                         if (!context.mounted) return;
-                        final messenger = ScaffoldMessenger.of(context);
-                        messenger.showSnackBar(
-                          const SnackBar(
-                              content: Text('+5 GP за практику сегодня')),
+                        NotificationCenter.showSuccess(
+                          context,
+                          '+5 GP за практику сегодня',
                         );
                       } catch (_) {}
                       await Future.delayed(const Duration(milliseconds: 800));

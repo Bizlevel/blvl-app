@@ -122,10 +122,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.transparent,
+      resizeToAvoidBottomInset: true,
       body: Container(
         decoration: const BoxDecoration(gradient: AppColor.bgGradient),
         child: Center(
           child: SingleChildScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             padding:
                 AppSpacing.insetsSymmetric(h: AppSpacing.xl, v: AppSpacing.x3l),
             child: Container(
@@ -175,6 +177,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           hint: 'Email',
           prefix: const Icon(Icons.email_outlined),
           controller: _emailController,
+          keyboardType: TextInputType.emailAddress,
+          textInputAction: TextInputAction.next,
+          autofillHints: const [AutofillHints.email],
+          preset: TextFieldPreset.auth,
         ),
         AppSpacing.gapH(AppSpacing.lg),
         CustomTextBox(
@@ -183,6 +189,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           prefix: const Icon(Icons.lock_outline),
           controller: _passwordController,
           obscureText: _obscurePassword,
+          keyboardType: TextInputType.visiblePassword,
+          textInputAction: TextInputAction.next,
+          autofillHints: const [AutofillHints.password],
+          preset: TextFieldPreset.auth,
           suffix: IconButton(
             tooltip: _obscurePassword ? 'Показать пароль' : 'Скрыть пароль',
             icon: Icon(
@@ -198,6 +208,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           prefix: const Icon(Icons.lock_person_outlined),
           controller: _confirmController,
           obscureText: _obscureConfirm,
+          keyboardType: TextInputType.visiblePassword,
+          textInputAction: TextInputAction.done,
+          autofillHints: const [AutofillHints.password],
+          preset: TextFieldPreset.auth,
           suffix: IconButton(
             tooltip: _obscureConfirm ? 'Показать пароль' : 'Скрыть пароль',
             icon:

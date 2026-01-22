@@ -170,7 +170,7 @@ void _handleCheckpointTap(BuildContext context, Map<String, dynamic> node) {
       
       showBizLevelInputBottomSheet(
         context: context,
-        applyKeyboardInset: false,
+        applyKeyboardInset: true,
         contentPadding: EdgeInsets.zero,
         builder: (ctx) => checkpointScreen,
       );
@@ -363,6 +363,7 @@ class _LevelNodeTile extends StatelessWidget {
     final bool isLocked = isLockedBase || blockedByCheckpoint;
     final bool isLockedByGp = isLockedBase && _isLockedByGp(data);
     final bool isCompleted = data['isCompleted'] == true;
+    final bool isRepeatable = data['isRepeatable'] == true;
 
     return Material(
       color: Colors.transparent,
@@ -372,7 +373,7 @@ class _LevelNodeTile extends StatelessWidget {
         onTap: () => _handleLevelTap(
           context,
           levelNumber: levelNumber,
-          canOpen: (isCompleted || !isLocked),
+          canOpen: (isRepeatable || !isLocked),
           blockedByCheckpoint: blockedByCheckpoint,
           data: data,
         ),
@@ -418,7 +419,7 @@ class _LevelNodeTile extends StatelessWidget {
                     child: const Text('Получить полный доступ к этажу'),
                   ),
                 ),
-              if (isCompleted)
+              if (isRepeatable)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
                   child: OutlinedButton(

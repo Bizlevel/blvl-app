@@ -4,6 +4,8 @@ import 'package:bizlevel/theme/spacing.dart';
 import 'package:bizlevel/theme/dimensions.dart';
 import 'package:bizlevel/theme/typography.dart';
 
+enum TextFieldPreset { auth, form, chat }
+
 class CustomTextBox extends StatelessWidget {
   const CustomTextBox({
     super.key,
@@ -23,12 +25,13 @@ class CustomTextBox extends StatelessWidget {
     this.enableIMEPersonalizedLearning,
     this.textInputAction,
     this.autofillHints,
-    this.textCapitalization = TextCapitalization.none,
+    this.textCapitalization,
     this.smartDashesType,
     this.smartQuotesType,
     this.minLines,
     this.onSubmitted,
     this.onTapOutside,
+    this.preset,
   });
 
   final String hint;
@@ -47,15 +50,31 @@ class CustomTextBox extends StatelessWidget {
   final bool? enableIMEPersonalizedLearning;
   final TextInputAction? textInputAction;
   final Iterable<String>? autofillHints;
-  final TextCapitalization textCapitalization;
+  final TextCapitalization? textCapitalization;
   final SmartDashesType? smartDashesType;
   final SmartQuotesType? smartQuotesType;
   final int? minLines;
   final ValueChanged<String>? onSubmitted;
   final TapRegionCallback? onTapOutside;
+  final TextFieldPreset? preset;
 
   @override
   Widget build(BuildContext context) {
+    final bool isAuthPreset = preset == TextFieldPreset.auth;
+    final bool isFormPreset = preset == TextFieldPreset.form;
+    final bool isChatPreset = preset == TextFieldPreset.chat;
+    final bool effectiveAutocorrect = autocorrect ?? !isAuthPreset;
+    final bool effectiveSuggestions = enableSuggestions ?? !isAuthPreset;
+    final bool effectiveImeLearning =
+        enableIMEPersonalizedLearning ?? !isAuthPreset;
+    final TextCapitalization effectiveCapitalization = textCapitalization ??
+        ((isFormPreset || isChatPreset)
+            ? TextCapitalization.sentences
+            : TextCapitalization.none);
+    final SmartDashesType? effectiveDashes =
+        smartDashesType ?? (isAuthPreset ? SmartDashesType.disabled : null);
+    final SmartQuotesType? effectiveQuotes =
+        smartQuotesType ?? (isAuthPreset ? SmartQuotesType.disabled : null);
     return Container(
       alignment: Alignment.center,
       padding: const EdgeInsets.only(bottom: AppSpacing.xs3),
@@ -97,14 +116,14 @@ class CustomTextBox extends StatelessWidget {
         maxLines: maxLines,
         // Для большинства полей оставляем системные значения по умолчанию,
         // а на чувствительных экранах (login/password) можем явно отключать подсказки/автокоррекцию.
-        autocorrect: autocorrect ?? true,
-        enableSuggestions: enableSuggestions ?? true,
-        enableIMEPersonalizedLearning: enableIMEPersonalizedLearning ?? true,
+        autocorrect: effectiveAutocorrect,
+        enableSuggestions: effectiveSuggestions,
+        enableIMEPersonalizedLearning: effectiveImeLearning,
         textInputAction: textInputAction,
         autofillHints: autofillHints,
-        textCapitalization: textCapitalization,
-        smartDashesType: smartDashesType,
-        smartQuotesType: smartQuotesType,
+        textCapitalization: effectiveCapitalization,
+        smartDashesType: effectiveDashes,
+        smartQuotesType: effectiveQuotes,
         onSubmitted: onSubmitted,
         onTapOutside: onTapOutside,
         textAlignVertical: TextAlignVertical.center,

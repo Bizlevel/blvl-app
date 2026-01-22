@@ -24,7 +24,7 @@ class BizLevelTextField extends StatelessWidget {
     this.maxLines = 1,
     this.textInputAction,
     this.autofillHints,
-    this.textCapitalization = TextCapitalization.none,
+    this.textCapitalization,
     this.smartDashesType,
     this.smartQuotesType,
     this.autocorrect,
@@ -32,6 +32,7 @@ class BizLevelTextField extends StatelessWidget {
     this.enableIMEPersonalizedLearning,
     this.onSubmitted,
     this.onTapOutside,
+    this.preset = TextFieldPreset.form,
   });
 
   final String? label;
@@ -51,7 +52,7 @@ class BizLevelTextField extends StatelessWidget {
   final int maxLines;
   final TextInputAction? textInputAction;
   final Iterable<String>? autofillHints;
-  final TextCapitalization textCapitalization;
+  final TextCapitalization? textCapitalization;
   final SmartDashesType? smartDashesType;
   final SmartQuotesType? smartQuotesType;
   final bool? autocorrect;
@@ -59,6 +60,7 @@ class BizLevelTextField extends StatelessWidget {
   final bool? enableIMEPersonalizedLearning;
   final ValueChanged<String>? onSubmitted;
   final TapRegionCallback? onTapOutside;
+  final TextFieldPreset preset;
 
   @override
   Widget build(BuildContext context) {
@@ -98,6 +100,7 @@ class BizLevelTextField extends StatelessWidget {
         enableIMEPersonalizedLearning: enableIMEPersonalizedLearning,
         onSubmitted: onSubmitted,
         onTapOutside: onTapOutside,
+        preset: preset,
       ),
     );
 
