@@ -31,7 +31,7 @@ final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 class _FlowNavigatorObserver extends NavigatorObserver {
   void _log(String msg) {
     assert(() {
-      debugPrint('[L0ProfileFlow][nav-observer] ' + msg);
+      debugPrint('[nav-observer] ' + msg);
       return true;
     }());
   }
@@ -189,7 +189,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
     ],
     redirect: (context, state) {
       assert(() {
-        debugPrint('[L0ProfileFlow][redirect] enter location=${state.uri} matched=${state.matchedLocation}');
+        debugPrint('[redirect] enter location=${state.uri} matched=${state.matchedLocation}');
         return true;
       }());
       try {
@@ -204,7 +204,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           guard.debugLog(
               'redirected_tower_to_level from=$location to=${guard.lastLevelRoute}');
           assert(() {
-            debugPrint('[L0ProfileFlow][redirect] force_to_last_level from=$location to=${guard.lastLevelRoute}');
+            debugPrint('[redirect] force_to_last_level from=$location to=${guard.lastLevelRoute}');
             return true;
           }());
           return guard.lastLevelRoute!;
@@ -222,7 +222,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         if (currentSession != null && !currentUserAsync.isLoading && !loggedIn) {
           ref.read(authServiceProvider).signOut();
           assert(() {
-            debugPrint('[L0ProfileFlow][redirect] session_without_user -> /login');
+            debugPrint('[redirect] session_without_user -> /login');
             return true;
           }());
           return '/login';
@@ -235,7 +235,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
 
         if (!loggedIn && !loggingIn && !currentUserAsync.isLoading) {
           assert(() {
-            debugPrint('[L0ProfileFlow][redirect] not_logged_in -> /login');
+            debugPrint('[redirect] not_logged_in -> /login');
             return true;
           }());
           return '/login';
@@ -243,7 +243,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
 
         if (loggedIn && loggingIn) {
           assert(() {
-            debugPrint('[L0ProfileFlow][redirect] logged_in_on_auth -> /home');
+            debugPrint('[redirect] logged_in_on_auth -> /home');
             return true;
           }());
           return '/home';
@@ -253,7 +253,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           final currentLevel = currentUser?.currentLevel ?? 0;
           if (currentLevel < 2) {
             assert(() {
-              debugPrint('[L0ProfileFlow][redirect] gate_goal currentLevel=$currentLevel -> /home');
+              debugPrint('[redirect] gate_goal currentLevel=$currentLevel -> /home');
               return true;
             }());
             return '/home';
@@ -261,14 +261,14 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         }
 
         assert(() {
-          debugPrint('[L0ProfileFlow][redirect] none');
+          debugPrint('[redirect] none');
           return true;
         }());
         return null;
       } on Object catch (error, stackTrace) {
         Sentry.captureException(error, stackTrace: stackTrace);
         assert(() {
-          debugPrint('[L0ProfileFlow][redirect] exception -> /login err=$error');
+          debugPrint('[redirect] exception -> /login err=$error');
           return true;
         }());
         return '/login';

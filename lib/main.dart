@@ -409,12 +409,37 @@ class _PostBootstrapRunner extends StatefulWidget {
 }
 
 class _PostBootstrapRunnerState extends State<_PostBootstrapRunner> {
+  void _onGlobalFocusChange() {
+    assert(() {
+      final node = FocusManager.instance.primaryFocus;
+      final focusDesc = node?.toStringShort() ?? 'null';
+      debugPrint('[focus] primary=$focusDesc hasFocus=${node?.hasFocus}');
+      return true;
+    }());
+  }
+
   @override
   void initState() {
     super.initState();
     // Запускаем тяжёлые операции (Sentry/notifications/timezone/push) только
     // после успешного bootstrap и после первого кадра реального UI (login/home).
     _schedulePostFrameBootstraps();
+    // Глобальный слушатель фокуса
+    assert(() {
+      FocusManager.instance.addListener(_onGlobalFocusChange);
+      debugPrint('[focus] listener_attached');
+      return true;
+    }());
+  }
+
+  @override
+  void dispose() {
+    assert(() {
+      FocusManager.instance.removeListener(_onGlobalFocusChange);
+      debugPrint('[focus] listener_detached');
+      return true;
+    }());
+    super.dispose();
   }
 
   @override
@@ -462,6 +487,16 @@ class _RouterApp extends StatelessWidget {
             Breakpoint(start: 1024, end: double.infinity, name: DESKTOP),
           ],
         );
+        final withPopScope = WillPopScope(
+          onWillPop: () async {
+            assert(() {
+              debugPrint('[pop] onWillPop (MaterialApp)');
+              return true;
+            }());
+            return true;
+          },
+          child: wrapped,
+        );
 
         // увеличиваем базовый размер шрифта на desktop (>=1024)
         final bool isDesktop = MediaQuery.of(context).size.width >= 1024;
@@ -507,7 +542,7 @@ class _RouterApp extends StatelessWidget {
             ),
             // Launch route от уведомлений обрабатывается в _schedulePostFrameBootstraps()
             // после полной инициализации Hive. FutureBuilder здесь вызывал HiveError.
-            child: wrapped,
+            child: withPopScope,
           ),
         );
       },

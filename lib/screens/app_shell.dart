@@ -40,8 +40,7 @@ class _AppShellState extends ConsumerState<AppShell> {
           message == 'tab_go_immediate' ||
           message == 'page_changed_go' ||
           message == 'page_changed_ignored';
-      final tag = tagNeeded ? '[L0ProfileFlow][nav]' : '[nav]';
-      debugPrint('$tag $message ${data.toString()}');
+      debugPrint('[nav] $message ${data.toString()}');
       return true;
     }());
   }

@@ -105,6 +105,17 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
     } else {
       LevelInputGuard.instance.deactivate();
     }
+    assert(() {
+      final field = _profileNameFocus.hasFocus
+          ? 'name'
+          : _profileAboutFocus.hasFocus
+              ? 'about'
+              : _profileGoalFocus.hasFocus
+                  ? 'goal'
+                  : 'none';
+      debugPrint('[focus] field_focus_change field=$field hasFocus=$hasFocus');
+      return true;
+    }());
   }
 
   Future<void> _maybeGuardCaseAccess() async {
