@@ -13,7 +13,6 @@ import 'package:bizlevel/providers/user_skills_provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:bizlevel/widgets/common/bizlevel_button.dart';
 import 'package:bizlevel/theme/spacing.dart';
-import 'package:bizlevel/widgets/common/milestone_celebration.dart';
 import 'package:bizlevel/providers/gp_providers.dart';
 import 'package:bizlevel/widgets/level/level_nav_bar.dart';
 import 'package:bizlevel/widgets/level/level_progress_dots.dart';
@@ -41,6 +40,7 @@ class LevelDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
+  bool _isCompleting = false;
   late final PageController _pageController;
 
   late List<LevelPageBlock> _blocks;
@@ -388,8 +388,10 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
               icon: const Icon(Icons.check, size: 20),
               backgroundColorOverride: AppColor.warning,
               foregroundColorOverride: AppColor.onPrimary,
-              onPressed: _isLevelCompleted(lessons)
+                onPressed: _isLevelCompleted(lessons) && !_isCompleting
                   ? () async {
+                    if (!mounted) return;
+                    setState(() => _isCompleting = true);
                       try {
                         try {
                           sentry.Sentry.addBreadcrumb(sentry.Breadcrumb(
@@ -420,18 +422,8 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
                           ));
                         } catch (_) {}
                         if (context.mounted) {
-                            await showDialog(
-                              context: context,
-                              builder: (_) => Dialog(
-                                backgroundColor: Colors.transparent,
-                                insetPadding: AppSpacing.insetsAll(AppSpacing.lg),
-                                child: MilestoneCelebration(
-                                  gpGain: 20,
-                                  onClose: () => Navigator.of(context).maybePop(),
-                                ),
-                              ),
-                            );
-                            ref.invalidate(gpBalanceProvider);
+                          // Убрали модалку с бонусом, чтобы не вводить в заблуждение.
+                          // ref.invalidate(gpBalanceProvider); // баланс уже инвалидации выше
 
                           // Предложение проверить идею после завершения Уровня 5 (Ray)
                           final isLevel5 = (widget.levelNumber ?? -1) == 5;
@@ -483,17 +475,11 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
                               );
                             }
                           }
-
-                            // После завершения уровня 1 возвращаем в Башню,
-                            // чтобы пользователь прошёл чекпоинт L1 перед доступом к Уровню 2.
-                            if ((widget.levelNumber ?? -1) == 1) {
-                              if (context.mounted) {
-                                context.go('/tower?scrollTo=2');
-                              }
-                            } else {
-                              if (!context.mounted) return;
-                              Navigator.of(context).pop();
-                            }
+                          // Переход в башню: для уровня 1 — к 2-му, иначе общий возврат
+                          if (!context.mounted) return;
+                          final nextScroll =
+                              (widget.levelNumber ?? 0) == 1 ? 2 : (widget.levelNumber ?? 0);
+                          context.go('/tower?scrollTo=$nextScroll');
                         }
                       } catch (e) {
                         if (context.mounted) {
@@ -501,6 +487,8 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
                             SnackBar(content: Text('Ошибка: $e')),
                           );
                         }
+                      } finally {
+                        if (mounted) setState(() => _isCompleting = false);
                       }
                     }
                   : null,

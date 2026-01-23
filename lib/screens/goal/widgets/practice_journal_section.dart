@@ -12,7 +12,6 @@ import 'package:bizlevel/widgets/common/bizlevel_card.dart';
 import 'package:bizlevel/theme/spacing.dart';
 import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/utils/max_context_helper.dart';
-import 'package:bizlevel/widgets/common/notification_center.dart';
 import 'package:bizlevel/theme/dimensions.dart';
 
 class PracticeJournalSection extends ConsumerStatefulWidget {
@@ -343,14 +342,8 @@ class _PracticeJournalSectionState
                             message: 'goal_momentum_shown',
                             level: SentryLevel.info));
                       } catch (_) {}
-                      // Сигнал о бонусе за практику
-                      try {
-                        if (!context.mounted) return;
-                        NotificationCenter.showSuccess(
-                          context,
-                          '+5 GP за практику сегодня',
-                        );
-                      } catch (_) {}
+                      // Убрали тост про бонус GP: начисление идемпотентно и может не произойти повторно,
+                      // чтобы не вводить пользователя в заблуждение (см. issue по повторному показу).
                       await Future.delayed(const Duration(milliseconds: 800));
                       if (!context.mounted) return;
                       setState(() => _showMomentum = false);
