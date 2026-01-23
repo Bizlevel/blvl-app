@@ -364,8 +364,10 @@ class _QuickAccessSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final levels = ref.watch(levelsProvider).value ?? const [];
     final collected = levels
-        .where((l) => (l['isCompleted'] as bool? ?? false))
-        .length;
+      .where((l) =>
+        ((l['level'] as int? ?? 0) > 0) &&
+        (l['isCompleted'] as bool? ?? false))
+      .length;
     final totalAsync = ref.watch(libraryTotalCountProvider);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
