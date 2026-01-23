@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:bizlevel/providers/gp_providers.dart';
@@ -192,7 +193,20 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Магазин GP')),
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            final router = GoRouter.of(context);
+            if (router.canPop()) {
+              router.pop();
+            } else {
+              router.go('/home');
+            }
+          },
+        ),
+        title: const Text('Магазин GP'),
+      ),
       body: LayoutBuilder(builder: (context, constraints) {
         final bool isXs = constraints.maxWidth < 360;
         // Устанавливаем дефолтный выбранный план (середина) если не выбрано

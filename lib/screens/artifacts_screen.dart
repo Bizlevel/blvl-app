@@ -21,6 +21,17 @@ class ArtifactsScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            final router = GoRouter.of(context);
+            if (router.canPop()) {
+              router.pop();
+            } else {
+              router.go('/home');
+            }
+          },
+        ),
         title: const Text('Артефакты'),
         centerTitle: true,
         actions: [
