@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:bizlevel/providers/goals_repository_provider.dart';
 import 'package:bizlevel/providers/goals_providers.dart';
+import 'package:bizlevel/providers/levels_provider.dart';
 import 'package:bizlevel/utils/date_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bizlevel/models/goal_update.dart';
@@ -80,6 +81,10 @@ class _CheckpointL1ScreenState extends ConsumerState<CheckpointL1Screen> {
             level: SentryLevel.info));
       } catch (_) {}
       ref.invalidate(userGoalProvider);
+      // Важно: после сохранения цели меняется статус чекпоинта L1 и доступность Уровня 2 в Башне.
+      // Инвалидируем башню/уровни, чтобы UI обновился сразу после закрытия экрана.
+      ref.invalidate(towerNodesProvider);
+      ref.invalidate(levelsProvider);
       if (!mounted) return;
       NotificationCenter.showSuccess(context, 'Цель сохранена');
       // Возвращаемся назад вместо перехода на /goal (который недоступен до завершения уровня)

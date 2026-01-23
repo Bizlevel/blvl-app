@@ -5,6 +5,7 @@ import 'package:bizlevel/theme/typography.dart';
 import 'package:bizlevel/widgets/common/breadcrumb.dart';
 import 'package:bizlevel/widgets/level/parallax_image.dart';
 import 'package:bizlevel/widgets/level/blocks/level_page_block.dart';
+import 'package:bizlevel/services/level_input_guard.dart';
 
 class IntroBlock extends LevelPageBlock {
   final int levelId;
@@ -35,11 +36,17 @@ class IntroBlock extends LevelPageBlock {
                     items: [
                       BreadcrumbItem(
                         label: 'Главная',
-                        onTap: () => context.go('/home'),
+                        onTap: () {
+                          LevelInputGuard.instance.clear();
+                          context.go('/home');
+                        },
                       ),
                       BreadcrumbItem(
                         label: 'Башня',
-                        onTap: () => context.go('/tower?scrollTo=$levelNumber'),
+                        onTap: () {
+                          LevelInputGuard.instance.clear();
+                          context.go('/tower?scrollTo=$levelNumber');
+                        },
                       ),
                       BreadcrumbItem(
                         label: 'Уровень $levelNumber',
@@ -59,6 +66,7 @@ class IntroBlock extends LevelPageBlock {
                   tooltip: 'К башне',
                   onPressed: () {
                     try {
+                      LevelInputGuard.instance.clear();
                       if (levelNumber > 0) {
                         GoRouter.of(context).go('/tower?scrollTo=$levelNumber');
                       } else {

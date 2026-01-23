@@ -31,6 +31,7 @@ class CustomTextBox extends StatelessWidget {
     this.minLines,
     this.onSubmitted,
     this.onTapOutside,
+    this.onTap,
     this.preset,
   });
 
@@ -56,6 +57,7 @@ class CustomTextBox extends StatelessWidget {
   final int? minLines;
   final ValueChanged<String>? onSubmitted;
   final TapRegionCallback? onTapOutside;
+  final VoidCallback? onTap;
   final TextFieldPreset? preset;
 
   @override
@@ -126,6 +128,7 @@ class CustomTextBox extends StatelessWidget {
         smartQuotesType: effectiveQuotes,
         onSubmitted: onSubmitted,
         onTapOutside: onTapOutside,
+        onTap: onTap,
         textAlignVertical: TextAlignVertical.center,
         decoration: InputDecoration(
           prefixIcon: prefix,

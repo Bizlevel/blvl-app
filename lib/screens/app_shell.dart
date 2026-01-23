@@ -14,6 +14,7 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:bizlevel/screens/biz_tower_screen.dart';
 import 'package:bizlevel/screens/leo_chat_screen.dart';
+import 'package:bizlevel/services/level_input_guard.dart';
 
 class AppShell extends ConsumerStatefulWidget {
   final Widget child;
@@ -28,6 +29,14 @@ class _AppShellState extends ConsumerState<AppShell> {
   PageController? _pageController;
   int _currentIndex = 0;
   bool _isSyncing = false;
+  String? _lastLocation;
+
+  void _debugNav(String message, Map<String, Object?> data) {
+    assert(() {
+      debugPrint('[nav] $message ${data.toString()}');
+      return true;
+    }());
+  }
 
   // context helpers удалены с плавающей кнопкой чата
 
@@ -46,6 +55,26 @@ class _AppShellState extends ConsumerState<AppShell> {
   Widget build(BuildContext context) {
     final String location =
         GoRouter.of(context).routeInformationProvider.value.uri.toString();
+    final guard = LevelInputGuard.instance;
+    if (guard.isActive &&
+        guard.lastLevelRoute != null &&
+        (location == '/tower' || location.startsWith('/tower?'))) {
+      _debugNav('guarded_tower_redirect', {
+        'from': location,
+        'to': guard.lastLevelRoute!,
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        GoRouter.of(context).go(guard.lastLevelRoute!);
+      });
+    }
+    if (_lastLocation != location) {
+      _debugNav('location_change', {
+        'from': _lastLocation,
+        'to': location,
+      });
+      _lastLocation = location;
+    }
     final int activeTab = _locationToTab(location);
 
     final width = MediaQuery.of(context).size.width;
@@ -56,6 +85,13 @@ class _AppShellState extends ConsumerState<AppShell> {
         final fromIndex = activeTab;
         final from = _routes[fromIndex];
         final to = _routes[index];
+        _debugNav('tab_tap', {
+          'from': from,
+          'to': to,
+          'activeTab': activeTab,
+          'targetIndex': index,
+          'location': location,
+        });
         if (from != to) {
           Sentry.addBreadcrumb(Breadcrumb(
             category: 'nav',
@@ -81,11 +117,21 @@ class _AppShellState extends ConsumerState<AppShell> {
           // Финализируем маршрут после завершения анимации на целевой вкладке
           final target = _routes[index];
           final current = router.routeInformationProvider.value.uri.toString();
+          _debugNav('tab_anim_complete', {
+            'target': target,
+            'current': current,
+            'index': index,
+          });
           if (current != target) {
             router.go(target);
           }
         });
       } else {
+        _debugNav('tab_go_immediate', {
+          'target': _routes[index],
+          'index': index,
+          'location': location,
+        });
         context.go(_routes[index]);
       }
     }
@@ -119,7 +165,9 @@ class _AppShellState extends ConsumerState<AppShell> {
     }
 
     return Scaffold(
-      bottomNavigationBar: isDesktop
+      // На небазовых маршрутах (например, /levels/*) скрываем таб-бар,
+      // чтобы избежать случайных переходов при вводе.
+      bottomNavigationBar: (isDesktop || !isBaseRoute)
           ? null
           : Container(
               height: 75,
@@ -226,6 +274,11 @@ class _AppShellState extends ConsumerState<AppShell> {
                     // Навигацию откладываем на пост-кадр, чтобы не вызывать go в build/скролле
                     WidgetsBinding.instance.addPostFrameCallback((_) {
                       if (!mounted) return;
+                    _debugNav('page_changed_go', {
+                      'index': i,
+                      'target': _routes[i],
+                      'location': location,
+                    });
                       context.go(_routes[i]);
                     });
                   },
