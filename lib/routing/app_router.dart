@@ -26,27 +26,59 @@ import '../screens/checkpoints/checkpoint_l4_screen.dart';
 import '../screens/checkpoints/checkpoint_l7_screen.dart';
 import '../services/level_input_guard.dart';
 
-/// Глобальный ключ для доступа к NavigatorState из GoRouter.
-/// Используется для навигации из _schedulePostFrameBootstraps().
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
-/// Riverpod provider that exposes the [GoRouter] instance used across the app.
-///
-/// ВАЖНО: НЕ используем ref.watch(authStateProvider) здесь!
-/// StreamProvider.watch() внутри Provider может заблокировать UI навсегда,
-/// если поток не выдаёт события сразу (проблема холодного старта).
-/// Вместо этого читаем сессию синхронно из Supabase SDK.
-final goRouterProvider = Provider<GoRouter>((ref) {
-  // Подписываемся на currentUserProvider для пересоздания роутера при изменении.
-  // НЕ используем authStateProvider напрямую — это StreamProvider!
-  final currentUserAsync = ref.watch(currentUserProvider);
-  
-  // Читаем сессию СИНХРОННО из кэша Supabase SDK.
-  // Это не блокирует — сессия уже загружена при Supabase.initialize().
-  final session = Supabase.instance.client.auth.currentSession;
+class _FlowNavigatorObserver extends NavigatorObserver {
+  void _log(String msg) {
+    assert(() {
+      debugPrint('[L0ProfileFlow][nav-observer] ' + msg);
+      return true;
+    }());
+  }
 
+  @override
+  void didPush(Route route, Route? previousRoute) {
+    _log('didPush route=${route.settings.name ?? route.runtimeType} previous=${previousRoute?.settings.name ?? previousRoute?.runtimeType}');
+    super.didPush(route, previousRoute);
+  }
+
+  @override
+  void didPop(Route route, Route? previousRoute) {
+    _log('didPop route=${route.settings.name ?? route.runtimeType} previous=${previousRoute?.settings.name ?? previousRoute?.runtimeType}');
+    super.didPop(route, previousRoute);
+  }
+
+  @override
+  void didRemove(Route route, Route? previousRoute) {
+    _log('didRemove route=${route.settings.name ?? route.runtimeType} previous=${previousRoute?.settings.name ?? previousRoute?.runtimeType}');
+    super.didRemove(route, previousRoute);
+  }
+
+  @override
+  void didReplace({Route? newRoute, Route? oldRoute}) {
+    _log('didReplace new=${newRoute?.settings.name ?? newRoute?.runtimeType} old=${oldRoute?.settings.name ?? oldRoute?.runtimeType}');
+    super.didReplace(newRoute: newRoute, oldRoute: oldRoute);
+  }
+}
+
+class AuthNotifier extends ChangeNotifier {
+  final Ref ref;
+  
+  AuthNotifier(this.ref) {
+    ref.listen(currentUserProvider, (_, __) {
+      notifyListeners();
+    });
+  }
+}
+
+final authNotifierProvider = Provider<AuthNotifier>((ref) => AuthNotifier(ref));
+
+final goRouterProvider = Provider<GoRouter>((ref) {
+  final authNotifier = ref.watch(authNotifierProvider);
+  final session = Supabase.instance.client.auth.currentSession;
   final initialLocation = session == null ? '/login' : '/home';
 
+  // ShellRoute содержит экраны, у которых ЕСТЬ нижнее меню (BottomBar)
   final ShellRoute appShell = ShellRoute(
     builder: (context, state, child) => AppShell(child: child),
     routes: [
@@ -86,7 +118,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: '/artifacts',
         builder: (context, state) => const ArtifactsScreen(),
       ),
-      // BizLevel Tower overview (MVP)
       GoRoute(
         path: '/tower',
         builder: (context, state) {
@@ -95,14 +126,9 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           return BizTowerScreen(scrollTo: scrollParam);
         },
       ),
-      GoRoute(
-        path: '/levels/:id',
-        builder: (context, state) {
-          final id = int.tryParse(state.pathParameters['id'] ?? '0') ?? 0;
-          final levelNum = int.tryParse(state.uri.queryParameters['num'] ?? '');
-          return LevelDetailScreen(levelId: id, levelNumber: levelNum);
-        },
-      ),
+      // ВАЖНО: /levels/:id удален отсюда. Он перенесен ниже, в корневой список.
+      // Это предотвращает конфликт с AppShell при открытии клавиатуры.
+      
       GoRoute(
         path: '/case/:id',
         builder: (context, state) {
@@ -110,7 +136,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           return MiniCaseScreen(caseId: caseId);
         },
       ),
-      // goal-checkpoint снят
       GoRoute(
         path: '/gp-store',
         builder: (context, state) => const GpStoreScreen(),
@@ -137,86 +162,117 @@ final goRouterProvider = Provider<GoRouter>((ref) {
     navigatorKey: rootNavigatorKey,
     initialLocation: initialLocation,
     debugLogDiagnostics: true,
-    observers: [SentryNavigatorObserver()],
+    refreshListenable: authNotifier,
+    observers: [SentryNavigatorObserver(), _FlowNavigatorObserver()],
     routes: [
       GoRoute(
         path: '/login',
         builder: (context, state) => const LoginScreen(),
       ),
-      // /goal объявлен внутри ShellRoute
       GoRoute(
         path: '/register',
         builder: (context, state) => const RegisterScreen(),
       ),
-      // Deprecated onboarding routes removed
-      // Премиум-роут удалён (этап 39.1)
+      // --- ПЕРЕНЕСЕННЫЙ МАРШРУТ ---
+      // Теперь он "над" ShellRoute. AppShell не будет перестраиваться при открытии
+      // клавиатуры на этом экране, и не будет пытаться сбросить нас в /tower.
+      GoRoute(
+        path: '/levels/:id',
+        builder: (context, state) {
+          final id = int.tryParse(state.pathParameters['id'] ?? '0') ?? 0;
+          final levelNum = int.tryParse(state.uri.queryParameters['num'] ?? '');
+          return LevelDetailScreen(levelId: id, levelNumber: levelNum);
+        },
+      ),
+      // -----------------------------
       appShell,
     ],
     redirect: (context, state) {
+      assert(() {
+        debugPrint('[L0ProfileFlow][redirect] enter location=${state.uri} matched=${state.matchedLocation}');
+        return true;
+      }());
       try {
         final guard = LevelInputGuard.instance;
         final String location = state.uri.toString();
+        
+        // Guard Logic: теперь он должен молчать, так как AppShell не будет пытаться 
+        // перенаправить нас на /tower.
         if (guard.isActive &&
             guard.lastLevelRoute != null &&
             (location == '/tower' || location.startsWith('/tower?'))) {
           guard.debugLog(
               'redirected_tower_to_level from=$location to=${guard.lastLevelRoute}');
+          assert(() {
+            debugPrint('[L0ProfileFlow][redirect] force_to_last_level from=$location to=${guard.lastLevelRoute}');
+            return true;
+          }());
           return guard.lastLevelRoute!;
         }
 
         final loggingIn = state.matchedLocation == '/login' ||
             state.matchedLocation == '/register';
-        // Onboarding routes deprecated; no special handling
 
-        // Используем currentUserProvider для определения статуса логина.
-        // Это надёжнее, чем просто проверять сессию.
+        final currentUserAsync = ref.read(currentUserProvider);
         final currentUser = currentUserAsync.asData?.value;
         final loggedIn = currentUser != null;
+        
+        final currentSession = Supabase.instance.client.auth.currentSession;
 
-        // Обработка случая с "зависшей" сессией, когда сессия есть,
-        // а пользователя в базе нет.
-        if (session != null && !currentUserAsync.isLoading && !loggedIn) {
-          // Запускаем signOut в фоне и сразу редиректим на логин
+        if (currentSession != null && !currentUserAsync.isLoading && !loggedIn) {
           ref.read(authServiceProvider).signOut();
+          assert(() {
+            debugPrint('[L0ProfileFlow][redirect] session_without_user -> /login');
+            return true;
+          }());
           return '/login';
         }
 
-        // Если не авторизован и не на страницах логина/регистрации - на логин
-        // НО: не редиректим, если провайдер просто обновляется (isLoading)
-        // или мы на странице профиля (где может происходить обновление данных)
         final isOnProfile = state.matchedLocation == '/profile';
-        // ВАЖНО: Если мы на странице профиля, никогда не редиректим отсюда,
-        // даже если провайдер обновляется - это может быть обновление аватара или других данных
         if (isOnProfile) {
-          return null; // Не редиректим со страницы профиля
+          return null; 
         }
-        // Для остальных страниц: редиректим, если не авторизован и не на страницах логина
+
         if (!loggedIn && !loggingIn && !currentUserAsync.isLoading) {
+          assert(() {
+            debugPrint('[L0ProfileFlow][redirect] not_logged_in -> /login');
+            return true;
+          }());
           return '/login';
         }
 
-        // Если авторизован и на страницах входа/регистрации - на домашнюю
         if (loggedIn && loggingIn) {
+          assert(() {
+            debugPrint('[L0ProfileFlow][redirect] logged_in_on_auth -> /home');
+            return true;
+          }());
           return '/home';
         }
 
-        // Гейтинг для /goal: доступно после завершения Уровня 1 (current_level >= 2)
         if (state.matchedLocation.startsWith('/goal')) {
           final currentLevel = currentUser?.currentLevel ?? 0;
           if (currentLevel < 2) {
+            assert(() {
+              debugPrint('[L0ProfileFlow][redirect] gate_goal currentLevel=$currentLevel -> /home');
+              return true;
+            }());
             return '/home';
           }
         }
 
-        // no redirect
+        assert(() {
+          debugPrint('[L0ProfileFlow][redirect] none');
+          return true;
+        }());
         return null;
       } on Object catch (error, stackTrace) {
-        // Защищаемся от неожиданных исключений (например, во время редиректа Supabase).
         Sentry.captureException(error, stackTrace: stackTrace);
+        assert(() {
+          debugPrint('[L0ProfileFlow][redirect] exception -> /login err=$error');
+          return true;
+        }());
         return '/login';
       }
     },
   );
 });
-
-// stub removed (реализован MiniCaseScreen)

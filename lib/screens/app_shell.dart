@@ -14,7 +14,8 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:bizlevel/screens/biz_tower_screen.dart';
 import 'package:bizlevel/screens/leo_chat_screen.dart';
-import 'package:bizlevel/services/level_input_guard.dart';
+// Удалил импорт guard, он здесь вреден
+// import 'package:bizlevel/services/level_input_guard.dart';
 
 class AppShell extends ConsumerStatefulWidget {
   final Widget child;
@@ -33,41 +34,41 @@ class _AppShellState extends ConsumerState<AppShell> {
 
   void _debugNav(String message, Map<String, Object?> data) {
     assert(() {
-      debugPrint('[nav] $message ${data.toString()}');
+      final tagNeeded = message == 'location_change' ||
+          message == 'tab_tap' ||
+          message == 'tab_anim_complete' ||
+          message == 'tab_go_immediate' ||
+          message == 'page_changed_go' ||
+          message == 'page_changed_ignored';
+      final tag = tagNeeded ? '[L0ProfileFlow][nav]' : '[nav]';
+      debugPrint('$tag $message ${data.toString()}');
       return true;
     }());
   }
 
-  // context helpers удалены с плавающей кнопкой чата
-
   int _locationToTab(String location) {
+    final path = Uri.parse(location).path;
     for (int i = 0; i < _routes.length; i++) {
-      if (location.startsWith(_routes[i])) return i;
+      if (path == _routes[i]) return i;
     }
     return 0;
   }
 
   void _ensureController(int initialPage) {
-    _pageController ??= PageController(initialPage: initialPage);
+    if (_pageController == null) {
+      _pageController = PageController(initialPage: initialPage);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    // ВАЖНО: Мы больше не трогаем LevelInputGuard здесь.
+    // Вся логика защиты маршрутов должна быть ТОЛЬКО в app_router.dart -> redirect.
+    // Дублирование логики в build() виджета приводило к конфликтам при ресайзе (клавиатура).
+
     final String location =
         GoRouter.of(context).routeInformationProvider.value.uri.toString();
-    final guard = LevelInputGuard.instance;
-    if (guard.isActive &&
-        guard.lastLevelRoute != null &&
-        (location == '/tower' || location.startsWith('/tower?'))) {
-      _debugNav('guarded_tower_redirect', {
-        'from': location,
-        'to': guard.lastLevelRoute!,
-      });
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        GoRouter.of(context).go(guard.lastLevelRoute!);
-      });
-    }
+
     if (_lastLocation != location) {
       _debugNav('location_change', {
         'from': _lastLocation,
@@ -75,10 +76,11 @@ class _AppShellState extends ConsumerState<AppShell> {
       });
       _lastLocation = location;
     }
+    
     final int activeTab = _locationToTab(location);
-
     final width = MediaQuery.of(context).size.width;
     final bool isDesktop = width >= 1024;
+    final bool isBaseRoute = _routes.contains(Uri.parse(location).path);
 
     void goTab(int index) {
       try {
@@ -97,24 +99,21 @@ class _AppShellState extends ConsumerState<AppShell> {
             category: 'nav',
             level: SentryLevel.info,
             message: 'tab_switch',
-            data: {
-              'from': from,
-              'to': to,
-            },
+            data: {'from': from, 'to': to},
           ));
         }
       } catch (_) {}
-      if (_pageController != null && _pageController!.positions.isNotEmpty) {
+
+      if (_pageController != null && _pageController!.hasClients) {
         final router = GoRouter.of(context);
         _isSyncing = true;
         _pageController!
             .animateToPage(index,
                 duration: const Duration(milliseconds: 250),
                 curve: Curves.easeOut)
-            .whenComplete(() {
+            .then((_) {
           if (!mounted) return;
           _isSyncing = false;
-          // Финализируем маршрут после завершения анимации на целевой вкладке
           final target = _routes[index];
           final current = router.routeInformationProvider.value.uri.toString();
           _debugNav('tab_anim_complete', {
@@ -130,50 +129,34 @@ class _AppShellState extends ConsumerState<AppShell> {
         _debugNav('tab_go_immediate', {
           'target': _routes[index],
           'index': index,
-          'location': location,
         });
         context.go(_routes[index]);
       }
     }
 
-    // Базовые табы только на точных путях '/home' | '/tower' | '/chat' | '/profile'.
-    // Вложенные маршруты (например, '/goal-checkpoint/:v') не должны попадать в PageView.
-    final bool isBaseRoute = location == '/home' ||
-        location == '/tower' ||
-        location == '/chat' ||
-        location == '/profile';
-
-    // Создаём/синхронизируем контроллер для PageView на базовых табах
     if (!isDesktop && isBaseRoute) {
       _ensureController(activeTab);
-      if (_currentIndex != activeTab && _pageController != null) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted) return;
-          if (_pageController != null &&
-              _pageController!.positions.isNotEmpty) {
-            _isSyncing = true;
-            _pageController!.jumpToPage(activeTab);
-            _currentIndex = activeTab;
-            // Сброс флага после кадра, чтобы onPageChanged не триггерил go
-            Future.microtask(() => _isSyncing = false);
-          }
-        });
+      if (_currentIndex != activeTab && _pageController != null && !_isSyncing) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+             if (mounted && _pageController != null && _pageController!.hasClients) {
+                _isSyncing = true;
+                _pageController!.jumpToPage(activeTab);
+                _currentIndex = activeTab;
+                _isSyncing = false;
+             }
+          });
       }
     } else {
-      // На небазовых маршрутах не держим контроллер привязанным
       _pageController = null;
     }
 
     return Scaffold(
-      // На небазовых маршрутах (например, /levels/*) скрываем таб-бар,
-      // чтобы избежать случайных переходов при вводе.
       bottomNavigationBar: (isDesktop || !isBaseRoute)
           ? null
           : Container(
               height: 75,
               width: double.infinity,
               decoration: BoxDecoration(
-                // Liquid glass: стеклянная панель навигации поверх общего фона
                 color: AppColor.glassSurfaceStrong,
                 borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(AppDimensions.radius24),
@@ -190,58 +173,49 @@ class _AppShellState extends ConsumerState<AppShell> {
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    ...List.generate(_routes.length, (index) {
-                      final (icon, label) = index == 0
-                          ? (Icons.home, 'Главная')
-                          : index == 1
-                              ? (Icons.map, 'Уровни')
-                              : index == 2
-                                  ? (Icons.smart_toy, 'Менторы')
-                                  : (Icons.person, 'Профиль');
-                      return BottomBarItem(
-                        icon,
-                        label: label,
-                        isActive: activeTab == index,
-                        onTap: () => goTab(index),
-                        iconBuilder: (isActive, color, activeColor) {
-                          if (index == 1) {
-                            return SvgPicture.asset(
-                              'assets/icons/icon_map.svg',
-                              width: 22,
-                              height: 22,
-                              // fix: заменить Colors.grey на семантический токен
-                              colorFilter: ColorFilter.mode(
-                                isActive
-                                    ? AppColor.primary
-                                    : AppColor.onSurfaceSubtle,
-                                BlendMode.srcIn,
-                              ),
-                            );
-                          }
-                          if (index == 2) {
-                            return SvgPicture.asset(
-                              'assets/icons/icon_ai.svg',
-                              width: 22,
-                              height: 22,
-                              // fix: заменить Colors.grey на семантический токен
-                              colorFilter: ColorFilter.mode(
-                                isActive
-                                    ? AppColor.primary
-                                    : AppColor.onSurfaceSubtle,
-                                BlendMode.srcIn,
-                              ),
-                            );
-                          }
-                          return Icon(
-                            icon,
-                            size: 22,
-                            color: isActive ? activeColor : color,
-                          );
-                        },
+                  children: List.generate(_routes.length, (index) {
+                    final (icon, label) = switch (index) {
+                      0 => (Icons.home, 'Главная'),
+                      1 => (Icons.map, 'Уровни'),
+                      2 => (Icons.smart_toy, 'Менторы'),
+                      _ => (Icons.person, 'Профиль'),
+                    };
+                    
+                    Widget iconWidget;
+                    if (index == 1) {
+                      iconWidget = SvgPicture.asset(
+                        'assets/icons/icon_map.svg',
+                        width: 22, height: 22,
+                        colorFilter: ColorFilter.mode(
+                          activeTab == index ? AppColor.primary : AppColor.onSurfaceSubtle,
+                          BlendMode.srcIn,
+                        ),
                       );
-                    }),
-                  ],
+                    } else if (index == 2) {
+                      iconWidget = SvgPicture.asset(
+                        'assets/icons/icon_ai.svg',
+                        width: 22, height: 22,
+                        colorFilter: ColorFilter.mode(
+                          activeTab == index ? AppColor.primary : AppColor.onSurfaceSubtle,
+                          BlendMode.srcIn,
+                        ),
+                      );
+                    } else {
+                      iconWidget = Icon(
+                        icon,
+                        size: 22,
+                        color: activeTab == index ? AppColor.primary : AppColor.onSurfaceSubtle,
+                      );
+                    }
+
+                    return BottomBarItem(
+                      icon,
+                      label: label,
+                      isActive: activeTab == index,
+                      onTap: () => goTab(index),
+                      iconBuilder: (_, __, ___) => iconWidget,
+                    );
+                  }),
                 ),
               ),
             ),
@@ -265,22 +239,31 @@ class _AppShellState extends ConsumerState<AppShell> {
           : isBaseRoute
               ? PageView(
                   controller: _pageController,
+                  physics: const NeverScrollableScrollPhysics(),
                   onPageChanged: (i) {
+                    final currentUri = GoRouter.of(context).routeInformationProvider.value.uri.toString();
+                    final isCurrentBase = _routes.contains(Uri.parse(currentUri).path);
+                    
+                    if (!isCurrentBase) {
+                      _debugNav('page_changed_ignored', {
+                        'index': i,
+                        'reason': 'not_base_route',
+                        'currentUri': currentUri
+                      });
+                      return;
+                    }
+
                     _currentIndex = i;
                     if (_isSyncing) return;
-                    try {
-                      HapticFeedback.selectionClick();
-                    } catch (_) {}
-                    // Навигацию откладываем на пост-кадр, чтобы не вызывать go в build/скролле
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      if (!mounted) return;
+                    
+                    try { HapticFeedback.selectionClick(); } catch (_) {}
+                    
                     _debugNav('page_changed_go', {
                       'index': i,
                       'target': _routes[i],
                       'location': location,
                     });
-                      context.go(_routes[i]);
-                    });
+                    context.go(_routes[i]);
                   },
                   children: const [
                     MainStreetScreen(key: PageStorageKey('tab_home')),
@@ -293,9 +276,3 @@ class _AppShellState extends ConsumerState<AppShell> {
     );
   }
 }
-
-// goal tab gate and custom goal svg icon removed as navigation was updated to Tower/Trainers
-
-// Удалён плавающий чат‑баттон в боттом‑баре
-
-// painter удалён вместе с плавающей кнопкой
