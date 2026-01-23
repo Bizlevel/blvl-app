@@ -1171,8 +1171,13 @@ class _AboutMeCardState extends ConsumerState<_AboutMeCard> {
 
   @override
   Widget build(BuildContext context) {
+    // Следим за актуальным профилем, чтобы отображение обновлялось сразу после сохранения
+    final liveUserAsync = ref.watch(currentUserProvider);
+    final liveUser = liveUserAsync.asData?.value;
+    final viewUser = liveUser ?? widget.user;
+
     if (!_editing) {
-      final chips = (widget.user.keyChallenges ?? const [])
+      final chips = (viewUser.keyChallenges ?? const [])
           .map((e) => Container(
                 padding: const EdgeInsets.symmetric(
                     horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
@@ -1192,7 +1197,7 @@ class _AboutMeCardState extends ConsumerState<_AboutMeCard> {
               ))
           .toList();
 
-      final completion = _computeCompletion();
+      final completion = _computeCompletion(viewUser);
       return BizLevelCard(
         semanticsLabel: 'Информация обо мне',
         child: Column(
@@ -1244,22 +1249,37 @@ class _AboutMeCardState extends ConsumerState<_AboutMeCard> {
                 ),
                 IconButton(
                   icon: const Icon(Icons.edit, color: AppColor.onSurfaceSubtle),
-                  onPressed: () => setState(() => _editing = true),
+                  onPressed: () {
+                    // Перед входом в режим редактирования подтянем актуальные значения
+                    final u = ref.read(currentUserProvider).asData?.value ?? widget.user;
+                    _nameCtrl.text = u.name;
+                    _aboutCtrl.text = u.about ?? '';
+                    _goalCtrl.text = u.goal ?? '';
+                    _businessAreaCtrl.text = u.businessArea ?? '';
+                    _experienceLevelCtrl.text = u.experienceLevel ?? '';
+                    _businessSizeCtrl.text = u.businessSize ?? '';
+                    _learningStyleCtrl.text = u.learningStyle ?? '';
+                    _businessRegionCtrl.text = u.businessRegion ?? '';
+                    _keyChallenges
+                      ..clear()
+                      ..addAll(u.keyChallenges ?? const []);
+                    setState(() => _editing = true);
+                  },
                   tooltip: 'Редактировать',
                 )
               ],
             ),
             AppSpacing.gapH(AppSpacing.sm),
-            _kv('Как к вам обращаться', widget.user.name),
-            _kv('Цель обучения', widget.user.goal ?? '—'),
-            _kv('Сфера деятельности', widget.user.businessArea ?? '—'),
+            _kv('Как к вам обращаться', viewUser.name),
+            _kv('Цель обучения', viewUser.goal ?? '—'),
+            _kv('Сфера деятельности', viewUser.businessArea ?? '—'),
             if (_expandedDetails) ...[
-              _kv('Кратко о себе', widget.user.about ?? '—'),
-              _kv('Уровень опыта', widget.user.experienceLevel ?? '—'),
-              _kv('Размер бизнеса', widget.user.businessSize ?? '—'),
+              _kv('Кратко о себе', viewUser.about ?? '—'),
+              _kv('Уровень опыта', viewUser.experienceLevel ?? '—'),
+              _kv('Размер бизнеса', viewUser.businessSize ?? '—'),
               _kv('Предпочитаемый стиль обучения',
-                  widget.user.learningStyle ?? '—'),
-              _kv('Регион ведения бизнеса', widget.user.businessRegion ?? '—'),
+                  viewUser.learningStyle ?? '—'),
+              _kv('Регион ведения бизнеса', viewUser.businessRegion ?? '—'),
             ],
             if (chips.isNotEmpty) ...[
               AppSpacing.gapH(AppSpacing.sm),
@@ -1406,17 +1426,17 @@ class _AboutMeCardState extends ConsumerState<_AboutMeCard> {
   }
 
   // Оценка заполненности профиля: возвращает (ratio 0..1, percent)
-  (double, int) _computeCompletion() {
+  (double, int) _computeCompletion(UserModel user) {
     final fields = <bool>[
-      widget.user.name.trim().isNotEmpty,
-      (widget.user.goal ?? '').trim().isNotEmpty,
-      (widget.user.about ?? '').trim().isNotEmpty,
-      (widget.user.businessArea ?? '').trim().isNotEmpty,
-      (widget.user.experienceLevel ?? '').trim().isNotEmpty,
-      (widget.user.businessSize ?? '').trim().isNotEmpty,
-      (widget.user.learningStyle ?? '').trim().isNotEmpty,
-      (widget.user.businessRegion ?? '').trim().isNotEmpty,
-      (widget.user.keyChallenges ?? const []).isNotEmpty,
+      user.name.trim().isNotEmpty,
+      (user.goal ?? '').trim().isNotEmpty,
+      (user.about ?? '').trim().isNotEmpty,
+      (user.businessArea ?? '').trim().isNotEmpty,
+      (user.experienceLevel ?? '').trim().isNotEmpty,
+      (user.businessSize ?? '').trim().isNotEmpty,
+      (user.learningStyle ?? '').trim().isNotEmpty,
+      (user.businessRegion ?? '').trim().isNotEmpty,
+      (user.keyChallenges ?? const []).isNotEmpty,
     ];
     final filled = fields.where((e) => e).length;
     final total = fields.length;
