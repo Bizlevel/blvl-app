@@ -168,8 +168,18 @@ class GpService {
     void Function()? onInsufficient,
     T Function()? devFallback,
   }) {
-    final msg = e.message.toString();
-    if (msg.contains('gp_insufficient_balance')) {
+    // Try to robustly detect insufficient balance coming from RPC
+    final combined = (
+            (e.message.toString()) +
+            ' ' +
+            ((e.details ?? '').toString()) +
+            ' ' +
+            ((e.hint ?? '').toString()))
+        .toLowerCase();
+    if (combined.contains('gp_insufficient_balance') ||
+        combined.contains('insufficient_gp') ||
+        combined.contains('gp insufficient') ||
+        combined.contains('недостаточно gp')) {
       if (onInsufficient != null) onInsufficient();
     }
     if (devFallback != null && _shouldEdgeFallback(e)) {

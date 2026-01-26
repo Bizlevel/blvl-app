@@ -61,7 +61,7 @@ Future<void> _unlockFloor(BuildContext context,
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Позже'),
+              child: const Text('OK'),
             ),
             TextButton(
               onPressed: () {
@@ -82,7 +82,56 @@ Future<void> _unlockFloor(BuildContext context,
         );
       } catch (_) {}
     } else {
-      NotificationCenter.showError(context, e.message);
+      // Fallback: если код недостатка средств не распознан по тексту ошибки,
+      // проверим баланс и при его нехватке дополним сообщение подсказкой «Пополните баланс».
+      try {
+        final price = priceGp ?? _kFloorUnlockCost;
+        int balance = 0;
+        try {
+          final fresh =
+              await GpService(Supabase.instance.client).getBalance();
+          balance = fresh['balance'] ?? 0;
+        } catch (_) {
+          final cached = GpService.readBalanceCache();
+          balance = cached?['balance'] ?? 0;
+        }
+
+        if (balance < price) {
+          // Покажем модальный диалог с предложением перейти в магазин
+          await showDialog<void>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text(UIS.floorOpenFailed),
+              content: Text('${UIS.floorOpenFailed}. Пополните баланс'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: const Text('OK'),
+                ),
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(ctx).pop();
+                    if (context.mounted) context.push('/gp-store');
+                  },
+                  child: const Text('Пополнить GP'),
+                ),
+              ],
+            ),
+          );
+          try {
+            await NotificationLogService.instance.record(
+              kind: NotificationKind.warn,
+              message: '${UIS.floorOpenFailed}. Пополните баланс',
+              route: '/gp-store',
+              category: 'gp',
+            );
+          } catch (_) {}
+        } else {
+          NotificationCenter.showError(context, e.message);
+        }
+      } catch (_) {
+        NotificationCenter.showError(context, e.message);
+      }
       try {
         await NotificationLogService.instance.record(
           kind: NotificationKind.error,
@@ -94,7 +143,45 @@ Future<void> _unlockFloor(BuildContext context,
   } catch (e, st) {
     _captureError(e, st);
     if (!context.mounted) return;
-    NotificationCenter.showError(context, UIS.floorOpenFailed);
+    // Последняя защита: если произошла неклассифицированная ошибка, но баланс
+    // меньше цены — подскажем про пополнение.
+    try {
+      final price = priceGp ?? _kFloorUnlockCost;
+      int balance = 0;
+      try {
+        final fresh = await GpService(Supabase.instance.client).getBalance();
+        balance = fresh['balance'] ?? 0;
+      } catch (_) {
+        final cached = GpService.readBalanceCache();
+        balance = cached?['balance'] ?? 0;
+      }
+      if (balance < price) {
+        await showDialog<void>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text(UIS.floorOpenFailed),
+            content: Text('${UIS.floorOpenFailed}. Пополните баланс'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('OK'),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.of(ctx).pop();
+                  if (context.mounted) context.push('/gp-store');
+                },
+                child: const Text('Пополнить GP'),
+              ),
+            ],
+          ),
+        );
+      } else {
+        NotificationCenter.showError(context, UIS.floorOpenFailed);
+      }
+    } catch (_) {
+      NotificationCenter.showError(context, UIS.floorOpenFailed);
+    }
     try {
       await NotificationLogService.instance.record(
         kind: NotificationKind.error,
