@@ -54,9 +54,7 @@ class _AppShellState extends ConsumerState<AppShell> {
   }
 
   void _ensureController(int initialPage) {
-    if (_pageController == null) {
-      _pageController = PageController(initialPage: initialPage);
-    }
+    _pageController ??= PageController(initialPage: initialPage);
   }
 
   @override

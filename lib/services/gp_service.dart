@@ -170,11 +170,7 @@ class GpService {
   }) {
     // Try to robustly detect insufficient balance coming from RPC
     final combined = (
-            (e.message.toString()) +
-            ' ' +
-            ((e.details ?? '').toString()) +
-            ' ' +
-            ((e.hint ?? '').toString()))
+            '${e.message} ${e.details ?? ''} ${e.hint ?? ''}')
         .toLowerCase();
     if (combined.contains('gp_insufficient_balance') ||
         combined.contains('insufficient_gp') ||

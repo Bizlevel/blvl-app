@@ -258,8 +258,6 @@ class _PracticeJournalSectionState
                 textInputAction: TextInputAction.done,
                 textCapitalization: TextCapitalization.sentences,
                 autocorrect: true,
-                enableSuggestions: true,
-                enableIMEPersonalizedLearning: true,
                 onSubmitted: (_) => FocusScope.of(context).unfocus(),
                 onTapOutside: (_) => FocusScope.of(context).unfocus(),
               ),

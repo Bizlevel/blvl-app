@@ -412,7 +412,8 @@ class _BodyState extends ConsumerState<_Body> {
     super.didUpdateWidget(oldWidget);
     // Обновляем локальное состояние, если widget.avatarId изменился извне
     // (например, при обновлении провайдера из другого места)
-    if (widget.avatarId != oldWidget.avatarId && _localAvatarId == oldWidget.avatarId) {
+    if (widget.avatarId != oldWidget.avatarId &&
+        _localAvatarId == oldWidget.avatarId) {
       _localAvatarId = widget.avatarId;
     }
   }
@@ -534,7 +535,7 @@ class _BodyState extends ConsumerState<_Body> {
     final code = _myReferralCode;
     final text = 'Мой код BizLevel: $code\n'
         'Используй при регистрации: bizlevel://ref/$code\n'
-        'Пройди уровни 0 и 1, и я получу бонус 100 GP.';
+        'Пройди уровни 0 и 1, и мы оба получим бонус 100 GP.';
     Share.share(text);
   }
 
@@ -572,7 +573,6 @@ class _BodyState extends ConsumerState<_Body> {
     await showBizLevelInputBottomSheet<void>(
       context: context,
       backgroundColor: AppColor.surface,
-      applyKeyboardInset: true,
       contentPadding: EdgeInsets.zero,
       builder: (ctx) {
         return DraggableScrollableSheet(
@@ -758,9 +758,7 @@ class _BodyState extends ConsumerState<_Body> {
     final hasCode = code?.isNotEmpty == true;
     final codeText = hasCode
         ? code!
-        : (_referralLoadError != null
-            ? 'Код недоступен'
-            : 'Генерируем код...');
+        : (_referralLoadError != null ? 'Код недоступен' : 'Генерируем код...');
 
     return BizLevelCard(
       padding: AppSpacing.insetsAll(AppSpacing.md),
@@ -785,8 +783,9 @@ class _BodyState extends ConsumerState<_Body> {
               ),
               BizLevelButton(
                 label: 'Поделиться',
-                onPressed:
-                    hasCode && !_referralCodeLoading ? _shareReferralCode : null,
+                onPressed: hasCode && !_referralCodeLoading
+                    ? _shareReferralCode
+                    : null,
                 size: BizLevelButtonSize.sm,
                 variant: BizLevelButtonVariant.outline,
               ),
@@ -794,7 +793,7 @@ class _BodyState extends ConsumerState<_Body> {
           ),
           AppSpacing.gapH(AppSpacing.s6),
           Text(
-            '+100 GP за каждого друга, который прошёл уровни 0 и 1',
+            '+100 GP вам и другу после прохождения уровней 0 и 1',
             style: theme.textTheme.bodySmall
                 ?.copyWith(color: AppColor.onSurfaceSubtle),
           ),
@@ -831,8 +830,7 @@ class _BodyState extends ConsumerState<_Body> {
               AppSpacing.gapW(AppSpacing.sm),
               BizLevelButton(
                 label: 'Активировать',
-                onPressed:
-                    _promoApplying ? null : _activatePromoOrReferralCode,
+                onPressed: _promoApplying ? null : _activatePromoOrReferralCode,
                 size: BizLevelButtonSize.sm,
               ),
             ],
@@ -1251,7 +1249,8 @@ class _AboutMeCardState extends ConsumerState<_AboutMeCard> {
                   icon: const Icon(Icons.edit, color: AppColor.onSurfaceSubtle),
                   onPressed: () {
                     // Перед входом в режим редактирования подтянем актуальные значения
-                    final u = ref.read(currentUserProvider).asData?.value ?? widget.user;
+                    final u = ref.read(currentUserProvider).asData?.value ??
+                        widget.user;
                     _nameCtrl.text = u.name;
                     _aboutCtrl.text = u.about ?? '';
                     _goalCtrl.text = u.goal ?? '';
@@ -1601,7 +1600,7 @@ class _DropdownLabeled extends StatelessWidget {
         ),
         AppSpacing.gapH(AppSpacing.s6),
         DropdownButtonFormField<String>(
-          value: value,
+          initialValue: value,
           items: options
               .map((e) => DropdownMenuItem<String>(
                     value: e,

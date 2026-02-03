@@ -180,8 +180,6 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                   textInputAction: TextInputAction.next,
                   textCapitalization: TextCapitalization.sentences,
                   autocorrect: true,
-                  enableSuggestions: true,
-                  enableIMEPersonalizedLearning: true,
                   onSubmitted: (_) => FocusScope.of(context).nextFocus(),
                   onTapOutside: (_) => FocusScope.of(context).unfocus(),
                 ),

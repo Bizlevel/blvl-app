@@ -976,8 +976,6 @@ class _RayDialogScreenState extends ConsumerState<RayDialogScreen>
                         textInputAction: TextInputAction.send,
                         textCapitalization: TextCapitalization.sentences,
                         autocorrect: true,
-                        enableSuggestions: true,
-                        enableIMEPersonalizedLearning: true,
                         onTapOutside: (_) => FocusScope.of(context).unfocus(),
                         onSubmitted: (_) {
                           if (_controller.text.trim().isNotEmpty &&

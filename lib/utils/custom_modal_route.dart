@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 /// - Работает с adjustPan в манифесте (окно не меняет размер)
 class CustomModalBottomSheetRoute<T> extends PageRouteBuilder<T> {
   final Widget child;
+  @override
   final bool barrierDismissible;
 
   CustomModalBottomSheetRoute({

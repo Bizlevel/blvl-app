@@ -1,10 +1,27 @@
-### BizLevel — структура проекта (актуально: 2025‑12‑14)
+### BizLevel — структура проекта (актуально: 2026‑02‑03)
 
 Этот документ фиксирует **текущий стек**, **архитектуру**, **взаимосвязи модулей** и **детальную структуру репозитория** BizLevel (Flutter + Supabase).
 
 - **Зачем**: иметь «карту проекта», чтобы безопасно развивать BizLevel (уровни/башня/цель/чаты/GP/уведомления) без регрессий.
 - **Как читать**: сначала разделы «Стек» и «Ключевые потоки», затем «Структура репозитория» (по файлам).
 - **Про Supabase**: проект `acevqbdpzgbtqznbpgzr`. В идеале актуальные настройки/секреты/проверки брать через `supabase-mcp`; в этом документе описано то, что **видно из кода, Edge Functions и миграций**.
+
+---
+
+### Актуализация (2026‑02‑03)
+Этот документ был написан как «снимок» и частично устарел. Ниже — что обновлено/уточнено по факту **кода** и **живого Supabase** (через MCP).
+
+- **Источник истины**:  
+  - клиентская логика — `lib/**` (Riverpod/GoRouter/Services/Repositories)  
+  - backend — *и миграции/функции в репозитории*, и **фактический деплой в Supabase** (в проде есть функции/миграции, которых нет в `supabase/functions`/`supabase/migrations` в репо)
+
+- **Ключевые добавления/изменения после 2025‑12‑14**:
+  - **Ray AI (валидатор идей)**: бот `ray`, Edge `ray-chat`, таблица `idea_validations`, UI `RayDialogScreen` + `RayService`.
+  - **Рефералки и промокоды**: deep links `bizlevel://ref|promo`, таблицы `referral_codes/referrals/promo_codes/promo_redemptions`, миграции `20260117*`, `20260202_referral_bonus_both_sides`.
+  - **Синхронизация напоминаний**: таблица `practice_reminders` + RPC `upsert_practice_reminders` (локальные prefs хранятся в `SharedPreferences`, синк best‑effort).
+  - **Чаты Leo/Max**: UI отправляет сообщения в Edge `leo-chat`, получает `chat_id` и читает историю из `leo_messages`. Клиентский метод `LeoService.saveConversation()` остался как legacy и в актуальном UI не используется.
+  - **GP‑Store**: продуктовые SKU `gp_300/gp_1000/gp_2000`; отображаемые пакеты учитывают бонусы (например «1000 + 400»).
+  - **Башня**: чекпоинты цели сейчас живые и блокируют следующий уровень после **1/4/7** (по заполненности `user_goal.goal_text/financial_focus/action_plan_note`).
 
 ---
 
@@ -163,12 +180,14 @@
   - включён дедуп по ключу `role::content` (защита от редких дублей)
 
 ##### Отправка сообщения: клиент → Edge → сохранение
-- UI добавляет user‑сообщение локально, затем:
-  - если чат новый (`chatId == null`) — создаётся чат и первое сообщение через `LeoService.saveConversation(...)`
-  - далее ответ ассистента получается через `LeoService.sendMessageWithRAG(...)` → Edge Function `leo-chat`
-  - после ответа ассистента (не caseMode) сообщение ассистента также сохраняется в `leo_messages` через `saveConversation`
-  
-**Важно (текущее состояние):** Edge `leo-chat` также выполняет вставку сообщений в `leo_messages` (и при необходимости создаёт `leo_chats`). Это означает, что сейчас существует риск **двойного сохранения одного и того же turn** (клиент + сервер). UI защищён от дублей частично (dedup по `role::content` при подгрузке истории), но на уровне БД дубли всё ещё возможны.
+- UI добавляет user‑сообщение локально, затем вызывает `LeoService.sendMessageWithRAG(...)` → Edge Function `leo-chat`.
+- Сервер (Edge `leo-chat`) является **источником истины** по истории:
+  - создаёт чат в `leo_chats` при первом сообщении (если `chatId == null`)
+  - сохраняет сообщения в `leo_messages`
+  - возвращает `chat_id` в ответе, чтобы клиент мог продолжать диалог
+- Клиент читает историю через пагинацию из `leo_messages` (`LeoDialogScreen._loadMessages()`).
+
+**Примечание:** в коде сервиса есть `LeoService.saveConversation(...)` (вставка в `leo_messages` и инкремент `leo_chats.message_count`) — это legacy‑контур и в текущем UI не используется. Соответственно, риск «двойного сохранения» (клиент+сервер) для Leo/Max в актуальном флоу считается снятым; дедуп в UI остаётся как защита от редких дублей данных в источнике.
 
 ##### Контекст и персонализация (userContext/levelContext)
 - Экран списка чатов строит контексты через `ContextService.buildUserContext/buildLevelContext`.
@@ -389,7 +408,7 @@
 </details>
 
 <details>
-<summary><code>supabase/functions/</code> (11 файлов)</summary>
+<summary><code>supabase/functions/</code> (12 файлов)</summary>
 
 - `supabase/functions/README.md`: README по синхронизации Edge Functions (что в репо vs что в проде)
 - `supabase/functions/create-checkout-session/index.ts`: Edge Function: legacy checkout session (пока mock URL)
@@ -399,11 +418,14 @@
 - `supabase/functions/leo-rag/index.ts`: Edge Function: отдельный RAG endpoint (embeddings + match_documents) (legacy/диагностический)
 - `supabase/functions/leo-test/index.ts`: Edge Function: тестовый endpoint (эхо)
 - `supabase/functions/push-dispatch/index.ts`: Edge Function: отправка push через OneSignal по user_ids (читает push_tokens)
+- `supabase/functions/ray-chat/index.ts`: Edge Function: Ray AI (валидатор идей) — валидация бизнес‑идей, запись отчёта и прогресса в `idea_validations` (+ сообщения в `leo_*` с bot=`ray`)
 - `supabase/functions/reminder-cron/index.ts`: Edge Function: cron-напоминания (due_practice_reminders → push-dispatch → mark_notified)
 - `supabase/functions/reminder-cron/supabase.toml`: конфиг Edge Function (verify_jwt/CORS и т.п.)
 - `supabase/functions/storage-integrity-check/index.ts`: Edge Function: проверка целостности ссылок на Storage (levels.cover_path, lessons.video_url)
 
 </details>
+
+> ВАЖНО (prod vs repo): в живом Supabase деплое присутствуют дополнительные Edge Functions, которых нет в `supabase/functions/` репозитория (например: `gp-purchase-init`, `gp-balance`, `gp-spend`, `gp-bonus-claim`, `gp-floor-unlock`, а также служебные `delete-account`, `telegram-auth`, `leo_context` и др.). Для актуального списка всегда сверять через `supabase-mcp`.
 
 <details>
 <summary><code>supabase/migrations/</code> (39 файлов)</summary>
@@ -450,9 +472,11 @@
 
 </details>
 
-#### 5.4 Платформы: `ios/`, `android/`, `web/`, `macos/`, `windows/`, `linux/`
+#### 5.4 Платформы: `ios/`, `android/`, `web/`
 > Это host‑проекты Flutter под конкретные платформы (build/packaging/native bridges).  
-> В этом репозитории есть **нетипично закоммиченные build‑артефакты** (например, `ios/build/*`, `android/build/reports/*`) — ниже они перечислены, но обычно такие файлы не хранят в git.
+> Desktop runner’ы (`macos/`, `windows/`, `linux/`) в текущем состоянии репозитория не являются частью актуального поставляемого продукта (и могут отсутствовать в дереве). Если они возвращаются — нужно заново описывать их сборку/CI отдельно.
+>
+> В репозитории встречаются **нетипично закоммиченные build‑артефакты** (например, `ios/build/*`, `android/build/reports/*`) — ниже они перечислены, но обычно такие файлы не хранят в git.
 
 <details>
 <summary><code>android/</code> (26 файлов)</summary>

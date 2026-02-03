@@ -365,7 +365,7 @@ class AuthService {
         );
 
         // Получаем idToken из authentication
-        final auth = await account.authentication;
+        final auth = account.authentication;
         if (auth.idToken == null || auth.idToken!.isEmpty) {
           throw AuthFailure('Не удалось получить ID токен от Google');
         }

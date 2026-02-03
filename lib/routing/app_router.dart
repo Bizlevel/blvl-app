@@ -31,7 +31,7 @@ final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 class _FlowNavigatorObserver extends NavigatorObserver {
   void _log(String msg) {
     assert(() {
-      debugPrint('[nav-observer] ' + msg);
+      debugPrint('[nav-observer] $msg');
       return true;
     }());
   }

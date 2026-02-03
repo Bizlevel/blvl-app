@@ -102,7 +102,7 @@ Future<void> _unlockFloor(BuildContext context,
             context: context,
             builder: (ctx) => AlertDialog(
               title: const Text(UIS.floorOpenFailed),
-              content: Text('${UIS.floorOpenFailed}. Пополните баланс'),
+              content: const Text('${UIS.floorOpenFailed}. Пополните баланс'),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(ctx).pop(),
@@ -160,7 +160,7 @@ Future<void> _unlockFloor(BuildContext context,
           context: context,
           builder: (ctx) => AlertDialog(
             title: const Text(UIS.floorOpenFailed),
-            content: Text('${UIS.floorOpenFailed}. Пополните баланс'),
+            content: const Text('${UIS.floorOpenFailed}. Пополните баланс'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(),
@@ -257,7 +257,6 @@ void _handleCheckpointTap(BuildContext context, Map<String, dynamic> node) {
       
       showBizLevelInputBottomSheet(
         context: context,
-        applyKeyboardInset: true,
         contentPadding: EdgeInsets.zero,
         builder: (ctx) => checkpointScreen,
       );
@@ -511,7 +510,7 @@ class _LevelNodeTile extends StatelessWidget {
                   padding: const EdgeInsets.only(top: 8),
                   child: OutlinedButton(
                     style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: AppColor.border, width: 1),
+                      side: const BorderSide(color: AppColor.border),
                       shape: RoundedRectangleBorder(
                         borderRadius:
                             BorderRadius.circular(AppDimensions.radiusMd),

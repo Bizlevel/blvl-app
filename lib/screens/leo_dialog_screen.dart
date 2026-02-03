@@ -898,8 +898,6 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
                       textInputAction: TextInputAction.send,
                       textCapitalization: TextCapitalization.sentences,
                       autocorrect: true,
-                      enableSuggestions: true,
-                      enableIMEPersonalizedLearning: true,
                       decoration: const InputDecoration(
                         hintText: 'Введите сообщение...',
                         border: OutlineInputBorder(),
