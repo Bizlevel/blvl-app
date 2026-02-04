@@ -29,7 +29,7 @@ Widget _buildNodeLabel(String label, {TextAlign textAlign = TextAlign.center}) {
       textAlign: textAlign,
       maxLines: 3,
       softWrap: true,
-      overflow: TextOverflow.ellipsis,
+      overflow: TextOverflow.visible,
       style: kNodeLabelStyle,
     ),
   );
@@ -44,10 +44,4 @@ Alignment _alignmentForColumn(int col) {
     default:
       return Alignment.centerRight;
   }
-}
-
-// Утилита затемнения цвета (используется в плитке уровня)
-Color _darker(Color c, double t) {
-  final lerped = Color.lerp(c, AppColor.textColor, t);
-  return lerped ?? c;
 }

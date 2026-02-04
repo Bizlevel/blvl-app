@@ -15,7 +15,6 @@ import 'package:bizlevel/widgets/common/bizlevel_button.dart';
 import 'package:bizlevel/widgets/common/bizlevel_empty.dart';
 import 'package:bizlevel/widgets/common/bizlevel_error.dart';
 import 'package:bizlevel/widgets/common/bizlevel_loading.dart';
-import 'package:bizlevel/screens/ray_dialog_screen.dart';
 
 class LibraryScreen extends ConsumerStatefulWidget {
   const LibraryScreen({super.key});
@@ -63,10 +62,17 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
               },
             ),
           ),
-          bottom: const TabBar(
-            tabs: [
-              Tab(text: 'Разделы'),
-              Tab(text: 'Избранное'),
+          bottom: TabBar(
+            labelColor: AppColor.colorPrimary,
+            unselectedLabelColor: AppColor.colorTextSecondary,
+            indicatorColor: AppColor.colorPrimary,
+            labelStyle: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+            unselectedLabelStyle: Theme.of(context).textTheme.titleSmall,
+            tabs: const [
+              Tab(height: 48, text: 'Разделы'),
+              Tab(height: 48, text: 'Избранное'),
             ],
           ),
         ),
@@ -149,29 +155,6 @@ class _SectionsTab extends ConsumerWidget {
             },
           ),
           AppSpacing.gapH(AppSpacing.sectionSpacing),
-          _SectionCard(
-            icon: Icons.psychology,
-            title: 'Проверить идею',
-            subtitle: 'Валидация бизнес-идеи (Ray)',
-            onTap: () {
-              try {
-                Sentry.addBreadcrumb(
-                  Breadcrumb(
-                    category: 'ui.tap',
-                    message: 'library_section_tap:ray',
-                    level: SentryLevel.info,
-                  ),
-                );
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const RayDialogScreen(),
-                  ),
-                );
-              } catch (e, st) {
-                Sentry.captureException(e, stackTrace: st);
-              }
-            },
-          ),
         ],
       ),
     );

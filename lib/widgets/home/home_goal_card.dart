@@ -22,10 +22,9 @@ class HomeGoalCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final goalAsync = ref.watch(userGoalProvider);
     final goalValue = goalAsync.value;
-    return BizLevelCard(
+    return BizLevelCard.hero(
       semanticsLabel: 'Моя цель',
       onTap: () => context.go('/goal'),
-      radius: AppDimensions.radiusXl,
       padding: AppSpacing.insetsAll(AppSpacing.s20),
       child: ConstrainedBox(
         constraints: const BoxConstraints(
@@ -56,6 +55,11 @@ class HomeGoalCard extends ConsumerWidget {
       final td = (goal?['target_date']?.toString());
       targetDate = td == null ? null : DateTime.tryParse(td)?.toLocal();
     } catch (_) {}
+
+    final bool isEmpty = goalText.trim().isEmpty;
+    if (isEmpty) {
+      return _buildEmptyState(context);
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -92,11 +96,12 @@ class HomeGoalCard extends ConsumerWidget {
                             targetDate.isBefore(DateTime.now())
                                 ? 'Поставить новый дедлайн'
                                 : 'до ${DateFormat('dd.MM.yyyy').format(targetDate)}',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: targetDate.isBefore(DateTime.now())
-                                      ? AppColor.error
-                                      : AppColor.onSurfaceSubtle,
-                                ),
+                            style:
+                                Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: targetDate.isBefore(DateTime.now())
+                                          ? AppColor.error
+                                          : AppColor.onSurfaceSubtle,
+                                    ),
                           ),
                         ),
                       ],
@@ -193,8 +198,8 @@ class HomeGoalCard extends ConsumerWidget {
                     );
                   } catch (_) {}
 
-                  final result = await Navigator.of(context, rootNavigator: true)
-                      .push(
+                  final result =
+                      await Navigator.of(context, rootNavigator: true).push(
                     CustomModalBottomSheetRoute(
                       barrierDismissible: false,
                       child: UncontrolledProviderScope(
@@ -226,7 +231,8 @@ class HomeGoalCard extends ConsumerWidget {
                                   child: ConstrainedBox(
                                     constraints: BoxConstraints(
                                       maxHeight:
-                                          MediaQuery.of(context).size.height * 0.9,
+                                          MediaQuery.of(context).size.height *
+                                              0.9,
                                     ),
                                     child: Container(
                                       decoration: const BoxDecoration(
@@ -243,17 +249,22 @@ class HomeGoalCard extends ConsumerWidget {
                                             child: SafeArea(
                                               bottom: false,
                                               child: AppBar(
-                                                backgroundColor: AppColor.primary,
-                                                automaticallyImplyLeading: false,
+                                                backgroundColor:
+                                                    AppColor.primary,
+                                                automaticallyImplyLeading:
+                                                    false,
                                                 leading: Builder(
-                                                  builder: (context) => IconButton(
+                                                  builder: (context) =>
+                                                      IconButton(
                                                     tooltip: 'Закрыть',
-                                                    icon: const Icon(Icons.close),
+                                                    icon:
+                                                        const Icon(Icons.close),
                                                     onPressed: () {
-                                                      FocusManager.instance
-                                                          .primaryFocus
+                                                      FocusManager
+                                                          .instance.primaryFocus
                                                           ?.unfocus();
-                                                      final navigator = Navigator.of(
+                                                      final navigator =
+                                                          Navigator.of(
                                                         context,
                                                         rootNavigator: true,
                                                       );
@@ -267,7 +278,8 @@ class HomeGoalCard extends ConsumerWidget {
                                                   children: [
                                                     CircleAvatar(
                                                       radius: 14,
-                                                      backgroundImage: AssetImage(
+                                                      backgroundImage:
+                                                          AssetImage(
                                                         'assets/images/avatars/avatar_max.png',
                                                       ),
                                                       backgroundColor:
@@ -318,6 +330,57 @@ class HomeGoalCard extends ConsumerWidget {
               ),
             ),
           ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEmptyState(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: AppColor.colorPrimaryLight,
+                borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
+              ),
+              child:
+                  const Icon(Icons.flag_outlined, color: AppColor.colorPrimary),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Поставь первую цель',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: AppColor.colorTextPrimary,
+                        ),
+                  ),
+                  AppSpacing.gapH(AppSpacing.xs),
+                  Text(
+                    'Это займёт 2 минуты. Пройди Уровень 1 — и сформулируй цель на чекпоинте',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColor.colorTextSecondary,
+                        ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        AppSpacing.gapH(AppSpacing.md),
+        BizLevelButton(
+          label: 'Начать Уровень 1 →',
+          onPressed: () => context.go('/tower?scrollTo=1'),
+          fullWidth: true,
         ),
       ],
     );

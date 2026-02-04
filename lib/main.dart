@@ -26,6 +26,7 @@ import 'package:go_router/go_router.dart';
 import 'services/supabase_service.dart';
 import 'theme/color.dart';
 import 'theme/app_theme.dart';
+import 'package:bizlevel/widgets/common/app_background.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:bizlevel/services/notifications_service.dart';
 import 'services/push_service.dart';
@@ -142,7 +143,6 @@ final appBootstrapProvider = FutureProvider<void>((ref) async {
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   _startupLog('main.ensure_initialized');
-  
 
   // Чистые URL без # — только для Web
   if (kIsWeb) {
@@ -522,12 +522,7 @@ class _RouterApp extends StatelessWidget {
           });
         }
 
-        return Container(
-          decoration: BoxDecoration(
-            gradient: Theme.of(context).brightness == Brightness.dark
-                ? AppColor.bgGradientDark
-                : AppColor.bgGradient,
-          ),
+        return AppBackground(
           child: Theme(
             data: Theme.of(context).copyWith(
               textTheme: scaledTextTheme,
@@ -846,8 +841,13 @@ class _LinkListenerState extends State<_LinkListener> {
             .applyPendingCodesBestEffort());
       }
     }
-    final path = mapBizLevelDeepLink(uri.toString());
+    var path = mapBizLevelDeepLink(uri.toString());
     if (path != null) {
+      // Если это реферальная ссылка и пользователь уже авторизован — на профиль
+      if (path.contains('from_referral=true')) {
+        final session = Supabase.instance.client.auth.currentSession;
+        path = session != null ? '/profile' : '/register';
+      }
       try {
         Sentry.addBreadcrumb(Breadcrumb(
           category: 'deeplink',

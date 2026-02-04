@@ -5,6 +5,7 @@ import 'package:bizlevel/theme/typography.dart';
 import 'package:bizlevel/theme/input_decoration_theme.dart';
 import 'package:bizlevel/theme/dimensions.dart';
 import 'package:bizlevel/theme/spacing.dart';
+import 'package:bizlevel/theme/effects.dart';
 import 'package:bizlevel/theme/chat_theme.dart';
 import 'package:bizlevel/theme/quiz_theme.dart';
 import 'package:bizlevel/theme/gp_theme.dart';
@@ -212,21 +213,27 @@ class AppTheme {
       );
 
   static DialogThemeData _dialogTheme(ColorScheme cs) => DialogThemeData(
-        // Liquid glass: более плотная поверхность для модалов
-        backgroundColor: AppColor.glassSurfaceStrong,
+        // Premium 2.0: glass-modal с premium border и shadow
+        backgroundColor: AppColor.glassContent,
+        shadowColor: AppEffects.shadowModal.first.color,
+        elevation: 24,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppDimensions.radiusXl),
+          side: const BorderSide(color: AppColor.glassBorderTop),
         ),
       );
 
   static BottomSheetThemeData _bottomSheetTheme(ColorScheme cs) =>
-      const BottomSheetThemeData(
-        // Liquid glass: bottom-sheet как "стеклянная" панель
-        backgroundColor: AppColor.glassSurfaceStrong,
-        shape: RoundedRectangleBorder(
+      BottomSheetThemeData(
+        // Premium 2.0: bottom-sheet с premium border
+        backgroundColor: AppColor.glassContent,
+        shadowColor: AppEffects.shadowModal.first.color,
+        elevation: 16,
+        shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(
             top: Radius.circular(AppDimensions.radiusXl),
           ),
+          side: BorderSide(color: AppColor.glassBorderTop),
         ),
       );
 

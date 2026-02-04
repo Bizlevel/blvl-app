@@ -158,6 +158,21 @@ class _TowerGrid extends StatelessWidget {
         child: Stack(
           children: [
             Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      AppColor.primary.withValues(alpha: 0.05),
+                      AppColor.success.withValues(alpha: 0.05),
+                      AppColor.premium.withValues(alpha: 0.05),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Positioned.fill(
               child: RepaintBoundary(
                 child: IgnorePointer(
                   child: CustomPaint(

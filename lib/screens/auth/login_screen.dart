@@ -14,6 +14,7 @@ import '../../widgets/common/bizlevel_button.dart';
 import '../../theme/spacing.dart';
 import '../../theme/dimensions.dart';
 import '../../utils/constant.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class LoginScreen extends HookConsumerWidget {
   const LoginScreen({super.key});
@@ -26,6 +27,7 @@ class LoginScreen extends HookConsumerWidget {
     final loginState = ref.watch(loginControllerProvider);
     final isLoading = loginState.isLoading;
     final obscurePassword = useState<bool>(true);
+    final agreed = useState<bool>(false);
 
     // Читаем query-параметр registered из GoRouter
     final registered =
@@ -56,6 +58,11 @@ class LoginScreen extends HookConsumerWidget {
     });
 
     Future<void> submit() async {
+      if (!agreed.value) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Подтвердите согласие с условиями')));
+        return;
+      }
       final email = emailController.text.trim();
       final password = passwordController.text;
       if (email.isEmpty || password.isEmpty) {
@@ -195,6 +202,12 @@ class LoginScreen extends HookConsumerWidget {
                                 obscurePassword.value = !obscurePassword.value,
                           ),
                         ),
+                        AppSpacing.gapH(AppSpacing.lg),
+                        _AgreementRow(
+                          checked: agreed.value,
+                          onChanged: (v) => agreed.value = v,
+                          onOpen: () => _openAgreement(context),
+                        ),
                         AppSpacing.gapH(AppSpacing.xl),
                         // Основная CTA: «Войти» – сразу под полем пароля
                         BizLevelButton(
@@ -202,8 +215,10 @@ class LoginScreen extends HookConsumerWidget {
                           onPressed: isLoading ? null : submit,
                         ),
                         AppSpacing.gapH(AppSpacing.xl),
-                        if (kEnableGoogleAuth || kEnableAppleAuth) const _OrDivider(),
-                        if (kEnableGoogleAuth || kEnableAppleAuth) AppSpacing.gapH(AppSpacing.xl),
+                        if (kEnableGoogleAuth || kEnableAppleAuth)
+                          const _OrDivider(),
+                        if (kEnableGoogleAuth || kEnableAppleAuth)
+                          AppSpacing.gapH(AppSpacing.xl),
                         if (kEnableGoogleAuth)
                           SizedBox(
                             width: double.infinity,
@@ -230,7 +245,8 @@ class LoginScreen extends HookConsumerWidget {
                             ),
                           ),
                         if (kEnableGoogleAuth) AppSpacing.gapH(AppSpacing.md),
-                        if (kEnableAppleAuth && (kIsWeb || (!kIsWeb && Platform.isIOS)))
+                        if (kEnableAppleAuth &&
+                            (kIsWeb || (!kIsWeb && Platform.isIOS)))
                           SizedBox(
                             width: double.infinity,
                             child: OutlinedButton.icon(
@@ -255,7 +271,8 @@ class LoginScreen extends HookConsumerWidget {
                               ),
                             ),
                           ),
-                        if (kEnableGoogleAuth || kEnableAppleAuth) AppSpacing.gapH(AppSpacing.lg),
+                        if (kEnableGoogleAuth || kEnableAppleAuth)
+                          AppSpacing.gapH(AppSpacing.lg),
                         // Social proof (лёгкий блок
                         const _SocialProofBlock(),
                         AppSpacing.gapH(AppSpacing.sm),
@@ -366,4 +383,127 @@ class _OrDivider extends StatelessWidget {
       ],
     );
   }
+}
+
+class _AgreementRow extends StatelessWidget {
+  final bool checked;
+  final ValueChanged<bool> onChanged;
+  final VoidCallback onOpen;
+  const _AgreementRow({
+    required this.checked,
+    required this.onChanged,
+    required this.onOpen,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Checkbox(
+          value: checked,
+          onChanged: (v) => onChanged(v ?? false),
+        ),
+        Expanded(
+          child: GestureDetector(
+            onTap: onOpen,
+            child: RichText(
+              text: TextSpan(
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(color: AppColor.onSurfaceSubtle),
+                children: [
+                  const TextSpan(text: 'Я принимаю '),
+                  TextSpan(
+                    text: 'Пользовательское соглашение',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColor.primary,
+                          decoration: TextDecoration.underline,
+                        ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+Future<void> _openAgreement(BuildContext context) async {
+  final uri = Uri.parse('https://www.bizlevel.kz/privacy');
+  await showModalBottomSheet(
+    context: context,
+    showDragHandle: true,
+    backgroundColor: AppColor.surface,
+    isScrollControlled: true,
+    builder: (ctx) {
+      return DraggableScrollableSheet(
+        expand: false,
+        minChildSize: 0.4,
+        maxChildSize: 0.92,
+        initialChildSize: 0.75,
+        builder: (context, controller) {
+          return Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
+                child: Row(
+                  children: [
+                    Text(
+                      'Пользовательское соглашение',
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      tooltip: 'Закрыть',
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.of(ctx).pop(),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              Expanded(
+                child: SingleChildScrollView(
+                  controller: controller,
+                  padding: AppSpacing.insetsAll(AppSpacing.lg),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Полный текст соглашения доступен по ссылке. Нажмите кнопку ниже, чтобы открыть документ.',
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodySmall
+                            ?.copyWith(color: AppColor.onSurfaceSubtle),
+                      ),
+                      AppSpacing.gapH(AppSpacing.lg),
+                      BizLevelButton(
+                        label: 'Открыть документ',
+                        onPressed: () async {
+                          if (await canLaunchUrl(uri)) {
+                            await launchUrl(
+                              uri,
+                              mode: LaunchMode.inAppWebView,
+                            );
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
 }

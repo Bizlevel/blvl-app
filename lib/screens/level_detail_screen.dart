@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:bizlevel/models/lesson_model.dart';
 import 'package:bizlevel/providers/lessons_provider.dart';
 import 'package:bizlevel/theme/color.dart';
+import 'package:bizlevel/theme/dimensions.dart';
+import 'package:bizlevel/theme/effects.dart';
 import 'package:bizlevel/services/supabase_service.dart';
 import 'package:sentry_flutter/sentry_flutter.dart' as sentry;
 import 'package:bizlevel/providers/lesson_progress_provider.dart';
@@ -14,8 +16,8 @@ import 'package:go_router/go_router.dart';
 import 'package:bizlevel/widgets/common/bizlevel_button.dart';
 import 'package:bizlevel/theme/spacing.dart';
 import 'package:bizlevel/providers/gp_providers.dart';
-import 'package:bizlevel/widgets/level/level_nav_bar.dart';
-import 'package:bizlevel/widgets/level/level_progress_dots.dart';
+import 'package:bizlevel/widgets/common/gp_balance_widget.dart';
+import 'package:bizlevel/theme/typography.dart';
 import 'package:bizlevel/utils/level_page_index.dart';
 import 'package:bizlevel/widgets/level/blocks/level_page_block.dart';
 import 'package:bizlevel/widgets/level/blocks/intro_block.dart';
@@ -85,8 +87,8 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
       _maybeGuardCaseAccess();
     });
 
-    LevelInputGuard.instance
-        .setCurrentLevelRoute('/levels/${widget.levelId}?num=${widget.levelNumber ?? 0}');
+    LevelInputGuard.instance.setCurrentLevelRoute(
+        '/levels/${widget.levelId}?num=${widget.levelNumber ?? 0}');
 
     _profileNameFocus.addListener(_syncInputPopGuard);
     _profileAboutFocus.addListener(_syncInputPopGuard);
@@ -217,281 +219,10 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
         children: [
           Expanded(child: _buildPageView()),
           if (!isProfilePage)
-            LevelNavBar(
-              showDiscuss: !isLevelZero,
-              canBack: (_pageController.hasClients
-                  ? (_pageController.page ??
-                          _pageController.initialPage.toDouble()) >
-                      0
-                  : false),
-              canNext: _currentIndex < _progress.unlockedPage ||
-                  _currentIndex + 1 == _progress.unlockedPage,
-              onBack: _goBack,
-              onNext: _goNext,
-              onDiscuss: () async {
-                // ВАЖНО: Получаем ProviderContainer из текущего контекста,
-                // чтобы передать его в UncontrolledProviderScope для диалога
-                // Это гарантирует, что провайдеры будут доступны даже если родитель умрет
-                final container = ProviderScope.containerOf(context);
-                final userContext = await _buildUserContext();
-                final levelContext = _buildLevelContext();
-                if (!mounted) return;
-
-                final router = GoRouter.of(context);
-                final origin =
-                    router.routeInformationProvider.value.uri.toString();
-                try {
-                  sentry.Sentry.addBreadcrumb(
-                    sentry.Breadcrumb(
-                      category: 'chat',
-                      level: sentry.SentryLevel.info,
-                      message: 'leo_dialog_open_requested',
-                      data: {'origin': origin},
-                    ),
-                  );
-                } catch (_) {}
-
-                final result =
-                    await Navigator.of(context, rootNavigator: true).push(
-                  CustomModalBottomSheetRoute(
-                    barrierDismissible: false,
-                    child: UncontrolledProviderScope(
-                      container: container,
-                      child: Scaffold(
-                        backgroundColor: Colors.transparent,
-                        // ВАЖНО: resizeToAvoidBottomInset: true, чтобы Flutter поднимал контент при появлении клавиатуры
-                        resizeToAvoidBottomInset: true,
-                        body: Stack(
-                          children: [
-                            Positioned.fill(
-                              child: GestureDetector(
-                                behavior: HitTestBehavior.opaque,
-                                onTap: () {
-                                  final navigator = Navigator.of(
-                                    context,
-                                    rootNavigator: true,
-                                  );
-                                  if (navigator.canPop()) {
-                                    navigator.pop();
-                                  }
-                                },
-                                child: Container(color: Colors.transparent),
-                              ),
-                            ),
-                            Align(
-                              alignment: Alignment.bottomCenter,
-                              child: Material(
-                                color: Colors.transparent,
-                                child: ConstrainedBox(
-                                  constraints: BoxConstraints(
-                                    maxHeight:
-                                        MediaQuery.of(context).size.height *
-                                            0.9,
-                                  ),
-                                  child: Container(
-                                    decoration: const BoxDecoration(
-                                      color: AppColor.surface,
-                                      borderRadius: BorderRadius.vertical(
-                                          top: Radius.circular(20)),
-                                    ),
-                                    clipBehavior: Clip.hardEdge,
-                                    child: Column(
-                                      children: [
-                                        Container(
-                                          color: AppColor.primary,
-                                          child: SafeArea(
-                                            bottom: false,
-                                            child: AppBar(
-                                              backgroundColor: AppColor.primary,
-                                              automaticallyImplyLeading: false,
-                                              leading: Builder(
-                                                builder: (context) =>
-                                                    IconButton(
-                                                  tooltip: 'Закрыть',
-                                                  icon: const Icon(Icons.close),
-                                                  onPressed: () {
-                                                    // Скрываем клавиатуру перед закрытием диалога
-                                                    FocusManager
-                                                        .instance.primaryFocus
-                                                        ?.unfocus();
-                                                    final navigator =
-                                                        Navigator.of(
-                                                      context,
-                                                      rootNavigator: true,
-                                                    );
-                                                    if (navigator.canPop()) {
-                                                      navigator.pop();
-                                                    }
-                                                  },
-                                                ),
-                                              ),
-                                              title: const Row(
-                                                children: [
-                                                  CircleAvatar(
-                                                    radius: 14,
-                                                    backgroundImage: AssetImage(
-                                                        'assets/images/avatars/avatar_leo.png'),
-                                                    backgroundColor:
-                                                        Colors.transparent,
-                                                  ),
-                                                  SizedBox(width: 8),
-                                                  Text('Лео'),
-                                                ],
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                        Expanded(
-                                          child: LeoDialogScreen(
-                                            chatId: _chatId,
-                                            userContext: userContext,
-                                            levelContext: levelContext,
-                                            onChatIdChanged: (id) {
-                                              if (mounted && id.isNotEmpty) {
-                                                setState(() => _chatId = id);
-                                              }
-                                            },
-                                            embedded: true,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-                if (!mounted) return;
-                final current =
-                    router.routeInformationProvider.value.uri.toString();
-                if (origin.startsWith('/tower') && current != origin) {
-                  router.go(origin);
-                }
-                assert(() {
-                  debugPrint(
-                      'leo_dialog_closed origin=$origin current=$current result=$result');
-                  return true;
-                }());
-              },
-            ),
-          AppSpacing.gapH(AppSpacing.s6),
-          if ((widget.levelNumber ?? -1) != 0)
-            BizLevelButton(
-              label: (widget.levelNumber ?? -1) == 1
-                  ? 'Завершить уровень'
-                  : 'Завершить уровень',
-              icon: const Icon(Icons.check, size: 20),
-              backgroundColorOverride: AppColor.warning,
-              foregroundColorOverride: AppColor.onPrimary,
-                onPressed: _isLevelCompleted(lessons) && !_isCompleting
-                  ? () async {
-                    if (!mounted) return;
-                    setState(() => _isCompleting = true);
-                      try {
-                        try {
-                          sentry.Sentry.addBreadcrumb(sentry.Breadcrumb(
-                            category: 'level',
-                            level: sentry.SentryLevel.info,
-                            message: 'level_complete_attempt',
-                            data: {
-                              'levelId': widget.levelId,
-                              'levelNumber': widget.levelNumber
-                            },
-                          ));
-                        } catch (_) {}
-                        await SupabaseService.completeLevel(widget.levelId);
-                        ref.invalidate(levelsProvider);
-                        ref.invalidate(towerNodesProvider);
-                        ref.invalidate(currentUserProvider);
-                        ref.invalidate(userSkillsProvider);
-                        ref.invalidate(gpBalanceProvider);
-                        try {
-                          sentry.Sentry.addBreadcrumb(sentry.Breadcrumb(
-                            category: 'level',
-                            level: sentry.SentryLevel.info,
-                            message: 'level_completed',
-                            data: {
-                              'levelId': widget.levelId,
-                              'levelNumber': widget.levelNumber
-                            },
-                          ));
-                        } catch (_) {}
-                        if (context.mounted) {
-                          // Убрали модалку с бонусом, чтобы не вводить в заблуждение.
-                          // ref.invalidate(gpBalanceProvider); // баланс уже инвалидации выше
-
-                          // Предложение проверить идею после завершения Уровня 5 (Ray)
-                          final isLevel5 = (widget.levelNumber ?? -1) == 5;
-                          if (isLevel5 && context.mounted) {
-                            final shouldOpenRay = await showDialog<bool>(
-                                  context: context,
-                                  barrierDismissible: false,
-                                  builder: (dialogCtx) => AlertDialog(
-                                    title: const Text('Проверь свою идею'),
-                                    content: const Text(
-                                      'Ты прошёл Уровень 5. Готов проверить свою бизнес‑идею с Ray?',
-                                    ),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () {
-                                          Navigator.of(dialogCtx).pop(false);
-                                        },
-                                        child: const Text('Позже'),
-                                      ),
-                                      ElevatedButton(
-                                        onPressed: () {
-                                          Navigator.of(dialogCtx).pop(true);
-                                        },
-                                        child: const Text('Проверить идею'),
-                                      ),
-                                    ],
-                                  ),
-                                ) ??
-                                false;
-
-                            if (shouldOpenRay && context.mounted) {
-                              try {
-                                sentry.Sentry.addBreadcrumb(
-                                  sentry.Breadcrumb(
-                                    category: 'ui.tap',
-                                    message: 'level_5_cta_tap:ray',
-                                    level: sentry.SentryLevel.info,
-                                  ),
-                                );
-                              } catch (_) {}
-
-                              // ВАЖНО: Используем rootNavigator: true, чтобы диалог не уничтожался
-                              // при пересоздании вложенного навигатора
-                              await Navigator.of(context, rootNavigator: true)
-                                  .push(
-                                MaterialPageRoute(
-                                  builder: (_) => const RayDialogScreen(),
-                                ),
-                              );
-                            }
-                          }
-                          // Переход в башню: для уровня 1 — к 2-му, иначе общий возврат
-                          if (!context.mounted) return;
-                          final nextScroll =
-                              (widget.levelNumber ?? 0) == 1 ? 2 : (widget.levelNumber ?? 0);
-                          context.go('/tower?scrollTo=$nextScroll');
-                        }
-                      } catch (e) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Ошибка: $e')),
-                          );
-                        }
-                      } finally {
-                        if (mounted) setState(() => _isCompleting = false);
-                      }
-                    }
-                  : null,
+            _buildBottomCta(
+              context,
+              lessons: lessons,
+              isLevelZero: isLevelZero,
             ),
         ],
       ),
@@ -508,23 +239,77 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
           right: 0,
           child: SafeArea(
             bottom: false,
-            child: LinearProgressIndicator(
-              value: (_currentIndex + 1) / (_blocks.length),
-              minHeight: 3,
-              backgroundColor: Colors.black.withValues(alpha: 0.06),
-              valueColor: const AlwaysStoppedAnimation(AppColor.primary),
+            child: Padding(
+              padding: AppSpacing.insetsSymmetric(
+                h: AppSpacing.lg,
+                v: AppSpacing.xs,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  LinearProgressIndicator(
+                    value: (_currentIndex + 1) / (_blocks.length),
+                    minHeight: 3,
+                    backgroundColor: Colors.black.withValues(alpha: 0.06),
+                    valueColor: const AlwaysStoppedAnimation(AppColor.primary),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Урок ${_currentIndex + 1} из ${_blocks.length}',
+                    style: AppTypography.caption
+                        .copyWith(color: AppColor.colorTextSecondary),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
         Positioned(
-          top: MediaQuery.of(context).size.height * 0.3,
-          right: 8,
-          child: LevelProgressDots(
-            current: _currentIndex,
-            total: _blocks.length,
-            vertical: true,
+          top: 0,
+          left: 0,
+          child: SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.all(4),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: AppColor.surface.withValues(alpha: 0.9),
+                  borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x1A000000),
+                      blurRadius: 8,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: IconButton(
+                  icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                  tooltip: 'К башне',
+                  onPressed: () => _goBackToTower(context),
+                ),
+              ),
+            ),
           ),
         ),
+        if ((widget.levelNumber ?? 0) > 0)
+          Positioned(
+            top: 4,
+            right: AppSpacing.lg,
+            child: SafeArea(
+              bottom: false,
+              child: Hero(
+                tag: 'level-hero-${widget.levelNumber}',
+                child: _LevelHeroBadge(levelNumber: widget.levelNumber ?? 0),
+              ),
+            ),
+          ),
+        if ((widget.levelNumber ?? -1) != 0)
+          Positioned(
+            right: AppSpacing.lg,
+            bottom: _floatingDiscussBottom(context),
+            child: _buildDiscussPill(context),
+          ),
       ],
     );
   }
@@ -636,19 +421,366 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
 
   // --- Leo chat helpers (legacy prompt удалён)
 
-  void _goBack() {
-    final pos = _pageController.page ?? _pageController.initialPage.toDouble();
-    if (pos > 0) {
-      _pageController.previousPage(
-          duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
-    }
-  }
-
   void _goNext() {
     if (_currentIndex + 1 < _blocks.length &&
         _currentIndex < _progress.unlockedPage) {
       _pageController.nextPage(
           duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
+    }
+  }
+
+  void _goBackToTower(BuildContext context) {
+    try {
+      LevelInputGuard.instance.clear();
+      final levelNumber = widget.levelNumber ?? 0;
+      if (levelNumber > 0) {
+        context.go('/tower?scrollTo=$levelNumber');
+      } else {
+        context.go('/tower');
+      }
+    } catch (_) {}
+  }
+
+  double _floatingDiscussBottom(BuildContext context) {
+    final safe = MediaQuery.of(context).padding.bottom;
+    // Увеличен отступ, чтобы FAB не перекрывал кнопку "Повторить" в квизе
+    return AppDimensions.buttonPrimaryLargeHeight + safe + AppSpacing.lg * 3 + 16;
+  }
+
+  Widget _buildDiscussPill(BuildContext context) {
+    final bool shouldPulse =
+        (widget.levelNumber ?? -1) == 1 && _currentIndex <= 3;
+    final Widget pill = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColor.colorSurface,
+        borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
+        border: Border.all(color: AppColor.colorPrimary),
+        boxShadow: [
+          BoxShadow(
+            color: AppColor.colorPrimary.withValues(alpha: 0.2),
+            blurRadius: 12,
+            spreadRadius: 1,
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const CircleAvatar(
+            radius: 12,
+            backgroundImage: AssetImage('assets/images/avatars/avatar_leo.png'),
+            backgroundColor: Colors.transparent,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            'Обсудить с Лео',
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: AppColor.colorPrimary,
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+        ],
+      ),
+    );
+
+    final Widget button = Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
+        onTap: () => _openDiscussSheet(context),
+        child: pill,
+      ),
+    );
+
+    if (!shouldPulse) return button;
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 1.0, end: 1.05),
+      duration: const Duration(milliseconds: 1000),
+      curve: Curves.easeInOut,
+      builder: (context, value, child) => Transform.scale(
+        scale: value,
+        child: child,
+      ),
+      child: button,
+    );
+  }
+
+  Widget _buildBottomCta(
+    BuildContext context, {
+    required List<LessonModel> lessons,
+    required bool isLevelZero,
+  }) {
+    final bool isLast = _currentIndex == _blocks.length - 1;
+    final bool canComplete = _isLevelCompleted(lessons) && !_isCompleting;
+    final bool canNext = _currentIndex < _progress.unlockedPage;
+    final bool showFinish = isLast && canComplete && !isLevelZero;
+
+    final String label = showFinish ? 'Завершить уровень ✓' : 'Далее';
+    final Color bg = showFinish ? AppColor.colorSuccess : AppColor.primary;
+
+    return SafeArea(
+      top: false,
+      child: Container(
+        padding: AppSpacing.insetsSymmetric(
+          h: AppSpacing.lg,
+          v: AppSpacing.sm,
+        ),
+        decoration: const BoxDecoration(
+          color: Colors.transparent,
+          boxShadow: [
+            BoxShadow(
+              color: Color(0x1A000000),
+              blurRadius: 12,
+              offset: Offset(0, -2),
+            ),
+          ],
+        ),
+        child: BizLevelButton(
+          label: label,
+          size: BizLevelButtonSize.lg,
+          fullWidth: true,
+          backgroundColorOverride: bg,
+          foregroundColorOverride: AppColor.onPrimary,
+          onPressed: showFinish
+              ? () => _completeLevel(context)
+              : (canNext ? _goNext : null),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openDiscussSheet(BuildContext context) async {
+    // ВАЖНО: Получаем ProviderContainer из текущего контекста,
+    // чтобы передать его в UncontrolledProviderScope для диалога
+    // Это гарантирует, что провайдеры будут доступны даже если родитель умрет
+    final container = ProviderScope.containerOf(context);
+    final userContext = await _buildUserContext();
+    final levelContext = _buildLevelContext();
+    if (!mounted) return;
+
+    final router = GoRouter.of(context);
+    final origin = router.routeInformationProvider.value.uri.toString();
+    try {
+      sentry.Sentry.addBreadcrumb(
+        sentry.Breadcrumb(
+          category: 'chat',
+          level: sentry.SentryLevel.info,
+          message: 'leo_dialog_open_requested',
+          data: {'origin': origin},
+        ),
+      );
+    } catch (_) {}
+
+    final result = await Navigator.of(context, rootNavigator: true).push(
+      CustomModalBottomSheetRoute(
+        barrierDismissible: false,
+        child: UncontrolledProviderScope(
+          container: container,
+          child: Scaffold(
+            backgroundColor: Colors.transparent,
+            // ВАЖНО: resizeToAvoidBottomInset: true, чтобы Flutter поднимал контент при появлении клавиатуры
+            resizeToAvoidBottomInset: true,
+            body: Stack(
+              children: [
+                Positioned.fill(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () {
+                      final navigator = Navigator.of(
+                        context,
+                        rootNavigator: true,
+                      );
+                      if (navigator.canPop()) {
+                        navigator.pop();
+                      }
+                    },
+                    child: Container(color: Colors.transparent),
+                  ),
+                ),
+                Align(
+                  alignment: Alignment.bottomCenter,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxHeight: MediaQuery.of(context).size.height * 0.9,
+                      ),
+                      child: Container(
+                        decoration: const BoxDecoration(
+                          color: AppColor.surface,
+                          borderRadius:
+                              BorderRadius.vertical(top: Radius.circular(20)),
+                        ),
+                        clipBehavior: Clip.hardEdge,
+                        child: Column(
+                          children: [
+                            Container(
+                              color: AppColor.primary,
+                              child: SafeArea(
+                                bottom: false,
+                                child: SizedBox(
+                                  height: 56,
+                                  child: Row(
+                                    children: [
+                                      IconButton(
+                                        tooltip: 'Закрыть',
+                                        icon: const Icon(Icons.close),
+                                        onPressed: () {
+                                          FocusManager.instance.primaryFocus
+                                              ?.unfocus();
+                                          final navigator = Navigator.of(
+                                            context,
+                                            rootNavigator: true,
+                                          );
+                                          if (navigator.canPop()) {
+                                            navigator.pop();
+                                          }
+                                        },
+                                      ),
+                                      const CircleAvatar(
+                                        radius: 14,
+                                        backgroundImage: AssetImage(
+                                            'assets/images/avatars/avatar_leo.png'),
+                                        backgroundColor: Colors.transparent,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      const Text('Лео'),
+                                      const Spacer(),
+                                      const Padding(
+                                        padding: EdgeInsets.only(right: 12),
+                                        child: Center(child: GpBalanceWidget()),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              child: LeoDialogScreen(
+                                chatId: _chatId,
+                                userContext: userContext,
+                                levelContext: levelContext,
+                                onChatIdChanged: (id) {
+                                  if (mounted && id.isNotEmpty) {
+                                    setState(() => _chatId = id);
+                                  }
+                                },
+                                embedded: true,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    if (!mounted) return;
+    final current = router.routeInformationProvider.value.uri.toString();
+    if (origin.startsWith('/tower') && current != origin) {
+      router.go(origin);
+    }
+    assert(() {
+      debugPrint(
+          'leo_dialog_closed origin=$origin current=$current result=$result');
+      return true;
+    }());
+  }
+
+  Future<void> _completeLevel(BuildContext context) async {
+    if (!mounted) return;
+    setState(() => _isCompleting = true);
+    try {
+      try {
+        sentry.Sentry.addBreadcrumb(sentry.Breadcrumb(
+          category: 'level',
+          level: sentry.SentryLevel.info,
+          message: 'level_complete_attempt',
+          data: {'levelId': widget.levelId, 'levelNumber': widget.levelNumber},
+        ));
+      } catch (_) {}
+      await SupabaseService.completeLevel(widget.levelId);
+      ref.invalidate(levelsProvider);
+      ref.invalidate(towerNodesProvider);
+      ref.invalidate(currentUserProvider);
+      ref.invalidate(userSkillsProvider);
+      ref.invalidate(gpBalanceProvider);
+      try {
+        sentry.Sentry.addBreadcrumb(sentry.Breadcrumb(
+          category: 'level',
+          level: sentry.SentryLevel.info,
+          message: 'level_completed',
+          data: {'levelId': widget.levelId, 'levelNumber': widget.levelNumber},
+        ));
+      } catch (_) {}
+      if (context.mounted) {
+        // Предложение проверить идею после завершения Уровня 5 (Ray)
+        final isLevel5 = (widget.levelNumber ?? -1) == 5;
+        if (isLevel5 && context.mounted) {
+          final shouldOpenRay = await showDialog<bool>(
+                context: context,
+                barrierDismissible: false,
+                builder: (dialogCtx) => AlertDialog(
+                  title: const Text('Проверь свою идею'),
+                  content: const Text(
+                    'Ты прошёл Уровень 5. Готов проверить свою бизнес‑идею с Ray?',
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () {
+                        Navigator.of(dialogCtx).pop(false);
+                      },
+                      child: const Text('Позже'),
+                    ),
+                    ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(dialogCtx).pop(true);
+                      },
+                      child: const Text('Проверить идею'),
+                    ),
+                  ],
+                ),
+              ) ??
+              false;
+
+          if (shouldOpenRay && context.mounted) {
+            try {
+              sentry.Sentry.addBreadcrumb(
+                sentry.Breadcrumb(
+                  category: 'ui.tap',
+                  message: 'level_5_cta_tap:ray',
+                  level: sentry.SentryLevel.info,
+                ),
+              );
+            } catch (_) {}
+
+            await Navigator.of(context, rootNavigator: true).push(
+              MaterialPageRoute(
+                builder: (_) => const RayDialogScreen(),
+              ),
+            );
+          }
+        }
+        // Переход в башню: для уровня 1 — к 2-му, иначе общий возврат
+        if (!context.mounted) return;
+        final nextScroll =
+            (widget.levelNumber ?? 0) == 1 ? 2 : (widget.levelNumber ?? 0);
+        context.go('/tower?scrollTo=$nextScroll');
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isCompleting = false);
     }
   }
 
@@ -779,5 +911,30 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
       ],
       ArtifactBlock(levelId: widget.levelId, levelNumber: widget.levelNumber),
     ];
+  }
+}
+
+class _LevelHeroBadge extends StatelessWidget {
+  final int levelNumber;
+  const _LevelHeroBadge({required this.levelNumber});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: AppSpacing.insetsSymmetric(h: AppSpacing.sm, v: AppSpacing.xs),
+      decoration: BoxDecoration(
+        color: AppColor.colorPrimaryLight,
+        borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
+        border: Border.all(color: AppColor.colorPrimary),
+        boxShadow: const [AppEffects.shadowSm],
+      ),
+      child: Text(
+        'Уровень $levelNumber',
+        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: AppColor.colorPrimary,
+              fontWeight: FontWeight.w600,
+            ),
+      ),
+    );
   }
 }

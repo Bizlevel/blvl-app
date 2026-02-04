@@ -88,8 +88,7 @@ Future<void> _unlockFloor(BuildContext context,
         final price = priceGp ?? _kFloorUnlockCost;
         int balance = 0;
         try {
-          final fresh =
-              await GpService(Supabase.instance.client).getBalance();
+          final fresh = await GpService(Supabase.instance.client).getBalance();
           balance = fresh['balance'] ?? 0;
         } catch (_) {
           final cached = GpService.readBalanceCache();
@@ -243,7 +242,7 @@ void _handleCheckpointTap(BuildContext context, Map<String, dynamic> node) {
     } else if (type == 'goal_checkpoint') {
       if (!context.mounted) return;
       final int after = node.afterLevel;
-      
+
       // ВАЖНО: используем showModalBottomSheet вместо context.push для чекпоинтов,
       // чтобы избежать проблем с клавиатурой (GoRouter закрывает клавиатуру при навигации)
       Widget checkpointScreen;
@@ -254,7 +253,7 @@ void _handleCheckpointTap(BuildContext context, Map<String, dynamic> node) {
       } else {
         checkpointScreen = const CheckpointL7Screen();
       }
-      
+
       showBizLevelInputBottomSheet(
         context: context,
         contentPadding: EdgeInsets.zero,
@@ -302,13 +301,35 @@ Widget _buildLevelCoreTile({
   required bool isCompleted,
   required bool isLocked,
 }) {
+  final Color bgColor;
+  final Color borderColor;
+  final IconData icon;
+  final Color iconColor;
+
+  if (isCompleted) {
+    bgColor = AppColor.colorSuccess;
+    borderColor = AppColor.colorSuccess;
+    icon = Icons.check;
+    iconColor = AppColor.onPrimary;
+  } else if (isLocked) {
+    bgColor = AppColor.colorPrimary;
+    borderColor = AppColor.colorPrimary;
+    icon = Icons.lock;
+    iconColor = AppColor.onPrimary;
+  } else {
+    bgColor = AppColor.colorPrimaryLight;
+    borderColor = AppColor.colorPrimary;
+    icon = Icons.circle;
+    iconColor = AppColor.colorPrimary;
+  }
+
   return Container(
     width: kNodeSize,
     height: kNodeSize,
     decoration: BoxDecoration(
-      color: AppColor.info,
+      color: bgColor,
       borderRadius: BorderRadius.circular(kTileRadius),
-      border: Border.all(color: _darker(AppColor.info, 0.2), width: 4),
+      border: Border.all(color: borderColor, width: 2),
       boxShadow: [
         const BoxShadow(
             color: AppColor.shadowColor, blurRadius: 10, offset: Offset(0, 6)),
@@ -319,7 +340,7 @@ Widget _buildLevelCoreTile({
             offset: Offset(0, 8)),
         if (isCurrent)
           BoxShadow(
-              color: AppColor.premium.withValues(alpha: 0.55),
+              color: AppColor.colorPrimary.withValues(alpha: 0.35),
               blurRadius: 18,
               spreadRadius: 1),
       ],
@@ -328,10 +349,8 @@ Widget _buildLevelCoreTile({
       children: [
         Center(
           child: Icon(
-            isCompleted
-                ? Icons.check
-                : (isLocked && !isCompleted ? Icons.lock : Icons.circle),
-            color: AppColor.onPrimary,
+            icon,
+            color: iconColor,
             size: kNodeSize * 0.7,
           ),
         ),
@@ -368,13 +387,14 @@ class _CheckpointNodeTile extends StatelessWidget {
     } else if (type == 'goal_checkpoint') {
       // afterLevel 1 → L1, 4 → L4, 7 → L7
       final String cp = after == 1
-          ? 'L1: Первая цель'
-          : (after == 4 ? 'L4: Финансовый фокус' : 'L7: Проверка реальности');
+          ? 'Чекпоинт L1'
+          : (after == 4 ? 'Чекпоинт L4' : 'Чекпоинт L7');
       label = cp;
     } else {
       label = '';
     }
 
+    final bool isGoalCheckpoint = type == 'goal_checkpoint';
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -395,30 +415,80 @@ class _CheckpointNodeTile extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               _buildNodeLabel(label),
-              Container(
+              SizedBox(
                 width: size,
                 height: size,
-                decoration: BoxDecoration(
-                  color: AppColor.surface,
-                  borderRadius: BorderRadius.circular(kTileRadius),
-                  border: const Border.fromBorderSide(kTileBorderSide),
-                  boxShadow: kTileShadows,
-                ),
-                child: Center(
-                  child: Icon(
-                    type == 'mini_case'
-                        ? (isCompleted ? Icons.work : Icons.work_outline)
-                        : (type == 'goal_checkpoint'
-                            ? (isCompleted ? Icons.flag : Icons.flag_outlined)
-                            : Icons.center_focus_strong),
-                    color: type == 'mini_case'
-                        ? (isCompleted ? AppColor.success : AppColor.info)
-                        : (type == 'goal_checkpoint'
-                            ? (isCompleted ? AppColor.success : AppColor.info)
-                            : AppColor.labelColor),
-                    size: size * 0.7,
-                  ),
-                ),
+                child: isGoalCheckpoint
+                    ? ClipPath(
+                        clipper: _HexagonClipper(),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: AppColor.colorAccentWarm,
+                            border: Border.all(
+                              color: AppColor.colorAccentWarm,
+                              width: 2,
+                            ),
+                            boxShadow: kTileShadows,
+                          ),
+                          child: Center(
+                            child: Icon(
+                              isCompleted ? Icons.flag : Icons.flag_outlined,
+                              color: AppColor.onPrimary,
+                              size: size * 0.7,
+                            ),
+                          ),
+                        ),
+                      )
+                    : Stack(
+                        children: [
+                          Container(
+                            width: size,
+                            height: size,
+                            decoration: BoxDecoration(
+                              color: AppColor.surface,
+                              borderRadius: BorderRadius.circular(kTileRadius),
+                              border: Border.all(
+                                color: AppColor.colorBorder,
+                                width: 2,
+                              ),
+                              boxShadow: kTileShadows,
+                            ),
+                            child: Center(
+                              child: Icon(
+                                isCompleted ? Icons.work : Icons.work_outline,
+                                color: isCompleted
+                                    ? AppColor.colorSuccess
+                                    : AppColor.colorPrimary,
+                                size: size * 0.7,
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            top: 6,
+                            right: 6,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppColor.colorAccentWarmLight,
+                                borderRadius: BorderRadius.circular(
+                                    AppDimensions.radiusS),
+                                border: Border.all(
+                                  color: AppColor.colorAccentWarm,
+                                ),
+                              ),
+                              child: const Text(
+                                'Кейс',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColor.colorTextPrimary,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
               ),
             ],
           ),
@@ -451,6 +521,15 @@ class _LevelNodeTile extends StatelessWidget {
     final bool isCompleted = data['isCompleted'] == true;
     final bool isRepeatable = data['isRepeatable'] == true;
 
+    final String rawName = (data['name'] as String?)?.trim() ?? '';
+    final String cleanedName = rawName.replaceFirst(
+      RegExp(r'^\s*Уровень\s*\d+\s*:?\s*', caseSensitive: false),
+      '',
+    );
+    final String label = levelNumber == 0
+        ? 'Первый шаг'
+        : (cleanedName.isNotEmpty ? cleanedName : 'Уровень $levelNumber');
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -470,14 +549,15 @@ class _LevelNodeTile extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               _buildNodeLabel(
-                levelNumber == 0
-                    ? 'Уровень 0: Первый шаг'
-                    : 'Уровень $levelNumber: ${data['name']}',
+                label,
               ),
-              _buildLevelCoreTile(
-                isCurrent: isCurrent,
-                isCompleted: isCompleted,
-                isLocked: isLocked,
+              Hero(
+                tag: 'level-hero-$levelNumber',
+                child: _buildLevelCoreTile(
+                  isCurrent: isCurrent,
+                  isCompleted: isCompleted,
+                  isLocked: isLocked,
+                ),
               ),
               if (_shouldShowUnlockButton(
                   isLockedByGp: isLockedByGp,
@@ -489,7 +569,8 @@ class _LevelNodeTile extends StatelessWidget {
                       side:
                           const BorderSide(color: AppColor.primary, width: 1.5),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
+                        borderRadius:
+                            BorderRadius.circular(AppDimensions.radiusMd),
                       ),
                       padding: const EdgeInsets.symmetric(
                           horizontal: 12, vertical: 8),
@@ -531,7 +612,10 @@ class _LevelNodeTile extends StatelessWidget {
                         _captureError(e, st);
                       }
                     },
-                    child: const Text('Повторить уровень'),
+                    child: const Text(
+                      'Повторить',
+                      style: TextStyle(fontSize: 11),
+                    ),
                   ),
                 ),
             ],
@@ -578,4 +662,27 @@ class _PulsingStarState extends State<_PulsingStar>
       child: const Icon(Icons.star, color: AppColor.premium, size: 20),
     );
   }
+}
+
+class _HexagonClipper extends CustomClipper<Path> {
+  @override
+  Path getClip(Size size) {
+    final w = size.width;
+    final h = size.height;
+    final double x = w / 2;
+    final double y = h / 2;
+    final double r = w / 2;
+    final Path path = Path()
+      ..moveTo(x, y - r)
+      ..lineTo(x + r * 0.866, y - r * 0.5)
+      ..lineTo(x + r * 0.866, y + r * 0.5)
+      ..lineTo(x, y + r)
+      ..lineTo(x - r * 0.866, y + r * 0.5)
+      ..lineTo(x - r * 0.866, y - r * 0.5)
+      ..close();
+    return path;
+  }
+
+  @override
+  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
 }

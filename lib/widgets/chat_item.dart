@@ -31,6 +31,8 @@ class _ChatItemState extends State<ChatItem> {
   Widget build(BuildContext context) {
     final String imagePath = widget.chatData['image'] as String? ?? '';
     final String botLabel = widget.chatData['botLabel'] as String? ?? '';
+    final Color ringColor =
+        (widget.chatData['ringColor'] as Color?) ?? AppColor.primary;
     final bool showPhoto = imagePath.isNotEmpty;
 
     return MouseRegion(
@@ -45,18 +47,19 @@ class _ChatItemState extends State<ChatItem> {
         duration: const Duration(milliseconds: 120),
         child: Padding(
           padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-          child: BizLevelCard(
+          child: BizLevelCard.content(
             onTap: widget.onTap,
             padding: const EdgeInsets.symmetric(
               horizontal: AppSpacing.md,
               vertical: AppSpacing.itemSpacing,
             ),
-            semanticsLabel: (widget.chatData['name'] as String?)?.isNotEmpty == true
-                ? 'Открыть диалог: ${widget.chatData['name']}'
-                : 'Открыть диалог',
+            semanticsLabel:
+                (widget.chatData['name'] as String?)?.isNotEmpty == true
+                    ? 'Открыть диалог: ${widget.chatData['name']}'
+                    : 'Открыть диалог',
             child: Row(
               children: [
-                if (showPhoto) _buildPhoto(imagePath, botLabel),
+                if (showPhoto) _buildPhoto(imagePath, botLabel, ringColor),
                 if (showPhoto) const SizedBox(width: AppSpacing.s10),
                 Expanded(
                   child: Column(
@@ -82,7 +85,7 @@ class _ChatItemState extends State<ChatItem> {
         Expanded(
           child: Text(
             widget.chatData['last_text'] ?? '',
-            maxLines: 1,
+            maxLines: 2,
             overflow: TextOverflow.ellipsis,
             // fix: inline типографика → Theme.textTheme
             style: Theme.of(context).textTheme.bodyMedium,
@@ -101,14 +104,24 @@ class _ChatItemState extends State<ChatItem> {
     );
   }
 
-  Widget _buildPhoto(String imagePath, String botLabel) {
+  Widget _buildPhoto(String imagePath, String botLabel, Color ringColor) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        CustomImage(
-          imagePath,
+        Container(
           width: widget.profileSize,
           height: widget.profileSize,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: ringColor, width: 3),
+          ),
+          child: ClipOval(
+            child: CustomImage(
+              imagePath,
+              width: widget.profileSize,
+              height: widget.profileSize,
+            ),
+          ),
         ),
         const SizedBox(height: AppSpacing.xs),
         if (botLabel.isNotEmpty)
@@ -131,7 +144,7 @@ class _ChatItemState extends State<ChatItem> {
         Expanded(
           child: Text(
             widget.chatData['name'] ?? '',
-            maxLines: 1,
+            maxLines: 2,
             overflow: TextOverflow.ellipsis,
             // fix: inline типографика → textTheme.titleMedium
             style: Theme.of(context)

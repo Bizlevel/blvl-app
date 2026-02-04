@@ -21,6 +21,7 @@ import 'package:bizlevel/theme/typography.dart';
 import 'package:bizlevel/theme/dimensions.dart';
 import 'package:bizlevel/widgets/common/bizlevel_button.dart';
 import 'package:bizlevel/widgets/common/bizlevel_card.dart';
+import 'package:shimmer/shimmer.dart';
 
 class MiniCaseScreen extends ConsumerStatefulWidget {
   final int caseId;
@@ -38,6 +39,7 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
 
   // 🆕 Для двухблоковой структуры
   late PageController _pageController;
+  int _pageIndex = 0;
   // Индикаторы текущей страницы/просмотра видео не используются — удалены
 
   @override
@@ -134,36 +136,52 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
         title: Text(title),
         backgroundColor: Colors.transparent,
         elevation: 0,
+        leading: _pageIndex == 1
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                tooltip: 'Назад к описанию',
+                onPressed: () {
+                  _pageController.previousPage(
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
+                  );
+                },
+              )
+            : null,
         actions: [
-          TextButton(onPressed: _onSkip, child: const Text('Пропустить')),
+          TextButton(
+            onPressed: _onSkip,
+            style: TextButton.styleFrom(
+              foregroundColor: AppColor.colorTextSecondary,
+            ),
+            child: const Text('Пропустить'),
+          ),
         ],
       ),
-      body: Container(
-        decoration: const BoxDecoration(gradient: AppColor.bgGradient),
-        child: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : PageView(
-                controller: _pageController,
-                physics:
-                    const NeverScrollableScrollPhysics(), // 🔒 Запретить свайпы
-                onPageChanged: (index) {
-                  // Breadcrumb для аналитики
-                  try {
-                    Sentry.addBreadcrumb(Breadcrumb(
-                      category: 'case',
-                      message: index == 0
-                          ? 'case_intro_block_opened'
-                          : 'case_video_block_opened',
-                      data: {'caseId': widget.caseId, 'blockIndex': index},
-                    ));
-                  } catch (_) {}
-                },
-                children: [
-                  _buildIntroBlock(), // Блок 1: Картинка + Описание + "Далее"
-                  _buildVideoBlock(), // Блок 2: Видео + "Решить с Лео"
-                ],
-              ),
-      ),
+      body: _loading
+          ? const _MiniCaseSkeleton()
+          : PageView(
+              controller: _pageController,
+              physics:
+                  const NeverScrollableScrollPhysics(), // 🔒 Запретить свайпы
+              onPageChanged: (index) {
+                setState(() => _pageIndex = index);
+                // Breadcrumb для аналитики
+                try {
+                  Sentry.addBreadcrumb(Breadcrumb(
+                    category: 'case',
+                    message: index == 0
+                        ? 'case_intro_block_opened'
+                        : 'case_video_block_opened',
+                    data: {'caseId': widget.caseId, 'blockIndex': index},
+                  ));
+                } catch (_) {}
+              },
+              children: [
+                _buildIntroBlock(), // Блок 1: Картинка + Описание + "Далее"
+                _buildVideoBlock(), // Блок 2: Видео + "Решить с Лео"
+              ],
+            ),
     );
   }
 
@@ -179,7 +197,6 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           AppSpacing.gapH(AppSpacing.md),
-
           BizLevelCard(
             padding: AppSpacing.insetsAll(AppSpacing.lg),
             child: Column(
@@ -200,9 +217,7 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
               ],
             ),
           ),
-
           AppSpacing.gapH(AppSpacing.xl),
-
           BizLevelButton(
             label: 'Далее',
             icon: const Icon(Icons.arrow_forward, size: 20),
@@ -215,11 +230,28 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
             },
           ),
           AppSpacing.gapH(AppSpacing.sm),
-          Text(
-            'Если пропустить кейс, бонусы за него не начисляются.',
-            textAlign: TextAlign.center,
-            style: AppTypography.textTheme.bodySmall
-                ?.copyWith(color: AppColor.labelColor),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppColor.colorAccentWarmLight,
+              borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
+              border: Border.all(color: AppColor.colorAccentWarm),
+            ),
+            child: const Row(
+              children: [
+                Text('🏆'),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Пройди 3 кейса — получи бонус +200 GP',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: AppColor.colorTextPrimary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -273,34 +305,20 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                Text(
+                  'Посмотрите видео перед решением кейса',
+                  textAlign: TextAlign.center,
+                  style: AppTypography.caption
+                      .copyWith(color: AppColor.colorTextSecondary),
+                ),
+                AppSpacing.gapH(AppSpacing.sm),
                 // Кнопка "Решить с Лео"
                 BizLevelButton(
                   label: 'Решить с Лео',
                   icon: const Icon(Icons.psychology_alt_outlined, size: 20),
                   fullWidth: true,
+                  size: BizLevelButtonSize.lg,
                   onPressed: _openDialog,
-                ),
-
-                AppSpacing.gapH(AppSpacing.sm),
-
-                // Кнопка "Назад" (опционально, чтобы вернуться к описанию)
-                BizLevelButton(
-                  label: 'Назад к описанию',
-                  icon: const Icon(Icons.arrow_back, size: 20),
-                  variant: BizLevelButtonVariant.text,
-                  onPressed: () {
-                    _pageController.previousPage(
-                      duration: const Duration(milliseconds: 300),
-                      curve: Curves.easeInOut,
-                    );
-                  },
-                ),
-                AppSpacing.gapH(AppSpacing.xs),
-                Text(
-                  'Если пропустить кейс, бонусы за него не начисляются.',
-                  textAlign: TextAlign.center,
-                  style: AppTypography.textTheme.bodySmall
-                      ?.copyWith(color: AppColor.labelColor),
                 ),
               ],
             ),
@@ -340,8 +358,8 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
       final String finalStory = _asMultilineText(_script?['final_story']);
       // Важно: открываем диалог через rootNavigator, чтобы он был поверх ShellRoute
       // (и не конфликтовал с таб-навбаром/вложенным навигатором).
-      final result =
-          await Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(
+      final result = await Navigator.of(context, rootNavigator: true)
+          .push(MaterialPageRoute(
         builder: (_) => LeoDialogScreen(
           caseMode: true,
           caseId: widget.caseId,
@@ -690,5 +708,56 @@ class _MiniCaseScreenState extends ConsumerState<MiniCaseScreen> {
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('Не удалось пропустить')));
     }
+  }
+}
+
+class _MiniCaseSkeleton extends StatelessWidget {
+  const _MiniCaseSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: AppSpacing.insetsAll(AppSpacing.lg),
+      child: Shimmer.fromColors(
+        baseColor: AppColor.colorBackgroundSecondary,
+        highlightColor: AppColor.colorSurface,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              height: 180,
+              decoration: BoxDecoration(
+                color: AppColor.colorSurface,
+                borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
+              ),
+            ),
+            AppSpacing.gapH(AppSpacing.md),
+            Container(
+              height: 20,
+              decoration: BoxDecoration(
+                color: AppColor.colorSurface,
+                borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
+              ),
+            ),
+            AppSpacing.gapH(AppSpacing.s6),
+            Container(
+              height: 16,
+              decoration: BoxDecoration(
+                color: AppColor.colorSurface,
+                borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
+              ),
+            ),
+            AppSpacing.gapH(AppSpacing.sm),
+            Container(
+              height: 44,
+              decoration: BoxDecoration(
+                color: AppColor.colorSurface,
+                borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

@@ -35,4 +35,36 @@ class MotionSystem {
   static const Curve entering = Curves.easeOutCubic;
   static const Curve exiting = Curves.easeInCubic;
   static const Curve emphasized = Curves.easeInOutCubic;
+
+  // ==========================================================================
+  // Premium 2.0: Purposeful Motion
+  // ==========================================================================
+
+  /// Tap feedback (scale 0.98 → 1.0).
+  static const Duration durationTap = Duration(milliseconds: 100);
+
+  /// Transition между экранами.
+  static const Duration durationTransition = Duration(milliseconds: 300);
+
+  /// Progress counters и bars.
+  static const Duration durationProgress = Duration(milliseconds: 400);
+
+  /// Success celebrations.
+  static const Duration durationSuccess = Duration(milliseconds: 600);
+
+  /// Standard ease-in-out curve.
+  static const Curve curveStandard = Curves.easeInOut;
+
+  /// Emphasize появление (ease-out).
+  static const Curve curveEmphasize = Curves.easeOut;
+
+  /// Decelerate для затухания.
+  static const Curve curveDecelerate = Curves.decelerate;
+
+  /// Bounce для success/celebration.
+  static const Curve curveBounce = Curves.elasticOut;
+
+  /// Scale для tap feedback.
+  static const double tapScaleDown = 0.98;
+  static const double tapScaleUp = 1.0;
 }

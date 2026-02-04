@@ -11,6 +11,8 @@ import 'package:bizlevel/theme/typography.dart';
 import 'package:bizlevel/theme/dimensions.dart';
 import 'package:bizlevel/widgets/leo_message_bubble.dart';
 import 'package:bizlevel/widgets/typing_indicator.dart';
+import 'package:bizlevel/widgets/common/bizlevel_text_field.dart';
+import 'package:bizlevel/widgets/custom_textfield.dart';
 import 'package:bizlevel/services/leo_service.dart';
 import 'package:bizlevel/providers/gp_providers.dart';
 import 'package:bizlevel/providers/cases_provider.dart';
@@ -37,7 +39,10 @@ class LeoDialogScreen extends ConsumerStatefulWidget {
       embedded; // когда true — рендер без Scaffold/AppBar (встраиваемый вид)
   final ValueChanged<String>?
       onAssistantMessage; // колбэк для получения ответа ассистента
-  final ValueChanged<String>? onChatIdChanged; // возвращает chatId после первого сообщения
+  final ValueChanged<String>?
+      onUserMessage; // колбэк для отправленного сообщения пользователя
+  final ValueChanged<String>?
+      onChatIdChanged; // возвращает chatId после первого сообщения
   final List<String>?
       recommendedChips; // опц. серверные подсказки (fallback на клиенте)
   final String?
@@ -61,6 +66,7 @@ class LeoDialogScreen extends ConsumerStatefulWidget {
     this.caseContexts,
     this.embedded = false,
     this.onAssistantMessage,
+    this.onUserMessage,
     this.onChatIdChanged,
     this.recommendedChips,
     this.casePreface,
@@ -99,6 +105,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
   final Set<String> _dismissedChips = {};
   bool _showScrollToBottom = false;
   bool _showSuggestions = true; // управляет показом inline-подсказок
+  String? _lastFailedMessage;
   List<String> get _defaultGoalChips {
     if (widget.bot != 'max') return const [];
     return const [
@@ -111,7 +118,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
   // Добавляем debounce для предотвращения дублей
   Timer? _debounceTimer;
   static const Duration _debounceDelay = Duration(milliseconds: 500);
-  
+
   // Debounce для обновления чипсов
   Timer? _chipsDebounceTimer;
   static const Duration _chipsDebounceDelay = Duration(milliseconds: 1000);
@@ -145,7 +152,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
       _showSuggestions = false;
     }
     _allowPop = !widget.caseMode;
-    
+
     // Следим за позицией скролла для показа FAB «вниз»
     _scrollController.addListener(() {
       if (!_scrollController.hasClients) return;
@@ -229,7 +236,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
           'LEO_DIALOG dispose caseMode=${widget.caseMode} chatId=$_chatId');
       return true;
     }());
-    
+
     _inputController.dispose();
     _inputFocus.dispose();
     super.dispose();
@@ -361,7 +368,8 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
     });
   }
 
-  Future<void> _sendMessageInternal(String text, {bool isAuto = false}) async {
+  Future<void> _sendMessageInternal(String text,
+      {bool isAuto = false, bool isRetry = false}) async {
     // Дополнительная проверка на случай, если состояние изменилось
     if (_isSending || !mounted) return;
     try {
@@ -379,13 +387,20 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
 
     setState(() {
       _isSending = true;
-      _messages.add({
-        'role': 'user',
-        'content': text,
-        'created_at': DateTime.now().toIso8601String(),
-      });
+      if (!isRetry) {
+        _messages.add({
+          'role': 'user',
+          'content': text,
+          'created_at': DateTime.now().toIso8601String(),
+        });
+      }
     });
-    _inputController.clear();
+    try {
+      widget.onUserMessage?.call(text);
+    } catch (_) {}
+    if (!isRetry) {
+      _inputController.clear();
+    }
     _scrollToBottom();
 
     try {
@@ -581,7 +596,8 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
                         if (mounted) {
                           setState(() => _allowPop = true);
                         }
-                        Navigator.of(context, rootNavigator: true).pop('case_final');
+                        Navigator.of(context, rootNavigator: true)
+                            .pop('case_final');
                       },
                       child: const Text('Вернуться в Башню'),
                     ),
@@ -623,8 +639,18 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
         ));
       } catch (_) {}
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+      _lastFailedMessage = text;
+      setState(() {
+        _messages.add({
+          'role': 'assistant',
+          'type': 'error',
+          'content':
+              'Не удалось получить ответ. GP не списаны. Можно попробовать ещё раз.',
+          'retryText': text,
+          'created_at': DateTime.now().toIso8601String(),
+        });
+      });
+      _scrollToBottom();
     } finally {
       if (mounted) setState(() => _isSending = false);
       // Обновляем чипсы после отправки сообщения
@@ -634,6 +660,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
 
   List<Map<String, dynamic>> _buildChatContext() {
     final List<Map<String, dynamic>> ctx = _messages
+        .where((m) => m['hidden'] != true && m['type'] != 'error')
         .map((m) => {'role': m['role'], 'content': m['content']})
         .toList();
     // В режиме мини‑кейса добавляем системный промпт фасилитатора как первое сообщение
@@ -660,7 +687,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
                 'LEO_DIALOG embedded popInvoked didPop=$didPop result=$result allowPop=$_allowPop');
             return true;
           }());
-          
+
           // В embedded режиме разрешаем закрытие по умолчанию
           // (контроль закрытия осуществляется на уровне родительского Scaffold)
         },
@@ -682,7 +709,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
               'LEO_DIALOG popInvoked didPop=$didPop result=$result allowPop=$_allowPop caseMode=${widget.caseMode}');
           return true;
         }());
-        
+
         try {
           Sentry.addBreadcrumb(Breadcrumb(
             category: 'nav',
@@ -703,7 +730,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
         appBar: AppBar(
           backgroundColor: AppColor.primary,
           automaticallyImplyLeading: !widget.caseMode,
-              leading: widget.caseMode
+          leading: widget.caseMode
               ? IconButton(
                   tooltip: 'Закрыть',
                   icon: const Icon(Icons.close),
@@ -771,9 +798,8 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
         controller: _scrollController,
         padding: const EdgeInsets.symmetric(
             horizontal: AppSpacing.lg, vertical: AppSpacing.s10),
-        itemCount: visibleMessages.length +
-            (_hasMore ? 1 : 0) +
-            (_isSending ? 1 : 0),
+        itemCount:
+            visibleMessages.length + (_hasMore ? 1 : 0) + (_isSending ? 1 : 0),
         itemBuilder: (context, index) {
           // 1) Плашка загрузки предыдущих сообщений
           if (_hasMore && index == 0) {
@@ -820,6 +846,54 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
           }
           // 3) Обычные сообщения
           final msg = visibleMessages[msgIndex];
+          if (msg['type'] == 'error') {
+            return Align(
+              alignment: Alignment.centerLeft,
+              child: Container(
+                margin: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+                constraints: BoxConstraints(
+                    maxWidth: MediaQuery.of(context).size.width * 0.85),
+                decoration: BoxDecoration(
+                  color: AppColor.colorErrorLight,
+                  borderRadius: BorderRadius.circular(AppDimensions.radiusLg)
+                      .copyWith(topLeft: const Radius.circular(0)),
+                  border: Border.all(
+                      color: AppColor.colorError.withValues(alpha: 0.4)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      msg['content']?.toString() ?? '',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: AppColor.colorTextPrimary,
+                          ),
+                    ),
+                    AppSpacing.gapH(AppSpacing.s6),
+                    TextButton(
+                      onPressed: _isSending
+                          ? null
+                          : () {
+                              msg['hidden'] = true;
+                              setState(() {});
+                              final retryText = msg['retryText']?.toString() ??
+                                  _lastFailedMessage ??
+                                  '';
+                              if (retryText.isEmpty) return;
+                              _sendMessageInternal(
+                                retryText,
+                                isRetry: true,
+                              );
+                            },
+                      child: const Text('Повторить'),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
           final isUser = msg['role'] == 'user';
           final bubble = LeoMessageBubble(
             text: msg['content'] as String? ?? '',
@@ -874,10 +948,15 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
   }
 
   Widget _buildInput() {
+    final bool isCaseMode = widget.caseMode;
+    final String inputHint =
+        isCaseMode ? 'Напиши своё решение...' : 'Введите сообщение...';
     // SafeArea(bottom: false) - Flutter сам обработает отступы снизу при adjustResize
     // Оставляем только боковые отступы для системных элементов (notch)
+    // Когда embedded: true, родительский Scaffold управляет клавиатурой через resizeToAvoidBottomInset.
+    // Не добавляем viewInsets.bottom здесь, чтобы избежать двойной компенсации и пустого пространства.
     return SafeArea(
-      bottom: false, // Flutter автоматически поднимет контент при появлении клавиатуры
+      bottom: false,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
         child: Column(
@@ -890,18 +969,14 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
                 Expanded(
                   child: Semantics(
                     label: 'Поле ввода сообщения',
-                    child: TextField(
+                    child: BizLevelTextField(
                       controller: _inputController,
                       focusNode: _inputFocus,
                       minLines: 1,
                       maxLines: 4,
                       textInputAction: TextInputAction.send,
-                      textCapitalization: TextCapitalization.sentences,
-                      autocorrect: true,
-                      decoration: const InputDecoration(
-                        hintText: 'Введите сообщение...',
-                        border: OutlineInputBorder(),
-                      ),
+                      preset: TextFieldPreset.chat,
+                      hint: inputHint,
                       onTapOutside: (_) {
                         FocusScope.of(context).unfocus();
                       },
@@ -942,6 +1017,15 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
                       ),
               ],
             ),
+            if (isCaseMode) ...[
+              const SizedBox(height: 6),
+              Text(
+                '2-3 предложения своими словами. Лео прокомментирует',
+                style: AppTypography.captionSmall.copyWith(
+                  color: AppColor.colorTextTertiary,
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -1081,7 +1165,8 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
   List<String> _resolveRecommendedChips() {
     // Временно показываем ТОЛЬКО серверные чипсы (без мерджа и без фильтра dismissed)
     if (_serverRecommendedChips.isNotEmpty) {
-      final clean = _serverRecommendedChips.where((e) => e.trim().isNotEmpty).toList();
+      final clean =
+          _serverRecommendedChips.where((e) => e.trim().isNotEmpty).toList();
       return clean.length > 6 ? clean.sublist(0, 6) : clean;
     }
     final fromWidget = widget.recommendedChips ?? const [];

@@ -11,6 +11,7 @@ import 'package:bizlevel/widgets/common/bizlevel_button.dart';
 import 'package:bizlevel/widgets/common/bizlevel_card.dart';
 import 'package:bizlevel/widgets/common/notification_center.dart';
 import 'package:bizlevel/theme/spacing.dart';
+import 'package:bizlevel/theme/color.dart';
 
 class CheckpointL1Screen extends ConsumerStatefulWidget {
   const CheckpointL1Screen({super.key});
@@ -62,7 +63,7 @@ class _CheckpointL1ScreenState extends ConsumerState<CheckpointL1Screen> {
       final num? metricTarget = num.tryParse(_metricTargetCtrl.text.trim());
       if (metricCurrent == null || metricTarget == null) {
         NotificationCenter.showError(
-            context, 'Введите числовые значения метрик');
+            context, 'Введите обе метрики числовыми значениями');
         return;
       }
       final userId = Supabase.instance.client.auth.currentUser?.id ?? '';
@@ -89,7 +90,8 @@ class _CheckpointL1ScreenState extends ConsumerState<CheckpointL1Screen> {
       NotificationCenter.showSuccess(context, 'Цель сохранена');
       // Возвращаемся назад вместо перехода на /goal (который недоступен до завершения уровня)
       if (Navigator.of(context).canPop()) {
-        Navigator.of(context).pop(true); // Возвращаем true как признак успешного сохранения
+        Navigator.of(context)
+            .pop(true); // Возвращаем true как признак успешного сохранения
       }
     } catch (e) {
       if (!mounted) return;
@@ -105,45 +107,35 @@ class _CheckpointL1ScreenState extends ConsumerState<CheckpointL1Screen> {
 
   @override
   Widget build(BuildContext context) {
-    final bool canSave = _goalTextCtrl.text.trim().isNotEmpty;
+    final bool hasGoal = _goalTextCtrl.text.trim().isNotEmpty;
+    final bool hasCurrent = _metricCurrentCtrl.text.trim().isNotEmpty;
+    final bool hasTarget = _metricTargetCtrl.text.trim().isNotEmpty;
+    final bool canSave = hasGoal && hasCurrent && hasTarget;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Чекпоинт: Первая цель'),
       ),
-      // ВАЖНО: resizeToAvoidBottomInset: true, чтобы Flutter поднимал контент при появлении клавиатуры
+      // Flutter автоматически управляет клавиатурой
       resizeToAvoidBottomInset: true,
       body: SingleChildScrollView(
         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         padding: const EdgeInsets.all(AppSpacing.lg),
-        child: BizLevelCard(
+        child: BizLevelCard.content(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Интро-блок: картинка ~1/3 экрана и 3 строки текста
-              LayoutBuilder(builder: (context, cons) {
-                final double h = MediaQuery.of(context).size.height / 3;
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(
-                      height: h.clamp(180, 320),
-                      width: double.infinity,
-                      child: Image.asset(
-                        'assets/images/logo_light.png',
-                        fit: BoxFit.contain,
+              // Интро-блок: формула цели
+              BizLevelCard.nested(
+                padding: AppSpacing.insetsAll(AppSpacing.lg),
+                child: Text(
+                  'Формула цели: Увеличить [показатель] с [X] до [Y] к [дата]',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        fontStyle: FontStyle.italic,
+                        color: AppColor.colorTextSecondary,
                       ),
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    Text(
-                      'Сформулируйте первую цель. Сделайте её измеримой и достижимой — так вы увидите прогресс и поймёте, что работает.',
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                    const SizedBox(height: AppSpacing.lg),
-                  ],
-                );
-              }),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.lg),
               Text('Шаг 1: Опишите свою цель',
                   style: Theme.of(context)
                       .textTheme
@@ -210,7 +202,7 @@ class _CheckpointL1ScreenState extends ConsumerState<CheckpointL1Screen> {
                 ],
               ),
               const SizedBox(height: AppSpacing.lg),
-              Text('Шаг 2: Срок достижения (необязательно)',
+              Text('Шаг 3: Срок достижения (необязательно)',
                   style: Theme.of(context).textTheme.bodyMedium),
               const SizedBox(height: AppSpacing.sm),
               Row(
@@ -233,6 +225,11 @@ class _CheckpointL1ScreenState extends ConsumerState<CheckpointL1Screen> {
                 width: double.infinity,
                 child: BizLevelButton(
                   label: 'Сформулировать цель',
+                  size: BizLevelButtonSize.lg,
+                  backgroundColorOverride:
+                      canSave ? AppColor.primary : AppColor.colorBorder,
+                  foregroundColorOverride:
+                      canSave ? AppColor.onPrimary : AppColor.colorTextTertiary,
                   onPressed: canSave ? _saveAndGoGoal : null,
                 ),
               ),

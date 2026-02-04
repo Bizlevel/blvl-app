@@ -7,6 +7,7 @@ import 'package:bizlevel/providers/reminder_prefs_provider.dart';
 import 'package:bizlevel/services/notifications_service.dart';
 import 'package:bizlevel/services/reminder_prefs_cache.dart';
 import 'package:bizlevel/utils/input_bottom_sheet.dart';
+import 'package:bizlevel/theme/color.dart';
 
 /// Common content for configuring practice reminders (time + weekdays)
 class RemindersSettingsContent extends ConsumerStatefulWidget {
@@ -247,8 +248,8 @@ class _RemindersSettingsContentState
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content:
-              Text(days.isEmpty ? 'Напоминания выключены' : 'Напоминания настроены'),
+          content: Text(
+              days.isEmpty ? 'Напоминания выключены' : 'Напоминания настроены'),
         ),
       );
       Navigator.of(context).maybePop();
@@ -335,34 +336,17 @@ class _ReminderStatus extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Row(
       children: [
-        Row(
-          children: [
-            Icon(Icons.cloud_outlined, size: 18, color: theme.colorScheme.primary),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'Расписание сохраняется и синхронизируется. Облачные пуши будут настроены на этапе 2.',
-                style: theme.textTheme.bodySmall,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Icon(Icons.phone_android, size: 18, color: theme.colorScheme.primary),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'Локальные напоминания продолжают работать офлайн и повторяют расписание.',
-                style: theme.textTheme.bodySmall,
-              ),
-            ),
-          ],
+        const Icon(Icons.check_circle, size: 18, color: AppColor.success),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            'Напоминания будут приходить в выбранное время',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppColor.success,
+                ),
+          ),
         ),
       ],
     );

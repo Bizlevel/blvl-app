@@ -20,6 +20,8 @@ import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:bizlevel/theme/spacing.dart';
 import 'package:bizlevel/theme/dimensions.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:bizlevel/services/referral_service.dart';
 
 class GpStoreScreen extends ConsumerStatefulWidget {
   const GpStoreScreen({super.key});
@@ -38,15 +40,35 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
   final Map<String, StoreKitProduct> _storeKitProducts = {};
   String? _storeKitStatusMessage;
   final Map<String, Map<String, dynamic>> _serverPricing = {};
+  
+  // Реферальный код
+  String? _myReferralCode;
+  bool _referralCodeLoading = false;
 
   @override
   void initState() {
     super.initState();
     _loadServerPricing();
+    _loadReferralCode();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _waitForVisibilityAndLoadIap();
     });
+  }
+
+  Future<void> _loadReferralCode() async {
+    if (_referralCodeLoading || _myReferralCode != null) return;
+    setState(() => _referralCodeLoading = true);
+    try {
+      final service = ReferralService(Supabase.instance.client);
+      final code = await service.getMyReferralCode();
+      if (!mounted) return;
+      setState(() => _myReferralCode = code);
+    } catch (e) {
+      // Код недоступен — кнопка будет шарить без кода
+    } finally {
+      if (mounted) setState(() => _referralCodeLoading = false);
+    }
   }
 
   void _waitForVisibilityAndLoadIap() {
@@ -217,84 +239,73 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
           padding: AppSpacing.insetsAll(AppSpacing.lg),
           children: [
             // Вводный блок
-            BizLevelCard(
+            BizLevelCard.hero(
               padding: AppSpacing.insetsAll(AppSpacing.md),
-              outlined: true,
               child: Row(
                 children: [
                   const GpBalanceWidget(),
                   const SizedBox(width: AppSpacing.md),
                   Expanded(
                     child: Text(
-                      'GP — внутренняя валюта BizLevel: 1 GP = 1 сообщение в чате тренеров, также GP открывают новые этажи.',
+                      'Growth Points (GP) — ваши очки роста. Они нужны для общения с менторами и открытия новых этажей.',
                       style: Theme.of(context).textTheme.bodyMedium,
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: AppSpacing.md),
-            // Подсказка: как получить GP (бонусы) — свёрнутый раздел
+            const SizedBox(height: AppSpacing.sm),
+            // Блок Пригласи друга
             BizLevelCard(
-              padding: AppSpacing.insetsAll(AppSpacing.xs),
-              child: ExpansionTile(
-                initiallyExpanded: _bonusExpanded,
-                onExpansionChanged: (v) => setState(() => _bonusExpanded = v),
-                title: const Text('Как получить бонусные GP'),
-                children: const [
-                  _FaqRow(
-                      icon: Icons.person_add_alt,
-                      text: '+30 GP — за регистрацию (первый вход)'),
-                  _FaqRow(
-                      icon: Icons.badge_outlined,
-                      text:
-                          '+50 GP — за полный профиль (Профиль > Информация обо мне)'),
-                  _FaqRow(
-                      icon: Icons.work_outline,
-                      text: '+200 GP — за 3 решённых мини‑кейса'),
-                  _FaqRow(
-                      icon: Icons.check_circle_outline,
-                      text: '+5 GP — за ежедневное применение навыков'),
-                  _FaqRow(
-                      icon: Icons.flag_outlined,
-                      text: '+20 GP — за завершение уровня'),
-                  _FaqRow(
-                      icon: Icons.rocket_launch_outlined,
-                      text: '+400 GP — покупка пакета «РАЗГОН»'),
-                  _FaqRow(
-                      icon: Icons.workspace_premium_outlined,
-                      text: '+1000 GP — покупка пакета «ТРАНСФОРМАЦИЯ»'),
+              padding: AppSpacing.insetsSymmetric(h: AppSpacing.md, v: AppSpacing.sm),
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  AppColor.colorPrimaryLight,
+                  AppColor.colorSurface,
                 ],
               ),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            BizLevelCard(
-              padding: AppSpacing.insetsAll(AppSpacing.md),
-              outlined: true,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Row(
                 children: [
-                  Text(
-                    'Пригласи друга — получи 100 GP',
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleSmall
-                        ?.copyWith(fontWeight: FontWeight.w600),
+                  SvgPicture.asset(
+                    'assets/images/gp_coin.svg',
+                    width: 24,
+                    height: 24,
+                    colorFilter: const ColorFilter.mode(
+                      AppColor.colorAccentWarm,
+                      BlendMode.srcIn,
+                    ),
                   ),
-                  AppSpacing.gapH(AppSpacing.s6),
-                  Text(
-                    'Бонус начислим после того, как друг пройдет уровни 0 и 1.',
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodySmall
-                        ?.copyWith(color: AppColor.onSurfaceSubtle),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Text(
+                      'Пригласи друга — получи 100 GP',
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleSmall
+                          ?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  Tooltip(
+                    message: 'Бонус будет начислен после того, как друг пройдёт уровень 1',
+                    child: Icon(
+                      Icons.info_outline,
+                      size: 20,
+                      color: AppColor.colorTextSecondary,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  BizLevelButton(
+                    label: 'Поделиться',
+                    size: BizLevelButtonSize.sm,
+                    variant: BizLevelButtonVariant.secondary,
+                    onPressed: _shareReferral,
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: AppSpacing.md),
+            const SizedBox(height: AppSpacing.sm),
             // Переключатель планов
             Semantics(
               label: 'Выбор плана',
@@ -334,7 +345,7 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: AppSpacing.md),
+            const SizedBox(height: AppSpacing.xs),
             // Одна карточка выбранного плана
             if (_selectedPackageId == 'gp_300')
               Semantics(
@@ -369,7 +380,7 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
                   italicNote: 'Выбор 80% предпринимателей',
                   priceLabel: _priceLabelFor('gp_1000', '₸9 990'),
                   highlight: true,
-                  ribbon: isXs ? null : 'Хит',
+                  ribbon: isXs ? null : 'Популярный',
                   selected: true,
                   onSelect: () {},
                 ),
@@ -393,14 +404,52 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
                   onSelect: () {},
                 ),
               ),
-            const SizedBox(height: AppSpacing.md),
+            const SizedBox(height: AppSpacing.sm),
+            // Подсказка: как получить GP (бонусы) — свёрнутый раздел
+            BizLevelCard.nested(
+              padding: EdgeInsets.zero,
+              child: ExpansionTile(
+                initiallyExpanded: _bonusExpanded,
+                onExpansionChanged: (v) => setState(() => _bonusExpanded = v),
+                tilePadding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                childrenPadding: const EdgeInsets.only(left: AppSpacing.md, right: AppSpacing.md, bottom: AppSpacing.sm),
+                title: Text('Как получить бонусные GP', style: Theme.of(context).textTheme.bodyMedium),
+                children: const [
+                  _FaqRow(
+                      icon: Icons.person_add_alt,
+                      text: '+30 GP — за регистрацию (первый вход)'),
+                  _FaqRow(
+                      icon: Icons.badge_outlined,
+                      text:
+                          '+50 GP — за полный профиль (Профиль > Информация обо мне)'),
+                  _FaqRow(
+                      icon: Icons.work_outline,
+                      text: '+200 GP — за 3 решённых мини‑кейса'),
+                  _FaqRow(
+                      icon: Icons.check_circle_outline,
+                      text: '+5 GP — за ежедневное применение навыков'),
+                  _FaqRow(
+                      icon: Icons.flag_outlined,
+                      text: '+20 GP — за завершение уровня'),
+                  _FaqRow(
+                      icon: Icons.rocket_launch_outlined,
+                      text: '+400 GP — покупка пакета «РАЗГОН»'),
+                  _FaqRow(
+                      icon: Icons.workspace_premium_outlined,
+                      text: '+1000 GP — покупка пакета «ТРАНСФОРМАЦИЯ»'),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
             // FAQ свернут по умолчанию
             BizLevelCard(
-              padding: AppSpacing.insetsAll(AppSpacing.xs),
+              padding: EdgeInsets.zero,
               child: ExpansionTile(
                 initiallyExpanded: _faqExpanded,
                 onExpansionChanged: (v) => setState(() => _faqExpanded = v),
-                title: const Text('Вопросы и безопасность'),
+                tilePadding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 0),
+                childrenPadding: const EdgeInsets.only(left: AppSpacing.md, right: AppSpacing.md, bottom: AppSpacing.xs),
+                title: Text('Вопросы и безопасность', style: Theme.of(context).textTheme.bodyMedium),
                 children: const [
                   _FaqRow(
                       icon: Icons.lock_outline,
@@ -426,17 +475,23 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
         child: Container(
           padding: const EdgeInsets.fromLTRB(
               AppSpacing.lg, AppSpacing.sm, AppSpacing.lg, AppSpacing.md),
-          decoration: const BoxDecoration(
-            color: AppColor.surface,
-            border: Border(top: BorderSide(color: AppColor.borderStrong)),
-          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Row(
                 children: [
+                  // Восстановить — слева, компактная
+                  BizLevelButton(
+                    variant: BizLevelButtonVariant.secondary,
+                    label: 'Восстановить',
+                    size: BizLevelButtonSize.sm,
+                    onPressed: () => _restorePurchases(context, ref),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  // Оплатить — справа, расширенная
                   Expanded(
+                    flex: 2,
                     child: BizLevelButton(
                       label: _selectedPackageId == null
                           ? 'Выберите пакет'
@@ -450,12 +505,6 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
                               ),
                     ),
                   ),
-                  const SizedBox(width: AppSpacing.md),
-                  BizLevelButton(
-                    variant: BizLevelButtonVariant.secondary,
-                    label: 'Проверить',
-                    onPressed: () => _verifyLastPurchase(context),
-                  ),
                 ],
               ),
             ],
@@ -463,6 +512,49 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
         ),
       ),
     );
+  }
+
+  void _shareReferral() {
+    final code = _myReferralCode;
+    final String text;
+    if (code != null && code.isNotEmpty) {
+      text = 'Мой код BizLevel: $code\n'
+          'Используй при регистрации и получи 100 GP!\n'
+          'Скачай: bizlevel.kz';
+    } else {
+      text = 'BizLevel — платформа для предпринимателей. Присоединяйся: bizlevel.kz';
+    }
+    Share.share(text);
+  }
+
+  Future<void> _restorePurchases(BuildContext context, WidgetRef ref) async {
+    try {
+      final platform = IapService.currentPlatform();
+      if (platform == 'ios') {
+        final items = await IapService.instance.restoreStoreKitPurchases();
+        if (!context.mounted) return;
+        final message = items.isEmpty
+            ? 'Покупки не найдены.'
+            : 'Найдено покупок: ${items.length}. Баланс обновится автоматически.';
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(message)));
+        ref.invalidate(gpBalanceProvider);
+        return;
+      }
+      if (platform == 'web') {
+        await _verifyLastPurchase(context);
+        return;
+      }
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Восстановление доступно только в App Store.'),
+      ));
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Не удалось восстановить покупки. Попробуйте позже.'),
+      ));
+    }
   }
 
   Future<void> _startPurchaseIapOrWeb(
@@ -871,7 +963,14 @@ class _GpPlanCard extends StatelessWidget {
     final theme = Theme.of(context);
     return Card(
       shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppDimensions.radiusLg)),
+        borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
+        side: BorderSide(
+          color: highlight
+              ? AppColor.colorAccentWarm.withValues(alpha: 0.6)
+              : Colors.transparent,
+          width: highlight ? 1.2 : 0,
+        ),
+      ),
       elevation: highlight ? 3 : AppDimensions.elevationHairline,
       child: Padding(
         padding: AppSpacing.insetsAll(AppSpacing.md),

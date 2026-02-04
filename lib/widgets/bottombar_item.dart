@@ -9,8 +9,8 @@ class BottomBarItem extends StatelessWidget {
     this.icon, {
     super.key,
     this.onTap,
-    this.color = AppColor.onSurfaceSubtle,
-    this.activeColor = AppColor.primary,
+    this.color = AppColor.colorTextTertiary,
+    this.activeColor = AppColor.colorPrimary,
     this.isActive = false,
     this.isNotified = false,
     this.iconWidget,
@@ -37,7 +37,7 @@ class BottomBarItem extends StatelessWidget {
             Icon(
               icon,
               color: isActive ? activeColor : color,
-              size: 22,
+              size: AppDimensions.iconMd,
             ));
 
     final Widget iconView = AnimatedContainer(
@@ -59,12 +59,33 @@ class BottomBarItem extends StatelessWidget {
       child: innerIcon,
     );
 
+    final Widget iconWithBadge = Stack(
+      clipBehavior: Clip.none,
+      children: [
+        iconView,
+        if (isNotified)
+          Positioned(
+            right: -2,
+            top: -2,
+            child: Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                color: AppColor.colorAccentWarm,
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColor.colorSurface),
+              ),
+            ),
+          ),
+      ],
+    );
+
     final Widget content = (label == null)
-        ? iconView
+        ? iconWithBadge
         : Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              iconView,
+              iconWithBadge,
               const SizedBox(height: 2),
               // fix: inline типографика → textTheme.labelSmall
               Builder(builder: (context) {

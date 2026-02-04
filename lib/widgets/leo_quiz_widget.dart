@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:math' as math;
 import 'package:bizlevel/theme/spacing.dart';
 import 'package:bizlevel/theme/dimensions.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -147,6 +148,7 @@ class _LeoQuizWidgetState extends ConsumerState<LeoQuizWidget> {
     final String question = widget.questionData['question'] as String;
     final List<String> options =
         List<String>.from(widget.questionData['options'] as List);
+    final int correctIndex = (widget.questionData['correct'] as int);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -184,12 +186,74 @@ class _LeoQuizWidgetState extends ConsumerState<LeoQuizWidget> {
               if (idx < cursor + options.length) {
                 final i = idx - cursor;
                 final bool isSelected = _selectedIndex == i;
-                final Color borderColor =
-                    isSelected ? Colors.transparent : AppColor.divider;
-                final Color bgColor =
-                    isSelected ? AppColor.primary : AppColor.surface;
-                final Color textColor =
-                    isSelected ? AppColor.onPrimary : AppColor.onSurface;
+                final bool isCorrectOption = i == correctIndex;
+                final bool isRightSelected =
+                    _checked && _isCorrect && isSelected;
+                final bool isWrongSelected =
+                    _checked && !_isCorrect && isSelected;
+                final bool showCorrectHighlight =
+                    _checked && !_isCorrect && isCorrectOption;
+                final bool isPending = _isSending && isSelected;
+
+                Color bgColor = AppColor.surface;
+                Color borderColor = AppColor.borderSubtle;
+                Color textColor = AppColor.onSurface;
+
+                if (isRightSelected) {
+                  bgColor = AppColor.colorSuccessLight;
+                  borderColor = AppColor.colorSuccess;
+                  textColor = AppColor.colorTextPrimary;
+                } else if (isWrongSelected) {
+                  bgColor = AppColor.colorErrorLight;
+                  borderColor = AppColor.colorError;
+                  textColor = AppColor.colorTextPrimary;
+                } else if (showCorrectHighlight) {
+                  bgColor = AppColor.colorSuccessLight;
+                  borderColor = AppColor.colorSuccess;
+                  textColor = AppColor.colorTextPrimary;
+                } else if (isPending) {
+                  bgColor = AppColor.colorPrimaryLight;
+                  borderColor = AppColor.colorPrimary;
+                  textColor = AppColor.colorTextPrimary;
+                } else if (isSelected) {
+                  bgColor = AppColor.colorPrimaryLight;
+                  borderColor = AppColor.colorPrimary;
+                  textColor = AppColor.colorTextPrimary;
+                }
+
+                final Widget optionContent = AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: bgColor,
+                    borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
+                    border: Border.all(color: borderColor),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          options[i],
+                          style: TextStyle(color: textColor),
+                        ),
+                      ),
+                      if (isRightSelected || showCorrectHighlight)
+                        const Padding(
+                          padding: EdgeInsets.only(left: 8.0),
+                          child: Icon(Icons.check_circle,
+                              size: 20, color: AppColor.colorSuccess),
+                        ),
+                      if (isWrongSelected)
+                        const Padding(
+                          padding: EdgeInsets.only(left: 8.0),
+                          child: Icon(Icons.cancel,
+                              size: 20, color: AppColor.colorError),
+                        ),
+                    ],
+                  ),
+                );
                 return Padding(
                   padding: const EdgeInsets.symmetric(vertical: 6),
                   child: Align(
@@ -207,33 +271,26 @@ class _LeoQuizWidgetState extends ConsumerState<LeoQuizWidget> {
                                 });
                                 _checkAnswer();
                               },
-                        borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 12),
-                          decoration: BoxDecoration(
-                            color: bgColor,
-                            borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
-                            border: Border.all(color: borderColor),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Flexible(
-                                child: Text(
-                                  options[i],
-                                  style: TextStyle(color: textColor),
-                                ),
+                        borderRadius:
+                            BorderRadius.circular(AppDimensions.radiusLg),
+                        child: isWrongSelected
+                            ? TweenAnimationBuilder<double>(
+                                tween: Tween(begin: 0, end: 1),
+                                duration: const Duration(milliseconds: 300),
+                                builder: (context, v, child) {
+                                  final dx = math.sin(v * math.pi * 6) * 4.0;
+                                  return Transform.translate(
+                                    offset: Offset(dx, 0),
+                                    child: child,
+                                  );
+                                },
+                                child: optionContent,
+                              )
+                            : AnimatedScale(
+                                scale: isRightSelected ? 1.02 : 1.0,
+                                duration: const Duration(milliseconds: 200),
+                                child: optionContent,
                               ),
-                              if (isSelected)
-                                const Padding(
-                                  padding: EdgeInsets.only(left: 8.0),
-                                  child: Icon(Icons.check_circle,
-                                      size: 20, color: AppColor.onPrimary),
-                                ),
-                            ],
-                          ),
-                        ),
                       ),
                     ),
                   ),
@@ -282,13 +339,14 @@ class _LeoQuizWidgetState extends ConsumerState<LeoQuizWidget> {
                         _isSending = false;
                       });
                     },
-                            borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
+                    borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 12, vertical: 10),
                       decoration: BoxDecoration(
                         color: AppColor.primary,
-                        borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
+                        borderRadius:
+                            BorderRadius.circular(AppDimensions.radiusLg),
                       ),
                       child: Text(
                         'Попробовать снова',

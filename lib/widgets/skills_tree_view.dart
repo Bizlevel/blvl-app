@@ -88,11 +88,12 @@ class _SkillsTreeViewState extends State<SkillsTreeView>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Плашка убрана — информация доступна через иконку (i)
           Row(
             children: [
-              Expanded(
-                child: Text('Дерево навыков',
-                    style: AppTypography.textTheme.headlineSmall),
+              const Expanded(
+                child:
+                    Text('Дерево навыков', style: AppTypography.headingSection),
               ),
               IconButton(
                 tooltip: 'О дереве навыков',
@@ -253,9 +254,8 @@ class _SkillsTreeViewState extends State<SkillsTreeView>
                         ?.copyWith(fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: AppSpacing.s6),
-                  _SegmentedProgressBar(
-                    total: SkillsTreeView._maxPoints,
-                    filled: skill.points,
+                  _LinearProgressBar(
+                    value: progress,
                     color: color,
                   ),
                 ],
@@ -263,8 +263,12 @@ class _SkillsTreeViewState extends State<SkillsTreeView>
             ),
             const SizedBox(width: AppSpacing.sm),
             Text('${skill.points}/${SkillsTreeView._maxPoints}',
-                style: AppTypography.textTheme.bodyMedium
-                    ?.copyWith(fontWeight: FontWeight.w500)),
+                style: AppTypography.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: skill.points > 0
+                      ? AppColor.colorTextPrimary
+                      : AppColor.colorTextSecondary,
+                )),
           ],
         ),
       ),
@@ -272,36 +276,30 @@ class _SkillsTreeViewState extends State<SkillsTreeView>
   }
 }
 
-class _SegmentedProgressBar extends StatelessWidget {
-  const _SegmentedProgressBar({
-    required this.total,
-    required this.filled,
+class _LinearProgressBar extends StatelessWidget {
+  const _LinearProgressBar({
+    required this.value,
     required this.color,
   });
 
-  final int total;
-  final int filled;
+  final double value;
   final Color color;
 
   @override
   Widget build(BuildContext context) {
-    final int clampedFilled = filled.clamp(0, total);
-    return Row(
-      children: [
-        for (int i = 0; i < total; i++)
-          Expanded(
-            child: Container(
-              height: 8,
-              margin:
-                  EdgeInsets.only(right: i == total - 1 ? 0 : AppSpacing.xs),
-              decoration: BoxDecoration(
-                color:
-                    i < clampedFilled ? color : color.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(AppDimensions.radiusSm),
-              ),
-            ),
-          ),
-      ],
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: value),
+      duration: const Duration(milliseconds: 600),
+      curve: Curves.easeOut,
+      builder: (context, v, _) => ClipRRect(
+        borderRadius: BorderRadius.circular(3),
+        child: LinearProgressIndicator(
+          value: v,
+          minHeight: 6,
+          backgroundColor: AppColor.colorBorder,
+          valueColor: AlwaysStoppedAnimation<Color>(color),
+        ),
+      ),
     );
   }
 }

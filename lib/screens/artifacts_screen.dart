@@ -9,6 +9,7 @@ import 'package:bizlevel/widgets/common/bizlevel_button.dart';
 import 'package:bizlevel/widgets/common/bizlevel_card.dart';
 import 'package:bizlevel/theme/spacing.dart';
 import 'package:bizlevel/theme/dimensions.dart';
+import 'package:bizlevel/theme/effects.dart';
 
 /// Экран «Артефакты» (этап 1: каркас и маршрут)
 /// Далее будет добавлена сетка 3xN и просмотр карточек.
@@ -173,13 +174,22 @@ class _CollectedBadge extends ConsumerWidget {
         .where((l) => (l['isCompleted'] as bool? ?? false))
         .length;
     final progress = total == 0 ? 0.0 : collected / total;
+    final bool isZero = collected == 0;
+    final bool isComplete = collected >= total && total > 0;
+    final Color accentColor = isComplete
+        ? AppColor.colorSuccess
+        : (isZero ? AppColor.colorTextSecondary : AppColor.colorAccentWarm);
+    final Color bgColor = isComplete
+        ? AppColor.colorSuccessLight
+        : (isZero
+            ? AppColor.colorBackgroundSecondary
+            : AppColor.colorAccentWarmLight);
     return Container(
       padding: AppSpacing.insetsSymmetric(h: AppSpacing.s10, v: AppSpacing.s6),
       decoration: BoxDecoration(
-        color: AppColor.glassTextColor.withValues(alpha: 0.15),
+        color: bgColor,
         borderRadius: BorderRadius.circular(AppDimensions.radiusXxl),
-        border:
-            Border.all(color: AppColor.glassTextColor.withValues(alpha: 0.3)),
+        border: Border.all(color: accentColor.withValues(alpha: 0.35)),
       ),
       child: SizedBox(
         width:
@@ -188,7 +198,14 @@ class _CollectedBadge extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('Собрано $collected/$total', textAlign: TextAlign.center),
+            Text(
+              'Собрано $collected/$total',
+              textAlign: TextAlign.center,
+              style: Theme.of(context)
+                  .textTheme
+                  .labelMedium
+                  ?.copyWith(color: accentColor, fontWeight: FontWeight.w600),
+            ),
             const SizedBox(height: AppSpacing.xs),
             SizedBox(
               height: 3,
@@ -196,10 +213,9 @@ class _CollectedBadge extends ConsumerWidget {
                 borderRadius: BorderRadius.circular(AppDimensions.radiusXs),
                 child: LinearProgressIndicator(
                   value: progress.clamp(0.0, 1.0),
-                  backgroundColor:
-                      AppColor.glassTextColor.withValues(alpha: 0.15),
+                  backgroundColor: accentColor.withValues(alpha: 0.15),
                   valueColor: AlwaysStoppedAnimation<Color>(
-                    AppColor.glassTextColor.withValues(alpha: 0.9),
+                    accentColor,
                   ),
                 ),
               ),
@@ -300,6 +316,7 @@ class _ArtifactTileState extends State<_ArtifactTile> {
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
+                  if (_isNew) AppEffects.glowPremium(blur: 10),
                 ],
               ),
               clipBehavior: Clip.antiAlias,
@@ -325,28 +342,55 @@ class _ArtifactTileState extends State<_ArtifactTile> {
                                 child: child,
                               );
                             },
-                            child: Image.asset(image, fit: BoxFit.cover),
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                Image.asset(image, fit: BoxFit.cover),
+                                DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topCenter,
+                                      end: Alignment.bottomCenter,
+                                      colors: [
+                                        AppColor.surface
+                                            .withValues(alpha: 0.05),
+                                        AppColor.surface
+                                            .withValues(alpha: 0.35),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           )
                         else
-                          Container(color: AppColor.glassSurfaceStrong),
+                          Container(
+                            color: AppColor.glassSurfaceStrong,
+                            child: const Center(
+                              child: Icon(
+                                Icons.auto_awesome,
+                                color: AppColor.onSurfaceSubtle,
+                              ),
+                            ),
+                          ),
                         if (!widget.isLocked && _isNew)
                           Positioned(
                             top: 8,
                             left: 8,
                             child: Container(
                               padding: AppSpacing.insetsSymmetric(
-                                  h: AppSpacing.sm, v: AppSpacing.xs),
+                                  h: AppSpacing.s6, v: AppSpacing.xs),
                               decoration: BoxDecoration(
-                                color: AppColor.premium.withValues(alpha: 0.9),
+                                color: AppColor.colorPrimary,
                                 borderRadius: BorderRadius.circular(
-                                    AppDimensions.radiusMd),
+                                    AppDimensions.radiusSm),
                               ),
                               child: Text('NEW',
                                   style: Theme.of(context)
                                       .textTheme
                                       .labelSmall
                                       ?.copyWith(
-                                          color: AppColor.glassTextColor,
+                                          color: AppColor.onPrimary,
                                           fontWeight: FontWeight.w700)),
                             ),
                           ),
@@ -625,7 +669,8 @@ class _ArtifactFullscreenState extends State<_ArtifactFullscreen>
                         decoration: BoxDecoration(
                           // fix: dark mode friendly overlay
                           color: AppColor.surfaceDark.withValues(alpha: 0.45),
-                          borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
+                          borderRadius:
+                              BorderRadius.circular(AppDimensions.radiusLg),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,

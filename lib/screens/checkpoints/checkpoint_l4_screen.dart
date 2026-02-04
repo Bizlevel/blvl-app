@@ -23,6 +23,7 @@ class CheckpointL4Screen extends ConsumerStatefulWidget {
 }
 
 class _CheckpointL4ScreenState extends ConsumerState<CheckpointL4Screen> {
+  bool _hasUserInteraction = false;
   String _buildGoalLine(Map<String, dynamic>? goal) {
     final String goalText = (goal?['goal_text'] ?? '').toString().trim();
     final String tdStr = (goal?['target_date'] ?? '').toString();
@@ -91,12 +92,18 @@ class _CheckpointL4ScreenState extends ConsumerState<CheckpointL4Screen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Чекпоинт: Регулярность')),
+      // Flutter автоматически управляет клавиатурой
       resizeToAvoidBottomInset: true,
       body: goalAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (_, __) =>
             const Center(child: Text('Не удалось загрузить цель')),
         data: (goal) {
+          final bool hasGoal =
+              (goal?['goal_text'] ?? '').toString().trim().isNotEmpty;
+          if (!hasGoal) {
+            return const _GoalRequiredGate();
+          }
           final List<String> initialMsgs = _composeInitialMessages(
             goal: goal,
             practice: practiceAsync.maybeWhen(
@@ -116,15 +123,14 @@ class _CheckpointL4ScreenState extends ConsumerState<CheckpointL4Screen> {
               'target_date: ${(goal?['target_date']).toString()}',
           ].join('\n');
 
+          // Простой layout: чат растягивается, кнопка внизу
           return Padding(
             padding: const EdgeInsets.all(AppSpacing.lg),
             child: Column(
               children: [
-                // Чат
-                // Раньше здесь была фиксированная высота (min 460), что приводило к RenderFlex overflow
-                // на маленьких экранах/в тестовом viewport. Делаем чат адаптивным через Expanded.
+                // Чат занимает всё доступное пространство
                 Expanded(
-                  child: BizLevelCard(
+                  child: BizLevelCard.content(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -137,6 +143,11 @@ class _CheckpointL4ScreenState extends ConsumerState<CheckpointL4Screen> {
                             userContext: userCtx,
                             levelContext: '',
                             initialAssistantMessages: initialMsgs,
+                            onUserMessage: (_) {
+                              if (!_hasUserInteraction) {
+                                setState(() => _hasUserInteraction = true);
+                              }
+                            },
                             onAssistantMessage: (msg) async {
                               try {
                                 await Sentry.addBreadcrumb(Breadcrumb(
@@ -158,47 +169,53 @@ class _CheckpointL4ScreenState extends ConsumerState<CheckpointL4Screen> {
                   width: double.infinity,
                   child: BizLevelButton(
                     label: 'Завершить чекпоинт →',
-                    onPressed: () async {
-                      try {
-                        await Sentry.addBreadcrumb(Breadcrumb(
-                          category: 'checkpoint',
-                          message: 'l4_completed',
-                          level: SentryLevel.info,
-                        ));
-                      } catch (_) {}
-                      final String goalText =
-                          (goal?['goal_text'] ?? '').toString().trim();
-                      if (goalText.isEmpty) {
-                        NotificationCenter.showError(
-                            context, 'Сначала задайте цель');
-                        return;
-                      }
-                      final String existingFocus =
-                          (goal?['financial_focus'] ?? '').toString().trim();
-                      final String? focusUpdate = existingFocus.isEmpty
-                          ? 'Финансовый фокус подтверждён'
-                          : null;
-                      try {
-                        final repo = ref.read(goalsRepositoryProvider);
-                        final userId =
-                            Supabase.instance.client.auth.currentUser?.id ?? '';
-                        await repo.upsertUserGoalRequest(GoalUpsertRequest(
-                          userId: userId,
-                          goalText: goalText,
-                          financialFocus: focusUpdate,
-                        ));
-                        ref.invalidate(userGoalProvider);
-                        ref.invalidate(towerNodesProvider);
-                        if (!context.mounted) return;
-                        NotificationCenter.showSuccess(
-                            context, 'Чекпоинт L4 завершён');
-                        GoRouter.of(context).push('/tower');
-                      } catch (e) {
-                        if (!context.mounted) return;
-                        NotificationCenter.showError(
-                            context, 'Не удалось завершить чекпоинт: $e');
-                      }
-                    },
+                    onPressed: _hasUserInteraction
+                        ? () async {
+                            try {
+                              await Sentry.addBreadcrumb(Breadcrumb(
+                                category: 'checkpoint',
+                                message: 'l4_completed',
+                                level: SentryLevel.info,
+                              ));
+                            } catch (_) {}
+                            final String goalText =
+                                (goal?['goal_text'] ?? '').toString().trim();
+                            if (goalText.isEmpty) {
+                              NotificationCenter.showError(
+                                  context, 'Сначала задайте цель');
+                              return;
+                            }
+                            final String existingFocus =
+                                (goal?['financial_focus'] ?? '')
+                                    .toString()
+                                    .trim();
+                            final String? focusUpdate = existingFocus.isEmpty
+                                ? 'Финансовый фокус подтверждён'
+                                : null;
+                            try {
+                              final repo = ref.read(goalsRepositoryProvider);
+                              final userId = Supabase
+                                      .instance.client.auth.currentUser?.id ??
+                                  '';
+                              await repo
+                                  .upsertUserGoalRequest(GoalUpsertRequest(
+                                userId: userId,
+                                goalText: goalText,
+                                financialFocus: focusUpdate,
+                              ));
+                              ref.invalidate(userGoalProvider);
+                              ref.invalidate(towerNodesProvider);
+                              if (!context.mounted) return;
+                              NotificationCenter.showSuccess(
+                                  context, 'Чекпоинт L4 завершён');
+                              GoRouter.of(context).push('/tower');
+                            } catch (e) {
+                              if (!context.mounted) return;
+                              NotificationCenter.showError(
+                                  context, 'Не удалось завершить чекпоинт: $e');
+                            }
+                          }
+                        : null,
                   ),
                 ),
               ],
@@ -224,10 +241,19 @@ class _CheckpointHeader extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const CircleAvatar(
-            radius: 16,
-            backgroundImage: AssetImage('assets/images/avatars/avatar_max.png'),
-            backgroundColor: AppColor.onPrimary,
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: AppColor.success, width: 3),
+            ),
+            child: const CircleAvatar(
+              radius: 16,
+              backgroundImage:
+                  AssetImage('assets/images/avatars/avatar_max.png'),
+              backgroundColor: AppColor.onPrimary,
+            ),
           ),
           const SizedBox(width: 8),
           Text(
@@ -252,6 +278,58 @@ class _CheckpointHeader extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _GoalRequiredGate extends StatelessWidget {
+  const _GoalRequiredGate();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      child: BizLevelCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: AppColor.success, width: 3),
+                  ),
+                  child: const CircleAvatar(
+                    backgroundImage:
+                        AssetImage('assets/images/avatars/avatar_max.png'),
+                    backgroundColor: Colors.transparent,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                const Expanded(
+                  child: Text(
+                    'Сначала поставь цель!',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ],
+            ),
+            AppSpacing.gapH(AppSpacing.sm),
+            const Text(
+              'Чтобы пройти этот чекпоинт, нужна сформулированная цель. Вернись к чекпоинту L1 и создай её.',
+            ),
+            AppSpacing.gapH(AppSpacing.md),
+            BizLevelButton(
+              label: 'Перейти к постановке цели →',
+              onPressed: () => GoRouter.of(context).go('/tower?scrollTo=1'),
+              fullWidth: true,
+            ),
+          ],
+        ),
       ),
     );
   }

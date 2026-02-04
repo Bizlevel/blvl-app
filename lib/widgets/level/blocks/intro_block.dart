@@ -57,27 +57,6 @@ class IntroBlock extends LevelPageBlock {
                 ),
               ),
             ),
-            // Кнопка «Назад к башне» в левом верхнем углу
-            SafeArea(
-              child: Align(
-                alignment: Alignment.topLeft,
-                child: IconButton(
-                  icon: const Icon(Icons.arrow_back_ios_new_rounded),
-                  tooltip: 'К башне',
-                  onPressed: () {
-                    try {
-                      LevelInputGuard.instance.clear();
-                      if (levelNumber > 0) {
-                        GoRouter.of(context).go('/tower?scrollTo=$levelNumber');
-                      } else {
-                        GoRouter.of(context).go('/tower');
-                      }
-                    } catch (_) {}
-                  },
-                ),
-              ),
-            ),
-
             // Основной контент по центру
             Center(
               child: ConstrainedBox(

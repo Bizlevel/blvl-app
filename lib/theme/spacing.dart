@@ -12,6 +12,14 @@ class AppSpacing {
   static const double xl = 24;
   static const double x2l = 32; // 2xl (без дефиса для стиля имен)
   static const double x3l = 48; // 3xl
+
+  // Семантические алиасы под дизайн-документ
+  static const double spacingXS = xs;
+  static const double spacingS = sm;
+  static const double spacingM = md;
+  static const double spacingL = lg;
+  static const double spacingXL = xl;
+  static const double spacingXXL = x2l;
   // Доп. часто используемые промежуточные значения
   static const double s6 = 6;
   static const double s10 = 10;

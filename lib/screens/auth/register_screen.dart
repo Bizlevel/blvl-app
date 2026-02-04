@@ -19,6 +19,9 @@ import '../../theme/spacing.dart';
 import '../../theme/dimensions.dart';
 import '../../theme/typography.dart';
 import '../../utils/constant.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../widgets/common/bizlevel_button.dart';
+import '../../services/referral_storage.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -31,22 +34,46 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmController = TextEditingController();
+  final _promoController = TextEditingController();
 
   bool _isLoading = false;
   bool _registrationSuccess = false;
 
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
+  bool _agreed = false;
+  bool _showPromoField = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPendingPromoCode();
+  }
+
+  Future<void> _loadPendingPromoCode() async {
+    final pending = await ReferralStorage.getPendingReferralCode();
+    if (pending != null && pending.isNotEmpty && mounted) {
+      setState(() {
+        _promoController.text = pending;
+        _showPromoField = true;
+      });
+    }
+  }
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
     _confirmController.dispose();
+    _promoController.dispose();
     super.dispose();
   }
 
   Future<void> _submit() async {
+    if (!_agreed) {
+      _showSnackBar('Подтвердите согласие с условиями');
+      return;
+    }
     final email = _emailController.text.trim();
     final password = _passwordController.text;
     final confirm = _confirmController.text;
@@ -68,6 +95,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         message: 'auth_register_submit',
       ));
     } catch (_) {}
+    // Сохраняем промокод для применения после авторизации
+    final promoCode = _promoController.text.trim();
+    if (promoCode.isNotEmpty) {
+      await ReferralStorage.savePendingReferralCode(promoCode);
+    }
+    
     log('Attempting to sign up with email: $email');
     try {
       await ref.read(authServiceProvider).signUp(
@@ -80,6 +113,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           category: 'auth',
           level: SentryLevel.info,
           message: 'auth_register_success',
+          data: {'has_promo': promoCode.isNotEmpty},
         ));
       } catch (_) {}
       if (!mounted) return;
@@ -219,6 +253,19 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
           ),
         ),
+        AppSpacing.gapH(AppSpacing.md),
+        // Сворачиваемое поле промокода
+        _PromoCodeSection(
+          controller: _promoController,
+          isExpanded: _showPromoField,
+          onToggle: () => setState(() => _showPromoField = !_showPromoField),
+        ),
+        AppSpacing.gapH(AppSpacing.lg),
+        _AgreementRow(
+          checked: _agreed,
+          onChanged: (v) => setState(() => _agreed = v),
+          onOpen: () => _openAgreement(context),
+        ),
         AppSpacing.gapH(AppSpacing.xl),
         GestureDetector(
           onTap: _isLoading ? null : _submit,
@@ -248,14 +295,20 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         ),
         AppSpacing.gapH(AppSpacing.lg),
         if (kEnableGoogleAuth || kEnableAppleAuth) const _OrDivider(),
-        if (kEnableGoogleAuth || kEnableAppleAuth) AppSpacing.gapH(AppSpacing.lg),
+        if (kEnableGoogleAuth || kEnableAppleAuth)
+          AppSpacing.gapH(AppSpacing.lg),
         if (kEnableGoogleAuth)
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
               icon: const Icon(Icons.login),
               label: const Text('Регистрация через Google'),
-              onPressed: () {
+              onPressed: () async {
+                // Сохраняем промокод перед OAuth
+                final promoCode = _promoController.text.trim();
+                if (promoCode.isNotEmpty) {
+                  await ReferralStorage.savePendingReferralCode(promoCode);
+                }
                 ref.read(loginControllerProvider.notifier).signInWithGoogle();
               },
               style: OutlinedButton.styleFrom(
@@ -275,7 +328,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             child: OutlinedButton.icon(
               icon: const Icon(Icons.apple),
               label: const Text('Регистрация через Apple'),
-              onPressed: () {
+              onPressed: () async {
+                // Сохраняем промокод перед OAuth
+                final promoCode = _promoController.text.trim();
+                if (promoCode.isNotEmpty) {
+                  await ReferralStorage.savePendingReferralCode(promoCode);
+                }
                 ref.read(loginControllerProvider.notifier).signInWithApple();
               },
               style: OutlinedButton.styleFrom(
@@ -288,7 +346,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               ),
             ),
           ),
-        if (kEnableGoogleAuth || kEnableAppleAuth) AppSpacing.gapH(AppSpacing.lg),
+        if (kEnableGoogleAuth || kEnableAppleAuth)
+          AppSpacing.gapH(AppSpacing.lg),
         TextButton(
           onPressed: () => context.go('/login'),
           child: const Text('Уже есть аккаунт? Войти'),
@@ -386,4 +445,187 @@ class _OrDivider extends StatelessWidget {
       ],
     );
   }
+}
+
+class _PromoCodeSection extends StatelessWidget {
+  final TextEditingController controller;
+  final bool isExpanded;
+  final VoidCallback onToggle;
+
+  const _PromoCodeSection({
+    required this.controller,
+    required this.isExpanded,
+    required this.onToggle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        GestureDetector(
+          onTap: onToggle,
+          child: Row(
+            children: [
+              Icon(
+                isExpanded ? Icons.expand_less : Icons.expand_more,
+                color: AppColor.primary,
+                size: 20,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                'Есть промокод?',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AppColor.primary,
+                      fontWeight: FontWeight.w500,
+                    ),
+              ),
+            ],
+          ),
+        ),
+        if (isExpanded) ...[
+          AppSpacing.gapH(AppSpacing.sm),
+          CustomTextBox(
+            hint: 'Введите промокод или код друга',
+            prefix: const Icon(Icons.card_giftcard_outlined),
+            controller: controller,
+            textCapitalization: TextCapitalization.characters,
+            textInputAction: TextInputAction.done,
+            preset: TextFieldPreset.auth,
+          ),
+          AppSpacing.gapH(AppSpacing.xs),
+          Text(
+            'Промокод будет применён после подтверждения email',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppColor.onSurfaceSubtle,
+                  fontSize: 11,
+                ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _AgreementRow extends StatelessWidget {
+  final bool checked;
+  final ValueChanged<bool> onChanged;
+  final VoidCallback onOpen;
+  const _AgreementRow({
+    required this.checked,
+    required this.onChanged,
+    required this.onOpen,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Checkbox(
+          value: checked,
+          onChanged: (v) => onChanged(v ?? false),
+        ),
+        Expanded(
+          child: GestureDetector(
+            onTap: onOpen,
+            child: RichText(
+              text: TextSpan(
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(color: AppColor.onSurfaceSubtle),
+                children: [
+                  const TextSpan(text: 'Я принимаю '),
+                  TextSpan(
+                    text: 'Пользовательское соглашение',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColor.primary,
+                          decoration: TextDecoration.underline,
+                        ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+Future<void> _openAgreement(BuildContext context) async {
+  final uri = Uri.parse('https://www.bizlevel.kz/privacy');
+  await showModalBottomSheet(
+    context: context,
+    showDragHandle: true,
+    backgroundColor: AppColor.surface,
+    isScrollControlled: true,
+    builder: (ctx) {
+      return DraggableScrollableSheet(
+        expand: false,
+        minChildSize: 0.4,
+        maxChildSize: 0.92,
+        initialChildSize: 0.75,
+        builder: (context, controller) {
+          return Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
+                child: Row(
+                  children: [
+                    Text(
+                      'Пользовательское соглашение',
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      tooltip: 'Закрыть',
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.of(ctx).pop(),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              Expanded(
+                child: SingleChildScrollView(
+                  controller: controller,
+                  padding: AppSpacing.insetsAll(AppSpacing.lg),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Полный текст соглашения доступен по ссылке. Нажмите кнопку ниже, чтобы открыть документ.',
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodySmall
+                            ?.copyWith(color: AppColor.onSurfaceSubtle),
+                      ),
+                      AppSpacing.gapH(AppSpacing.lg),
+                      BizLevelButton(
+                        label: 'Открыть документ',
+                        onPressed: () async {
+                          if (await canLaunchUrl(uri)) {
+                            await launchUrl(
+                              uri,
+                              mode: LaunchMode.inAppWebView,
+                            );
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
 }

@@ -27,8 +27,19 @@ class ListRowTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final content = Row(
       children: [
-        Icon(leadingIcon,
-            size: 26, color: Theme.of(context).colorScheme.onSurface),
+        Container(
+          width: 36,
+          height: 36,
+          decoration: const BoxDecoration(
+            color: AppColor.colorPrimaryLight,
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            leadingIcon,
+            size: 20,
+            color: AppColor.colorPrimary,
+          ),
+        ),
         AppSpacing.gapW(AppSpacing.itemSpacing),
         Expanded(
           child: Column(
@@ -40,7 +51,7 @@ class ListRowTile extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurface,
+                      color: AppColor.colorTextPrimary,
                       fontWeight: FontWeight.w600,
                     ),
               ),
@@ -53,13 +64,17 @@ class ListRowTile extends StatelessWidget {
                   style: Theme.of(context)
                       .textTheme
                       .labelMedium
-                      ?.copyWith(color: AppColor.onSurfaceSubtle),
+                      ?.copyWith(color: AppColor.colorTextSecondary),
                 ),
               ],
             ],
           ),
         ),
-        if (trailing != null) trailing!,
+        if (trailing != null)
+          IconTheme(
+            data: const IconThemeData(color: AppColor.colorTextSecondary),
+            child: trailing!,
+          ),
       ],
     );
 

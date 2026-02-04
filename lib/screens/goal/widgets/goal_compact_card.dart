@@ -77,6 +77,12 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
             }
           } catch (_) {}
 
+          final String goalText = (goal?['goal_text'] ?? '').toString();
+          final bool isEmpty = goalText.trim().isEmpty;
+          if (isEmpty && !_isEditing) {
+            return _buildEmptyState(context);
+          }
+
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -148,20 +154,6 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                                 ?.copyWith(color: AppColor.labelColor),
                           ),
                         ),
-                    ],
-                  ),
-                ),
-              if (goal == null || (goal['goal_text'] ?? '').toString().isEmpty)
-                const Padding(
-                  padding: EdgeInsets.only(bottom: AppSpacing.sm),
-                  child: Row(
-                    children: [
-                      Icon(Icons.flag_outlined,
-                          color: AppColor.onSurfaceSubtle),
-                      SizedBox(width: AppSpacing.sm),
-                      Expanded(
-                          child: Text(
-                              'Пока цель не задана. Начните с простого описания и метрики.')),
                     ],
                   ),
                 ),
@@ -266,11 +258,28 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
               Row(
                 children: [
                   Expanded(
+                    flex: 2,
                     child: !_isEditing
                         ? BizLevelButton(
-                            variant: BizLevelButtonVariant.outline,
-                            label: 'Редактировать',
-                            onPressed: () => setState(() => _isEditing = true),
+                            icon: const Icon(Icons.chat_bubble_outline),
+                            label: 'Обсудить с Максом',
+                            onPressed: () {
+                              Navigator.of(context).push(MaterialPageRoute(
+                                builder: (_) => LeoDialogScreen(
+                                  bot: 'max',
+                                  userContext: buildMaxUserContext(goal: {
+                                    'goal_text': _goalCtrl.text.trim(),
+                                    'metric_current':
+                                        _metricCurrentCtrl.text.trim(),
+                                    'metric_target':
+                                        _metricTargetCtrl.text.trim(),
+                                    'target_date':
+                                        _selectedTargetDate?.toIso8601String(),
+                                  }),
+                                  levelContext: '',
+                                ),
+                              ));
+                            },
                           )
                         : BizLevelButton(
                             label: 'Сохранить',
@@ -328,33 +337,12 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                   ),
                   const SizedBox(width: AppSpacing.md),
                   Expanded(
-                    child: BizLevelButton(
-                      icon: const Icon(Icons.chat_bubble_outline),
-                      label: 'Обсудить с Максом',
-                      onPressed: () {
-                        Navigator.of(context).push(MaterialPageRoute(
-                          builder: (_) => LeoDialogScreen(
-                            bot: 'max',
-                            userContext: buildMaxUserContext(goal: {
-                              'goal_text': _goalCtrl.text.trim(),
-                              'metric_current': _metricCurrentCtrl.text.trim(),
-                              'metric_target': _metricTargetCtrl.text.trim(),
-                              'target_date':
-                                  _selectedTargetDate?.toIso8601String(),
-                            }),
-                            levelContext: '',
-                          ),
-                        ));
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.md),
-                  Expanded(
                     child: !_isEditing
                         ? BizLevelButton(
-                            variant: BizLevelButtonVariant.outline,
-                            label: 'Новая цель',
-                            onPressed: () => _showStartNewGoalSheet(context),
+                            variant: BizLevelButtonVariant.secondary,
+                            label: 'Править',
+                            icon: const Icon(Icons.edit, size: 18),
+                            onPressed: () => setState(() => _isEditing = true),
                           )
                         : BizLevelButton(
                             variant: BizLevelButtonVariant.text,
@@ -364,10 +352,47 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
                   ),
                 ],
               ),
+              if (!_isEditing) ...[
+                AppSpacing.gapH(AppSpacing.sm),
+                BizLevelButton(
+                  variant: BizLevelButtonVariant.text,
+                  label: 'Поставить новую цель',
+                  onPressed: () => _showStartNewGoalSheet(context),
+                ),
+              ],
             ],
           );
         },
       ),
+    );
+  }
+
+  Widget _buildEmptyState(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Моя цель',
+          style: Theme.of(context)
+              .textTheme
+              .titleLarge
+              ?.copyWith(fontWeight: FontWeight.w700),
+        ),
+        AppSpacing.gapH(AppSpacing.sm),
+        Text(
+          'Опиши, чего хочешь достичь — Макс поможет отслеживать прогресс.',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: AppColor.colorTextSecondary,
+              ),
+        ),
+        AppSpacing.gapH(AppSpacing.md),
+        BizLevelButton(
+          label: 'Создать цель →',
+          onPressed: () => _showStartNewGoalSheet(context),
+          size: BizLevelButtonSize.lg,
+          fullWidth: true,
+        ),
+      ],
     );
   }
 
@@ -385,130 +410,124 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-              Text('Новая цель',
-                  style: Theme.of(ctx)
-                      .textTheme
-                      .titleMedium
-                      ?.copyWith(fontWeight: FontWeight.w600)),
-              AppSpacing.gapH(AppSpacing.md),
-              TextField(
-                controller: textCtrl,
-                decoration:
-                    const InputDecoration(labelText: 'Опишите новую цель'),
-                textInputAction: TextInputAction.next,
-                onSubmitted: (_) => FocusScope.of(ctx).nextFocus(),
-                onTapOutside: (_) => FocusScope.of(ctx).unfocus(),
+          Text('Новая цель',
+              style: Theme.of(ctx)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(fontWeight: FontWeight.w600)),
+          AppSpacing.gapH(AppSpacing.md),
+          TextField(
+            controller: textCtrl,
+            decoration: const InputDecoration(labelText: 'Опишите новую цель'),
+            textInputAction: TextInputAction.next,
+            onSubmitted: (_) => FocusScope.of(ctx).nextFocus(),
+            onTapOutside: (_) => FocusScope.of(ctx).unfocus(),
+          ),
+          AppSpacing.gapH(AppSpacing.sm),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: currentCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration:
+                      const InputDecoration(labelText: 'Текущая метрика'),
+                  textInputAction: TextInputAction.next,
+                  onSubmitted: (_) => FocusScope.of(ctx).nextFocus(),
+                  onTapOutside: (_) => FocusScope.of(ctx).unfocus(),
+                ),
               ),
-              AppSpacing.gapH(AppSpacing.sm),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: currentCtrl,
-                      keyboardType: TextInputType.number,
-                      decoration:
-                          const InputDecoration(labelText: 'Текущая метрика'),
-                      textInputAction: TextInputAction.next,
-                      onSubmitted: (_) => FocusScope.of(ctx).nextFocus(),
-                      onTapOutside: (_) => FocusScope.of(ctx).unfocus(),
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.md),
-                  Expanded(
-                    child: TextField(
-                      controller: targetCtrl,
-                      keyboardType: TextInputType.number,
-                      decoration:
-                          const InputDecoration(labelText: 'Целевая метрика'),
-                      textInputAction: TextInputAction.next,
-                      onSubmitted: (_) => FocusScope.of(ctx).nextFocus(),
-                      onTapOutside: (_) => FocusScope.of(ctx).unfocus(),
-                    ),
-                  ),
-                ],
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: TextField(
+                  controller: targetCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration:
+                      const InputDecoration(labelText: 'Целевая метрика'),
+                  textInputAction: TextInputAction.next,
+                  onSubmitted: (_) => FocusScope.of(ctx).nextFocus(),
+                  onTapOutside: (_) => FocusScope.of(ctx).unfocus(),
+                ),
               ),
-              AppSpacing.gapH(AppSpacing.sm),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      newTarget == null
-                          ? 'Дедлайн не выбран'
-                          : newTarget!
-                              .toLocal()
-                              .toIso8601String()
-                              .split('T')
-                              .first,
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: () async {
-                      final now = DateTime.now();
-                      final picked = await showRuDatePicker(
-                        context: ctx,
-                        initialDate: newTarget ?? now,
-                        firstDate: now,
-                        lastDate: now.add(const Duration(days: 365 * 3)),
-                      );
-                      if (picked != null) {
-                        newTarget = picked;
-                        // ignore: use_build_context_synchronously
-                        (ctx as Element).markNeedsBuild();
-                      }
-                    },
-                    child: const Text('Выбрать дату'),
-                  )
-                ],
+            ],
+          ),
+          AppSpacing.gapH(AppSpacing.sm),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  newTarget == null
+                      ? 'Дедлайн не выбран'
+                      : newTarget!.toLocal().toIso8601String().split('T').first,
+                ),
               ),
-              AppSpacing.gapH(AppSpacing.md),
-              ElevatedButton(
+              TextButton(
                 onPressed: () async {
-                  final String txt = textCtrl.text.trim();
-                  if (txt.isEmpty) {
-                    ScaffoldMessenger.of(ctx).showSnackBar(
-                      const SnackBar(
-                          content: Text('Введите формулировку цели')),
-                    );
-                    return;
-                  }
-                  final num? cur = num.tryParse(currentCtrl.text.trim());
-                  final num? tgt = num.tryParse(targetCtrl.text.trim());
-                  if (cur == null || tgt == null) {
-                    ScaffoldMessenger.of(ctx).showSnackBar(
-                      const SnackBar(content: Text('Заполните метрики')),
-                    );
-                    return;
-                  }
-                  try {
-                    final repo = ref.read(goalsRepositoryProvider);
-                    final userId =
-                        Supabase.instance.client.auth.currentUser?.id ?? '';
-                    await repo.startNewGoalRequest(StartNewGoalRequest(
-                      userId: userId,
-                      goalText: txt,
-                      targetDate: newTarget,
-                      metricStart: cur,
-                      metricCurrent: cur,
-                      metricTarget: tgt,
-                    ));
-                    if (!context.mounted || !ctx.mounted) return;
-                    if (mounted) {
-                      ref.invalidate(userGoalProvider);
-                      Navigator.of(ctx).pop();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Новая цель сохранена')),
-                      );
-                    }
-                  } catch (e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Ошибка: $e')),
-                      );
-                    }
+                  final now = DateTime.now();
+                  final picked = await showRuDatePicker(
+                    context: ctx,
+                    initialDate: newTarget ?? now,
+                    firstDate: now,
+                    lastDate: now.add(const Duration(days: 365 * 3)),
+                  );
+                  if (picked != null) {
+                    newTarget = picked;
+                    // ignore: use_build_context_synchronously
+                    (ctx as Element).markNeedsBuild();
                   }
                 },
-                child: const Text('Сохранить новую цель'),
-              ),
+                child: const Text('Выбрать дату'),
+              )
+            ],
+          ),
+          AppSpacing.gapH(AppSpacing.md),
+          ElevatedButton(
+            onPressed: () async {
+              final String txt = textCtrl.text.trim();
+              if (txt.isEmpty) {
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  const SnackBar(content: Text('Введите формулировку цели')),
+                );
+                return;
+              }
+              final num? cur = num.tryParse(currentCtrl.text.trim());
+              final num? tgt = num.tryParse(targetCtrl.text.trim());
+              if (cur == null || tgt == null) {
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  const SnackBar(content: Text('Заполните метрики')),
+                );
+                return;
+              }
+              try {
+                final repo = ref.read(goalsRepositoryProvider);
+                final userId =
+                    Supabase.instance.client.auth.currentUser?.id ?? '';
+                await repo.startNewGoalRequest(StartNewGoalRequest(
+                  userId: userId,
+                  goalText: txt,
+                  targetDate: newTarget,
+                  metricStart: cur,
+                  metricCurrent: cur,
+                  metricTarget: tgt,
+                ));
+                if (!context.mounted || !ctx.mounted) return;
+                if (mounted) {
+                  ref.invalidate(userGoalProvider);
+                  Navigator.of(ctx).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Новая цель сохранена')),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Ошибка: $e')),
+                  );
+                }
+              }
+            },
+            child: const Text('Сохранить новую цель'),
+          ),
         ],
       ),
     );
@@ -564,6 +583,5 @@ class _GoalProgressCircle extends StatelessWidget {
 // Простая обёртка, чтобы прокинуть цвет в индикатор (без кастомного painter)
 class _GradientColor extends Color {
   final List<Color> colors;
-  _GradientColor({required this.colors})
-      : super(colors.first.toARGB32());
+  _GradientColor({required this.colors}) : super(colors.first.toARGB32());
 }

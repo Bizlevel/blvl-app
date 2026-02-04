@@ -6,6 +6,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/theme/dimensions.dart';
 import 'package:bizlevel/theme/animations.dart';
+import 'package:bizlevel/theme/typography.dart';
 
 class TopGpBadge extends ConsumerStatefulWidget {
   const TopGpBadge({super.key});
@@ -56,6 +57,14 @@ class _TopGpBadgeState extends ConsumerState<TopGpBadge>
       });
     }
 
+    final bool isZero = balance <= 0;
+    final Color bgColor =
+        isZero ? AppColor.colorWarningLight : AppColor.colorAccentWarmLight;
+    final Color borderColor =
+        isZero ? AppColor.colorWarning : AppColor.colorAccentWarm;
+    final Color iconColor =
+        isZero ? AppColor.colorWarning : AppColor.colorAccentWarm;
+
     return Semantics(
       label: 'Баланс GP: $balance',
       button: true,
@@ -74,10 +83,10 @@ class _TopGpBadgeState extends ConsumerState<TopGpBadge>
                   padding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
-                    // outlined‑капсула: светлый фон + бордер
-                    color: AppColor.surface,
-                    borderRadius: BorderRadius.circular(AppDimensions.radiusXxl),
-                    border: Border.all(color: AppColor.border),
+                    color: bgColor,
+                    borderRadius:
+                        BorderRadius.circular(AppDimensions.radiusXxl),
+                    border: Border.all(color: borderColor),
                     boxShadow: const [
                       BoxShadow(
                         color: AppColor.shadow,
@@ -89,16 +98,24 @@ class _TopGpBadgeState extends ConsumerState<TopGpBadge>
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      SvgPicture.asset('assets/images/gp_coin.svg',
-                          width: 18, height: 18),
+                      SvgPicture.asset(
+                        'assets/images/gp_coin.svg',
+                        width: 18,
+                        height: 18,
+                        colorFilter:
+                            ColorFilter.mode(iconColor, BlendMode.srcIn),
+                      ),
                       const SizedBox(width: 6),
                       Text(
                         '$balance',
-                        style:
-                            Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  color: AppColor.primary,
-                                  fontWeight: FontWeight.w700,
-                                ),
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleMedium
+                            ?.copyWith(
+                              color: AppColor.colorTextPrimary,
+                              fontWeight: FontWeight.w700,
+                              fontFeatures: AppTypography.number.fontFeatures,
+                            ),
                       ),
                       if (_delta != 0) ...[
                         const SizedBox(width: 6),

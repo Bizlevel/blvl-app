@@ -2,12 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import 'package:bizlevel/providers/goals_providers.dart';
 import 'package:bizlevel/screens/goal/widgets/motivation_card.dart';
 import 'package:bizlevel/screens/goal/widgets/practice_journal_section.dart';
-import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/theme/spacing.dart';
-import 'package:bizlevel/theme/dimensions.dart';
 import 'package:bizlevel/theme/animations.dart';
 import 'package:bizlevel/screens/goal/widgets/goal_compact_card.dart';
 
@@ -25,8 +22,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
   void _scrollToJournal() {
     final ctx = _journalSectionKey.currentContext;
     if (ctx != null) {
-      Scrollable.ensureVisible(ctx,
-          duration: AppAnimations.normal);
+      Scrollable.ensureVisible(ctx, duration: AppAnimations.normal);
     }
   }
 
@@ -99,41 +95,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                 }),
                 const MotivationCard(),
                 AppSpacing.gapH(AppSpacing.lg),
-                // Онбординг: если цель ещё не задана — предложить начать с L1
-                Consumer(builder: (context, ref, _) {
-                  final g = ref.watch(userGoalProvider).asData?.value;
-                  final bool empty = g == null ||
-                      ((g['goal_text'] ?? '').toString().trim().isEmpty);
-                  if (!empty) return const SizedBox.shrink();
-                  return Container(
-                    width: double.infinity,
-                    padding: AppSpacing.insetsAll(AppSpacing.md),
-                    decoration: BoxDecoration(
-                      color: AppColor.backgroundInfo,
-                      borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
-                      border: Border.all(color: AppColor.border),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.flag_outlined,
-                            color: AppColor.primary),
-                        const SizedBox(width: AppSpacing.s10),
-                        Expanded(
-                          child: Text(
-                            'Начните с формулировки первой цели. Это займёт 1–2 минуты.',
-                            style: Theme.of(context).textTheme.bodyMedium,
-                          ),
-                        ),
-                        const SizedBox(width: AppSpacing.s10),
-                        ElevatedButton(
-                          onPressed: () => context.go('/checkpoint/l1'),
-                          child: const Text('Чекпоинт L1'),
-                        ),
-                      ],
-                    ),
-                  );
-                }),
-                AppSpacing.gapH(AppSpacing.lg),
+                // Онбординг: вынесен в пустое состояние карточки цели
                 // Что дальше? (баннер) — удалён по новой спецификации
                 AppSpacing.gapH(AppSpacing.lg),
 

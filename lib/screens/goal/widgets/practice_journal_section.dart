@@ -41,6 +41,32 @@ class _PracticeJournalSectionState
 
   @override
   Widget build(BuildContext context) {
+    final goal = ref.watch(userGoalProvider).asData?.value;
+    final bool hasGoal = goal != null &&
+        ((goal['goal_text'] ?? '').toString().trim().isNotEmpty);
+    if (!hasGoal) {
+      return BizLevelCard(
+        padding: AppSpacing.insetsAll(AppSpacing.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Журнал применений',
+                style: Theme.of(context)
+                    .textTheme
+                    .titleLarge
+                    ?.copyWith(fontWeight: FontWeight.w700)),
+            AppSpacing.gapH(AppSpacing.sm),
+            Text(
+              'Сначала сформулируйте цель — журнал появится здесь.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColor.colorTextSecondary,
+                  ),
+            ),
+          ],
+        ),
+      );
+    }
+
     final practiceAsync = ref.watch(practiceLogProvider);
     final toolsAsync = ref.watch(usedToolsOptionsProvider);
 
@@ -156,6 +182,10 @@ class _PracticeJournalSectionState
                               } catch (_) {}
                               _selectingGuard = false;
                             },
+                            style: FilledButton.styleFrom(
+                              backgroundColor: AppColor.colorPrimaryLight,
+                              foregroundColor: AppColor.colorPrimary,
+                            ),
                             icon: const Icon(Icons.flash_on, size: 18),
                             label: Text((t is Map && t['label'] != null)
                                 ? t['label'].toString()
@@ -240,7 +270,7 @@ class _PracticeJournalSectionState
                 controller: _metricUpdateCtrl,
                 keyboardType: TextInputType.number,
                 decoration: const InputDecoration(
-                  hintText: 'Обновить текущее значение метрики',
+                  hintText: 'Текущее значение метрики',
                 ),
                 textInputAction: TextInputAction.next,
                 autocorrect: false,
@@ -253,8 +283,8 @@ class _PracticeJournalSectionState
               TextField(
                 controller: _practiceNoteCtrl,
                 maxLines: 2,
-                decoration: const InputDecoration(
-                    labelText: 'Что конкретно сделал(а) сегодня'),
+                decoration:
+                    const InputDecoration(labelText: 'Что сделал(а) сегодня'),
                 textInputAction: TextInputAction.done,
                 textCapitalization: TextCapitalization.sentences,
                 autocorrect: true,
@@ -286,18 +316,14 @@ class _PracticeJournalSectionState
                       try {
                         await repo.logPracticeAndUpdateMetricTx(
                           appliedTools: toolsSnapshot,
-                          note: noteSnapshot.isEmpty
-                              ? null
-                              : noteSnapshot,
+                          note: noteSnapshot.isEmpty ? null : noteSnapshot,
                           appliedAt: DateTime.now(),
                           metricCurrent: metricUpdate,
                         );
                       } catch (_) {
                         await repo.addPracticeEntry(
                           appliedTools: toolsSnapshot,
-                          note: noteSnapshot.isEmpty
-                              ? null
-                              : noteSnapshot,
+                          note: noteSnapshot.isEmpty ? null : noteSnapshot,
                           appliedAt: DateTime.now(),
                         );
                         if (metricUpdate != null) {
@@ -503,38 +529,39 @@ class _PracticeJournalSectionState
               ),
             ],
           ),
-        if (_showMomentum)
-          Positioned(
-            right: 0,
-            top: 40, // Сдвинуто вниз, чтобы не перекрывать кнопку колокольчика
-            child: IgnorePointer(
-              child: AnimatedOpacity(
-                duration: const Duration(milliseconds: 250),
-                opacity: _showMomentum ? 1 : 0,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.md, vertical: AppSpacing.sm),
-                  decoration: BoxDecoration(
-                    color: AppColor.backgroundSuccess,
-                    borderRadius:
-                        BorderRadius.circular(AppDimensions.radiusXxl),
-                    border: Border.all(
-                        color: AppColor.success.withValues(alpha: 0.3)),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.trending_up,
-                          color: AppColor.success, size: 18),
-                      SizedBox(width: AppSpacing.s6),
-                      Text('+1 день движения к цели',
-                          style: TextStyle(color: AppColor.success)),
-                    ],
+          if (_showMomentum)
+            Positioned(
+              right: 0,
+              top:
+                  40, // Сдвинуто вниз, чтобы не перекрывать кнопку колокольчика
+              child: IgnorePointer(
+                child: AnimatedOpacity(
+                  duration: const Duration(milliseconds: 250),
+                  opacity: _showMomentum ? 1 : 0,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+                    decoration: BoxDecoration(
+                      color: AppColor.backgroundSuccess,
+                      borderRadius:
+                          BorderRadius.circular(AppDimensions.radiusXxl),
+                      border: Border.all(
+                          color: AppColor.success.withValues(alpha: 0.3)),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.trending_up,
+                            color: AppColor.success, size: 18),
+                        SizedBox(width: AppSpacing.s6),
+                        Text('+1 день движения к цели',
+                            style: TextStyle(color: AppColor.success)),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
         ],
       ),
     );

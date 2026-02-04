@@ -21,6 +21,13 @@ class AppDimensions {
   static const double radiusAvatar = 40.0;
   static const double radiusRound = 999.0;
 
+  // Семантические алиасы под дизайн-документ
+  static const double radiusS = radiusMd;
+  static const double radiusM = radiusLg;
+  static const double radiusL = radiusXl;
+  static const double radiusXL = radiusXxl;
+  static const double radiusFull = radiusRound;
+
   // Элевации
   static const double elevationNone = 0.0;
   static const double elevationHairline = 1.0;
@@ -28,6 +35,14 @@ class AppDimensions {
   // Минимальные размеры
   static const double minTouchTarget = 48.0;
   static const double minButtonHeight = 48.0;
+
+  // Семантические высоты кнопок
+  static const double buttonPrimaryLargeHeight = 56.0;
+  static const double buttonPrimaryMediumHeight = 48.0;
+  static const double buttonSecondaryHeight = 44.0;
+  static const double buttonTextHeight = 40.0;
+  static const double buttonPillHeight = 44.0;
+  static const double buttonChipHeight = 36.0;
 
   // Home screen specific
   static const double homeGreetingHeight = 80.0; // avatar row height

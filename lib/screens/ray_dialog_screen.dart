@@ -17,6 +17,8 @@ import 'package:bizlevel/theme/dimensions.dart';
 import 'package:bizlevel/theme/spacing.dart';
 import 'package:bizlevel/theme/typography.dart';
 import 'package:bizlevel/widgets/common/bizlevel_card.dart';
+import 'package:bizlevel/widgets/common/bizlevel_text_field.dart';
+import 'package:bizlevel/widgets/custom_textfield.dart';
 import 'package:bizlevel/widgets/leo_message_bubble.dart';
 import 'package:bizlevel/widgets/typing_indicator.dart';
 
@@ -190,12 +192,11 @@ class _RayDialogScreenState extends ConsumerState<RayDialogScreen>
       _messages.add(const _RayMessage(
         role: 'assistant',
         includeInApi: false,
-        content:
-            'Привет! Я Ray — валидатор бизнес‑идей в BizLevel.\n\n'
+        content: 'Привет! Я Ray — валидатор бизнес‑идей в BizLevel.\n\n'
             'Я задам 7 вопросов по твоей идее и после этого сделаю краткий отчёт: '
             'оценка, сильные стороны, красные флаги и следующий шаг.',
       ));
-      
+
       // Устанавливаем метаданные онбординга
       setState(() {
         _onboardingMetadata = {
@@ -204,8 +205,8 @@ class _RayDialogScreenState extends ConsumerState<RayDialogScreen>
           'actions': [
             {
               'id': 'start_validation',
-              'label': isFirst 
-                  ? 'Начать проверку (Бесплатно)' 
+              'label': isFirst
+                  ? 'Начать проверку (Бесплатно)'
                   : 'Начать проверку (${RayService.kValidationCostGp} GP)',
               'is_primary': true,
             },
@@ -333,7 +334,8 @@ class _RayDialogScreenState extends ConsumerState<RayDialogScreen>
     final onboardingMeta = _onboardingMetadata;
     if (onboardingMeta == null) return const SizedBox.shrink();
 
-    final price = onboardingMeta['price'] as int? ?? RayService.kValidationCostGp;
+    final price =
+        onboardingMeta['price'] as int? ?? RayService.kValidationCostGp;
     final isFree = onboardingMeta['is_free'] as bool? ?? false;
     final actions = onboardingMeta['actions'] as List? ?? [];
 
@@ -349,30 +351,36 @@ class _RayDialogScreenState extends ConsumerState<RayDialogScreen>
               child: ElevatedButton.icon(
                 icon: const Icon(Icons.rocket_launch),
                 label: Text(
-                  isFree 
-                      ? 'Начать проверку (Бесплатно)' 
+                  isFree
+                      ? 'Начать проверку (Бесплатно)'
                       : 'Начать проверку ($price GP)',
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: isFree ? AppColor.success : AppColor.primary,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                 ),
-                onPressed: _sending ? null : () => _handleStartValidation(price, isFree),
+                onPressed: _sending
+                    ? null
+                    : () => _handleStartValidation(price, isFree),
               ),
             ),
-          
+
           const SizedBox(height: 12),
-          
+
           // Вторичная кнопка "А что ты умеешь?"
           if (actions.length > 1)
             SizedBox(
               width: double.infinity,
               child: TextButton(
-                onPressed: _sending ? null : () {
-                  _controller.text = 'Расскажи подробнее, как ты работаешь и зачем ты нужен?';
-                  _send();
-                },
+                onPressed: _sending
+                    ? null
+                    : () {
+                        _controller.text =
+                            'Расскажи подробнее, как ты работаешь и зачем ты нужен?';
+                        _send();
+                      },
                 child: const Text('А что ты умеешь?'),
               ),
             ),
@@ -400,7 +408,8 @@ class _RayDialogScreenState extends ConsumerState<RayDialogScreen>
       } catch (e) {
         // Если не удалось проверить баланс на фронтенде, продолжаем
         // Финальная проверка будет на бэкенде при списании GP
-        debugPrint('Failed to check GP balance on frontend, will check on backend: $e');
+        debugPrint(
+            'Failed to check GP balance on frontend, will check on backend: $e');
       }
     }
 
@@ -429,17 +438,17 @@ class _RayDialogScreenState extends ConsumerState<RayDialogScreen>
       final msg = res['message'];
       final content = (msg is Map ? (msg['content'] as String?) : null) ?? '';
       final meta = res['metadata'] as Map<String, dynamic>?;
-      
+
       if (meta != null) {
         _currentStep = (meta['current_step'] as int?) ?? 1;
         _isComplete = (meta['is_complete'] as bool?) ?? false;
-        
+
         // Применяем slots_state если он есть
         final slotsState = meta['slots_state'];
         if (slotsState != null) {
           _applySlotsState(slotsState);
         }
-        
+
         // Обновляем onboarding metadata
         setState(() {
           _onboardingMetadata = null; // Скрываем кнопки онбординга
@@ -546,11 +555,11 @@ class _RayDialogScreenState extends ConsumerState<RayDialogScreen>
       final msg = res['message'];
       final content = (msg is Map ? (msg['content'] as String?) : null) ?? '';
       final meta = res['metadata'] as Map<String, dynamic>?;
-      
+
       if (meta != null) {
         _currentStep = (meta['current_step'] as int?) ?? _currentStep;
         _isComplete = (meta['is_complete'] as bool?) ?? _isComplete;
-        
+
         // Применяем slots_state если он есть
         final slotsState = meta['slots_state'];
         if (slotsState != null) {
@@ -572,8 +581,8 @@ class _RayDialogScreenState extends ConsumerState<RayDialogScreen>
       if (!mounted) return;
       if (e.statusCode == 402) {
         // Недостаточно GP
-        final required = e.code == 'insufficient_gp' 
-            ? RayService.kValidationCostGp 
+        final required = e.code == 'insufficient_gp'
+            ? RayService.kValidationCostGp
             : RayService.kValidationCostGp;
         _showInsufficientGpDialog(required);
       } else {
@@ -635,7 +644,8 @@ class _RayDialogScreenState extends ConsumerState<RayDialogScreen>
           children: [
             CircleAvatar(
               radius: 14,
-              backgroundImage: AssetImage('assets/images/avatars/avatar_12.png'),
+              backgroundImage:
+                  AssetImage('assets/images/avatars/avatar_12.png'),
               backgroundColor: Colors.transparent,
             ),
             SizedBox(width: 8),
@@ -945,8 +955,9 @@ class _RayDialogScreenState extends ConsumerState<RayDialogScreen>
 
   Widget _buildComposer(String startLabel) {
     final hasStarted = _validationId != null && _currentStep > 0;
-    final showOnboardingActions = _currentStep == 0 && _onboardingMetadata != null;
-    
+    final showOnboardingActions =
+        _currentStep == 0 && _onboardingMetadata != null;
+
     return SafeArea(
       bottom: false,
       // Приводим нижнюю панель к паттерну Leo/Max:
@@ -960,83 +971,81 @@ class _RayDialogScreenState extends ConsumerState<RayDialogScreen>
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-            // Важно: не выключаем TextField во время отправки.
-            // На iOS это часто приводит к пересозданию input-session и "подвисанию" клавиатуры.
-            if (hasStarted)
-              Row(
-                children: [
-                  Expanded(
-                    child: Semantics(
-                      label: 'Поле ввода ответа',
-                      child: TextField(
-                        controller: _controller,
-                        focusNode: _inputFocus,
-                        minLines: 1,
-                        maxLines: 4,
-                        textInputAction: TextInputAction.send,
-                        textCapitalization: TextCapitalization.sentences,
-                        autocorrect: true,
-                        onTapOutside: (_) => FocusScope.of(context).unfocus(),
-                        onSubmitted: (_) {
-                          if (_controller.text.trim().isNotEmpty &&
-                              !_sending &&
-                              !_starting) {
-                            _send();
-                          }
-                        },
-                        decoration: const InputDecoration(
-                          hintText: 'Ваш ответ…',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  Semantics(
-                    label: 'Скрыть клавиатуру',
-                    button: true,
-                    child: IconButton(
-                      tooltip: 'Скрыть клавиатуру',
-                      icon: const Icon(Icons.keyboard_hide),
-                      onPressed: () => FocusScope.of(context).unfocus(),
-                    ),
-                  ),
-                  _sending
-                      ? const SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Semantics(
-                          label: 'Отправить ответ',
-                          button: true,
-                          child: IconButton(
-                            onPressed: (hasStarted && !_sending && !_starting)
-                                ? _send
-                                : null,
-                            icon: const Icon(Icons.send),
-                            color: AppColor.primary,
+                // Важно: не выключаем TextField во время отправки.
+                // На iOS это часто приводит к пересозданию input-session и "подвисанию" клавиатуры.
+                if (hasStarted)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Semantics(
+                          label: 'Поле ввода ответа',
+                          child: BizLevelTextField(
+                            controller: _controller,
+                            focusNode: _inputFocus,
+                            minLines: 1,
+                            maxLines: 4,
+                            textInputAction: TextInputAction.send,
+                            preset: TextFieldPreset.chat,
+                            hint: 'Ваш ответ…',
+                            onTapOutside: (_) =>
+                                FocusScope.of(context).unfocus(),
+                            onSubmitted: (_) {
+                              if (_controller.text.trim().isNotEmpty &&
+                                  !_sending &&
+                                  !_starting) {
+                                _send();
+                              }
+                            },
                           ),
                         ),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Semantics(
+                        label: 'Скрыть клавиатуру',
+                        button: true,
+                        child: IconButton(
+                          tooltip: 'Скрыть клавиатуру',
+                          icon: const Icon(Icons.keyboard_hide),
+                          onPressed: () => FocusScope.of(context).unfocus(),
+                        ),
+                      ),
+                      _sending
+                          ? const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Semantics(
+                              label: 'Отправить ответ',
+                              button: true,
+                              child: IconButton(
+                                onPressed:
+                                    (hasStarted && !_sending && !_starting)
+                                        ? _send
+                                        : null,
+                                icon: const Icon(Icons.send),
+                                color: AppColor.primary,
+                              ),
+                            ),
+                    ],
+                  ),
+                if (_isComplete && !_scoring && _reportMarkdown == null) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _score,
+                      child: const Text('Показать отчёт'),
+                    ),
+                  ),
                 ],
-              ),
-            if (_isComplete && !_scoring && _reportMarkdown == null) ...[
-              const SizedBox(height: AppSpacing.sm),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _score,
-                  child: const Text('Показать отчёт'),
-                ),
-              ),
-            ],
-            if (_scoring) ...[
-              const SizedBox(height: AppSpacing.sm),
-              const LinearProgressIndicator(),
-            ],
-          ],
-        ),
-      ),
+                if (_scoring) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  const LinearProgressIndicator(),
+                ],
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -1044,15 +1053,15 @@ class _RayDialogScreenState extends ConsumerState<RayDialogScreen>
 
   Widget _buildReportView(String markdown) {
     final styleSheet = _buildReportMarkdownStyleSheet(context);
-    final recommendedLevels = _validationData?['recommended_levels'] as List? ?? [];
-    
+    final recommendedLevels =
+        _validationData?['recommended_levels'] as List? ?? [];
+
     return ListView(
       padding: AppSpacing.insetsAll(AppSpacing.lg),
       children: [
         BizLevelCard(
           tonal: true,
           outlined: true,
-          elevation: 1,
           padding: AppSpacing.insetsAll(AppSpacing.lg),
           child: MarkdownBody(
             data: markdown,
@@ -1297,5 +1306,3 @@ class _RayMessage {
     this.createdAt,
   });
 }
-
-

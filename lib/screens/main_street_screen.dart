@@ -18,8 +18,9 @@ import 'package:bizlevel/widgets/home/home_goal_card.dart';
 import 'package:bizlevel/widgets/home/home_continue_card.dart';
 import 'package:bizlevel/widgets/home/home_quote_card.dart';
 import 'package:bizlevel/widgets/common/notification_center.dart';
-import 'package:bizlevel/theme/animations.dart';
-import 'package:bizlevel/screens/ray_dialog_screen.dart';
+import 'package:bizlevel/widgets/common/bizlevel_card.dart';
+import 'package:bizlevel/widgets/onboarding/coach_mark_targets.dart';
+import 'package:bizlevel/widgets/referral/promo_reminder_modal.dart';
 
 class MainStreetScreen extends ConsumerStatefulWidget {
   const MainStreetScreen({super.key});
@@ -40,6 +41,24 @@ class _MainStreetScreenState extends ConsumerState<MainStreetScreen> {
         level: SentryLevel.info,
       ),
     );
+    // Показываем модал промокода если уровень 0 завершён
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _maybeShowPromoReminder();
+    });
+  }
+
+  Future<void> _maybeShowPromoReminder() async {
+    // Проверяем, завершён ли уровень 0
+    final levels = ref.read(levelsProvider).value ?? [];
+    final level0 = levels.firstWhere(
+      (l) => (l['level'] as int? ?? -1) == 0,
+      orElse: () => <String, dynamic>{},
+    );
+    final isLevel0Completed = level0['isCompleted'] as bool? ?? false;
+    
+    if (isLevel0Completed && mounted) {
+      await PromoReminderModal.showIfNeeded(context);
+    }
   }
 
   @override
@@ -50,206 +69,186 @@ class _MainStreetScreenState extends ConsumerState<MainStreetScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
-        children: [
-          const Positioned.fill(child: _BackgroundLayer()),
-          SafeArea(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                AppSpacing.gapH(AppSpacing.sm),
-                // Greeting block with avatar, name/level, GP badge
-                SizedBox(
-                  height: AppDimensions.homeGreetingHeight,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.lg,
-                    ),
-                    child: _GreetingHeader(),
-                  ),
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            AppSpacing.gapH(AppSpacing.sm),
+            // Greeting block with avatar, name/level, GP badge
+            SizedBox(
+              height: AppDimensions.homeGreetingHeight,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.lg,
                 ),
-                Expanded(
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 900),
-                      child: RefreshIndicator(
-                        color: AppColor.primary,
-                        onRefresh: () async {
-                          try {
-                            // Обновление ключевых провайдеров
-                            await Future.wait([
-                              ref.refresh(currentUserProvider.future),
-                              ref.refresh(gpBalanceProvider.future),
-                              ref.refresh(userGoalProvider.future),
-                              ref.refresh(levelsProvider.future),
-                            ]);
-                            if (context.mounted) {
-                              NotificationCenter.showSuccess(
-                                context,
-                                'Обновлено',
+                child: _GreetingHeader(),
+              ),
+            ),
+            Expanded(
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 900),
+                  child: RefreshIndicator(
+                    color: AppColor.primary,
+                    onRefresh: () async {
+                      try {
+                        // Обновление ключевых провайдеров
+                        await Future.wait([
+                          ref.refresh(currentUserProvider.future),
+                          ref.refresh(gpBalanceProvider.future),
+                          ref.refresh(userGoalProvider.future),
+                          ref.refresh(levelsProvider.future),
+                        ]);
+                        if (context.mounted) {
+                          NotificationCenter.showSuccess(
+                            context,
+                            'Обновлено',
+                          );
+                        }
+                      } catch (_) {
+                        // Без падения, индикатор скрываем
+                      }
+                    },
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.lg, // Уменьшено с s20 для большего места
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // Цитата дня
+                          const HomeQuoteCard(),
+                          const SizedBox(height: AppSpacing.md),
+                          // Карточка «Моя цель»
+                          const HomeGoalCard(),
+                          const SizedBox(height: AppSpacing.s20),
+                          // Карточка «Продолжить обучение»
+                          Consumer(
+                            builder: (context, ref, _) {
+                              final nextAsync = ref.watch(
+                                nextLevelToContinueProvider,
                               );
-                            }
-                          } catch (_) {
-                            // Без падения, индикатор скрываем
-                          }
-                        },
-                        child: SingleChildScrollView(
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.s20,
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              // Цитата дня
-                              const HomeQuoteCard(),
-                              const SizedBox(height: AppSpacing.md),
-                              // Карточка «Моя цель»
-                              const HomeGoalCard(),
-                              const SizedBox(height: AppSpacing.s20),
-                              // Карточка «Продолжить обучение»
-                              Consumer(
-                                builder: (context, ref, _) {
-                                  final nextAsync = ref.watch(
-                                    nextLevelToContinueProvider,
-                                  );
-                                  final nextValue = nextAsync.value;
+                              final nextValue = nextAsync.value;
 
-                                  Widget buildCard(Map<String, dynamic> next) {
-                                    final String label =
-                                        (next['label'] as String?) ?? 'Далее';
-                                    final bool isLocked =
-                                        next['isLocked'] as bool? ?? false;
-                                    final int targetScroll =
-                                        next['targetScroll'] as int? ?? 0;
-                                    final int levelNum =
-                                        next['levelNumber'] as int? ?? 0;
-                                    final levelTitle =
-                                        (next['levelTitle'] as String?)
-                                            ?.trim();
-                                    // Подзаголовок: только название уровня без префикса «Уровень N»
-                                    String subtitle;
-                                    if (levelTitle != null &&
-                                        levelTitle.isNotEmpty) {
-                                      // Удаляем возможный префикс «Уровень X: »
-                                      final cleaned = levelTitle.replaceFirst(
-                                        RegExp(
-                                          r'^\s*Уровень\s*\d*\s*:?\s*',
-                                          caseSensitive: false,
-                                        ),
-                                        '',
-                                      );
-                                      subtitle = cleaned.isNotEmpty
-                                          ? cleaned
-                                          : levelTitle;
-                                    } else {
-                                      subtitle = label;
-                                    }
-                                    return HomeContinueCard(
-                                      subtitle: subtitle,
-                                      levelNumber: levelNum,
-                                      onTap: () {
-                                        try {
-                                          Sentry.addBreadcrumb(
-                                            Breadcrumb(
-                                              category: 'ui.tap',
-                                              message:
-                                                  'home_cta_continue_tap',
-                                              level: SentryLevel.info,
-                                            ),
-                                          );
-                                          final int? miniCaseId =
-                                              next['miniCaseId'] as int?;
-                                          if (miniCaseId != null) {
-                                            context.go('/case/$miniCaseId');
-                                            return;
-                                          }
-                                          if (isLocked) {
-                                            context.go(
-                                              '/tower?scrollTo=$targetScroll',
-                                            );
-                                            return;
-                                          }
-                                          final levelNumber =
-                                              next['levelNumber'] as int? ?? 0;
-                                          final levelId =
-                                              next['levelId'] as int? ?? 0;
-                                          context.go(
-                                            '/levels/$levelId?num=$levelNumber',
-                                          );
-                                        } catch (e, st) {
-                                          Sentry.captureException(
-                                            e,
-                                            stackTrace: st,
-                                          );
-                                          NotificationCenter.showError(
-                                            context,
-                                            'Не удалось открыть уровень',
-                                          );
-                                        }
-                                      },
-                                    );
-                                  }
-
-                                  if (nextValue != null) {
-                                    return buildCard(nextValue);
-                                  }
-
-                                  return nextAsync.when(
-                                    data: buildCard,
-                                    loading: () => const Center(
-                                      child: CircularProgressIndicator(),
+                              Widget buildCard(Map<String, dynamic> next) {
+                                final String label =
+                                    (next['label'] as String?) ?? 'Далее';
+                                final bool isLocked =
+                                    next['isLocked'] as bool? ?? false;
+                                final int targetScroll =
+                                    next['targetScroll'] as int? ?? 0;
+                                final int levelNum =
+                                    next['levelNumber'] as int? ?? 0;
+                                final levelTitle =
+                                    (next['levelTitle'] as String?)?.trim();
+                                // Подзаголовок: только название уровня без префикса «Уровень N»
+                                String subtitle;
+                                if (levelTitle != null &&
+                                    levelTitle.isNotEmpty) {
+                                  // Удаляем возможный префикс «Уровень X: »
+                                  final cleaned = levelTitle.replaceFirst(
+                                    RegExp(
+                                      r'^\s*Уровень\s*\d*\s*:?\s*',
+                                      caseSensitive: false,
                                     ),
-                                    error: (error, stack) {
+                                    '',
+                                  );
+                                  subtitle =
+                                      cleaned.isNotEmpty ? cleaned : levelTitle;
+                                } else {
+                                  subtitle = label;
+                                }
+                                return HomeContinueCard(
+                                  subtitle: subtitle,
+                                  levelNumber: levelNum,
+                                  onTap: () {
+                                    try {
+                                      Sentry.addBreadcrumb(
+                                        Breadcrumb(
+                                          category: 'ui.tap',
+                                          message: 'home_cta_continue_tap',
+                                          level: SentryLevel.info,
+                                        ),
+                                      );
+                                      final int? miniCaseId =
+                                          next['miniCaseId'] as int?;
+                                      if (miniCaseId != null) {
+                                        context.go('/case/$miniCaseId');
+                                        return;
+                                      }
+                                      if (isLocked) {
+                                        context.go(
+                                          '/tower?scrollTo=$targetScroll',
+                                        );
+                                        return;
+                                      }
+                                      final levelNumber =
+                                          next['levelNumber'] as int? ?? 0;
+                                      final levelId =
+                                          next['levelId'] as int? ?? 0;
+                                      context.go(
+                                        '/levels/$levelId?num=$levelNumber',
+                                      );
+                                    } catch (e, st) {
                                       Sentry.captureException(
-                                        error,
-                                        stackTrace: stack,
+                                        e,
+                                        stackTrace: st,
                                       );
-                                      return HomeContinueCard(
-                                        subtitle: 'Башня',
-                                        levelNumber: 1,
-                                        onTap: () => context.go('/tower'),
+                                      NotificationCenter.showError(
+                                        context,
+                                        'Не удалось открыть уровень',
                                       );
-                                    },
+                                    }
+                                  },
+                                );
+                              }
+
+                              if (nextValue != null) {
+                                return KeyedSubtree(
+                                  key: CoachMarkTargets.continueCard,
+                                  child: buildCard(nextValue),
+                                );
+                              }
+
+                              return nextAsync.when(
+                                data: (data) => KeyedSubtree(
+                                  key: CoachMarkTargets.continueCard,
+                                  child: buildCard(data),
+                                ),
+                                loading: () => const HomeContinueCardSkeleton(),
+                                error: (error, stack) {
+                                  Sentry.captureException(
+                                    error,
+                                    stackTrace: stack,
+                                  );
+                                  return HomeContinueCard(
+                                    subtitle: 'Башня',
+                                    levelNumber: 1,
+                                    onTap: () => context.go('/tower'),
                                   );
                                 },
-                              ),
-                              const SizedBox(height: AppSpacing.xl),
-                              const _QuickAccessSection(),
-                              AppSpacing.gapH(12),
-                            ],
+                              );
+                            },
                           ),
-                        ),
+                          const SizedBox(height: AppSpacing.xl),
+                          const _QuickAccessSection(),
+                          AppSpacing.gapH(12),
+                        ],
                       ),
                     ),
                   ),
                 ),
-              ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
 
 // Сцена и подписи удалены (задача 33.20)
-
-class _BackgroundLayer extends StatelessWidget {
-  const _BackgroundLayer();
-  @override
-  Widget build(BuildContext context) {
-    // Локальный мягкий градиент фона для Main Street
-    return Container(
-      decoration: const BoxDecoration(
-        // fix: заменить хардкод-градиент на токен AppColor.bgGradient
-        gradient: AppColor.bgGradient,
-      ),
-    );
-  }
-}
-
-// Анимация облаков и интерактивные SVG удалены (задача 33.20)
 
 class _GreetingHeader extends ConsumerWidget {
   @override
@@ -272,9 +271,9 @@ class _GreetingHeader extends ConsumerWidget {
                     user.name,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      height: 1.1,
-                    ),
+                          fontWeight: FontWeight.bold,
+                          height: 1.1,
+                        ),
                   ),
                   AppSpacing.gapH(AppSpacing.xs),
                   FutureBuilder<int>(
@@ -286,8 +285,8 @@ class _GreetingHeader extends ConsumerWidget {
                       return Text(
                         'Уровень $level',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppColor.onSurfaceSubtle,
-                        ),
+                              color: AppColor.onSurfaceSubtle,
+                            ),
                       );
                     },
                   ),
@@ -295,7 +294,7 @@ class _GreetingHeader extends ConsumerWidget {
               ),
             ),
             const SizedBox(width: 12),
-            const TopGpBadge(),
+            TopGpBadge(key: CoachMarkTargets.gpBadge),
           ],
         );
       },
@@ -364,16 +363,18 @@ class _QuickAccessSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final levels = ref.watch(levelsProvider).value ?? const [];
     final collected = levels
-      .where((l) =>
-        ((l['level'] as int? ?? 0) > 0) &&
-        (l['isCompleted'] as bool? ?? false))
-      .length;
+        .where((l) =>
+            ((l['level'] as int? ?? 0) > 0) &&
+            (l['isCompleted'] as bool? ?? false))
+        .length;
     final totalAsync = ref.watch(libraryTotalCountProvider);
+    final double artifactsProgress =
+        (collected / 10).clamp(0.0, 1.0).toDouble();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Title removed per requirement
-          GridView.count(
+        GridView.count(
           crossAxisCount: 2,
           // Уменьшен ratio для достаточной высоты текста
           childAspectRatio: 1.8,
@@ -386,7 +387,7 @@ class _QuickAccessSection extends ConsumerWidget {
               icon: Icons.menu_book,
               title: 'Библиотека',
               subtitle: totalAsync.when(
-                data: (v) => '$v материалов',
+                data: (v) => '$v ресурсов',
                 loading: () => 'Загрузка…',
                 error: (_, __) => 'Материалы',
               ),
@@ -404,7 +405,8 @@ class _QuickAccessSection extends ConsumerWidget {
             _QuickTile(
               icon: Icons.inventory_2_outlined,
               title: 'Артефакты',
-              subtitle: '$collected инструментов',
+              subtitle: '$collected из 10 собрано',
+              progress: artifactsProgress,
               onTap: () {
                 Sentry.addBreadcrumb(
                   Breadcrumb(
@@ -414,25 +416,6 @@ class _QuickAccessSection extends ConsumerWidget {
                   ),
                 );
                 context.go('/artifacts');
-              },
-            ),
-            _QuickTile(
-              icon: Icons.psychology,
-              title: 'Лаборатория идей',
-              subtitle: 'Проверь идею на прочность',
-              onTap: () {
-                Sentry.addBreadcrumb(
-                  Breadcrumb(
-                    category: 'ui.tap',
-                    message: 'home_quick_action_tap:ray',
-                    level: SentryLevel.info,
-                  ),
-                );
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const RayDialogScreen(),
-                  ),
-                );
               },
             ),
           ],
@@ -447,95 +430,84 @@ class _QuickTile extends StatelessWidget {
   final String title;
   final String subtitle;
   final VoidCallback onTap;
+  final double? progress;
   const _QuickTile({
     required this.icon,
     required this.title,
     required this.subtitle,
     required this.onTap,
+    this.progress,
   });
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      label: '$title, $subtitle',
-      button: true,
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: TweenAnimationBuilder<double>(
-          tween: Tween(begin: 1, end: 1),
-          duration: AppAnimations.micro,
-          builder: (context, scale, child) {
-            return Material(
-              color: AppColor.card,
-              borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
-                onTap: onTap,
-                child: AnimatedScale(
-                  scale: scale,
-                  duration: AppAnimations.micro,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
-                      border: Border.all(color: AppColor.border),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: AppColor.shadowSoft,
-                          blurRadius: 12,
-                          offset: Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: AppColor.primary.withValues(alpha: 0.1),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            icon,
-                            size: 20,
-                            color: AppColor.primary,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                subtitle,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                      color: AppColor.onSurfaceSubtle,
-                                    ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: BizLevelCard(
+        semanticsLabel: '$title, $subtitle',
+        onTap: onTap,
+        radius: AppDimensions.radiusLg,
+        padding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 8,
+        ),
+        tonal: true,
+        outlined: true,
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColor.primary.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
               ),
-            );
-          },
+              child: Icon(
+                icon,
+                size: 20,
+                color: AppColor.primary,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColor.onSurfaceSubtle,
+                        ),
+                  ),
+                  if (progress != null) ...[
+                    const SizedBox(height: 6),
+                    ClipRRect(
+                      borderRadius:
+                          BorderRadius.circular(AppDimensions.radiusRound),
+                      child: LinearProgressIndicator(
+                        value: progress,
+                        minHeight: 4,
+                        backgroundColor: AppColor.colorBorder,
+                        valueColor: const AlwaysStoppedAnimation<Color>(
+                          AppColor.colorPrimary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );

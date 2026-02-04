@@ -51,6 +51,13 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
   // _lastNodes удалён
   int? _lastScrolledTo;
 
+  @override
+  void initState() {
+    super.initState();
+    // Открытие экрана — breadcrumb (однократно)
+    _logBreadcrumb('tower_opened');
+  }
+
   void _scheduleAutoscrollTo(int levelNumber) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -77,8 +84,6 @@ class _BizTowerScreenState extends ConsumerState<BizTowerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Открытие экрана — breadcrumb (однократно)
-    _logBreadcrumb('tower_opened');
     return Scaffold(
       appBar: AppBar(
         centerTitle: true,

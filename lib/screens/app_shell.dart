@@ -14,6 +14,11 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:bizlevel/screens/biz_tower_screen.dart';
 import 'package:bizlevel/screens/leo_chat_screen.dart';
+import 'package:bizlevel/utils/hive_box_helper.dart';
+import 'package:bizlevel/widgets/onboarding/coach_mark_targets.dart';
+import 'package:bizlevel/widgets/onboarding/coach_marks_overlay.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'dart:async';
 // Удалил импорт guard, он здесь вреден
 // import 'package:bizlevel/services/level_input_guard.dart';
 
@@ -31,15 +36,54 @@ class _AppShellState extends ConsumerState<AppShell> {
   int _currentIndex = 0;
   bool _isSyncing = false;
   String? _lastLocation;
+  bool _showCoachMarks = false;
+  bool _onboardingChecked = false;
+  bool _isOffline = false;
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadOnboardingFlag();
+    _initConnectivity();
+  }
+
+  Future<void> _loadOnboardingFlag() async {
+    final seen =
+        await HiveBoxHelper.readValue('onboarding', 'hasSeenOnboarding');
+    if (!mounted) return;
+    setState(() {
+      _showCoachMarks = seen != true;
+      _onboardingChecked = true;
+    });
+  }
+
+  Future<void> _initConnectivity() async {
+    try {
+      final connectivity = Connectivity();
+      final result = await connectivity.checkConnectivity();
+      if (!mounted) return;
+      _isOffline = result.contains(ConnectivityResult.none);
+      setState(() {});
+      _connectivitySub?.cancel();
+      _connectivitySub = connectivity.onConnectivityChanged.listen((results) {
+        if (!mounted) return;
+        final offline = results.contains(ConnectivityResult.none);
+        if (offline != _isOffline) {
+          setState(() => _isOffline = offline);
+        }
+      });
+    } catch (_) {}
+  }
+
+  @override
+  void dispose() {
+    _connectivitySub?.cancel();
+    super.dispose();
+  }
 
   void _debugNav(String message, Map<String, Object?> data) {
     assert(() {
-      final tagNeeded = message == 'location_change' ||
-          message == 'tab_tap' ||
-          message == 'tab_anim_complete' ||
-          message == 'tab_go_immediate' ||
-          message == 'page_changed_go' ||
-          message == 'page_changed_ignored';
       debugPrint('[nav] $message ${data.toString()}');
       return true;
     }());
@@ -73,7 +117,7 @@ class _AppShellState extends ConsumerState<AppShell> {
       });
       _lastLocation = location;
     }
-    
+
     final int activeTab = _locationToTab(location);
     final width = MediaQuery.of(context).size.width;
     final bool isDesktop = width >= 1024;
@@ -133,143 +177,240 @@ class _AppShellState extends ConsumerState<AppShell> {
 
     if (!isDesktop && isBaseRoute) {
       _ensureController(activeTab);
-      if (_currentIndex != activeTab && _pageController != null && !_isSyncing) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-             if (mounted && _pageController != null && _pageController!.hasClients) {
-                _isSyncing = true;
-                _pageController!.jumpToPage(activeTab);
-                _currentIndex = activeTab;
-                _isSyncing = false;
-             }
-          });
+      if (_currentIndex != activeTab &&
+          _pageController != null &&
+          !_isSyncing) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted &&
+              _pageController != null &&
+              _pageController!.hasClients) {
+            _isSyncing = true;
+            _pageController!.jumpToPage(activeTab);
+            _currentIndex = activeTab;
+            _isSyncing = false;
+          }
+        });
       }
     } else {
       _pageController = null;
     }
 
-    return Scaffold(
-      bottomNavigationBar: (isDesktop || !isBaseRoute)
-          ? null
-          : Container(
-              height: 75,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: AppColor.glassSurfaceStrong,
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(AppDimensions.radius24),
-                  topRight: Radius.circular(AppDimensions.radius24),
+    return Stack(
+      children: [
+        Scaffold(
+          bottomNavigationBar: isDesktop
+              ? null
+              : Container(
+                  height: 72,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: AppColor.colorSurface,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(AppDimensions.radius24),
+                      topRight: Radius.circular(AppDimensions.radius24),
+                    ),
+                    border: Border.all(color: AppColor.colorBorder),
+                    boxShadow: const [AppEffects.shadowSm],
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.only(
+                      left: AppSpacing.s20,
+                      right: AppSpacing.s20,
+                      bottom: AppSpacing.s10,
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: List.generate(_routes.length, (index) {
+                        final (icon, label) = switch (index) {
+                          0 => (Icons.home, 'Главная'),
+                          1 => (Icons.map, 'Уровни'),
+                          2 => (Icons.smart_toy, 'Менторы'),
+                          _ => (Icons.person, 'Профиль'),
+                        };
+
+                        const inactive = AppColor.colorTextTertiary;
+                        const active = AppColor.colorPrimary;
+
+                        Widget iconWidget;
+                        if (index == 1) {
+                          iconWidget = SvgPicture.asset(
+                            'assets/icons/icon_map.svg',
+                            width: 22,
+                            height: 22,
+                            colorFilter: ColorFilter.mode(
+                              activeTab == index ? active : inactive,
+                              BlendMode.srcIn,
+                            ),
+                          );
+                        } else if (index == 2) {
+                          iconWidget = SvgPicture.asset(
+                            'assets/icons/icon_ai.svg',
+                            width: 22,
+                            height: 22,
+                            colorFilter: ColorFilter.mode(
+                              activeTab == index ? active : inactive,
+                              BlendMode.srcIn,
+                            ),
+                          );
+                        } else {
+                          iconWidget = Icon(
+                            icon,
+                            size: 22,
+                            color: activeTab == index ? active : inactive,
+                          );
+                        }
+
+                        return BottomBarItem(
+                          icon,
+                          key: index == 1
+                              ? CoachMarkTargets.tabLevels
+                              : (index == 2
+                                  ? CoachMarkTargets.tabMentors
+                                  : null),
+                          label: label,
+                          isActive: activeTab == index,
+                          isNotified: index == 2,
+                          onTap: () => goTab(index),
+                          iconBuilder: (_, __, ___) => iconWidget,
+                        );
+                      }),
+                    ),
+                  ),
                 ),
-                border: Border.all(color: AppColor.glassBorder),
-                boxShadow: AppEffects.glassCardShadowSm,
-              ),
-              child: Padding(
-                padding: const EdgeInsets.only(
-                  left: AppSpacing.s25,
-                  right: AppSpacing.s25,
-                  bottom: AppSpacing.s15,
+          body: isDesktop
+              ? Row(
+                  children: [
+                    DesktopNavBar(
+                      tabs: const [
+                        {'icon': Icons.home, 'label': 'Главная'},
+                        {'icon': Icons.map, 'label': 'Уровни'},
+                        {'icon': Icons.smart_toy, 'label': 'Менторы'},
+                        {'icon': Icons.person, 'label': 'Профиль'},
+                      ],
+                      activeIndex: activeTab,
+                      onTabSelected: (index) => context.go(_routes[index]),
+                    ),
+                    const VerticalDivider(width: 1),
+                    Expanded(child: widget.child),
+                  ],
+                )
+              : isBaseRoute
+                  ? PageView(
+                      controller: _pageController,
+                      physics: const NeverScrollableScrollPhysics(),
+                      onPageChanged: (i) {
+                        final currentUri = GoRouter.of(context)
+                            .routeInformationProvider
+                            .value
+                            .uri
+                            .toString();
+                        final isCurrentBase =
+                            _routes.contains(Uri.parse(currentUri).path);
+
+                        if (!isCurrentBase) {
+                          _debugNav('page_changed_ignored', {
+                            'index': i,
+                            'reason': 'not_base_route',
+                            'currentUri': currentUri
+                          });
+                          return;
+                        }
+
+                        _currentIndex = i;
+                        if (_isSyncing) return;
+
+                        try {
+                          HapticFeedback.selectionClick();
+                        } catch (_) {}
+
+                        _debugNav('page_changed_go', {
+                          'index': i,
+                          'target': _routes[i],
+                          'location': location,
+                        });
+                        context.go(_routes[i]);
+                      },
+                      children: const [
+                        MainStreetScreen(key: PageStorageKey('tab_home')),
+                        BizTowerScreen(key: PageStorageKey('tab_tower')),
+                        LeoChatScreen(key: PageStorageKey('tab_trainers')),
+                        ProfileScreen(key: PageStorageKey('tab_profile')),
+                      ],
+                    )
+                  : widget.child,
+        ),
+        if (_isOffline)
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: SafeArea(
+              bottom: false,
+              child: Container(
+                padding: AppSpacing.insetsSymmetric(
+                    h: AppSpacing.lg, v: AppSpacing.s6),
+                decoration: BoxDecoration(
+                  color: AppColor.colorWarningLight,
+                  border: Border(
+                    bottom: BorderSide(
+                        color: AppColor.colorWarning.withValues(alpha: 0.4)),
+                  ),
                 ),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: List.generate(_routes.length, (index) {
-                    final (icon, label) = switch (index) {
-                      0 => (Icons.home, 'Главная'),
-                      1 => (Icons.map, 'Уровни'),
-                      2 => (Icons.smart_toy, 'Менторы'),
-                      _ => (Icons.person, 'Профиль'),
-                    };
-                    
-                    Widget iconWidget;
-                    if (index == 1) {
-                      iconWidget = SvgPicture.asset(
-                        'assets/icons/icon_map.svg',
-                        width: 22, height: 22,
-                        colorFilter: ColorFilter.mode(
-                          activeTab == index ? AppColor.primary : AppColor.onSurfaceSubtle,
-                          BlendMode.srcIn,
-                        ),
-                      );
-                    } else if (index == 2) {
-                      iconWidget = SvgPicture.asset(
-                        'assets/icons/icon_ai.svg',
-                        width: 22, height: 22,
-                        colorFilter: ColorFilter.mode(
-                          activeTab == index ? AppColor.primary : AppColor.onSurfaceSubtle,
-                          BlendMode.srcIn,
-                        ),
-                      );
-                    } else {
-                      iconWidget = Icon(
-                        icon,
-                        size: 22,
-                        color: activeTab == index ? AppColor.primary : AppColor.onSurfaceSubtle,
-                      );
-                    }
-
-                    return BottomBarItem(
-                      icon,
-                      label: label,
-                      isActive: activeTab == index,
-                      onTap: () => goTab(index),
-                      iconBuilder: (_, __, ___) => iconWidget,
-                    );
-                  }),
+                  children: [
+                    const Icon(Icons.wifi_off,
+                        size: 18, color: AppColor.colorWarning),
+                    const SizedBox(width: AppSpacing.s6),
+                    Expanded(
+                      child: Text(
+                        'Нет соединения. Некоторые функции недоступны.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: AppColor.colorTextPrimary,
+                            ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
-      body: isDesktop
-          ? Row(
-              children: [
-                DesktopNavBar(
-                  tabs: const [
-                    {'icon': Icons.home, 'label': 'Главная'},
-                    {'icon': Icons.map, 'label': 'Уровни'},
-                    {'icon': Icons.smart_toy, 'label': 'Менторы'},
-                    {'icon': Icons.person, 'label': 'Профиль'},
-                  ],
-                  activeIndex: activeTab,
-                  onTabSelected: (index) => context.go(_routes[index]),
-                ),
-                const VerticalDivider(width: 1),
-                Expanded(child: widget.child),
-              ],
-            )
-          : isBaseRoute
-              ? PageView(
-                  controller: _pageController,
-                  physics: const NeverScrollableScrollPhysics(),
-                  onPageChanged: (i) {
-                    final currentUri = GoRouter.of(context).routeInformationProvider.value.uri.toString();
-                    final isCurrentBase = _routes.contains(Uri.parse(currentUri).path);
-                    
-                    if (!isCurrentBase) {
-                      _debugNav('page_changed_ignored', {
-                        'index': i,
-                        'reason': 'not_base_route',
-                        'currentUri': currentUri
-                      });
-                      return;
-                    }
-
-                    _currentIndex = i;
-                    if (_isSyncing) return;
-                    
-                    try { HapticFeedback.selectionClick(); } catch (_) {}
-                    
-                    _debugNav('page_changed_go', {
-                      'index': i,
-                      'target': _routes[i],
-                      'location': location,
-                    });
-                    context.go(_routes[i]);
-                  },
-                  children: const [
-                    MainStreetScreen(key: PageStorageKey('tab_home')),
-                    BizTowerScreen(key: PageStorageKey('tab_tower')),
-                    LeoChatScreen(key: PageStorageKey('tab_trainers')),
-                    ProfileScreen(key: PageStorageKey('tab_profile')),
-                  ],
-                )
-              : widget.child,
+          ),
+        if (_onboardingChecked &&
+            _showCoachMarks &&
+            Uri.parse(location).path == '/home')
+          CoachMarksOverlay(
+            steps: [
+              CoachMarkStep(
+                targetKey: CoachMarkTargets.continueCard,
+                title: 'Продолжить обучение',
+                description:
+                    'Быстрый переход к следующему уровню и рекомендациям.',
+              ),
+              CoachMarkStep(
+                targetKey: CoachMarkTargets.tabLevels,
+                title: 'Уровни',
+                description: 'Все этапы обучения и прогресс по Башне.',
+              ),
+              CoachMarkStep(
+                targetKey: CoachMarkTargets.tabMentors,
+                title: 'Менторы',
+                description: 'Чат с Лео, Максом и Рэем — задавайте вопросы.',
+              ),
+              CoachMarkStep(
+                targetKey: CoachMarkTargets.gpBadge,
+                title: 'Баланс GP',
+                description: 'GP тратятся на чаты и открывают новые этажи.',
+              ),
+            ],
+            onFinish: () {
+              setState(() => _showCoachMarks = false);
+              HiveBoxHelper.putDeferred(
+                'onboarding',
+                'hasSeenOnboarding',
+                true,
+              );
+            },
+          ),
+      ],
     );
   }
 }

@@ -37,22 +37,32 @@ class BizLevelButton extends StatelessWidget {
   Size get _minSize {
     switch (size) {
       case BizLevelButtonSize.sm:
-        return const Size(48, 48);
+        return const Size(48, AppDimensions.minTouchTarget);
       case BizLevelButtonSize.md:
-        return const Size(52, 52);
+        return const Size(48, AppDimensions.buttonPrimaryMediumHeight);
       case BizLevelButtonSize.lg:
-        return const Size(56, 56);
+        return const Size(56, AppDimensions.buttonPrimaryLargeHeight);
     }
   }
 
   EdgeInsets get _padding {
     switch (size) {
       case BizLevelButtonSize.sm:
-        return AppSpacing.insetsSymmetric(h: AppSpacing.md, v: AppSpacing.s10);
+        return AppSpacing.insetsSymmetric(h: AppSpacing.lg, v: AppSpacing.sm);
       case BizLevelButtonSize.md:
-        return AppSpacing.insetsSymmetric(h: AppSpacing.lg, v: AppSpacing.md);
+        return AppSpacing.insetsSymmetric(h: AppSpacing.s20, v: AppSpacing.md);
       case BizLevelButtonSize.lg:
-        return AppSpacing.insetsSymmetric(h: AppSpacing.s20, v: AppSpacing.s14);
+        return AppSpacing.insetsSymmetric(h: AppSpacing.xl, v: AppSpacing.s14);
+    }
+  }
+
+  double get _radius {
+    switch (size) {
+      case BizLevelButtonSize.lg:
+        return AppDimensions.radiusL;
+      case BizLevelButtonSize.md:
+      case BizLevelButtonSize.sm:
+        return AppDimensions.radiusM;
     }
   }
 
@@ -100,7 +110,7 @@ class BizLevelButton extends StatelessWidget {
             minimumSize: _minSize,
             padding: _padding,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
+              borderRadius: BorderRadius.circular(_radius),
             ),
           ),
           child: child,
@@ -118,7 +128,7 @@ class BizLevelButton extends StatelessWidget {
             minimumSize: _minSize,
             padding: _padding,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
+              borderRadius: BorderRadius.circular(_radius),
             ),
           ),
           child: child,
@@ -134,7 +144,7 @@ class BizLevelButton extends StatelessWidget {
             side: const BorderSide(color: AppColor.primary),
             foregroundColor: AppColor.primary,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
+              borderRadius: BorderRadius.circular(_radius),
             ),
           ),
           child: child,
@@ -148,6 +158,9 @@ class BizLevelButton extends StatelessWidget {
             minimumSize: _minSize,
             padding: _padding,
             foregroundColor: AppColor.primary,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppDimensions.radiusS),
+            ),
           ),
           child: child,
         );
@@ -160,6 +173,9 @@ class BizLevelButton extends StatelessWidget {
             minimumSize: _minSize,
             padding: _padding,
             foregroundColor: AppColor.primary,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppDimensions.radiusS),
+            ),
             textStyle: const TextStyle(decoration: TextDecoration.underline),
           ),
           child: child,
@@ -175,7 +191,7 @@ class BizLevelButton extends StatelessWidget {
             side: const BorderSide(color: AppColor.borderColor),
             foregroundColor: AppColor.primary,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
+              borderRadius: BorderRadius.circular(_radius),
             ),
             backgroundColor: AppColor.surface,
           ),

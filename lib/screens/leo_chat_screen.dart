@@ -13,6 +13,7 @@ import 'package:bizlevel/theme/color.dart' show AppColor;
 import 'package:bizlevel/providers/auth_provider.dart';
 import 'package:bizlevel/services/context_service.dart';
 import 'package:bizlevel/theme/spacing.dart';
+import 'package:bizlevel/theme/typography.dart';
 
 class LeoChatScreen extends ConsumerStatefulWidget {
   const LeoChatScreen({super.key});
@@ -100,85 +101,104 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.only(top: 10),
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: _chats.length,
-      itemBuilder: (context, index) {
-        final chat = _chats[index];
-        final dt = DateTime.tryParse(chat['updated_at'] as String? ?? '') ??
-            DateTime.now();
-        final formattedDate =
-            '${dt.day.toString().padLeft(2, '0')}.${dt.month.toString().padLeft(2, '0')}';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Недавние чаты',
+          style: AppTypography.headingSection,
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        ListView.builder(
+          padding: const EdgeInsets.only(top: 10),
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: _chats.length,
+          itemBuilder: (context, index) {
+            final chat = _chats[index];
+            final dt = DateTime.tryParse(chat['updated_at'] as String? ?? '') ??
+                DateTime.now();
+            final formattedDate =
+                '${dt.day.toString().padLeft(2, '0')}.${dt.month.toString().padLeft(2, '0')}';
 
-        final String botRaw = (chat['bot'] as String?)?.toLowerCase() ?? 'leo';
-        final String bot = ['leo', 'max', 'ray'].contains(botRaw) ? botRaw : 'leo';
-        final String botLabel =
-            bot == 'max'
+            final String botRaw =
+                (chat['bot'] as String?)?.toLowerCase() ?? 'leo';
+            final String bot =
+                ['leo', 'max', 'ray'].contains(botRaw) ? botRaw : 'leo';
+            final String botLabel = bot == 'max'
                 ? 'Max AI'
                 : bot == 'ray'
                     ? 'Ray AI'
                     : 'Leo AI';
-        final String avatarPath = bot == 'max'
-            ? 'assets/images/avatars/avatar_max.png'
-            : bot == 'ray'
-                ? 'assets/images/avatars/avatar_12.png'
-                : 'assets/images/avatars/avatar_leo.png';
+            final String avatarPath = bot == 'max'
+                ? 'assets/images/avatars/avatar_max.png'
+                : bot == 'ray'
+                    ? 'assets/images/avatars/avatar_12.png'
+                    : 'assets/images/avatars/avatar_leo.png';
+            final Color ringColor = bot == 'max'
+                ? AppColor.success
+                : bot == 'ray'
+                    ? AppColor.premium
+                    : AppColor.info;
 
-        final chatData = {
-          'name': chat['title'] ?? 'Диалог',
-          'last_text': '${chat['message_count']} сообщений',
-          'date': formattedDate,
-          'image': avatarPath,
-          'botLabel': botLabel,
-          'notify': 0,
-        };
-        return ChatItem(
-          chatData,
-          isNotified: false,
-          onTap: () {
-            try {
-              Sentry.addBreadcrumb(Breadcrumb(
-                category: 'chat',
-                level: SentryLevel.info,
-                message: 'chat_opened',
-                data: {
-                  'bot': bot,
-                  'chatId': chat['id']?.toString() ?? '',
-                },
-              ));
-            } catch (_) {}
-            if (bot == 'ray') {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => RayDialogScreen(chatId: chat['id'] as String?),
-                ),
-              );
-              return;
-            }
+            final chatData = {
+              'name': chat['title'] ?? 'Диалог',
+              'last_text': '${chat['message_count']} сообщений',
+              'date': formattedDate,
+              'image': avatarPath,
+              'botLabel': botLabel,
+              'notify': 0,
+              'ringColor': ringColor,
+            };
+            return ChatItem(
+              chatData,
+              isNotified: false,
+              onTap: () {
+                try {
+                  Sentry.addBreadcrumb(Breadcrumb(
+                    category: 'chat',
+                    level: SentryLevel.info,
+                    message: 'chat_opened',
+                    data: {
+                      'bot': bot,
+                      'chatId': chat['id']?.toString() ?? '',
+                    },
+                  ));
+                } catch (_) {}
+                if (bot == 'ray') {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          RayDialogScreen(chatId: chat['id'] as String?),
+                    ),
+                  );
+                  return;
+                }
 
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => FutureBuilder<List<String?>>(
-                    future:
-                        Future.wait([_getUserContext(), _getLevelContext()]),
-                    builder: (context, snap) {
-                      final userCtx =
-                          (snap.data != null) ? snap.data![0] : null;
-                      final lvlCtx = (snap.data != null) ? snap.data![1] : null;
-                      return LeoDialogScreen(
-                        chatId: chat['id'],
-                        userContext: userCtx,
-                        levelContext: lvlCtx,
-                        bot: bot,
-                      );
-                    }),
-              ),
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => FutureBuilder<List<String?>>(
+                        future: Future.wait(
+                            [_getUserContext(), _getLevelContext()]),
+                        builder: (context, snap) {
+                          final userCtx =
+                              (snap.data != null) ? snap.data![0] : null;
+                          final lvlCtx =
+                              (snap.data != null) ? snap.data![1] : null;
+                          return LeoDialogScreen(
+                            chatId: chat['id'],
+                            userContext: userCtx,
+                            levelContext: lvlCtx,
+                            bot: bot,
+                          );
+                        }),
+                  ),
+                );
+              },
             );
           },
-        );
-      },
+        ),
+      ],
     );
   }
 
@@ -223,23 +243,35 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
         {required String bot,
         required String name,
         required String subtitle,
-        required String avatar}) {
+        required String avatar,
+        required Color ringColor,
+        required Color tintColor,
+        required String ctaLabel}) {
       return Padding(
         padding: AppSpacing.insetsSymmetric(v: AppSpacing.s6),
         child: BizLevelCard(
           onTap: () => _onNewChat(bot),
           outlined: true,
           tonal: true,
+          color: tintColor.withValues(alpha: 0.3),
           padding: AppSpacing.insetsAll(AppSpacing.md),
           semanticsLabel: 'Начать чат с $name',
           child: ConstrainedBox(
             constraints: const BoxConstraints(minHeight: 112),
             child: Row(
               children: [
-                CircleAvatar(
-                  radius: 32,
-                  backgroundImage: AssetImage(avatar),
-                  backgroundColor: AppColor.surface.withValues(alpha: 0.0),
+                Container(
+                  width: 72,
+                  height: 72,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: ringColor, width: 3),
+                  ),
+                  child: CircleAvatar(
+                    radius: 36,
+                    backgroundImage: AssetImage(avatar),
+                    backgroundColor: AppColor.surface.withValues(alpha: 0.0),
+                  ),
                 ),
                 AppSpacing.gapW(AppSpacing.md),
                 Expanded(
@@ -267,10 +299,10 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
                       ),
                       AppSpacing.gapH(AppSpacing.sm),
                       Text(
-                        'Начать чат',
+                        ctaLabel,
                         style: Theme.of(context).textTheme.labelLarge?.copyWith(
                               fontWeight: FontWeight.w600,
-                              color: AppColor.primary,
+                              color: ringColor,
                             ),
                       ),
                     ],
@@ -288,20 +320,29 @@ class _LeoChatScreenState extends ConsumerState<LeoChatScreen> {
         buildCard(
           bot: 'leo',
           name: 'Leo AI',
-          subtitle: 'Твой бизнес‑ментор',
+          subtitle: 'Разбери урок или посоветуйся',
           avatar: 'assets/images/avatars/avatar_leo.png',
+          ringColor: AppColor.info,
+          tintColor: AppColor.colorPrimaryLight,
+          ctaLabel: 'Спросить Лео →',
         ),
         buildCard(
           bot: 'max',
           name: 'Max AI',
-          subtitle: 'Твой помощник в достижении цели',
+          subtitle: 'Трекинг цели и навыков',
           avatar: 'assets/images/avatars/avatar_max.png',
+          ringColor: AppColor.success,
+          tintColor: AppColor.backgroundSuccess,
+          ctaLabel: 'Обсудить с Максом →',
         ),
         buildCard(
           bot: 'ray',
           name: 'Ray AI',
-          subtitle: 'Проверь идею на прочность',
+          subtitle: 'Проверь бизнес-идею за 10 минут',
           avatar: 'assets/images/avatars/avatar_12.png',
+          ringColor: AppColor.premium,
+          tintColor: AppColor.premium,
+          ctaLabel: 'Проверить идею →',
         ),
       ],
     );

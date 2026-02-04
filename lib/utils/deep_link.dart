@@ -30,9 +30,11 @@ String? mapBizLevelDeepLink(String link) {
         }
       }
 
-      // Реферальные и промо ссылки ведём на профиль
+      // Реферальные и промо ссылки: если код есть — на регистрацию (для новых) или профиль (для авторизованных)
+      // Фактический роутинг определяется в main.dart на основе авторизации
       if (first == 'ref' || first == 'referral' || first == 'promo') {
-        return '/profile';
+        // Возвращаем специальный путь, который обработается в main.dart
+        return '/register?from_referral=true';
       }
     }
   } catch (_) {

@@ -25,7 +25,6 @@ import 'package:bizlevel/widgets/common/notification_center.dart';
 import 'package:bizlevel/widgets/reminders_settings_sheet.dart';
 import 'package:bizlevel/widgets/common/achievement_badge.dart';
 import 'package:bizlevel/theme/dimensions.dart';
-import 'package:bizlevel/utils/input_bottom_sheet.dart';
 import 'package:bizlevel/services/referral_service.dart';
 import 'package:bizlevel/services/referral_storage.dart';
 import 'package:share_plus/share_plus.dart';
@@ -570,58 +569,24 @@ class _BodyState extends ConsumerState<_Body> {
   // Старый модал артефактов убран — вместо этого ведём на экран /artifacts
 
   Future<void> _openAboutMeModal() async {
-    await showBizLevelInputBottomSheet<void>(
-      context: context,
-      backgroundColor: AppColor.surface,
-      contentPadding: EdgeInsets.zero,
-      builder: (ctx) {
-        return DraggableScrollableSheet(
-          expand: false,
-          minChildSize: 0.4,
-          maxChildSize: 0.92,
-          initialChildSize: 0.66,
-          builder: (context, scrollController) {
-            return Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.lg,
-                    vertical: AppSpacing.sm,
-                  ),
-                  child: Row(
-                    children: [
-                      Text(
-                        'Информация обо мне',
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleMedium
-                            ?.copyWith(fontWeight: FontWeight.w600),
-                      ),
-                      const Spacer(),
-                      // fix: добавить tooltip для IconButton (accessibility)
-                      IconButton(
-                        tooltip: 'Закрыть',
-                        icon: const Icon(Icons.close),
-                        onPressed: () => Navigator.of(context).pop(),
-                      ),
-                    ],
-                  ),
-                ),
-                const Divider(height: 1),
-                Expanded(
-                  child: SingleChildScrollView(
-                    controller: scrollController,
-                    keyboardDismissBehavior:
-                        ScrollViewKeyboardDismissBehavior.onDrag,
-                    padding: const EdgeInsets.all(AppSpacing.lg),
-                    child: _AboutMeCard(user: widget.user),
-                  ),
-                ),
-              ],
-            );
-          },
-        );
-      },
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => Scaffold(
+          appBar: AppBar(
+            title: const Text('Обо мне'),
+            leading: IconButton(
+              tooltip: 'Закрыть',
+              icon: const Icon(Icons.close),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ),
+          body: SingleChildScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            child: _AboutMeCard(user: widget.user),
+          ),
+        ),
+      ),
     );
   }
 
@@ -760,9 +725,8 @@ class _BodyState extends ConsumerState<_Body> {
         ? code!
         : (_referralLoadError != null ? 'Код недоступен' : 'Генерируем код...');
 
-    return BizLevelCard(
+    return BizLevelCard.content(
       padding: AppSpacing.insetsAll(AppSpacing.md),
-      outlined: true,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -936,19 +900,11 @@ class _BodyState extends ConsumerState<_Body> {
                           alignment: Alignment.centerRight,
                           child: FittedBox(
                             fit: BoxFit.scaleDown,
-                            child: OutlinedButton(
+                            child: BizLevelButton(
+                              label: 'Обо мне →',
                               onPressed: _openAboutMeModal,
-                              style: OutlinedButton.styleFrom(
-                                padding: AppSpacing.insetsSymmetric(
-                                    h: AppSpacing.s10, v: AppSpacing.s6),
-                                minimumSize: const Size(0, 0),
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                side: BorderSide(
-                                    color: AppColor.primary
-                                        .withValues(alpha: 0.6)),
-                                foregroundColor: AppColor.primary,
-                              ),
-                              child: const _InfoButtonLabel(),
+                              variant: BizLevelButtonVariant.secondary,
+                              size: BizLevelButtonSize.sm,
                             ),
                           ),
                         ),
@@ -1196,7 +1152,7 @@ class _AboutMeCardState extends ConsumerState<_AboutMeCard> {
           .toList();
 
       final completion = _computeCompletion(viewUser);
-      return BizLevelCard(
+      return BizLevelCard.content(
         semanticsLabel: 'Информация обо мне',
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1468,29 +1424,6 @@ class _AboutMeCardState extends ConsumerState<_AboutMeCard> {
   }
 
   // Компактная двухстрочная надпись для кнопки в шапке
-}
-
-class _InfoButtonLabel extends StatelessWidget {
-  const _InfoButtonLabel();
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        const Text('Информация'),
-        AppSpacing.gapH(AppSpacing.xs),
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('обо мне'),
-            AppSpacing.gapW(AppSpacing.s6),
-            const Icon(Icons.chevron_right, size: 18),
-          ],
-        ),
-      ],
-    );
-  }
 }
 
 class _ChallengesEditor extends StatefulWidget {
