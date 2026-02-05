@@ -17,7 +17,9 @@ class GoalScreen extends ConsumerStatefulWidget {
 
 class _GoalScreenState extends ConsumerState<GoalScreen> {
   // New unified goal controllers (user_goal)
+  final GlobalKey _goalSectionKey = GlobalKey();
   final GlobalKey _journalSectionKey = GlobalKey();
+  bool _forceEditGoal = false;
 
   void _scrollToJournal() {
     final ctx = _journalSectionKey.currentContext;
@@ -76,7 +78,7 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Автопрокрутка к журналу, если указан параметр ?scroll=journal
+                // Автопрокрутка к нужной секции по query param.
                 Builder(builder: (context) {
                   try {
                     final loc = GoRouter.of(context)
@@ -85,9 +87,21 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                         .uri
                         .toString();
                     final uri = Uri.parse(loc);
-                    if (uri.queryParameters['scroll'] == 'journal') {
+                    final scrollTarget = uri.queryParameters['scroll'];
+                    final bool forceEdit =
+                        uri.queryParameters['edit'] == '1';
+                    _forceEditGoal = forceEdit;
+                    if (scrollTarget == 'journal') {
                       WidgetsBinding.instance.addPostFrameCallback((_) {
                         _scrollToJournal();
+                      });
+                    } else if (scrollTarget == 'goal') {
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        final ctx = _goalSectionKey.currentContext;
+                        if (ctx != null) {
+                          Scrollable.ensureVisible(ctx,
+                              duration: AppAnimations.normal);
+                        }
                       });
                     }
                   } catch (_) {}
@@ -100,7 +114,10 @@ class _GoalScreenState extends ConsumerState<GoalScreen> {
                 AppSpacing.gapH(AppSpacing.lg),
 
                 // Моя цель (редактируемая)
-                const GoalCompactCard(),
+                Container(
+                  key: _goalSectionKey,
+                  child: GoalCompactCard(forceEdit: _forceEditGoal),
+                ),
 
                 const SizedBox(height: AppSpacing.s20),
 

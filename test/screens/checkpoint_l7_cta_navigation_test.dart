@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:bizlevel/providers/goals_providers.dart';
-import 'package:bizlevel/screens/checkpoints/checkpoint_l7_screen.dart';
+import 'package:bizlevel/screens/checkpoints/checkpoint_screen.dart';
 
 void main() {
   testWidgets('L7 CTA «Завершить чекпоинт» ведёт в башню', (tester) async {
@@ -30,7 +30,8 @@ void main() {
       routes: [
         GoRoute(
           path: '/',
-          builder: (context, state) => const CheckpointL7Screen(),
+          builder: (context, state) =>
+              const CheckpointScreen(type: CheckpointType.l7),
         ),
         GoRoute(
           path: '/tower',
@@ -53,7 +54,7 @@ void main() {
     await tester.pump(); // первый кадр
     await tester.pump(const Duration(milliseconds: 50));
 
-    await tester.tap(find.text('Завершить чекпоинт →'));
+    await tester.tap(find.text('Позже'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
 

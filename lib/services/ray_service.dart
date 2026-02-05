@@ -357,6 +357,7 @@ class RayService {
         final response = await _postRayChat(payload);
 
         if (response.statusCode == 200 && response.data is Map) {
+          Future.microtask(() => refreshGpBalanceCache());
           return Map<String, dynamic>.from(response.data as Map);
         }
 
@@ -417,6 +418,7 @@ class RayService {
         });
         final response = await _postRayChat(payload);
         if (response.statusCode == 200 && response.data is Map) {
+          Future.microtask(() => refreshGpBalanceCache());
           return Map<String, dynamic>.from(response.data as Map);
         }
         final msg =

@@ -1,5 +1,4 @@
-import 'package:bizlevel/screens/checkpoints/checkpoint_l4_screen.dart';
-import 'package:bizlevel/screens/checkpoints/checkpoint_l7_screen.dart';
+import 'package:bizlevel/screens/checkpoints/checkpoint_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -20,7 +19,10 @@ void main() {
     final router = GoRouter(
       initialLocation: '/',
       routes: [
-        GoRoute(path: '/', builder: (_, __) => const CheckpointL4Screen()),
+        GoRoute(
+          path: '/',
+          builder: (_, __) => const CheckpointScreen(type: CheckpointType.l4),
+        ),
         GoRoute(
           path: '/tower',
           builder: (_, __) => const Scaffold(body: Text('TOWER_SCREEN')),
@@ -42,10 +44,11 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
-    expect(find.text('Чекпоинт: Регулярность'), findsOneWidget);
-    expect(find.text('Завершить чекпоинт →'), findsOneWidget);
+    expect(find.text('Уровень 4'), findsOneWidget);
+    expect(find.text('Перейти в журнал'), findsOneWidget);
+    expect(find.text('Позже'), findsOneWidget);
 
-    await tester.tap(find.text('Завершить чекпоинт →'));
+    await tester.tap(find.text('Позже'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
 
@@ -68,14 +71,16 @@ void main() {
         practiceLogProvider
             .overrideWith((ref) async => const <Map<String, dynamic>>[]),
       ],
-      child: const MaterialApp(home: CheckpointL7Screen()),
+      child: const MaterialApp(
+        home: CheckpointScreen(type: CheckpointType.l7),
+      ),
     ));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
-    expect(find.text('Чекпоинт: Система поддержки'), findsOneWidget);
+    expect(find.text('Уровень 7'), findsOneWidget);
     expect(find.text('Настроить напоминания'), findsOneWidget);
-    expect(find.text('Завершить чекпоинт →'), findsOneWidget);
+    expect(find.text('Позже'), findsOneWidget);
   });
 }
 

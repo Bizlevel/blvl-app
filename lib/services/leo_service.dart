@@ -124,6 +124,19 @@ class LeoService {
     }
   }
 
+  void _refreshBalanceAfterServerSpend(GpService gp, {required String source}) {
+    Future.microtask(() async {
+      try {
+        final fresh = await gp.getBalance();
+        await GpService.saveBalanceCache(fresh);
+        _addBreadcrumb('gp', 'gp_balance_refreshed', {
+          'source': source,
+          'balance_after': fresh['balance'] ?? 0,
+        });
+      } catch (_) {}
+    });
+  }
+
   void _addBreadcrumb(String category, String message,
       [Map<String, dynamic>? data]) {
     try {
@@ -186,6 +199,9 @@ class LeoService {
         if (response.statusCode == 200 &&
             response.data is Map<String, dynamic>) {
           final responseData = Map<String, dynamic>.from(response.data);
+          if (kEnableServerGpSpend) {
+            _refreshBalanceAfterServerSpend(gp, source: 'leo_sendMessage');
+          }
           return responseData;
         } else {
           final message =
@@ -305,6 +321,9 @@ class LeoService {
         if (response.statusCode == 200 &&
             response.data is Map<String, dynamic>) {
           final responseData = Map<String, dynamic>.from(response.data);
+          if (kEnableServerGpSpend && !caseMode) {
+            _refreshBalanceAfterServerSpend(gp, source: 'leo_sendMessageWithRAG');
+          }
           return responseData;
         } else {
           final message =

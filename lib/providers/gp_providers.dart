@@ -25,6 +25,10 @@ final gpBalanceProvider = FutureProvider<Map<String, int>>((ref) async {
         try {
           final fresh = await ref.read(gpServiceProvider).getBalance();
           await GpService.saveBalanceCache(fresh);
+          if (!_balancesEqual(fresh, cached)) {
+            // ignore: unused_result
+            ref.invalidateSelf();
+          }
           // Инвалидация выполняется из мест изменения баланса (списание/покупка/бонус)
         } catch (_) {}
       });
@@ -48,3 +52,9 @@ final gpBalanceProvider = FutureProvider<Map<String, int>>((ref) async {
     return const {'balance': 0, 'total_earned': 0, 'total_spent': 0};
   }
 });
+
+bool _balancesEqual(Map<String, int> a, Map<String, int> b) {
+  return (a['balance'] ?? 0) == (b['balance'] ?? 0) &&
+      (a['total_earned'] ?? 0) == (b['total_earned'] ?? 0) &&
+      (a['total_spent'] ?? 0) == (b['total_spent'] ?? 0);
+}

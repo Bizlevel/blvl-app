@@ -21,9 +21,7 @@ import '../screens/library/library_screen.dart';
 import '../screens/library/library_section_screen.dart';
 import '../screens/notifications_settings_screen.dart';
 import '../screens/artifacts_screen.dart';
-import '../screens/checkpoints/checkpoint_l1_screen.dart';
-import '../screens/checkpoints/checkpoint_l4_screen.dart';
-import '../screens/checkpoints/checkpoint_l7_screen.dart';
+import '../screens/checkpoints/checkpoint_screen.dart';
 import '../services/level_input_guard.dart';
 
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -99,18 +97,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const GoalHistoryScreen(),
       ),
       GoRoute(
-        path: '/checkpoint/l1',
-        builder: (context, state) => const CheckpointL1Screen(),
-      ),
-      GoRoute(
-        path: '/checkpoint/l4',
-        builder: (context, state) => const CheckpointL4Screen(),
-      ),
-      GoRoute(
-        path: '/checkpoint/l7',
-        builder: (context, state) => const CheckpointL7Screen(),
-      ),
-      GoRoute(
         path: '/profile',
         builder: (context, state) => const ProfileScreen(),
       ),
@@ -172,6 +158,21 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/register',
         builder: (context, state) => const RegisterScreen(),
+      ),
+      GoRoute(
+        path: '/checkpoint/l1',
+        builder: (context, state) =>
+            const CheckpointScreen(type: CheckpointType.l1),
+      ),
+      GoRoute(
+        path: '/checkpoint/l4',
+        builder: (context, state) =>
+            const CheckpointScreen(type: CheckpointType.l4),
+      ),
+      GoRoute(
+        path: '/checkpoint/l7',
+        builder: (context, state) =>
+            const CheckpointScreen(type: CheckpointType.l7),
       ),
       // --- ПЕРЕНЕСЕННЫЙ МАРШРУТ ---
       // Теперь он "над" ShellRoute. AppShell не будет перестраиваться при открытии
@@ -251,7 +252,9 @@ final goRouterProvider = Provider<GoRouter>((ref) {
 
         if (state.matchedLocation.startsWith('/goal')) {
           final currentLevel = currentUser?.currentLevel ?? 0;
-          if (currentLevel < 2) {
+          final bool fromCheckpoint =
+              state.uri.queryParameters['from'] == 'checkpoint';
+          if (currentLevel < 2 && !fromCheckpoint) {
             assert(() {
               debugPrint('[redirect] gate_goal currentLevel=$currentLevel -> /home');
               return true;

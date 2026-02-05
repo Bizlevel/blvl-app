@@ -13,6 +13,7 @@ import 'package:bizlevel/theme/spacing.dart';
 import 'package:bizlevel/theme/color.dart';
 import 'package:bizlevel/utils/max_context_helper.dart';
 import 'package:bizlevel/theme/dimensions.dart';
+import 'package:bizlevel/utils/goal_checkpoint_helper.dart';
 
 class PracticeJournalSection extends ConsumerStatefulWidget {
   const PracticeJournalSection({super.key});
@@ -43,7 +44,10 @@ class _PracticeJournalSectionState
   Widget build(BuildContext context) {
     final goal = ref.watch(userGoalProvider).asData?.value;
     final bool hasGoal = goal != null &&
-        ((goal['goal_text'] ?? '').toString().trim().isNotEmpty);
+        (() {
+          final text = (goal['goal_text'] ?? '').toString();
+          return text.trim().isNotEmpty && !isCheckpointGoalPlaceholder(text);
+        })();
     if (!hasGoal) {
       return BizLevelCard(
         padding: AppSpacing.insetsAll(AppSpacing.lg),

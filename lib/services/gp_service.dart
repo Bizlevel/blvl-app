@@ -290,6 +290,7 @@ class GpService {
         final data = await _client.rpc('gp_spend', params: buildSpendParams());
         final parsed = _parseBalanceAfter(data);
         if (parsed != null) {
+          await _cacheBalanceAfter(parsed);
           _bcSpent(type, amount);
           return parsed;
         }
@@ -437,7 +438,9 @@ class GpService {
           options: Options(headers: _edgeHeadersAnonWithUserJwt(session)));
       if (resp.statusCode == 200 && resp.data is Map<String, dynamic>) {
         final m = Map<String, dynamic>.from(resp.data);
-        return (m['balance_after'] as num?)?.toInt() ?? 0;
+        final balance = (m['balance_after'] as num?)?.toInt() ?? 0;
+        await _cacheBalanceAfter(balance);
+        return balance;
       }
       // Попробуем отдать код ошибки от Edge (например: google_purchase_failed, android_package_missing)
       try {
@@ -474,6 +477,7 @@ class GpService {
       });
       final parsed = _parseBalanceAfter(data);
       if (parsed != null) {
+        await _cacheBalanceAfter(parsed);
         _bcFloorUnlocked(floorNumber);
         return parsed;
       }
@@ -514,6 +518,7 @@ class GpService {
       });
       final parsed = _parseBalanceAfter(data);
       if (parsed != null) {
+        await _cacheBalanceAfter(parsed);
         _bcBonusGranted(ruleKey);
         return parsed;
       }
@@ -616,6 +621,18 @@ class GpService {
     } catch (_) {}
   }
 
+  static Future<void> saveBalanceAfter(int balanceAfter) async {
+    try {
+      final cached = readBalanceCache();
+      final data = {
+        'balance': balanceAfter,
+        'total_earned': cached?['total_earned'] ?? 0,
+        'total_spent': cached?['total_spent'] ?? 0,
+      };
+      await saveBalanceCache(data);
+    } catch (_) {}
+  }
+
   static Map<String, int>? readBalanceCache() {
     try {
       final box = Hive.box(_boxName);
@@ -630,5 +647,11 @@ class GpService {
       }
     } catch (_) {}
     return null;
+  }
+
+  Future<void> _cacheBalanceAfter(int balanceAfter) async {
+    try {
+      await GpService.saveBalanceAfter(balanceAfter);
+    } catch (_) {}
   }
 }

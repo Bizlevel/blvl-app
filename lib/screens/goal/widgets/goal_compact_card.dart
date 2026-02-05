@@ -14,9 +14,11 @@ import 'package:bizlevel/utils/date_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bizlevel/models/goal_update.dart';
 import 'package:bizlevel/utils/input_bottom_sheet.dart';
+import 'package:bizlevel/utils/goal_checkpoint_helper.dart';
 
 class GoalCompactCard extends ConsumerStatefulWidget {
-  const GoalCompactCard({super.key});
+  final bool forceEdit;
+  const GoalCompactCard({super.key, this.forceEdit = false});
 
   @override
   ConsumerState<GoalCompactCard> createState() => _GoalCompactCardState();
@@ -29,6 +31,7 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
   final TextEditingController _targetDateCtrl = TextEditingController();
   DateTime? _selectedTargetDate;
   bool _isEditing = false;
+  bool _forceEditHandled = false;
 
   @override
   void dispose() {
@@ -37,6 +40,26 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
     _metricTargetCtrl.dispose();
     _targetDateCtrl.dispose();
     super.dispose();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.forceEdit) {
+      _isEditing = true;
+      _forceEditHandled = true;
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant GoalCompactCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.forceEdit && !_forceEditHandled) {
+      setState(() {
+        _isEditing = true;
+        _forceEditHandled = true;
+      });
+    }
   }
 
   @override
@@ -49,7 +72,9 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
         error: (_, __) => const Text('Не удалось загрузить цель'),
         data: (goal) {
           if (goal != null && !_isEditing) {
-            _goalCtrl.text = (goal['goal_text'] ?? '').toString();
+            final String rawGoal = (goal['goal_text'] ?? '').toString();
+            _goalCtrl.text =
+                isCheckpointGoalPlaceholder(rawGoal) ? '' : rawGoal;
             _metricCurrentCtrl.text = (goal['metric_current'] ?? '').toString();
             _metricTargetCtrl.text = (goal['metric_target'] ?? '').toString();
             final String td = (goal['target_date'] ?? '').toString();
@@ -78,7 +103,8 @@ class _GoalCompactCardState extends ConsumerState<GoalCompactCard> {
           } catch (_) {}
 
           final String goalText = (goal?['goal_text'] ?? '').toString();
-          final bool isEmpty = goalText.trim().isEmpty;
+          final bool isEmpty = goalText.trim().isEmpty ||
+              isCheckpointGoalPlaceholder(goalText);
           if (isEmpty && !_isEditing) {
             return _buildEmptyState(context);
           }

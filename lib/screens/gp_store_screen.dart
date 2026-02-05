@@ -657,6 +657,7 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
       token: receipt,
       transactionId: transaction.transactionId,
     );
+    await GpService.saveBalanceAfter(balance);
 
     // Важно: завершаем StoreKit2 транзакцию только ПОСЛЕ успешной доставки (начисления GP).
     // Иначе при сетевых сбоях можно потерять возможность повторно обработать покупку.
@@ -797,6 +798,7 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
           rethrow;
         }
       }
+      await GpService.saveBalanceAfter(balance);
       try {
         await Sentry.addBreadcrumb(Breadcrumb(
           message: 'gp_verify_success',
@@ -846,6 +848,7 @@ class _GpStoreScreenState extends ConsumerState<GpStoreScreen> {
     if (isMock && purchaseId.isNotEmpty) {
       try {
         final balance = await gp.verifyPurchase(purchaseId: purchaseId);
+        await GpService.saveBalanceAfter(balance);
         if (!context.mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -918,6 +921,7 @@ Future<void> _verifyLastPurchase(BuildContext context) async {
     ));
     final gp = GpService(Supabase.instance.client);
     final balance = await gp.verifyPurchase(purchaseId: lastId);
+    await GpService.saveBalanceAfter(balance);
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Покупка подтверждена, баланс: $balance')),

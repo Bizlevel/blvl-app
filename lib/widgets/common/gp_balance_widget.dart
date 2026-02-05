@@ -58,8 +58,11 @@ class _GpBalanceWidgetState extends ConsumerState<GpBalanceWidget> {
   @override
   Widget build(BuildContext context) {
     final gpAsync = ref.watch(gpBalanceProvider);
-    final balance = gpAsync.value?['balance'] ?? 0;
-    _maybeShowZeroDialog(context, balance);
+    final map = gpAsync.asData?.value;
+    final balance = map?['balance'] ?? 0;
+    if (gpAsync.asData != null) {
+      _maybeShowZeroDialog(context, balance);
+    }
 
     const height = 32.0;
 

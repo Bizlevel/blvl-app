@@ -32,7 +32,7 @@ class RayDialogScreen extends ConsumerStatefulWidget {
 }
 
 class _RayDialogScreenState extends ConsumerState<RayDialogScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   static const int maxSteps = 7;
   static const List<String> _slotOrder = [
     'product',
@@ -74,6 +74,7 @@ class _RayDialogScreenState extends ConsumerState<RayDialogScreen>
   bool _scoring = false;
   final bool _isAnalyzing = false;
   bool _showScrollToBottom = false;
+  double _lastViewInsetsBottom = 0.0;
 
   String? _chatId;
   String? _validationId;
@@ -99,6 +100,7 @@ class _RayDialogScreenState extends ConsumerState<RayDialogScreen>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _focusPulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 900),
@@ -131,11 +133,34 @@ class _RayDialogScreenState extends ConsumerState<RayDialogScreen>
   @override
   void dispose() {
     _debounceTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     _focusPulseController.dispose();
     _controller.dispose();
     _scroll.dispose();
     _inputFocus.dispose();
     super.dispose();
+  }
+
+  double _currentViewInsetsBottom() {
+    final views = WidgetsBinding.instance.platformDispatcher.views;
+    if (views.isEmpty) return 0.0;
+    final view = views.first;
+    final bottom = view.viewInsets.bottom;
+    final dpr = view.devicePixelRatio;
+    if (dpr == 0) return 0.0;
+    return bottom / dpr;
+  }
+
+  @override
+  void didChangeMetrics() {
+    final nextBottom = _currentViewInsetsBottom();
+    if (nextBottom != _lastViewInsetsBottom) {
+      _lastViewInsetsBottom = nextBottom;
+      if (nextBottom > 0) {
+        _scrollToBottom();
+      }
+    }
+    super.didChangeMetrics();
   }
 
   Future<void> _bootstrap() async {

@@ -30,6 +30,7 @@ import 'package:bizlevel/utils/custom_modal_route.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bizlevel/services/context_service.dart';
 import 'package:bizlevel/services/level_input_guard.dart';
+import 'package:bizlevel/widgets/common/discuss_bubble.dart';
 
 /// Shows a level as full-screen blocks (Intro → Lesson → Quiz → …).
 class LevelDetailScreen extends ConsumerStatefulWidget {
@@ -308,7 +309,10 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
           Positioned(
             right: AppSpacing.lg,
             bottom: _floatingDiscussBottom(context),
-            child: _buildDiscussPill(context),
+            child: DiscussBubble.leo(
+              onTap: () => _openDiscussSheet(context),
+              pulse: (widget.levelNumber ?? -1) == 1 && _currentIndex <= 3,
+            ),
           ),
       ],
     );
@@ -445,65 +449,6 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
     final safe = MediaQuery.of(context).padding.bottom;
     // Увеличен отступ, чтобы FAB не перекрывал кнопку "Повторить" в квизе
     return AppDimensions.buttonPrimaryLargeHeight + safe + AppSpacing.lg * 3 + 16;
-  }
-
-  Widget _buildDiscussPill(BuildContext context) {
-    final bool shouldPulse =
-        (widget.levelNumber ?? -1) == 1 && _currentIndex <= 3;
-    final Widget pill = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: AppColor.colorSurface,
-        borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
-        border: Border.all(color: AppColor.colorPrimary),
-        boxShadow: [
-          BoxShadow(
-            color: AppColor.colorPrimary.withValues(alpha: 0.2),
-            blurRadius: 12,
-            spreadRadius: 1,
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const CircleAvatar(
-            radius: 12,
-            backgroundImage: AssetImage('assets/images/avatars/avatar_leo.png'),
-            backgroundColor: Colors.transparent,
-          ),
-          const SizedBox(width: 8),
-          Text(
-            'Обсудить с Лео',
-            style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: AppColor.colorPrimary,
-                  fontWeight: FontWeight.w600,
-                ),
-          ),
-        ],
-      ),
-    );
-
-    final Widget button = Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
-        onTap: () => _openDiscussSheet(context),
-        child: pill,
-      ),
-    );
-
-    if (!shouldPulse) return button;
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 1.0, end: 1.05),
-      duration: const Duration(milliseconds: 1000),
-      curve: Curves.easeInOut,
-      builder: (context, value, child) => Transform.scale(
-        scale: value,
-        child: child,
-      ),
-      child: button,
-    );
   }
 
   Widget _buildBottomCta(

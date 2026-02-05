@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'auth_provider.dart';
 import 'goals_repository_provider.dart';
 import 'levels_provider.dart';
+import 'package:bizlevel/utils/goal_checkpoint_helper.dart';
 
 // Удалены провайдеры legacy версий/weekly
 
@@ -149,8 +150,9 @@ final practiceLogAggregatesProvider =
 
 final goalStateProvider = FutureProvider<Map<String, dynamic>>((ref) async {
   final goal = await ref.watch(userGoalProvider.future);
-  final bool l1Done =
-      goal != null && (goal['goal_text'] ?? '').toString().trim().isNotEmpty;
+  final String goalText = (goal?['goal_text'] ?? '').toString();
+  final bool l1Done = goal != null &&
+      (goalText.trim().isNotEmpty || isCheckpointGoalPlaceholder(goalText));
 
   final bool l4Done = goal != null &&
       (goal['financial_focus'] ?? '').toString().trim().isNotEmpty;

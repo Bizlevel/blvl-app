@@ -11,7 +11,9 @@ import 'package:bizlevel/theme/color.dart';
 
 /// Common content for configuring practice reminders (time + weekdays)
 class RemindersSettingsContent extends ConsumerStatefulWidget {
-  const RemindersSettingsContent({super.key});
+  final VoidCallback? onLater;
+  final VoidCallback? onSaved;
+  const RemindersSettingsContent({super.key, this.onLater, this.onSaved});
 
   @override
   ConsumerState<RemindersSettingsContent> createState() =>
@@ -182,6 +184,32 @@ class _RemindersSettingsContentState
                 : const Text('Сохранить'),
           ),
         ),
+        if (widget.onLater != null) ...[
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(
+              onPressed: _saving
+                  ? null
+                  : () {
+                      try {
+                        Sentry.addBreadcrumb(
+                          Breadcrumb(
+                            category: 'notif.ui',
+                            message: 'reminders_later',
+                            level: SentryLevel.info,
+                          ),
+                        );
+                      } catch (_) {}
+                      if (Navigator.of(context).canPop()) {
+                        Navigator.of(context).pop();
+                      }
+                      widget.onLater?.call();
+                    },
+              child: const Text('Настроить позже'),
+            ),
+          ),
+        ],
         const SizedBox(height: 16),
         const _ReminderStatus(),
       ],
@@ -253,6 +281,7 @@ class _RemindersSettingsContentState
         ),
       );
       Navigator.of(context).maybePop();
+      widget.onSaved?.call();
     } catch (error) {
       setState(() {
         if (error is NotificationsPermissionDenied) {
@@ -273,7 +302,11 @@ class _RemindersSettingsContentState
   }
 }
 
-Future<void> showRemindersSettingsSheet(BuildContext context) async {
+Future<void> showRemindersSettingsSheet(
+  BuildContext context, {
+  VoidCallback? onLater,
+  VoidCallback? onSaved,
+}) async {
   try {
     Sentry.addBreadcrumb(
       Breadcrumb(
@@ -286,7 +319,10 @@ Future<void> showRemindersSettingsSheet(BuildContext context) async {
   await showBizLevelInputBottomSheet<void>(
     context: context,
     showDragHandle: true,
-    builder: (ctx) => const RemindersSettingsContent(),
+    builder: (ctx) => RemindersSettingsContent(
+      onLater: onLater,
+      onSaved: onSaved,
+    ),
   );
 }
 

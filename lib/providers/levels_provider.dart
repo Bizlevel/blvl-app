@@ -4,6 +4,7 @@ import 'package:bizlevel/providers/levels_repository_provider.dart';
 import 'package:bizlevel/providers/auth_provider.dart';
 import 'package:bizlevel/utils/formatters.dart';
 import 'package:bizlevel/services/supabase_service.dart';
+import 'package:bizlevel/utils/goal_checkpoint_helper.dart';
 // import 'package:hive_flutter/hive_flutter.dart';
 // import 'package:bizlevel/providers/goals_providers.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -390,8 +391,9 @@ final towerNodesProvider =
         // Чекпоинт L1 считается завершенным только если:
         // 1. Уровень 1 завершен
         // 2. И есть goal_text в user_goal
-        final hasGoalText =
-            ((userGoal?['goal_text'] ?? '').toString().trim().isNotEmpty);
+        final String goalText = (userGoal?['goal_text'] ?? '').toString();
+        final bool hasGoalText = goalText.trim().isNotEmpty ||
+            isCheckpointGoalPlaceholder(goalText);
         completed = levelCompleted && hasGoalText;
       } else if (num == 4) {
         // Чекпоинт L4 считается завершенным только если:

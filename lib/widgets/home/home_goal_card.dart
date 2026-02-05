@@ -14,6 +14,7 @@ import 'package:intl/intl.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:bizlevel/utils/max_context_helper.dart';
 import 'package:bizlevel/utils/custom_modal_route.dart';
+import 'package:bizlevel/utils/goal_checkpoint_helper.dart';
 
 class HomeGoalCard extends ConsumerWidget {
   const HomeGoalCard({super.key});
@@ -56,7 +57,8 @@ class HomeGoalCard extends ConsumerWidget {
       targetDate = td == null ? null : DateTime.tryParse(td)?.toLocal();
     } catch (_) {}
 
-    final bool isEmpty = goalText.trim().isEmpty;
+    final bool isEmpty = goalText.trim().isEmpty ||
+        isCheckpointGoalPlaceholder(goalText);
     if (isEmpty) {
       return _buildEmptyState(context);
     }

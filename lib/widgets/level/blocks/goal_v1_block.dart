@@ -6,16 +6,13 @@ import 'package:go_router/go_router.dart';
 import 'package:bizlevel/widgets/common/bizlevel_button.dart';
 import 'package:bizlevel/widgets/level/blocks/level_page_block.dart';
 import 'package:bizlevel/providers/goals_providers.dart';
+import 'package:bizlevel/utils/goal_checkpoint_helper.dart';
 
 class GoalV1Block extends LevelPageBlock {
   final VoidCallback onSaved;
   GoalV1Block({required this.onSaved});
   @override
   Widget build(BuildContext context, int index) {
-    final TextEditingController goalInitialCtrl = TextEditingController();
-    final TextEditingController goalWhyCtrl = TextEditingController();
-    final TextEditingController mainObstacleCtrl = TextEditingController();
-
     return Consumer(builder: (context, ref, _) {
       // Проверяем наличие сохраненной цели через userGoalProvider
       final goalAsync = ref.watch(userGoalProvider);
@@ -25,8 +22,11 @@ class GoalV1Block extends LevelPageBlock {
         error: (e, __) => Center(child: Text('Ошибка загрузки цели: $e')),
         data: (goal) {
           // Проверяем, есть ли сохраненная цель
+          final String goalText =
+              (goal?['goal_text'] as String? ?? '').toString();
           final bool hasGoal = goal != null &&
-              (goal['goal_text'] as String? ?? '').trim().isNotEmpty;
+              goalText.trim().isNotEmpty &&
+              !isCheckpointGoalPlaceholder(goalText);
 
           return SingleChildScrollView(
             padding:
@@ -58,8 +58,7 @@ class GoalV1Block extends LevelPageBlock {
                           onPressed: () async {
                             // Используем /checkpoint/l1 для сохранения цели во время прохождения Уровня 1
                             // (так как /goal недоступен до завершения уровня из-за гейтинга)
-                            final result = await GoRouter.of(context)
-                                .push('/checkpoint/l1');
+                            await GoRouter.of(context).push('/checkpoint/l1');
                             // После возврата проверяем, была ли сохранена цель
                             // result будет true если цель была сохранена, или проверяем БД
                             // Инвалидируем провайдер для обновления данных
@@ -69,10 +68,11 @@ class GoalV1Block extends LevelPageBlock {
                               final updatedGoal =
                                   await ref.read(userGoalProvider.future);
                               if (updatedGoal != null) {
-                                final goalText =
+                                final updatedText =
                                     (updatedGoal['goal_text'] as String? ?? '')
                                         .trim();
-                                if (goalText.isNotEmpty) {
+                                if (updatedText.isNotEmpty &&
+                                    !isCheckpointGoalPlaceholder(updatedText)) {
                                   onSaved();
                                 }
                               }

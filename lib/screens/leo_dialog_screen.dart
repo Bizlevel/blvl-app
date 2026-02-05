@@ -82,7 +82,8 @@ class LeoDialogScreen extends ConsumerStatefulWidget {
   ConsumerState<LeoDialogScreen> createState() => _LeoDialogScreenState();
 }
 
-class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
+class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen>
+    with WidgetsBindingObserver {
   static const _pageSize = 30;
 
   String? _chatId;
@@ -123,6 +124,8 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
   Timer? _chipsDebounceTimer;
   static const Duration _chipsDebounceDelay = Duration(milliseconds: 1000);
 
+  double _lastViewInsetsBottom = 0.0;
+
   /// Защита от "случайного" закрытия экрана на iOS при попытке сфокусировать TextField
   /// (наблюдалось как резкий pop → возврат на /tower).
   /// Для mini-case запрещаем системный pop, оставляем только явную кнопку закрытия.
@@ -131,6 +134,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _leo = ref.read(leoServiceProvider);
     // Лимиты сообщений отключены (этап 39.1)
     _chatId = widget.chatId;
@@ -231,6 +235,7 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
   void dispose() {
     _debounceTimer?.cancel();
     _chipsDebounceTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     assert(() {
       debugPrint(
           'LEO_DIALOG dispose caseMode=${widget.caseMode} chatId=$_chatId');
@@ -240,6 +245,28 @@ class _LeoDialogScreenState extends ConsumerState<LeoDialogScreen> {
     _inputController.dispose();
     _inputFocus.dispose();
     super.dispose();
+  }
+
+  double _currentViewInsetsBottom() {
+    final views = WidgetsBinding.instance.platformDispatcher.views;
+    if (views.isEmpty) return 0.0;
+    final view = views.first;
+    final bottom = view.viewInsets.bottom;
+    final dpr = view.devicePixelRatio;
+    if (dpr == 0) return 0.0;
+    return bottom / dpr;
+  }
+
+  @override
+  void didChangeMetrics() {
+    final nextBottom = _currentViewInsetsBottom();
+    if (nextBottom != _lastViewInsetsBottom) {
+      _lastViewInsetsBottom = nextBottom;
+      if (nextBottom > 0) {
+        _scrollToBottom();
+      }
+    }
+    super.didChangeMetrics();
   }
 
   // Лимиты сообщений отключены — метод удалён

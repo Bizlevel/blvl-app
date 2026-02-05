@@ -829,7 +829,6 @@
 - `test/screens/checkpoint_l4_l7_buttons_test.dart`: widget/integration тест экранов: `checkpoint_l4_l7_buttons_test.dart`
 - `test/screens/checkpoint_l7_cta_navigation_test.dart`: widget/integration тест экранов: `checkpoint_l7_cta_navigation_test.dart`
 - `test/screens/checkpoint_l7_integration_test.dart`: widget/integration тест экранов: `checkpoint_l7_integration_test.dart`
-- `test/screens/checkpoint_l7_screen_test.dart`: widget/integration тест экранов: `checkpoint_l7_screen_test.dart`
 - `test/screens/checkpoints_l4_l7_dialog_flow_test.dart`: widget/integration тест экранов: `checkpoints_l4_l7_dialog_flow_test.dart`
 - `test/screens/goal_practice_aggregates_test.dart`: widget/integration тест экранов: `goal_practice_aggregates_test.dart`
 - `test/screens/goal_screen_top_tools_test.dart`: widget/integration тест экранов: `goal_screen_top_tools_test.dart`
@@ -1190,9 +1189,7 @@
 - `lib/screens/auth/onboarding_video_screen.dart`: **deprecated stub** (видео‑онбординг удалён из навигации; исходники перенесены в `docs/archive/`).
 - `lib/screens/auth/register_screen.dart`: экран регистрации.
 - `lib/screens/biz_tower_screen.dart`: экран «Башня» (рендер узлов уровней/кейсов/чекпоинтов, автоскролл, гейтинг этажей/GP).
-- `lib/screens/checkpoints/checkpoint_l1_screen.dart`: чекпоинт L1 (встраиваемый Макс, настройка цели).
-- `lib/screens/checkpoints/checkpoint_l4_screen.dart`: чекпоинт L4 (финансовый акцент цели).
-- `lib/screens/checkpoints/checkpoint_l7_screen.dart`: чекпоинт L7 (проверка реалистичности/темпа).
+- `lib/screens/checkpoints/checkpoint_screen.dart`: единый экран чекпоинтов L1/L4/L7 (Max bubble, CTA, контент по типу).
 - `lib/screens/goal/controller/goal_screen_controller.dart`: **legacy/не используется** (контроллер/логика старой версии GoalScreen).
 - `lib/screens/goal/widgets/checkin_form.dart`: **legacy/не используется** (форма чек‑ина старой версии).
 - `lib/screens/goal/widgets/goal_compact_card.dart`: компактная карточка цели (для списков/превью).

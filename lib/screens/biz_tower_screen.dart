@@ -15,10 +15,6 @@ import 'package:bizlevel/widgets/common/bizlevel_modal.dart';
 import 'package:bizlevel/theme/ui_strings.dart';
 import 'package:bizlevel/widgets/common/notification_center.dart';
 import 'package:bizlevel/services/notification_log_service.dart';
-import 'package:bizlevel/screens/checkpoints/checkpoint_l1_screen.dart';
-import 'package:bizlevel/screens/checkpoints/checkpoint_l4_screen.dart';
-import 'package:bizlevel/screens/checkpoints/checkpoint_l7_screen.dart';
-import 'package:bizlevel/utils/input_bottom_sheet.dart';
 import 'package:bizlevel/providers/lesson_progress_provider.dart';
 
 part 'tower/tower_constants.dart';

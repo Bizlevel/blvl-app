@@ -1,0 +1,50 @@
+Вы — AI‑ассистент для проекта BizLevel.
+
+## Язык и формат ответов
+- Всегда отвечай на русском языке.
+- Будь кратким и структурированным; для итогов используй списки и подзаголовки.
+
+## Контекст проекта (миграция)
+- Текущий клиент: Flutter/Dart (`lib/**`).
+- Backend: Supabase (Postgres + RLS + RPC + Edge Functions + Storage) — **нельзя менять**.
+- Видео: Bunny HLS (и/или Supabase Storage signed URLs) — **нельзя менять**.
+- Результаты аудита/планирования сохраняй в `docs/migration/**`.
+- Опорные документы:
+  - `docs/migration/supabase-schema.md`
+  - `docs/migration/edge-functions.md`
+  - `docs/migration/flutter-architecture.md`
+  - `docs/migration/feature-map.md`
+  - `docs/migration/ai-coding-approaches.md`
+  - `docs/migration/migration-plan.md`
+
+## Безопасность
+- Никогда не коммить/не вставляй в документы значения секретов (JWT, service role key, cron secret, API keys). Допустимы только имена переменных (`SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET` и т.п.).
+
+## Общие инженерные стандарты
+- Предпочитай композицию наследованию.
+- Используй понятные имена переменных.
+- Добавляй комментарии только для нетривиальной логики (гейтинг, идемпотентность, гонки, оффлайн‑fallback).
+- Держи изменения маленькими и проверяемыми; не смешивай рефакторинг и фичу в одном изменении.
+
+## Flutter/Dart (когда правим `lib/**/*.dart`)
+- Следуй существующим паттернам Riverpod/GoRouter:
+  - навигационный гейтинг и редиректы — только в роутере/redirect, не в `build()`.
+  - избегай тяжёлых операций на cold start (Hive.openBox, permissions, OneSignal init).
+- Для Storage:
+  - если путь начинается с `http` — не пытайся делать signed URL;
+  - иначе получай signed URL через Supabase Storage bucket (`video`, `level-covers`, `artifacts`).
+- Для GP:
+  - уважай флаги `kEnableServerGpSpend` и `kDisableGpSpendInChat`;
+  - используй идемпотентные ключи там, где уже есть паттерн (сообщения/покупки/разблокировки).
+
+## TypeScript/React (для нового клиента переписывания)
+- Пиши современный TypeScript и React hooks.
+- Данные:
+  - предпочитай TanStack Query (SWR/инвалидации/ретраи) вместо самописных кешей;
+  - генерируй TS типы из Supabase схемы и используй их как source‑of‑truth;
+  - Edge Functions оборачивай в типизированный клиент + Zod runtime‑валидацию response.
+- Навигация:
+  - предпочитай file‑based routing + typed routes (например, Expo Router).
+- Ошибки:
+  - используй единый тип `AppError` и мапперы из Supabase/HTTP/IAP.
+
