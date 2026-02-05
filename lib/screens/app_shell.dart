@@ -18,6 +18,9 @@ import 'package:bizlevel/utils/hive_box_helper.dart';
 import 'package:bizlevel/widgets/onboarding/coach_mark_targets.dart';
 import 'package:bizlevel/widgets/onboarding/coach_marks_overlay.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:bizlevel/providers/auth_provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:bizlevel/models/user_model.dart';
 import 'dart:async';
 // Удалил импорт guard, он здесь вреден
 // import 'package:bizlevel/services/level_input_guard.dart';
@@ -44,18 +47,40 @@ class _AppShellState extends ConsumerState<AppShell> {
   @override
   void initState() {
     super.initState();
-    _loadOnboardingFlag();
+    _refreshOnboardingState(ref.read(currentUserProvider));
+    ref.listen<AsyncValue<UserModel?>>(currentUserProvider, (_, next) {
+      _refreshOnboardingState(next);
+    });
     _initConnectivity();
   }
 
-  Future<void> _loadOnboardingFlag() async {
-    final seen =
-        await HiveBoxHelper.readValue('onboarding', 'hasSeenOnboarding');
+  Future<void> _refreshOnboardingState(
+    AsyncValue<UserModel?> userAsync,
+  ) async {
+    final authUser = Supabase.instance.client.auth.currentUser;
+    if (authUser == null) {
+      if (!mounted) return;
+      setState(() {
+        _showCoachMarks = false;
+        _onboardingChecked = true;
+      });
+      return;
+    }
+
+    final user = userAsync.asData?.value;
+    final String userId = user?.id ?? authUser.id;
+    final String localKey = 'hasSeenOnboarding_$userId';
+    final seen = await HiveBoxHelper.readValue('onboarding', localKey);
+    final bool serverCompleted = user?.onboardingCompleted ?? false;
+    final bool shouldShow = !(seen == true) && !serverCompleted;
     if (!mounted) return;
     setState(() {
-      _showCoachMarks = seen != true;
+      _showCoachMarks = shouldShow;
       _onboardingChecked = true;
     });
+    if (serverCompleted && seen != true) {
+      HiveBoxHelper.putDeferred('onboarding', localKey, true);
+    }
   }
 
   Future<void> _initConnectivity() async {
@@ -403,9 +428,12 @@ class _AppShellState extends ConsumerState<AppShell> {
             ],
             onFinish: () {
               setState(() => _showCoachMarks = false);
+              final authUser = Supabase.instance.client.auth.currentUser;
+              if (authUser == null) return;
+              final localKey = 'hasSeenOnboarding_${authUser.id}';
               HiveBoxHelper.putDeferred(
                 'onboarding',
-                'hasSeenOnboarding',
+                localKey,
                 true,
               );
             },
