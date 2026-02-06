@@ -1108,7 +1108,14 @@ class _AboutMeCardState extends ConsumerState<_AboutMeCard> {
       }
       // Обновляем профиль без полной инвалидации, чтобы избежать редиректа
       ref.invalidate(currentUserProvider);
-      setState(() => _editing = false);
+      // После успешного сохранения возвращаем пользователя на предыдущий экран,
+      // если это возможно (например, модальный экран «Обо мне»).
+      // В противном случае просто выходим из режима редактирования как раньше.
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      } else {
+        setState(() => _editing = false);
+      }
     } catch (e) {
       try {
         Sentry.addBreadcrumb(Breadcrumb(
