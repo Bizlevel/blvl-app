@@ -87,8 +87,9 @@ class _CoachMarksOverlayState extends State<CoachMarksOverlay> {
                 child: Container(
                   decoration: BoxDecoration(
                     border: Border.all(
-                      color: AppColor.colorPrimary,
-                      width: 2,
+                      // Более яркий жёлтый бордер для лучшего акцента
+                      color: AppColor.colorWarning,
+                      width: 3,
                     ),
                     borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
                   ),
@@ -131,34 +132,46 @@ class _CoachMarksOverlayState extends State<CoachMarksOverlay> {
                           ),
                     ),
                     AppSpacing.gapH(AppSpacing.sm),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          '${_index + 1}/${widget.steps.length}',
-                          style:
-                              Theme.of(context).textTheme.labelSmall?.copyWith(
+                    // Используем Stack, чтобы счётчик шагов был строго по центру,
+                    // независимо от ширины кнопок слева и справа.
+                    SizedBox(
+                      height: 32,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          // Ряд с кнопками по краям
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              TextButton(
+                                onPressed: widget.onFinish,
+                                child: const Text('Пропустить'),
+                              ),
+                              TextButton(
+                                onPressed: _next,
+                                child: Text(
+                                  _index >= widget.steps.length - 1
+                                      ? 'Готово'
+                                      : 'Далее',
+                                ),
+                              ),
+                            ],
+                          ),
+                          // Центрированный счётчик 1/4
+                          Align(
+                            alignment: Alignment.center,
+                            child: Text(
+                              '${_index + 1}/${widget.steps.length}',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .labelSmall
+                                  ?.copyWith(
                                     color: AppColor.colorTextSecondary,
                                   ),
-                        ),
-                        Row(
-                          children: [
-                            TextButton(
-                              onPressed: widget.onFinish,
-                              child: const Text('Пропустить'),
                             ),
-                            const SizedBox(width: AppSpacing.s6),
-                            ElevatedButton(
-                              onPressed: _next,
-                              child: Text(
-                                _index >= widget.steps.length - 1
-                                    ? 'Готово'
-                                    : 'Далее',
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
