@@ -41,6 +41,108 @@ class ProfileScreen extends ConsumerStatefulWidget {
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   bool _profileOpenedLogged = false;
 
+  Future<void> _openSupportModal(BuildContext context) async {
+    final controller = TextEditingController();
+    await showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: AppColor.surface,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return DraggableScrollableSheet(
+          expand: false,
+          minChildSize: 0.4,
+          maxChildSize: 0.92,
+          initialChildSize: 0.7,
+          builder: (context, scrollController) {
+            return Padding(
+              padding: MediaQuery.of(context).viewInsets,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.lg,
+                      vertical: AppSpacing.sm,
+                    ),
+                    child: Row(
+                      children: [
+                        Text(
+                          'Связаться с поддержкой',
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                        const Spacer(),
+                        IconButton(
+                          tooltip: 'Закрыть',
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.of(ctx).pop(),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      controller: scrollController,
+                      padding: AppSpacing.insetsAll(AppSpacing.lg),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Опишите, с чем вам нужна помощь. Мы постараемся ответить как можно скорее.',
+                          ),
+                          AppSpacing.gapH(AppSpacing.md),
+                          BizLevelTextField(
+                            label: 'Сообщение',
+                            hint: 'Напишите ваш вопрос или опишите проблему',
+                            controller: controller,
+                            minLines: 4,
+                            maxLines: 6,
+                            textInputAction: TextInputAction.newline,
+                          ),
+                          AppSpacing.gapH(AppSpacing.lg),
+                          SizedBox(
+                            width: double.infinity,
+                            child: BizLevelButton(
+                              label: 'Отправить',
+                              onPressed: () {
+                                final text = controller.text.trim();
+                                if (text.isEmpty) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content:
+                                          Text('Пожалуйста, опишите ваш вопрос'),
+                                    ),
+                                  );
+                                  return;
+                                }
+                                // TODO: интегрировать реальную отправку обращения в поддержку.
+                                Navigator.of(ctx).pop();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                        'Сообщение отправлено в поддержку'),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Сначала проверяем состояние аутентификации
@@ -234,6 +336,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         // push() сохраняет возможность вернуться назад на профиль.
                         context.push('/gp-store');
                         break;
+                      case 'support':
+                        await _openSupportModal(context);
+                        break;
                       case 'logout':
                         try {
                           Sentry.addBreadcrumb(Breadcrumb(
@@ -302,6 +407,31 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           ),
                           AppSpacing.gapW(AppSpacing.s10),
                           const Text('Платежи'),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'support',
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(AppSpacing.s6),
+                            decoration: const BoxDecoration(
+                              color: AppColor.teal,
+                              shape: BoxShape.circle,
+                            ),
+                            child: SvgPicture.asset(
+                              'assets/icons/chat.svg',
+                              colorFilter: const ColorFilter.mode(
+                                AppColor.onPrimary,
+                                BlendMode.srcIn,
+                              ),
+                              width: 18,
+                              height: 18,
+                            ),
+                          ),
+                          AppSpacing.gapW(AppSpacing.s10),
+                          const Text('Связаться с поддержкой'),
                         ],
                       ),
                     ),
