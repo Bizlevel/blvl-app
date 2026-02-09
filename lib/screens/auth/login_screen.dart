@@ -27,7 +27,6 @@ class LoginScreen extends HookConsumerWidget {
     final loginState = ref.watch(loginControllerProvider);
     final isLoading = loginState.isLoading;
     final obscurePassword = useState<bool>(true);
-    final agreed = useState<bool>(false);
 
     // Читаем query-параметр registered из GoRouter
     final registered =
@@ -58,11 +57,6 @@ class LoginScreen extends HookConsumerWidget {
     });
 
     Future<void> submit() async {
-      if (!agreed.value) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Подтвердите согласие с условиями')));
-        return;
-      }
       final email = emailController.text.trim();
       final password = passwordController.text;
       if (email.isEmpty || password.isEmpty) {
@@ -204,8 +198,6 @@ class LoginScreen extends HookConsumerWidget {
                         ),
                         AppSpacing.gapH(AppSpacing.lg),
                         _AgreementRow(
-                          checked: agreed.value,
-                          onChanged: (v) => agreed.value = v,
                           onOpen: () => _openAgreement(context),
                         ),
                         AppSpacing.gapH(AppSpacing.xl),
@@ -386,12 +378,15 @@ class _OrDivider extends StatelessWidget {
 }
 
 class _AgreementRow extends StatelessWidget {
-  final bool checked;
-  final ValueChanged<bool> onChanged;
+  /// На экране логина чекбокс убран и строка носит информационный характер.
+  /// На экране регистрации этот же виджет продолжает использоваться
+  /// с обязательным чекбоксом.
+  final bool? checked;
+  final ValueChanged<bool>? onChanged;
   final VoidCallback onOpen;
   const _AgreementRow({
-    required this.checked,
-    required this.onChanged,
+    this.checked,
+    this.onChanged,
     required this.onOpen,
   });
 
@@ -400,10 +395,11 @@ class _AgreementRow extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Checkbox(
-          value: checked,
-          onChanged: (v) => onChanged(v ?? false),
-        ),
+        if (checked != null && onChanged != null)
+          Checkbox(
+            value: checked,
+            onChanged: (v) => onChanged!(v ?? false),
+          ),
         Expanded(
           child: GestureDetector(
             onTap: onOpen,
@@ -414,9 +410,9 @@ class _AgreementRow extends StatelessWidget {
                     .bodySmall
                     ?.copyWith(color: AppColor.onSurfaceSubtle),
                 children: [
-                  const TextSpan(text: 'Я принимаю '),
+                  const TextSpan(text: 'Я ознакомился(ась) и принимаю '),
                   TextSpan(
-                    text: 'Пользовательское соглашение',
+                    text: 'Условия использования BizLevel',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: AppColor.primary,
                           decoration: TextDecoration.underline,

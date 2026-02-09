@@ -520,7 +520,7 @@ class _AgreementRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Checkbox(
           value: checked,
@@ -536,9 +536,9 @@ class _AgreementRow extends StatelessWidget {
                     .bodySmall
                     ?.copyWith(color: AppColor.onSurfaceSubtle),
                 children: [
-                  const TextSpan(text: 'Я принимаю '),
+                  const TextSpan(text: 'Я ознакомился(ась) и принимаю '),
                   TextSpan(
-                    text: 'Пользовательское соглашение',
+                    text: 'Условия использования BizLevel',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: AppColor.primary,
                           decoration: TextDecoration.underline,
