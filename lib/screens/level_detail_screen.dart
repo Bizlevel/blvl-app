@@ -233,7 +233,12 @@ class _LevelDetailScreenState extends ConsumerState<LevelDetailScreen> {
   Widget _buildOverlays(BuildContext context, Widget mainContent) {
     return Stack(
       children: [
-        mainContent,
+        // Сдвигаем основное содержимое вниз, чтобы прогресс‑бар и заголовок
+        // не перекрывали видео/контент первого блока.
+        Padding(
+          padding: const EdgeInsets.only(top: 36),
+          child: mainContent,
+        ),
         Positioned(
           top: 0,
           left: 0,
