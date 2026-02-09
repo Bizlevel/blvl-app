@@ -1,6 +1,7 @@
 import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -429,7 +430,7 @@ class _AgreementRow extends StatelessWidget {
 }
 
 Future<void> _openAgreement(BuildContext context) async {
-  final uri = Uri.parse('https://www.bizlevel.kz/privacy');
+  final uri = Uri.parse('https://bizlevel.kz/terms');
   await showModalBottomSheet(
     context: context,
     showDragHandle: true,
@@ -472,26 +473,39 @@ Future<void> _openAgreement(BuildContext context) async {
                   padding: AppSpacing.insetsAll(AppSpacing.lg),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Полный текст соглашения доступен по ссылке. Нажмите кнопку ниже, чтобы открыть документ.',
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodySmall
-                            ?.copyWith(color: AppColor.onSurfaceSubtle),
-                      ),
-                      AppSpacing.gapH(AppSpacing.lg),
-                      BizLevelButton(
-                        label: 'Открыть документ',
-                        onPressed: () async {
-                          if (await canLaunchUrl(uri)) {
-                            await launchUrl(
-                              uri,
-                              mode: LaunchMode.inAppWebView,
-                            );
-                          }
-                        },
-                      ),
+                      children: [
+                        RichText(
+                          text: TextSpan(
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(color: AppColor.onSurfaceSubtle),
+                            children: [
+                              const TextSpan(
+                                  text:
+                                      'Полный текст соглашения доступен на нашем сайте: '),
+                              TextSpan(
+                                text: 'https://bizlevel.kz/terms',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(
+                                      color: AppColor.primary,
+                                      decoration: TextDecoration.underline,
+                                    ),
+                                recognizer: TapGestureRecognizer()
+                                  ..onTap = () async {
+                                    if (await canLaunchUrl(uri)) {
+                                      await launchUrl(
+                                        uri,
+                                        mode: LaunchMode.inAppWebView,
+                                      );
+                                    }
+                                  },
+                              ),
+                            ],
+                          ),
+                        ),
                     ],
                   ),
                 ),
