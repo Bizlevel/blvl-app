@@ -153,7 +153,7 @@ class LoginScreen extends HookConsumerWidget {
                     ),
                     child: Column(
                       children: [
-                        // Логотип без внешнего кольца: чистый белый круг и увеличенный логотип
+                        // Логотип BizLevel (light) — растровая версия
                         Container(
                           width: 224,
                           height: 224,
@@ -162,8 +162,8 @@ class LoginScreen extends HookConsumerWidget {
                             shape: BoxShape.circle,
                           ),
                           alignment: Alignment.center,
-                          child: SvgPicture.asset(
-                            'assets/images/logo_light.svg',
+                          child: Image.asset(
+                            'assets/images/logo_light.png',
                             width: 176,
                             height: 176,
                           ),

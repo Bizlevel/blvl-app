@@ -200,8 +200,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   Widget _buildRegistrationForm() {
     return Column(
       children: [
-        SvgPicture.asset(
-          'assets/images/logo_light.svg',
+        Image.asset(
+          'assets/images/logo_light.png',
           width: 176,
           height: 176,
         ),
@@ -359,8 +359,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   Widget _buildSuccessView() {
     return Column(
       children: [
-        SvgPicture.asset(
-          'assets/images/logo_light.svg',
+        Image.asset(
+          'assets/images/logo_light.png',
           width: 176,
           height: 176,
         ),
